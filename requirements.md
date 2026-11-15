@@ -24,6 +24,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   contained the ARM64 app and backend source, and opened to the Dashboard
   on that Mac. GitHub Actions run [43714250108](https://github.com/arpit-it/ALMG/actions/runs/43714250108)
   completed successfully after a push to `main` and published this prerelease.
+  A local ARM64 package built with an explicit backend file list passed its
+  SHA-256 check, contained exactly the eight expected backend files, and
+  opened to the Dashboard after extraction.
 - [x] Test a fresh installation on an Apple silicon Mac. Follow the documented Python setup, register the backend, download and verify the checkpoint, send a chat message, and confirm that history survives a relaunch.
   The isolated Mac build reached Chat with setup required and showed a live
   transfer rate of 24.8 MB/s beside checkpoint progress in Settings. In a fresh
