@@ -138,6 +138,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac app ran one opt-in retry from validation errors using a local
   Qwen fixture and reported a separate held-out score. The saved dataset
   included the novel retry example and rejected the punctuation variant. A
+  second Mac run reached preview with held-out macro F1 of 0.245 and kept
+  the novel example while rejecting a variant of a removed duplicate. A
   full run through release and reload with this retry enabled remains open.
 
 ## P2 · Improve chat and project work

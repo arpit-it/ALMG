@@ -228,7 +228,8 @@ def train(rows, labels, target, repair=None, report=None):
     """Compare classifiers, optionally repair the dataset, and evaluate on held-out data."""
     if report:
         report("Removing duplicate examples and creating training, validation, and test splits.")
-    counts = Counter(" ".join(row["text"].casefold().split()) for row in rows)
+    original_texts = [row["text"] for row in rows]
+    counts = Counter(" ".join(text.casefold().split()) for text in original_texts)
     distinct = [(row, group) for row, group in zip(rows, classifier_split_groups(rows))
                 if counts[" ".join(row["text"].casefold().split())] == 1]
     rows = [row for row, _ in distinct]
@@ -298,8 +299,8 @@ def train(rows, labels, target, repair=None, report=None):
             repaired = repair(mistakes[:12]) if mistakes else []
         except (OSError, ValueError, TypeError, KeyError) as error:
             repair_error = str(error)
-        known = {" ".join(text.casefold().split()) for text in x}
-        known_variants = {classifier_variant_key(text) for text in x}
+        known = {" ".join(text.casefold().split()) for text in original_texts}
+        known_variants = {classifier_variant_key(text) for text in original_texts}
         for row in repaired:
             key = " ".join(row["text"].casefold().split())
             words = classifier_variant_key(key)
