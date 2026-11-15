@@ -148,7 +148,20 @@ class _StudioPageState extends State<StudioPage> {
   @override
   void initState() {
     super.initState();
-    _loadProjects();
+    if (widget.initialModel case final String id) {
+      _loadModel(id);
+    } else {
+      _loadProjects();
+    }
+  }
+
+  Future<void> _loadModel(String id) async {
+    try {
+      final job = await _request('/jobs/$id');
+      if (mounted) _openSession(job);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _loadProjects() async {
@@ -159,14 +172,7 @@ class _StudioPageState extends State<StudioPage> {
         () => _projects = (response['projects'] as List)
             .cast<Map<String, dynamic>>(),
       );
-      if (widget.initialModel case final String id) {
-        final job = await _request('/jobs/$id');
-        if (!mounted) return;
-        if (job['project_id'] case final String projectId) {
-          await _selectProject(projectId);
-        }
-        if (mounted) _openSession(job);
-      } else if (_projects.isNotEmpty) {
+      if (_projects.isNotEmpty) {
         await _selectProject(_projects.first['id'] as String);
       }
     } catch (error) {
@@ -327,6 +333,21 @@ class _StudioPageState extends State<StudioPage> {
   /// Shows the training conversation beside the live model creation panel.
   @override
   Widget build(BuildContext context) {
+    if (widget.initialModel != null) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Run Model')),
+        body: Center(
+          child: ConstrainedBox(
+            constraints: const BoxConstraints(maxWidth: 760),
+            child: _job == null
+                ? _error == null
+                    ? const CircularProgressIndicator()
+                    : SelectableText(_error!)
+                : _modelProgress(),
+          ),
+        ),
+      );
+    }
     final conversation = _trainingChat();
     final progress = _modelProgress();
     return Scaffold(
