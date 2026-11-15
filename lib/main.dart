@@ -33,8 +33,162 @@ class ModelStudio extends StatelessWidget {
 }
 
 /// Provides a launch point for the three ALMG workspaces.
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  final _client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+  late Future<Map<String, dynamic>> _dashboard = _load();
+
+  Future<Map<String, dynamic>> _load() async {
+    final request = await _client.getUrl(
+      Uri.parse('http://127.0.0.1:8766/dashboard'),
+    );
+    request.headers.set('X-Model-Studio', 'desktop');
+    final response = await request.close().timeout(const Duration(seconds: 8));
+    final data = jsonDecode(
+      await response.transform(utf8.decoder).join(),
+    ) as Map<String, dynamic>;
+    if (response.statusCode != 200) {
+      throw const FormatException('Could not load dashboard.');
+    }
+    return data;
+  }
+
+  Future<void> _open(Widget page) async {
+    await Navigator.of(context)
+        .push(MaterialPageRoute<void>(builder: (_) => page));
+    if (mounted) setState(() => _dashboard = _load());
+  }
+
+  @override
+  void dispose() {
+    _client.close(force: true);
+    super.dispose();
+  }
+
+  Widget _activity() => FutureBuilder<Map<String, dynamic>>(
+    future: _dashboard,
+    builder: (context, snapshot) {
+      if (snapshot.hasError) {
+        return const Text(
+          'Could not load projects and chats. Check the local backend and refresh.',
+        );
+      }
+      if (!snapshot.hasData) return const LinearProgressIndicator();
+      final projects = snapshot.data!['projects'] as List;
+      final chats = snapshot.data!['chats'] as List;
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Projects', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 8),
+          if (projects.isEmpty) const Text('No projects yet.'),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final columns = constraints.maxWidth >= 620
+                  ? 3
+                  : constraints.maxWidth >= 380
+                  ? 2
+                  : 1;
+              return GridView.builder(
+                shrinkWrap: true,
+                primary: false,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: columns,
+                  mainAxisExtent: 155,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                ),
+                itemCount: projects.length,
+                itemBuilder: (context, index) {
+                  final project = projects[index] as Map;
+                  final model = project['model'] as Map?;
+                  final status = switch (model?['status']) {
+                    'passed' => 'Released',
+                    'preview_ready' => 'Ready for preview',
+                    'approval' ||
+                    'image_candidates' ||
+                    'dataset_ready' => 'Awaiting approval',
+                    'waiting_idle' => 'Waiting for idle time',
+                    'clarification' => 'Waiting for details',
+                    'failed' => 'Failed',
+                    final String value => value.replaceAll('_', ' '),
+                    _ => 'No training sessions',
+                  };
+                  return Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _open(
+                        StudioPage(initialProject: project['id'] as String),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(14),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Icon(Icons.folder_outlined),
+                            const SizedBox(height: 4),
+                            Text(
+                              project['name'] as String,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: Theme.of(context).textTheme.titleMedium,
+                            ),
+                            if (model != null)
+                              Text(
+                                model['name'] as String,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            const Spacer(),
+                            Text(
+                              status,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+          const SizedBox(height: 20),
+          Text('Recent chats', style: Theme.of(context).textTheme.titleLarge),
+          if (chats.isEmpty) const Text('No saved chats yet.'),
+          for (final chat in chats)
+            ListTile(
+              leading: const Icon(Icons.chat_bubble_outline),
+              title: Text(
+                chat['title'] as String,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                chat['project_name'] as String? ?? 'Personal chats',
+              ),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => _open(
+                ChatPage(
+                  trainingPage: const StudioPage(),
+                  modelLibraryPage: const ModelLibraryPage(),
+                  initialProject: chat['project_id'] as String?,
+                  initialChat: chat['id'] as String,
+                ),
+              ),
+            ),
+        ],
+      );
+    },
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -62,7 +216,16 @@ class DashboardPage extends StatelessWidget {
       ),
     ];
     return Scaffold(
-      appBar: AppBar(title: const Text('ALMG')),
+      appBar: AppBar(
+        title: const Text('ALMG'),
+        actions: [
+          IconButton(
+            tooltip: 'Refresh dashboard',
+            icon: const Icon(Icons.refresh),
+            onPressed: () => setState(() => _dashboard = _load()),
+          ),
+        ],
+      ),
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 760),
@@ -86,11 +249,11 @@ class DashboardPage extends StatelessWidget {
                     title: Text(title),
                     subtitle: Text(description),
                     trailing: const Icon(Icons.chevron_right),
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute<void>(builder: (_) => destination),
-                    ),
+                    onTap: () => _open(destination),
                   ),
                 ),
+              const SizedBox(height: 24),
+              _activity(),
             ],
           ),
         ),
@@ -240,7 +403,9 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
 /// Presents the workflow for planning and training a text classifier.
 class StudioPage extends StatefulWidget {
   /// Creates the classifier training page.
-  const StudioPage({super.key, this.initialModel});
+  const StudioPage({super.key, this.initialModel, this.initialProject});
+
+  final String? initialProject;
 
   final String? initialModel;
 
@@ -298,7 +463,9 @@ class _StudioPageState extends State<StudioPage> {
             .cast<Map<String, dynamic>>(),
       );
       if (_projects.isNotEmpty) {
-        await _selectProject(_projects.first['id'] as String);
+        await _selectProject(
+          widget.initialProject ?? _projects.first['id'] as String,
+        );
       }
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
@@ -465,8 +632,8 @@ class _StudioPageState extends State<StudioPage> {
             constraints: const BoxConstraints(maxWidth: 760),
             child: _job == null
                 ? _error == null
-                    ? const CircularProgressIndicator()
-                    : SelectableText(_error!)
+                      ? const CircularProgressIndicator()
+                      : SelectableText(_error!)
                 : _modelProgress(),
           ),
         ),
@@ -579,7 +746,9 @@ class _StudioPageState extends State<StudioPage> {
                   'Create a project in Chat to begin a training conversation.',
                 ),
               if (_job == null)
-                const Text('Describe what the model should do and give an example of its input and output.'),
+                const Text(
+                  'Describe what the model should do and give an example of its input and output.',
+                ),
               for (final (speaker, message) in _conversation)
                 _message(speaker, message),
               if (_job?['planner_message'] case final String explanation)
@@ -645,7 +814,8 @@ class _StudioPageState extends State<StudioPage> {
   Future<void> _sendGoal() async {
     final text = _prompt.text.trim();
     if (text.length < 5) return;
-    final previous = {'approval', 'clarification', 'preview_ready'}.contains(_job?['status'])
+    final previous =
+        {'approval', 'clarification', 'preview_ready'}.contains(_job?['status'])
         ? (_job!['prompt'] as String?)
         : null;
     final goal = previous == null
@@ -745,7 +915,11 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (job?['error'] case final String error) SelectableText(error),
         if (plan != null)
-          Text(_imageRecipe ? 'Workflow: Text to image' : 'Workflow: Text classification'),
+          Text(
+            _imageRecipe
+                ? 'Workflow: Text to image'
+                : 'Workflow: Text classification',
+          ),
         if (plan != null && !_imageRecipe) ...[
           const SizedBox(height: 16),
           Text('Labels: ${(plan['labels'] as List).join(', ')}'),

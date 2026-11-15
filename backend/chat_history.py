@@ -69,6 +69,16 @@ def list_chats(project_id=None, query=""):
         """, (project_id, query, query, query))]
 
 
+def recent_chats():
+    """List recent conversations across projects and personal chats."""
+    with closing(connect()) as db:
+        return [dict(row) for row in db.execute("""
+            SELECT chats.id, chats.title, chats.project_id, projects.name AS project_name
+            FROM chats LEFT JOIN projects ON chats.project_id = projects.id
+            ORDER BY chats.updated DESC, chats.id LIMIT 30
+        """)]
+
+
 def list_projects():
     """List projects in alphabetical order."""
     with closing(connect()) as db:

@@ -595,6 +595,23 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as error:
                 return self.respond({"error": str(error)}, 404)
         route = urlsplit(self.path)
+        if route.path == "/dashboard":
+            projects = chat_history.list_projects()
+            with LOCK:
+                latest = {}
+                for job in JOBS.values():
+                    project_id = job.get("project_id")
+                    activity_log = job.get("activity") or []
+                    timestamp = activity_log[-1]["timestamp"] if activity_log else 0
+                    if project_id not in latest or timestamp >= latest[project_id][0]:
+                        latest[project_id] = timestamp, job
+                cards = [
+                    {"id": project["id"], "name": project["name"],
+                     "model": {"name": job["prompt"], "status": job["status"]} if job else None}
+                    for project in projects
+                    for _, job in [latest.get(project["id"], (0, None))]
+                ]
+            return self.respond({"projects": cards, "chats": chat_history.recent_chats()})
         if route.path == "/chats":
             params = parse_qs(route.query)
             project_id = params.get("project_id", [None])[0]
