@@ -25,6 +25,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   on that Mac. GitHub Actions run [43714250108](https://github.com/arpit-it/ALMG/actions/runs/43714250108)
   completed successfully after a push to `main` and published this prerelease.
 - [ ] Test a fresh installation on an Apple silicon Mac. Follow the documented Python setup, register the backend, download and verify the checkpoint, send a chat message, and confirm that history survives a relaunch.
+  The isolated Mac build reached Chat with setup required and showed a live
+  transfer rate of 24.8 MB/s beside checkpoint progress in Settings.
 - [ ] Document signing and notarization requirements for public distribution. Verify the downloaded app opens on a clean Mac.
 - [ ] Add automated checks for pull requests. Run Flutter analysis, widget tests, and offline Python tests. Cover the macOS stop and restart flow, interrupted replies, attachment persistence, and checkpoint download recovery.
 

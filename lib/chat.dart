@@ -63,6 +63,9 @@ class _ChatPageState extends State<ChatPage> {
   bool _recall = true;
   bool _checking = false;
   bool _backendOffline = false;
+  final _downloadClock = Stopwatch()..start();
+  int? _downloadSampleMs;
+  double? _downloadBytesPerSecond;
   bool _runtimeStopped = false;
   bool _stoppingRuntime = false;
   bool _restartingBackend = false;
@@ -229,6 +232,22 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted) return;
       final reconnecting = _backendOffline;
       setState(() {
+        final now = _downloadClock.elapsedMilliseconds;
+        final previousMs = _downloadSampleMs;
+        final previousBytes = _model?['downloaded_bytes'] as num?;
+        final currentBytes = model['downloaded_bytes'] as num?;
+        final transferring = model['phase'] == 'downloading';
+        _downloadBytesPerSecond =
+            transferring &&
+                !reconnecting &&
+                previousMs != null &&
+                now > previousMs &&
+                previousBytes != null &&
+                currentBytes != null &&
+                currentBytes >= previousBytes
+            ? (currentBytes - previousBytes) * 1000 / (now - previousMs)
+            : null;
+        _downloadSampleMs = transferring ? now : null;
         _model = model;
         _backendOffline = false;
         if (reconnecting) _error = null;
@@ -1732,6 +1751,10 @@ class _ChatPageState extends State<ChatPage> {
                       '${model?['completed_files']} of ${model?['total_files']} files on disk',
                     ),
                   ],
+                  if (!_backendOffline &&
+                      phase == 'downloading' &&
+                      _downloadBytesPerSecond != null)
+                    Text('${_size(_downloadBytesPerSecond!)}/s'),
                   if (model?['error'] case final String error)
                     Text(error, style: TextStyle(color: colors.error)),
                 ],
