@@ -172,18 +172,21 @@ def collect(job):
 def synthesize(job):
     """Generate labeled training examples with the local model."""
     rows = []
+    requested = job["plan"].get("synthetic_examples_per_label", 40)
+    batches = (requested + 19) // 20
     for label in job["plan"]["labels"]:
-        for batch in range(2):
-            activity(job, f"Qwen is generating {label} examples, batch {batch + 1} of 2. "
+        for batch in range(batches):
+            batch_size = min(20, requested - batch * 20)
+            activity(job, f"Qwen is generating {label} examples, batch {batch + 1} of {batches}. "
                      f"{len(rows)} examples collected so far.")
             result = ask(
-                'Generate 20 distinct, realistic synthetic text inputs belonging to the given label. '
+                f'Generate {batch_size} distinct, realistic synthetic text inputs belonging to the given label. '
                 'Vary vocabulary and scenarios. Do not print labels or personal information in the '
                 'examples. Return {"examples":["..."]}.',
                 {"goal": job["prompt"], "labels": job["plan"]["labels"], "label": label,
                  "variation_batch": batch, "previous": [r["text"] for r in rows if r["label"] == label]},
             )
-            for example in result.get("examples", [])[:20]:
+            for example in result.get("examples", [])[:batch_size]:
                 if isinstance(example, str) and 10 <= len(example.strip()) <= 600:
                     value = example.strip()
                     rows.append({"text": value, "label": label, "source": "synthetic",
@@ -805,6 +808,13 @@ class Handler(BaseHTTPRequestHandler):
                     if job is None:
                         raise ValueError("Training task not found.")
                     status = job["status"]
+                    if action == "edit-dataset-size" and status == "approval" and job.get("recipe") == "classifier":
+                        count = data.get("examples_per_label")
+                        if type(count) is not int or not 10 <= count <= 40:
+                            raise ValueError("Enter 10 to 40 examples per label.")
+                        job["plan"] = {**job["plan"], "synthetic_examples_per_label": count}
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     if action == "edit-labels" and status == "approval" and job.get("recipe") == "classifier":
                         labels = data.get("labels")
                         if (not isinstance(labels, list)

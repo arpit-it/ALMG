@@ -725,6 +725,43 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _editDatasetSize(String id, int current) async {
+    var input = current.toString();
+    final count = await showDialog<int>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Local dataset size'),
+        content: TextFormField(
+          initialValue: input,
+          keyboardType: TextInputType.number,
+          decoration: const InputDecoration(
+            labelText: 'Examples per label (10–40)',
+          ),
+          onChanged: (value) => input = value,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = int.tryParse(input.trim());
+              if (value == null || value < 10 || value > 40) return;
+              Navigator.pop(context, value);
+            },
+            child: const Text('Save'),
+          ),
+        ],
+      ),
+    );
+    if (count != null && mounted) {
+      await _submit('/jobs/$id/edit-dataset-size', {
+        'examples_per_label': count,
+      });
+    }
+  }
+
   Future<void> _submit(String path, Map<String, dynamic> body) async {
     setState(() {
       _error = null;
@@ -1092,6 +1129,18 @@ class _StudioPageState extends State<StudioPage> {
               'ALMG will render 45 local examples of circles, squares, and triangles in five colors. Some color and shape combinations are held out for evaluation.',
             )
           else ...[
+            TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () => _editDatasetSize(
+                      id as String,
+                      plan['synthetic_examples_per_label'] as int? ?? 40,
+                    ),
+              icon: const Icon(Icons.edit_outlined),
+              label: Text(
+                'Local examples per label: ${plan['synthetic_examples_per_label'] ?? 40}',
+              ),
+            ),
             const Text(
               'Web collection sends these queries to Brave Search. Local generation uses Qwen on this device.',
             ),
