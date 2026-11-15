@@ -73,7 +73,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   the dataset preview and left training awaiting separate approval. This test
   used a local search response. The rebuilt Mac app showed the exact query,
   Brave Search as the destination, and how ALMG uses excerpts and records
-  source URLs before approval. Live collection remains to be verified.
+  source URLs before approval. In the isolated Mac app, approving a search
+  without a Brave API key showed the configuration error and kept dataset
+  approval pending, with local generation and CSV import still available.
+  Live collection remains to be verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing

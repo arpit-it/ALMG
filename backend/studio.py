@@ -1038,6 +1038,8 @@ class Handler(BaseHTTPRequestHandler):
                         if mode == "web" and (not job["plan"]["queries"]
                                               or data.get("approved_queries") != job["plan"]["queries"]):
                             raise ValueError("Approve the exact search queries first.")
+                        if mode == "web" and not os.environ.get("BRAVE_SEARCH_API_KEY"):
+                            raise ValueError("Set BRAVE_SEARCH_API_KEY on the Python backend to use web search.")
                         job.update(status="creating_dataset", mode=mode)
                         worker = (prepare_dataset, (job,))
                     elif action == "cancel" and status in ("queued", "waiting_idle", "training"):
