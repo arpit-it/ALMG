@@ -95,6 +95,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   that the Unicode variants share a split group and an unrelated row stays separate.
   In the isolated Mac app, importing the variants with different labels
   showed one conflicting-label group and left training awaiting approval.
+  Reopening this fixture in the rebuilt Mac app showed the instruction to
+  review conflicting labels before approving training.
   Importing a CSV with a blank label showed the line number and missing-label
   error in the isolated Mac app and left dataset approval pending. After rebuilding,
   the same import displayed the validation message without the exception prefix.
