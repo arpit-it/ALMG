@@ -41,7 +41,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   listener. The Settings retry loop still lacks automated coverage. An offline
   checkpoint test covers resuming a partial file
   after restart and verifying its checksum. In the isolated Mac app, Settings
-  resumed the local fixture and reported Verified and ready to use.
+  resumed the local fixture and reported Verified and ready to use. The Mac
+  chat showed the interruption and restored the prompt after a fixture emitted
+  a delta and failed. An offline stream test confirms no failed turn is saved.
 
 ## P1 · Make text-classifier training reliable
 
