@@ -106,6 +106,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   message and kept the original proposal pending approval.
   Approving a saved Mac fixture with three entries and two distinct queries
   recorded two search steps and previewed one result from each query.
+  Saving the label editor in the isolated Mac app cleared the fixture's
+  previous dataset error and left dataset approval pending.
   Live collection remains to be verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples

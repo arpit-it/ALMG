@@ -1029,6 +1029,7 @@ class Handler(BaseHTTPRequestHandler):
                         if len({label.casefold() for label in labels}) != len(labels):
                             raise ValueError("Labels must be distinct.")
                         job["plan"] = {**job["plan"], "labels": labels}
+                        job["error"] = None
                         store_job(job)
                         return self.respond({"id": job["id"]})
                     if action == "edit-queries" and status == "approval":
