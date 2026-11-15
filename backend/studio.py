@@ -519,8 +519,14 @@ def read_classifier_csv(content, labels):
         for row in reader:
             body = (row["text"] or "").strip()
             label = (row["label"] or "").strip()
-            if None in row or label not in labels or not 1 <= len(body) <= 3000:
-                raise ValueError(f"CSV line {reader.line_num} needs text and a proposed label.")
+            if None in row:
+                raise ValueError(f"CSV line {reader.line_num} has extra columns. Quote text that contains commas.")
+            if not label:
+                raise ValueError(f"CSV line {reader.line_num} is missing a label.")
+            if label not in labels:
+                raise ValueError(f"CSV line {reader.line_num} has a label outside the approved list.")
+            if not 1 <= len(body) <= 3000:
+                raise ValueError(f"CSV line {reader.line_num} needs 1 to 3000 characters of text.")
             rows.append({"text": body, "label": label, "source": "local-csv",
                          "group": " ".join(body.casefold().split())})
     except csv.Error as error:
