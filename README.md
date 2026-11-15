@@ -1,7 +1,8 @@
 # ALMG - Automated Language Model Generator
 
 Flutter desktop client and local Python training backend. This first version
-takes a natural-language goal and builds a supervised text classifier.
+uses local Qwen to select a supported training workflow from a plain-language goal.
+The app supports supervised text classification and experimental 48 × 48 image generation.
 
 See the [project backlog](PROJECT_TASKS.md) for planned work and verification tasks.
 
@@ -26,8 +27,8 @@ With the manually started backend stopped, run:
 ALMG starts the registered backend over localhost when it connects. **Restart backend**
 retries that connection. Run the registration command again after logging out or rebooting.
 
-In another terminal run `flutter run -d macos`. The app opens to Qwen chat.
-Open **Settings**, then click **Download local model** to fetch the 4-bit checkpoint from Hugging Face.
+In another terminal run `flutter run -d macos`. The app opens to the **Dashboard**.
+Open **Chat**, then **Settings**, then click **Download local model** to fetch the 4-bit checkpoint from Hugging Face.
 The app shows bytes received and the current file. **Pause** keeps partial
 files and **Resume download** continues them, including after a backend restart.
 **Verify files** checks each file against the Hugging Face revision manifest.
@@ -48,7 +49,15 @@ hf download mlx-community/Qwen3.8-27B-4bit --local-dir backend/models/qwen3.8-27
 ```
 
 Chat and the dataset planner run directly in Python with local model files.
-Select **Training** to open the existing classifier workflow on the Mac.
+From the Dashboard, choose **New Model Training** and describe the model’s
+inputs and outputs. Qwen proposes a workflow or asks for more details.
+Use **Add Project** to save a project name and an existing local folder.
+Project cards display the latest training goal and state, and **Recent chats**
+reopens saved conversations. The **Model Library** lets you search saved
+models by name or project and run them on fresh inputs.
+
+The selected project folder is stored with the project. Training artifacts
+currently use `backend/runs` by default.
 
 ## Train a classifier
 
@@ -75,9 +84,33 @@ test split. Web examples use hostname groups to limit overlap between splits.
 Synthetic or AI-labeled test data measures agreement with those labels.
 Test on representative, human-labeled examples before relying on the result.
 
-This prototype searches indexed excerpts. Full-page crawling, additional model
-types, checkpoint and resume, and remote Mac-to-Windows job dispatch are outside
+This prototype searches indexed excerpts. Full-page crawling, training checkpoints and resume, and remote Mac-to-Windows job dispatch are outside
 this build. The idle setting gates the start; running jobs continue if you return.
+
+## Train an experimental image model
+
+Describe the images and prompts you want to support. Review Qwen’s proposed
+workflow. For web data, approve the Wikimedia Commons query, then separately
+approve the listed downloads. Review the captioned dataset before training.
+For a local shapes run, approve the synthetic dataset instead.
+
+A shapes candidate can generate up to three supported colored shapes and
+export its JSON weights after evaluation and preview. The Commons recipe uses
+a small caption-to-pixel model and supports local preview. Android and iOS
+integration and export validation remain pending.
+
+## Verify changes locally
+
+```sh
+flutter analyze --fatal-infos
+flutter test
+.venv/bin/python -W error -m unittest discover -s test -p 'test_*.py'
+flutter build macos --no-pub
+```
+
+Open the rebuilt app and exercise the changed workflow on this Mac before
+committing. Record the verified behavior and any remaining acceptance criteria
+in [requirements.md](requirements.md).
 
 ## GitHub releases
 

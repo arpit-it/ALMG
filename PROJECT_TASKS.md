@@ -1,6 +1,6 @@
 # ALMG project backlog
 
-ALMG runs a local assistant that helps turn a plain-language goal into a dataset, a trained model, and an evaluation report. The Flutter desktop app uses a local Python backend. The proposed build order is to make the existing classifier workflow reliable on macOS, add language-model fine-tuning, then validate Windows and expand the training recipes.
+ALMG runs a local assistant that helps turn a plain-language goal into a dataset, a trained model, and an evaluation report. The Flutter desktop app uses a local Python backend. See [requirements.md](requirements.md) for priorities and acceptance criteria.
 
 ## Current baseline
 
@@ -11,6 +11,15 @@ ALMG runs a local assistant that helps turn a plain-language goal into a dataset
 - [x] Generate synthetic examples or label search excerpts. Compare classifier candidates, evaluate the selected model on a separate test split, and export the dataset, model, and report.
 - [x] Retry synthetic dataset generation once using validation errors. Gate the start of idle jobs on inactivity and AC power.
 - [x] Verify local Qwen chat in the macOS app and verify the classifier pipeline with fixture data.
+
+- [x] Launch into the Dashboard with project status cards and a separate recent chat list.
+- [x] Create a project from the Dashboard using a name and existing local folder.
+- [x] Open saved candidates from the local Model Library and run a fresh prediction in the Mac app.
+- [x] Choose a supported workflow from the goal using local Qwen. Offline tests cover image planning and clarification.
+- [x] Collect approved Commons images and show the captioned dataset in Training. Verified with a live Mac run.
+
+The project folder is saved as metadata. Routing new training artifacts into
+that folder and reconnecting a moved folder remain open in requirements.md.
 
 ## Dataset planning and collection
 
@@ -33,7 +42,7 @@ ALMG runs a local assistant that helps turn a plain-language goal into a dataset
 
 ## Idle scheduling and Windows
 
-- [ ] Store jobs and status on disk so they survive an app or backend restart.
+- [x] Restore saved jobs, datasets, candidates, and preview history from disk.
 - [ ] Check for competing workloads as well as inactivity and power. Checkpoint at safe boundaries when the user returns and resume once the machine is eligible again.
 - [ ] Verify idle detection, sleep and wake behavior, and recovery after power loss on supported platforms.
 - [ ] Detect and validate the Windows PC’s GPU, VRAM, and drivers. Test a CPU recipe and enable GPU training for verified runtime combinations.

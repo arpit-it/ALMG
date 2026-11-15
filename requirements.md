@@ -42,8 +42,8 @@ See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baselin
 
 **Implementation gate.** Finish and verify the P2 chat and project work before
 replacing the training form. Launch into the Dashboard. The
-Training action opens the workspace, and Back returns to the active chat.
-The first implementation uses the existing text-classifier recipe.
+Dashboard opens the Training workspace, Model Library, and Chat. Qwen chooses
+from the text classifier and experimental text-to-image recipes.
 
 ### Desktop layout
 
@@ -204,7 +204,7 @@ retain the conversation and last known job data and refresh when it reconnects.
 ### Text-to-image recipe
 
 ALMG's first image generator learns from local synthetic prompt and image pairs.
-It creates 48 × 48 RGB images of one colored circle, square, or triangle, with
+It creates 48 × 48 RGB images of up to three colored circles, squares, or triangles, with
 optional left, center, or right placement. ALMG fits the shape and color weights
 from scratch. Some shape and color combinations are held out for evaluation.
 The preview and approval gate applies before export. The exported JSON weights
@@ -232,8 +232,7 @@ integration and on-device validation are pending.
 
 ## Future model generation recipes
 
-Each row defines a planned recipe family. The use cases are searchable examples
-in the recipe picker. Multiple use cases can use the same trainer.
+Each row describes a planned recipe family and example goals for the Training conversation. Multiple use cases can use the same trainer.
 
 | Recipe family | Example use cases |
 | --- | --- |
@@ -359,12 +358,18 @@ for existing models.
 - [ ] Show **Training activity**, **Recent models**, and **Recent chats**
   on launch, with a link to the full Model Library. Refresh active training
   status while the Dashboard is visible.
+  Verified on macOS: the grid showed the latest model state, and the separate
+  chat list reopened the exact saved transcript in its project. Training
+  activity and recent model rows with automatic refresh are pending.
 - [ ] Open the exact training session from its row with progress and pending
   actions. Open **Run Model** for the selected model version and restore the
   selected chat with its project context.
 - [ ] Provide **Add Project** on the Dashboard. Collect a project name and a
   local directory, save both, and offer **Open Model Training** with the new
   project selected.
+  Verified on macOS: naming a project and choosing a folder saves both values
+  and adds the card to the grid. The explicit post-create Training shortcut
+  still needs live verification.
 - [ ] Validate that the selected directory is writable before training.
   Store datasets, checkpoints, models, and reports for new runs in an
   ALMG-managed subfolder. Resolve existing runs at their recorded locations
