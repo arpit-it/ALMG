@@ -38,7 +38,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Offline tests now cover acknowledgment before shutdown and rejection of
   stop requests for manually started backends. A socket fixture verifies that
   the replacement backend accepts a connection queued on its inherited
-  listener. The Settings retry loop still lacks automated coverage. An offline
+  listener. Flutter tests cover Settings retries until connection and stopping
+  when the retry window is exhausted. The rebuilt isolated Mac app again
+  showed Runtime stopped, then Connected with the verified model. An offline
   checkpoint test covers resuming a partial file
   after restart and verifying its checksum. In the isolated Mac app, Settings
   resumed the local fixture and reported Verified and ready to use. The Mac

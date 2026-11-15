@@ -10,6 +10,22 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'project_settings.dart';
 
+/// Refreshes immediately, then retries while the local backend is unavailable.
+Future<void> retryBackendConnection({
+  required Future<void> Function() refresh,
+  required bool Function() shouldRetry,
+  Duration retryInterval = const Duration(milliseconds: 700),
+  Duration retryWindow = const Duration(seconds: 20),
+}) async {
+  await refresh();
+  final wait = Stopwatch()..start();
+  while (shouldRetry() && wait.elapsed < retryWindow) {
+    await Future<void>.delayed(retryInterval);
+    if (!shouldRetry()) break;
+    await refresh();
+  }
+}
+
 /// Displays local conversations and links to model settings and training.
 class ChatPage extends StatefulWidget {
   /// Creates the chat workspace with its training destination.
@@ -320,14 +336,10 @@ class _ChatPageState extends State<ChatPage> {
         );
       }
       // The launch agent starts Python when this connection reaches its socket.
-      await _refresh(background: true);
-      final wait = Stopwatch()..start();
-      while (mounted &&
-          _backendOffline &&
-          wait.elapsed < const Duration(seconds: 20)) {
-        await Future<void>.delayed(const Duration(milliseconds: 700));
-        if (mounted) await _refresh(background: true);
-      }
+      await retryBackendConnection(
+        refresh: () => _refresh(background: true),
+        shouldRetry: () => mounted && _backendOffline,
+      );
       if (mounted && _backendOffline) {
         setState(
           () => _restartError = 'The backend did not respond. Check that the ALMG backend service is registered.',
