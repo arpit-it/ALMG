@@ -2,7 +2,9 @@
 
 import io
 import json
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import Mock, patch
 
 from backend import studio
@@ -91,3 +93,23 @@ class TrainingPlannerTest(unittest.TestCase):
         for prompt, split in assignments.items():
             if prompt.endswith("?"):
                 self.assertEqual(split, assignments[prompt[:-1] + "!"])
+
+    def test_restore_interrupted_classifier_requires_new_approval(self):
+        job_id = "a" * 32
+        rows = [{"text": "An invoice example", "label": "billing"}]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            dataset = root / "training-sessions" / job_id / "dataset.json"
+            dataset.parent.mkdir(parents=True)
+            dataset.write_text(json.dumps(rows), encoding="utf-8")
+            with patch.object(studio, "ROOT", root), \
+                 patch.object(studio, "JOBS", {}), \
+                 patch.object(studio, "TRAINING_DATA", {}), \
+                 patch.object(studio.threading, "Thread") as worker:
+                studio.store_job({"id": job_id, "status": "training", "recipe": "classifier"})
+                studio.restore_jobs()
+
+                self.assertEqual(studio.JOBS[job_id]["status"], "dataset_ready")
+                self.assertIn("saved dataset", studio.JOBS[job_id]["error"])
+                self.assertEqual(studio.TRAINING_DATA[job_id], rows)
+                worker.assert_not_called()

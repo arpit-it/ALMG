@@ -97,7 +97,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   stopped it at a progress boundary and produced no model candidate.
   The isolated Mac app also reopened an interrupted classifier fixture after
   a backend restart. Approving training again reused the saved dataset and
-  reached inference preview. This restarts fitting from the beginning.
+  reached inference preview. An offline regression test confirms recovery
+  reloads the saved rows and waits for approval. Fitting restarts from the
+  beginning.
   Resuming from a training checkpoint remains open.
 - [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
 
