@@ -144,11 +144,19 @@ def collect(job):
         })
         results = request_json(url, headers={"X-Subscription-Token": key})
         for result in results.get("web", {}).get("results", []):
-            source = result.get("url", "")
-            snippet = unescape(re.sub(r"<[^>]+>", "", result.get("description", ""))).strip()
+            if not isinstance(result, dict):
+                continue
+            source = result.get("url")
+            description = result.get("description")
+            if not isinstance(source, str) or not isinstance(description, str):
+                continue
+            try:
+                location = urlsplit(source)
+            except ValueError:
+                continue
+            snippet = unescape(re.sub(r"<[^>]+>", "", description)).strip()
             snippet = snippet[:450].rstrip()
             snippet_key = " ".join(snippet.casefold().split())
-            location = urlsplit(source)
             group = location.netloc.lower().removeprefix("www.")
             if location.scheme in ("https", "http") and group and len(snippet) >= 40 and snippet_key not in seen:
                 seen.add(snippet_key)

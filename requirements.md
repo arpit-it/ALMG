@@ -88,6 +88,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   training approval. In a local search response, two excerpts with the same
   retained text yielded one billing example, while a distinct shipping
   excerpt and both retained source URLs appeared in the Mac preview.
+  A mixed offline response skipped malformed entries and showed both valid
+  examples and URLs in the Mac app before separate training approval.
   Live collection remains to be verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
