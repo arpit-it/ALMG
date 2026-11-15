@@ -513,6 +513,21 @@ def export_candidate(job, candidate):
         update(job, status="preview_ready", error=str(error))
 
 
+def missing_model_files(job):
+    """Check the local files required to run a saved model."""
+    image = job.get("recipe") in ("text_to_image", "diffusion")
+    if job["status"] == "passed":
+        folder = ROOT / job["id"]
+        files = ["model.json" if image else "model.joblib"]
+    else:
+        folder = ROOT / "training-sessions" / job["id"]
+        files = ["candidate.json" if image else "candidate.joblib"]
+        if job.get("recipe") == "diffusion":
+            folder = ROOT / "projects" / job["project_id"] / job["id"]
+            files.append("diffusion.pt")
+    return [name for name in files if not (folder / name).is_file()]
+
+
 class Handler(BaseHTTPRequestHandler):
     """Serve the local training, chat, and model-management HTTP API."""
     def respond(self, value, status=200):
@@ -561,6 +576,7 @@ class Handler(BaseHTTPRequestHandler):
                      "project": projects.get(job.get("project_id"), "Unknown project"),
                      "project_id": job.get("project_id"), "recipe": job.get("recipe", "classifier"),
                      "status": job["status"],
+                     "missing_files": missing_model_files(job),
                      "created_at": next((entry["timestamp"] for entry in job.get("activity", [])), None)}
                     for job in reversed(list(JOBS.values()))
                     if job["status"] == "passed" or (

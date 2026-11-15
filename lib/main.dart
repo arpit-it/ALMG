@@ -168,6 +168,10 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
           itemCount: models.length,
           itemBuilder: (context, index) {
             final model = models[index] as Map;
+            final missing = (model['missing_files'] as List?) ?? const [];
+            final availability = missing.isEmpty
+                ? ''
+                : '\nMissing local files: ${missing.join(', ')}';
             final created = model['created_at'] as num?;
             final date = created == null
                 ? ''
@@ -185,10 +189,10 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
                 overflow: TextOverflow.ellipsis,
               ),
               subtitle: Text(
-                "${model['project']} · $recipe · ${model['status'] == 'passed' ? 'Released' : 'Candidate'}$date",
+                "${model['project']} · $recipe · ${model['status'] == 'passed' ? 'Released' : 'Candidate'}$date$availability",
               ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(
+              onTap: missing.isNotEmpty ? null : () => Navigator.of(context).push(
                 MaterialPageRoute<void>(
                   builder: (_) =>
                       StudioPage(initialModel: model['id'] as String),
