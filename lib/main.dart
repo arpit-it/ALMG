@@ -1179,7 +1179,7 @@ class _StudioPageState extends State<StudioPage> {
                     : () => _submit('/jobs/$id/prepare', {'mode': 'synthetic'}),
                 child: const Text('Approve local dataset'),
               ),
-              if (!_imageRecipe)
+              if (!_imageRecipe && (plan['queries'] as List).isNotEmpty)
                 OutlinedButton(
                   onPressed: _busy
                       ? null

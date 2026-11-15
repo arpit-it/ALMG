@@ -865,7 +865,8 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Select a dataset source.")
                         if job.get("recipe") == "text_to_image" and mode != "synthetic":
                             raise ValueError("Text-to-image uses a local synthetic dataset.")
-                        if mode == "web" and data.get("approved_queries") != job["plan"]["queries"]:
+                        if mode == "web" and (not job["plan"]["queries"]
+                                              or data.get("approved_queries") != job["plan"]["queries"]):
                             raise ValueError("Approve the exact search queries first.")
                         job.update(status="creating_dataset", mode=mode)
                         worker = (prepare_dataset, (job,))
