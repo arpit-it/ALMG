@@ -396,13 +396,18 @@ def restore_jobs():
             output = ROOT / job["id"]
             if job["status"] == "exporting" and output.is_dir():
                 job.update(status="passed", output=str(output))
-            elif job["status"] in ("dataset_ready", "queued", "waiting_idle"):
+            elif (job["status"] in ("dataset_ready", "queued", "waiting_idle")
+                  or (job["status"] == "training" and job.get("recipe") == "classifier")):
                 TRAINING_DATA[job["id"]] = json.loads(
                     ((ROOT / "training-sessions" / job["id"]) / "dataset.json").read_text(encoding="utf-8")
                 )
                 if job["status"] != "dataset_ready":
-                    job.update(status="dataset_ready",
-                               error="The backend restarted before training began. Approve training to queue it again.")
+                    message = (
+                        "Training was interrupted. Approve training to restart from the saved dataset."
+                        if job["status"] == "training"
+                        else "The backend restarted before training began. Approve training to queue it again."
+                    )
+                    job.update(status="dataset_ready", error=message)
                     store_job(job)
             elif job["status"] == "preview_ready":
                 work = ROOT / "training-sessions" / job["id"]
