@@ -749,7 +749,9 @@ class _StudioPageState extends State<StudioPage> {
       await _submit('/jobs/$id/import-csv', {'csv': csv});
     } catch (error) {
       if (mounted && _activeJob == id) {
-        setState(() => _error = error.toString());
+        setState(() => _error = error is FormatException
+            ? error.message
+            : error.toString());
       }
     }
   }
@@ -807,6 +809,8 @@ class _StudioPageState extends State<StudioPage> {
         setState(
           () => _error = error is SocketException
               ? 'Start the Python backend, then try again.'
+              : error is FormatException
+              ? error.message
               : error.toString(),
         );
       }
