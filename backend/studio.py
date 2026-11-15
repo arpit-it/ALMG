@@ -157,7 +157,7 @@ def collect(job):
             snippet = unescape(re.sub(r"<[^>]+>", "", description)).strip()
             snippet = snippet[:450].rstrip()
             snippet_key = " ".join(snippet.casefold().split())
-            group = location.netloc.lower().removeprefix("www.")
+            group = (location.hostname or "").rstrip(".").removeprefix("www.")
             if location.scheme in ("https", "http") and group and len(snippet) >= 40 and snippet_key not in seen:
                 seen.add(snippet_key)
                 candidates.append({"text": snippet, "source": source,
