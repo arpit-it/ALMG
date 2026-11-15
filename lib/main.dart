@@ -1250,6 +1250,10 @@ class _StudioPageState extends State<StudioPage> {
         if (status == 'dataset_ready') ...[
           if ((job?['duplicate_rows'] as int? ?? 0) > 0)
             Text('Duplicate rows: ${job?['duplicate_rows']}'),
+          if ((job?['near_duplicate_groups'] as int? ?? 0) > 0)
+            Text(
+              'Near-duplicate groups (punctuation variants): ${job?['near_duplicate_groups']}',
+            ),
           if ((job?['conflicting_texts'] as int? ?? 0) > 0)
             Text(
               'Examples with conflicting labels: ${job?['conflicting_texts']}',

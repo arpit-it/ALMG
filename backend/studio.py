@@ -512,17 +512,22 @@ def prepare_dataset(job, imported_rows=None):
         (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
         label_counts = {}
         labels_by_text = {}
+        texts_by_words = {}
         if job.get("recipe") == "classifier":
             label_counts = dict.fromkeys(job["plan"]["labels"], 0)
             for row in rows:
                 label_counts[row["label"]] += 1
                 normalized = " ".join(row["text"].casefold().split())
                 labels_by_text.setdefault(normalized, []).append(row["label"])
+                words = tuple(re.findall(r"[^\W_]+", normalized))
+                if len(words) >= 3:
+                    texts_by_words.setdefault(words, set()).add(normalized)
         activity(job, f"Prepared {len(rows)} examples. Waiting for training approval.")
         with LOCK:
             TRAINING_DATA[job["id"]] = rows
             job.update(status="dataset_ready", examples=len(rows), label_counts=label_counts,
                        duplicate_rows=sum(len(labels) - 1 for labels in labels_by_text.values()),
+                       near_duplicate_groups=sum(len(texts) > 1 for texts in texts_by_words.values()),
                        conflicting_texts=sum(len(set(labels)) > 1 for labels in labels_by_text.values()),
                        preview=[{"text": row["text"][:500], "label": row["label"],
                                  **{key: row[key] for key in ("image", "source", "license") if key in row}}

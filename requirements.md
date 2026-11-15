@@ -80,8 +80,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   through the file picker and showed both class counts and example texts,
   including a quoted comma, while training approval remained pending.
   The rebuilt app flagged two duplicate rows and one text with conflicting
-  labels in a local fixture. Near-duplicate detection and split verification
-  remain open.
+  labels in a local fixture. The isolated Mac app showed one near-duplicate
+  group for two invoice examples differing only in punctuation. Grouping
+  those variants during dataset splitting still needs verification.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
 - [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
 
