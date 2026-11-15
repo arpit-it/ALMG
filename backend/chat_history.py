@@ -45,6 +45,8 @@ def connect():
             db.execute("ALTER TABLE chats ADD COLUMN project_id TEXT REFERENCES projects(id)")
         if "instructions" not in {row["name"] for row in db.execute("PRAGMA table_info(projects)")}:
             db.execute("ALTER TABLE projects ADD COLUMN instructions TEXT NOT NULL DEFAULT ''")
+        if "directory" not in {row["name"] for row in db.execute("PRAGMA table_info(projects)")}:
+            db.execute("ALTER TABLE projects ADD COLUMN directory TEXT")
         columns = {row["name"] for row in db.execute("PRAGMA table_info(messages)")}
         if "file_name" not in columns:
             db.execute("ALTER TABLE messages ADD COLUMN file_name TEXT")
@@ -85,13 +87,18 @@ def list_projects():
         return [dict(row) for row in db.execute("SELECT * FROM projects ORDER BY name COLLATE NOCASE")]
 
 
-def create_project(name):
+def create_project(name, directory=None):
     """Validate and create a project with a unique ID."""
     if not isinstance(name, str) or not 0 < len(name.strip()) <= 80:
         raise ValueError("Enter a project name of up to 80 characters.")
     project = {"id": uuid.uuid4().hex, "name": name.strip()}
+    if directory is not None:
+        if not isinstance(directory, str) or not Path(directory).is_absolute() or not Path(directory).is_dir():
+            raise ValueError("Choose an existing local folder.")
+        project["directory"] = directory
     with closing(connect()) as db, db:
-        db.execute("INSERT INTO projects (id, name) VALUES (:id, :name)", project)
+        db.execute("INSERT INTO projects (id, name, directory) VALUES (?, ?, ?)",
+                   (project["id"], project["name"], directory))
     return project
 
 

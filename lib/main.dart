@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -57,6 +58,84 @@ class _DashboardPageState extends State<DashboardPage> {
       throw const FormatException('Could not load dashboard.');
     }
     return data;
+  }
+
+  Future<void> _addProject() async {
+    var name = '';
+    String? directory;
+    final project = await showDialog<Map<String, String>>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, update) => AlertDialog(
+          title: const Text('Add Project'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextField(
+                autofocus: true,
+                maxLength: 80,
+                decoration: const InputDecoration(labelText: 'Project name'),
+                onChanged: (value) => update(() => name = value.trim()),
+              ),
+              OutlinedButton.icon(
+                icon: const Icon(Icons.folder_open),
+                label: const Text('Choose folder'),
+                onPressed: () async {
+                  final selected = await getDirectoryPath();
+                  if (context.mounted && selected != null) {
+                    update(() => directory = selected);
+                  }
+                },
+              ),
+              if (directory != null) SelectableText(directory!),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: name.isEmpty || directory == null
+                  ? null
+                  : () => Navigator.pop(context, {
+                      'name': name,
+                      'directory': directory!,
+                    }),
+              child: const Text('Create project'),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (project == null || !mounted) return;
+    try {
+      final request = await _client.postUrl(
+        Uri.parse('http://127.0.0.1:8766/projects'),
+      );
+      request.headers.set('X-Model-Studio', 'desktop');
+      request.headers.contentType = ContentType.json;
+      final bytes = utf8.encode(jsonEncode(project));
+      request.contentLength = bytes.length;
+      request.add(bytes);
+      final response = await request.close().timeout(
+        const Duration(seconds: 8),
+      );
+      final data =
+          jsonDecode(await response.transform(utf8.decoder).join()) as Map;
+      if (response.statusCode != 201) {
+        throw FormatException(
+          data['error']?.toString() ?? 'Could not create project.',
+        );
+      }
+      if (mounted) setState(() => _dashboard = _load());
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(error.toString())));
+      }
+    }
   }
 
   Future<void> _open(Widget page) async {
@@ -219,6 +298,11 @@ class _DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(
         title: const Text('ALMG'),
         actions: [
+          TextButton.icon(
+            onPressed: _addProject,
+            icon: const Icon(Icons.create_new_folder_outlined),
+            label: const Text('Add Project'),
+          ),
           IconButton(
             tooltip: 'Refresh dashboard',
             icon: const Icon(Icons.refresh),

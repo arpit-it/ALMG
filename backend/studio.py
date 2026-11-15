@@ -606,7 +606,7 @@ class Handler(BaseHTTPRequestHandler):
                     if project_id not in latest or timestamp >= latest[project_id][0]:
                         latest[project_id] = timestamp, job
                 cards = [
-                    {"id": project["id"], "name": project["name"],
+                    {"id": project["id"], "name": project["name"], "directory": project.get("directory"),
                      "model": {"name": job["prompt"], "status": job["status"]} if job else None}
                     for project in projects
                     for _, job in [latest.get(project["id"], (0, None))]
@@ -711,7 +711,7 @@ class Handler(BaseHTTPRequestHandler):
                 inference.start_setup(data.get("action", "resume"))
                 return self.respond(inference.status(), 202)
             if self.path == "/projects":
-                return self.respond(chat_history.create_project(data["name"]), 201)
+                return self.respond(chat_history.create_project(data["name"], data.get("directory")), 201)
             if self.path == "/projects/rename":
                 chat_history.rename_project(data["id"], data["name"])
                 return self.respond({"ok": True})
