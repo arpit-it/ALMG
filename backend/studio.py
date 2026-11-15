@@ -573,6 +573,14 @@ def prepare_dataset(job, imported_rows=None):
             rows = collect(job) if job["mode"] == "web" else synthesize(job)
             if job["mode"] == "web" and not rows:
                 raise ValueError("No usable examples found. Edit the web queries or choose a local dataset.")
+            if job["mode"] == "web":
+                present = {row["label"] for row in rows}
+                missing = [label for label in job["plan"]["labels"] if label not in present]
+                if missing:
+                    raise ValueError(
+                        f"No usable web examples for: {', '.join(missing)}. "
+                        "Edit the web queries or choose a local dataset."
+                    )
         work = ROOT / "training-sessions" / job["id"]
         work.mkdir(parents=True, exist_ok=True)
         (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
