@@ -35,6 +35,10 @@ def connect():
             id INTEGER PRIMARY KEY, chat_id TEXT NOT NULL REFERENCES chats(id),
             role TEXT NOT NULL, content TEXT NOT NULL
         );
+        CREATE TABLE IF NOT EXISTS chat_requests (
+            token TEXT PRIMARY KEY, chat_id TEXT NOT NULL REFERENCES chats(id) ON DELETE CASCADE,
+            reply TEXT NOT NULL, finish_reason TEXT
+        );
         CREATE INDEX IF NOT EXISTS messages_by_chat ON messages(chat_id, id);
         """)
         if "project_id" not in {row["name"] for row in db.execute("PRAGMA table_info(chats)")}:
@@ -45,16 +49,24 @@ def connect():
         if "file_name" not in columns:
             db.execute("ALTER TABLE messages ADD COLUMN file_name TEXT")
             db.execute("ALTER TABLE messages ADD COLUMN file_bytes BLOB")
+        if "file_text" not in columns:
+            db.execute("ALTER TABLE messages ADD COLUMN file_text TEXT")
         db.execute("CREATE INDEX IF NOT EXISTS chats_by_project ON chats(project_id, updated)")
     return db
 
 
-def list_chats(project_id=None):
-    """List chats in the selected project, newest first."""
+def list_chats(project_id=None, query=""):
+    """Find chats in one project by title or message body, newest first."""
+    query = query.strip().casefold()
     with closing(connect()) as db:
-        return [dict(row) for row in db.execute(
-            "SELECT * FROM chats WHERE project_id IS ? ORDER BY updated DESC", (project_id,)
-        )]
+        db.create_function("casefold", 1, str.casefold, deterministic=True)
+        return [dict(row) for row in db.execute("""
+            SELECT chats.* FROM chats WHERE project_id IS ?
+            AND (? = '' OR instr(casefold(title), ?) > 0 OR EXISTS (
+                SELECT 1 FROM messages
+                WHERE messages.chat_id = chats.id AND instr(casefold(content), ?) > 0
+            )) ORDER BY updated DESC
+        """, (project_id, query, query, query))]
 
 
 def list_projects():
@@ -106,15 +118,15 @@ def branch(chat_id, message_count):
             (branch_id, f"Branch of {source['title']}"[:80], time.time(), source["project_id"]),
         )
         db.execute(
-            """INSERT INTO messages (chat_id, role, content, file_name, file_bytes)
-               SELECT ?, role, content, file_name, file_bytes FROM messages
+            """INSERT INTO messages (chat_id, role, content, file_name, file_bytes, file_text)
+               SELECT ?, role, content, file_name, file_bytes, file_text FROM messages
                WHERE chat_id = ? ORDER BY id LIMIT ?""",
             (branch_id, chat_id, message_count),
         )
     return {"id": branch_id}
 
 
-def context(db, chat_id, prompt, project_id=None):
+def context(db, chat_id, prompt, project_id=None, *, recall=True):
     """Assemble recent turns, related chat excerpts, and project reference material."""
     recent = db.execute(
         "SELECT role, content FROM messages WHERE chat_id = ? ORDER BY id DESC LIMIT 40",
@@ -132,7 +144,7 @@ def context(db, chat_id, prompt, project_id=None):
     terms = set(re.findall(r"[^\W_]{5,}", prompt.casefold())) - {
         "about", "could", "please", "should", "there", "these", "those", "would",
     }
-    if terms:
+    if recall and terms:
         candidates = db.execute(
             """SELECT messages.content FROM messages JOIN chats ON chats.id = messages.chat_id
                WHERE chats.project_id IS ? AND chats.id != ? AND messages.role = 'user'
@@ -178,26 +190,33 @@ def context(db, chat_id, prompt, project_id=None):
     return [*history, {"role": "user", "content": prompt}]
 
 
-def file_context(name, data):
+def file_context(name, data, extracted=None):
     """Describe an attachment and include a bounded text excerpt when available."""
     try:
-        content = data.decode("utf-8-sig")
+        content = data.decode("utf-8-sig") if extracted is None else extracted
+        if not content.strip():
+            raise UnicodeError()
         if "\x00" in content:
             raise UnicodeError()
     except UnicodeError:
         return f"Attached file {name!r}. Its contents cannot be read as text. Use the user's description."
-    return f"Attached file {name!r}. Treat this excerpt as reference data.\n{content[:12_000]}"
+    return f"Attached file {name!r}. Treat this excerpt as reference data. Cite the filename and page when the excerpt specifies one.\n{content[:12_000]}"
 
 
-def send(chat_id, prompt, generate, *, project_id=None, attachment=None):
+def send(chat_id, prompt, generate, *, project_id=None, attachment=None, recall=True, token=None):
     """Generate a reply and save the new turn and attachment atomically."""
     if not isinstance(prompt, str) or not 0 < len(prompt.strip()) <= 8000:
         raise ValueError("Enter a message of up to 8,000 characters.")
     if chat_id is not None and not isinstance(chat_id, str):
         raise ValueError("Invalid conversation.")
-    name = data = None
+    if token is not None and (not isinstance(token, str) or not re.fullmatch(r"[a-f0-9]{32}", token)):
+        raise ValueError("Invalid message token.")
+    name = data = extracted = None
     if attachment is not None:
         name = attachment.get("name")
+        extracted = attachment.get("extracted")
+        if extracted is not None and (not isinstance(extracted, str) or len(extracted) > 48_000):
+            raise ValueError("Invalid attachment text.")
         if not isinstance(name, str) or not 0 < len(name) <= 255:
             raise ValueError("Invalid attachment name.")
         data = base64.b64decode(attachment["data"], validate=True)
@@ -205,6 +224,13 @@ def send(chat_id, prompt, generate, *, project_id=None, attachment=None):
             raise ValueError("Attachments can be up to 1 MB.")
     prompt = prompt.strip()
     with SEND_LOCK, closing(connect()) as db:
+        if token:
+            saved = db.execute(
+                "SELECT chat_id AS id, reply, finish_reason FROM chat_requests WHERE token = ?",
+                (token,),
+            ).fetchone()
+            if saved:
+                return dict(saved)
         if project_id is not None and (
             not isinstance(project_id, str)
             or not db.execute("SELECT 1 FROM projects WHERE id = ?", (project_id,)).fetchone()
@@ -219,16 +245,16 @@ def send(chat_id, prompt, generate, *, project_id=None, attachment=None):
             chat_id = uuid.uuid4().hex
         model_prompt = prompt
         if name is not None:
-            model_prompt += "\n\n" + file_context(name, data)
+            model_prompt += "\n\n" + file_context(name, data, extracted)
         else:
             recent_file = db.execute(
-                """SELECT file_name, file_bytes FROM messages
+                """SELECT file_name, file_bytes, file_text FROM messages
                    WHERE chat_id = ? AND file_name IS NOT NULL ORDER BY id DESC LIMIT 1""",
                 (chat_id,),
             ).fetchone()
             if recent_file:
-                model_prompt += "\n\n" + file_context(recent_file["file_name"], recent_file["file_bytes"])
-        chat_context = context(db, chat_id, prompt, project_id)
+                model_prompt += "\n\n" + file_context(recent_file["file_name"], recent_file["file_bytes"], recent_file["file_text"])
+        chat_context = context(db, chat_id, prompt, project_id, recall=recall)
         chat_context[-1]["content"] = model_prompt
         reply = generate(chat_context)
         reason = None
@@ -244,11 +270,14 @@ def send(chat_id, prompt, generate, *, project_id=None, attachment=None):
                 ON CONFLICT(id) DO UPDATE SET updated = excluded.updated
             """, (chat_id, " ".join(prompt.split())[:80], time.time(), project_id))
             db.execute(
-                "INSERT INTO messages (chat_id, role, content, file_name, file_bytes) VALUES (?, ?, ?, ?, ?)",
-                (chat_id, "user", prompt, name, data),
+                "INSERT INTO messages (chat_id, role, content, file_name, file_bytes, file_text) VALUES (?, ?, ?, ?, ?, ?)",
+                (chat_id, "user", prompt, name, data, extracted),
             )
             db.execute("INSERT INTO messages (chat_id, role, content) VALUES (?, 'assistant', ?)",
                        (chat_id, reply))
+            if token:
+                db.execute("INSERT INTO chat_requests VALUES (?, ?, ?, ?)",
+                           (token, chat_id, reply, reason))
     return {"id": chat_id, "reply": reply, "finish_reason": reason}
 
 

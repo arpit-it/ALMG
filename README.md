@@ -58,20 +58,21 @@ Select **Training** to open the existing classifier workflow on the Mac.
    examples for a local run, or approve the queries to use Brave Search excerpts.
    For web mode, set `BRAVE_SEARCH_API_KEY` in the backend environment before
    starting it. Use sources and an API plan that permit your intended data use.
-3. Set the macro F1 target. By default the job waits for AC power and 10 minutes
+3. Review the dataset preview, set the macro F1 target, and approve training
+   and evaluation. By default the job waits for AC power and 10 minutes
    without input. Leave the computer awake and keep the backend running.
-4. Find the exported dataset, report, and joblib model under `backend/runs`.
+4. Enter representative examples in **Model preview** and review the labels
+   from the trained classifier. A candidate must meet the evaluation target and
+   return a preview prediction before you can approve release.
+5. Find the released dataset, report, and joblib model under `backend/runs`.
    The report includes validation trials, held-out test results, and per-class
    scores. Only load joblib files you trust.
 
-Qwen designs the collection plan and labels snippets or writes synthetic
+Qwen drafts the collection plan and labels snippets or writes synthetic
 examples. Python compares a majority baseline with word and character TF-IDF
 classifiers on validation data, then evaluates the selected model on a separate
 test split. Web examples use hostname groups to limit overlap between splits.
-If synthetic validation misses the target, Qwen gets a sample of validation
-mistakes and generates additional training examples for one retry. The test
-split stays out of candidate selection and repair. A model that still misses
-the target ends with **Model needs review**. Synthetic or AI-labeled test data measures agreement with those labels.
+Synthetic or AI-labeled test data measures agreement with those labels.
 Test on representative, human-labeled examples before relying on the result.
 
 This prototype searches indexed excerpts. Full-page crawling, additional model

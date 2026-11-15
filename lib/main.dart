@@ -3,6 +3,8 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'app_name.dart';
 
@@ -45,11 +47,106 @@ class _StudioPageState extends State<StudioPage> {
   final _http = HttpClient()..connectionTimeout = const Duration(seconds: 4);
   final _prompt = TextEditingController();
   final _target = TextEditingController(text: '0.80');
+  final _previewInput = TextEditingController();
+  final _conversation = <(String, String)>[];
+  final _predictions = <(String, String, String?)>[];
+  String _recipe = 'text_to_image';
+
+  bool get _imageRecipe => (_job?['recipe'] ?? _recipe) == 'text_to_image';
   Map<String, dynamic>? _job;
   String? _error;
   bool _busy = false;
   bool _idle = true;
   Timer? _poll;
+  String? _activeJob;
+
+  List<Map<String, dynamic>> _projects = [];
+  List<Map<String, dynamic>> _sessions = [];
+  String? _project;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProjects();
+  }
+
+  Future<void> _loadProjects() async {
+    try {
+      final response = await _request('/projects');
+      if (!mounted) return;
+      setState(
+        () => _projects = (response['projects'] as List)
+            .cast<Map<String, dynamic>>(),
+      );
+      if (_projects.isNotEmpty) {
+        await _selectProject(_projects.first['id'] as String);
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _selectProject(String id) async {
+    _resetSession();
+    setState(() {
+      _project = id;
+      _sessions = [];
+    });
+    await _loadSessions();
+  }
+
+  void _resetSession() {
+    _poll?.cancel();
+    _activeJob = null;
+    setState(() {
+      _job = null;
+      _error = null;
+      _conversation.clear();
+      _predictions.clear();
+      _prompt.clear();
+      _previewInput.clear();
+    });
+  }
+
+  Future<void> _loadSessions() async {
+    final project = _project;
+    final path = Uri(
+      path: '/jobs',
+      queryParameters: {'project_id': project},
+    ).toString();
+    try {
+      final response = await _request(path);
+      if (mounted && _project == project) {
+        setState(
+          () => _sessions = (response['jobs'] as List)
+              .cast<Map<String, dynamic>>(),
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  void _openSession(Map<String, dynamic> job) {
+    _resetSession();
+    setState(() {
+      _job = job;
+      _recipe = job['recipe'] as String? ?? 'classifier';
+      _conversation.addAll(
+        (job['messages'] as List? ?? []).map((text) => ('You', text as String)),
+      );
+      for (final prediction in job['predictions'] as List? ?? []) {
+        _predictions.add(('You', prediction['text'] as String, null));
+        _predictions.add((
+          'Trained model',
+          prediction['label'] as String? ?? '',
+          prediction['image'] as String?,
+        ));
+      }
+    });
+    _activeJob = job['id'] as String;
+    _refresh(_activeJob!);
+  }
 
   /// Sends a JSON request to the local training API.
   Future<Map<String, dynamic>> _request(
@@ -81,21 +178,22 @@ class _StudioPageState extends State<StudioPage> {
   Future<void> _refresh(String id) async {
     try {
       final job = await _request('/jobs/$id');
-      if (!mounted) return;
+      if (!mounted || _activeJob != id) return;
       setState(() => _job = job);
       const active = {
         'planning',
         'queued',
         'waiting_idle',
+        'searching_images',
         'creating_dataset',
         'training',
-        'refining',
+        'exporting',
       };
       if (active.contains(job['status'])) {
         _poll = Timer(const Duration(seconds: 2), () => _refresh(id));
       }
     } catch (error) {
-      if (mounted) {
+      if (mounted && _activeJob == id) {
         setState(() => _error = 'Could not read job status. $error');
         _poll = Timer(const Duration(seconds: 3), () => _refresh(id));
       }
@@ -111,7 +209,9 @@ class _StudioPageState extends State<StudioPage> {
     try {
       final result = await _request(path, body);
       _poll?.cancel();
-      await _refresh(result['id'] as String);
+      _activeJob = result['id'] as String;
+      await _refresh(_activeJob!);
+      if (mounted) unawaited(_loadSessions());
     } catch (error) {
       if (mounted) {
         setState(
@@ -132,169 +232,527 @@ class _StudioPageState extends State<StudioPage> {
     _http.close(force: true);
     _prompt.dispose();
     _target.dispose();
+    _previewInput.dispose();
     super.dispose();
   }
 
-  /// Builds the classifier form, job status, and evaluation metrics.
+  /// Shows the training conversation beside the live model creation panel.
   @override
   Widget build(BuildContext context) {
-    final job = _job;
-    final plan = job?['plan'] as Map<String, dynamic>?;
-    final metrics = job?['metrics'] as Map<String, dynamic>?;
-    final status = job?['status'];
-    final canPlan =
-        status == null ||
-        {'approval', 'failed', 'passed', 'needs_review'}.contains(status);
-    const statusNames = {
-      'planning': 'Qwen is designing the dataset',
-      'approval': 'Review the dataset plan',
-      'queued': 'Job queued',
-      'waiting_idle': 'Waiting for AC power and 10 minutes of inactivity',
-      'creating_dataset': 'Creating and labeling examples',
-      'training': 'Training and evaluating classifiers',
-      'refining': 'Qwen is generating examples to address validation errors',
-      'failed': 'Job failed',
-      'passed': 'Model met the score target',
-      'needs_review': 'Model needs review',
-    };
+    final conversation = _trainingChat();
+    final progress = _modelProgress();
     return Scaffold(
-      backgroundColor: const Color(0xfff5f7f2),
-      appBar: AppBar(title: const Text(appName)),
-      body: Center(
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 820),
-          child: ListView(
-            padding: const EdgeInsets.all(28),
-            children: [
-              Text(
-                'Train a text classifier',
-                style: Theme.of(context).textTheme.headlineMedium,
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Describe the text you want to classify and the categories it should recognize.',
-              ),
-              const SizedBox(height: 20),
-              TextField(
-                controller: _prompt,
-                minLines: 3,
-                maxLines: 6,
-                maxLength: 3000,
-                decoration: const InputDecoration(
-                  border: OutlineInputBorder(),
-                  labelText: 'Model goal',
-                  hintText: 'Classify support messages as billing, delivery, or returns.',
-                ),
-              ),
-              Align(
-                alignment: Alignment.centerLeft,
-                child: FilledButton(
-                  onPressed: _busy || !canPlan
-                      ? null
-                      : () => _submit('/jobs', {'prompt': _prompt.text}),
-                  child: const Text('Create dataset plan'),
-                ),
-              ),
-              if (_error != null || job?['error'] != null) ...[
-                const SizedBox(height: 16),
-                Text(
-                  _error ?? job!['error'].toString(),
-                  style: TextStyle(color: Theme.of(context).colorScheme.error),
-                ),
+      appBar: AppBar(
+        title: const Text('Model Training'),
+        actions: [
+          if (_projects.isNotEmpty)
+            DropdownButton<String>(
+              value: _project,
+              hint: const Text('Project'),
+              items: [
+                for (final project in _projects)
+                  DropdownMenuItem(
+                    value: project['id'] as String,
+                    child: Text(project['name'] as String),
+                  ),
               ],
-              if (job != null) ...[
-                const SizedBox(height: 24),
-                Text(
-                  statusNames[status] ?? status.toString(),
-                  style: Theme.of(context).textTheme.titleLarge,
+              onChanged: _busy ? null : (id) => _selectProject(id!),
+            ),
+          PopupMenuButton<Map<String, dynamic>>(
+            tooltip: 'Training conversations',
+            enabled: !_busy && _sessions.isNotEmpty,
+            icon: const Icon(Icons.history),
+            onSelected: _openSession,
+            itemBuilder: (_) => [
+              for (final session in _sessions)
+                PopupMenuItem(
+                  value: session,
+                  child: Text(
+                    (session['messages'] as List).first as String,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
-                const SizedBox(height: 10),
-                if (plan != null)
-                  Text('Labels: ${(plan['labels'] as List).join(', ')}'),
-                if (status == 'approval' && plan != null) ...[
-                  const SizedBox(height: 12),
-                  const Text(
-                    'Web mode sends the queries below to Brave Search. Qwen labels the returned excerpts locally. Synthetic mode generates examples locally.',
-                  ),
-                  const SizedBox(height: 8),
-                  for (final query in plan['queries'] as List)
-                    SelectableText('• $query'),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: 230,
-                    child: TextField(
-                      controller: _target,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        labelText: 'Target macro F1 (0–1)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                  ),
-                  SwitchListTile(
-                    contentPadding: EdgeInsets.zero,
-                    value: _idle,
-                    onChanged: _busy
-                        ? null
-                        : (value) => setState(() => _idle = value),
-                    title: const Text(
-                      'Wait until this computer is idle and plugged in',
-                    ),
-                  ),
-                  Wrap(
-                    spacing: 12,
-                    runSpacing: 8,
-                    children: [
-                      FilledButton(
-                        onPressed: _busy
-                            ? null
-                            : () => _start(job, plan, 'web'),
-                        child: const Text('Approve queries and train'),
-                      ),
-                      OutlinedButton(
-                        onPressed: _busy
-                            ? null
-                            : () => _start(job, plan, 'synthetic'),
-                        child: const Text('Generate locally and train'),
-                      ),
+            ],
+          ),
+          IconButton(
+            tooltip: 'New training conversation',
+            onPressed: _busy || _project == null ? null : _resetSession,
+            icon: const Icon(Icons.edit_square),
+          ),
+        ],
+      ),
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          if (constraints.maxWidth < 760) {
+            return DefaultTabController(
+              length: 2,
+              child: Column(
+                children: [
+                  const TabBar(
+                    tabs: [
+                      Tab(text: 'Conversation'),
+                      Tab(text: 'Model creation'),
                     ],
                   ),
+                  Expanded(
+                    child: TabBarView(children: [conversation, progress]),
+                  ),
                 ],
-                if (!canPlan) const LinearProgressIndicator(),
-                if (metrics != null) ...[
-                  Text(metrics['algorithm'].toString()),
-                  Text(
-                    'Validation macro F1: ${_score(metrics['validation_macro_f1'])}',
-                  ),
-                  Text(
-                    'Test macro F1: ${_score(metrics['test_macro_f1'])} on ${metrics['test_examples']} examples',
-                  ),
-                  Text(
-                    'Target: ${_score(metrics['target_macro_f1'])} · Dataset: ${job['examples']} examples',
-                  ),
-                  if (job['mode'] == 'synthetic')
-                    const Text(
-                      'Scores use synthetic examples. Check the model on real data before deployment.',
+              ),
+            );
+          }
+          return Row(
+            children: [
+              Expanded(flex: 3, child: conversation),
+              const VerticalDivider(width: 1),
+              Expanded(flex: 2, child: progress),
+            ],
+          );
+        },
+      ),
+    );
+  }
+
+  /// Renders the prompt history and lets the user request a plan or revisions.
+  Widget _trainingChat() {
+    final status = _job?['status'];
+    final canPlan =
+        _project != null &&
+        !_busy &&
+        (status == null ||
+            {
+              'approval',
+              'preview_ready',
+              'failed',
+              'passed',
+              'needs_review',
+            }.contains(status));
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Expanded(
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(
+                'Training conversation',
+                style: Theme.of(context).textTheme.titleLarge,
+              ),
+              const SizedBox(height: 12),
+              if (_project == null)
+                const Text(
+                  'Create a project in Chat to begin a training conversation.',
+                ),
+              if (_job == null && !_busy)
+                DropdownButton<String>(
+                  value: _recipe,
+                  items: const [
+                    DropdownMenuItem(
+                      value: 'text_to_image',
+                      child: Text('Text to image'),
                     ),
-                  const SizedBox(height: 12),
-                  const Text('Model, dataset, and evaluation report'),
-                  SelectableText(job['output'].toString()),
-                ],
-              ],
+                    DropdownMenuItem(
+                      value: 'classifier',
+                      child: Text('Text classifier'),
+                    ),
+                  ],
+                  onChanged: (value) => setState(() => _recipe = value!),
+                ),
+              Text(
+                _imageRecipe
+                    ? 'Train a small generator for single colored shapes using synthetic examples.'
+                    : 'Describe the text to classify and the categories it should recognize.',
+              ),
+              for (final (speaker, message) in _conversation)
+                _message(speaker, message),
+              if (_job?['plan'] case final Map plan when !_imageRecipe)
+                _message(
+                  'Qwen',
+                  "Proposed labels: ${(plan['labels'] as List).join(', ')}. Review the dataset proposal in Model creation.",
+                ),
+              if (_error case final String error)
+                Text(
+                  error,
+                  style: TextStyle(color: Theme.of(context).colorScheme.error),
+                ),
             ],
           ),
         ),
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: TextField(
+            controller: _prompt,
+            enabled: canPlan,
+            minLines: 1,
+            maxLines: 4,
+            maxLength: 3000,
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              hintText: status == 'approval'
+                  ? 'Request a revision to the plan'
+                  : 'Describe your model goal',
+              suffixIcon: IconButton(
+                tooltip: 'Send training message',
+                onPressed: canPlan ? _sendGoal : null,
+                icon: const Icon(Icons.arrow_upward),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// Builds a single message shared by training and the inference preview.
+  Widget _message(String speaker, String text) => Card(
+    margin: const EdgeInsets.only(top: 10),
+    child: Padding(
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(speaker, style: Theme.of(context).textTheme.labelLarge),
+          const SizedBox(height: 4),
+          if (speaker == 'Qwen')
+            MarkdownBody(data: text, selectable: true)
+          else
+            SelectableText(text),
+        ],
       ),
+    ),
+  );
+
+  /// Turns a training message into a new plan proposal.
+  Future<void> _sendGoal() async {
+    final text = _prompt.text.trim();
+    if (text.length < 5) return;
+    final previous = {'approval', 'preview_ready'}.contains(_job?['status'])
+        ? (_job!['prompt'] as String?)
+        : null;
+    final goal = previous == null
+        ? text
+        : '$previous\n\nRequested changes: $text';
+    if (goal.length > 3000) {
+      setState(
+        () =>
+            _error = 'The goal and revisions must fit within 3,000 characters.',
+      );
+      return;
+    }
+    setState(() {
+      _conversation.add(('You', text));
+      _predictions.clear();
+      _prompt.clear();
+    });
+    await _submit('/jobs', {
+      'project_id': _project,
+      'recipe': _recipe,
+      'prompt': goal,
+      'message': text,
+      if (previous != null) 'previous_id': _job?['id'],
+    });
+  }
+
+  /// Shows the current proposal, dataset preview, evaluation, and release gate.
+  Widget _modelProgress() {
+    final job = _job;
+    final webImages = job?['mode'] == 'web_images';
+    final id = job?['id'];
+    final status = job?['status'];
+    final plan = job?['plan'] as Map?;
+    final metrics = job?['metrics'] as Map?;
+    final states = {
+      'planning': 'Qwen is drafting the plan',
+      'approval': 'Dataset approval required',
+      'searching_images': 'Searching for images',
+      'image_candidates': 'Image search results',
+      'creating_dataset': 'Preparing dataset',
+      'dataset_ready': 'Training approval required',
+      'queued': 'Training queued',
+      'waiting_idle': 'Waiting for idle time and AC power',
+      'training': 'Training and evaluating the model',
+      'preview_ready': 'Ready for inference preview',
+      'exporting': 'Exporting approved model',
+      'passed': 'Model released',
+      'failed': 'Task failed',
+      'needs_review': 'Model needs review',
+    };
+    final activity = (job?['activity'] as List?) ?? const [];
+    final working = {
+      'planning',
+      'creating_dataset',
+      'queued',
+      'waiting_idle',
+      'training',
+      'exporting',
+    }.contains(status);
+    return ListView(
+      padding: const EdgeInsets.all(24),
+      children: [
+        Text('Model creation', style: Theme.of(context).textTheme.titleLarge),
+        const SizedBox(height: 12),
+        Text(states[status] ?? 'Waiting for a model goal'),
+        if (_busy || working) ...[
+          const SizedBox(height: 12),
+          const LinearProgressIndicator(),
+        ],
+        if (activity.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Semantics(
+            liveRegion: working,
+            child: Text((activity.last as Map)['message'] as String),
+          ),
+          ExpansionTile(
+            tilePadding: EdgeInsets.zero,
+            title: const Text('Activity history'),
+            children: [
+              for (final entry in activity.reversed)
+                ListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(entry['message'] as String),
+                  subtitle: Text(
+                    MaterialLocalizations.of(context).formatTimeOfDay(
+                      TimeOfDay.fromDateTime(
+                        DateTime.fromMillisecondsSinceEpoch(
+                          ((entry['timestamp'] as num) * 1000).round(),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+        if (job?['error'] case final String error) SelectableText(error),
+        if (plan != null && !_imageRecipe) ...[
+          const SizedBox(height: 16),
+          Text('Labels: ${(plan['labels'] as List).join(', ')}'),
+        ],
+        if (status == 'approval' && plan != null) ...[
+          const SizedBox(height: 12),
+          if (_imageRecipe)
+            const Text(
+              'ALMG will render 45 local examples of circles, squares, and triangles in five colors. Some color and shape combinations are held out for evaluation.',
+            )
+          else ...[
+            const Text(
+              'Web collection sends these queries to Brave Search. Local generation uses Qwen on this device.',
+            ),
+            for (final query in plan['queries'] as List)
+              SelectableText('• $query'),
+          ],
+          if (_imageRecipe && (plan['queries'] as List).isNotEmpty) ...[
+            const Text('Wikimedia Commons · up to 20 results'),
+            for (final query in plan['queries'] as List)
+              SelectableText(query as String),
+            OutlinedButton(
+              onPressed: _busy
+                  ? null
+                  : () => _submit('/jobs/$id/search-images', {
+                      'approved_queries': plan['queries'],
+                    }),
+              child: const Text('Approve image search'),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: [
+              FilledButton(
+                onPressed: _busy
+                    ? null
+                    : () => _submit('/jobs/$id/prepare', {'mode': 'synthetic'}),
+                child: const Text('Approve local dataset'),
+              ),
+              if (!_imageRecipe)
+                OutlinedButton(
+                  onPressed: _busy
+                      ? null
+                      : () => _submit('/jobs/$id/prepare', {
+                          'mode': 'web',
+                          'approved_queries': plan['queries'],
+                        }),
+                  child: const Text('Approve web queries'),
+                ),
+            ],
+          ),
+        ],
+        if (status == 'image_candidates') ...[
+          if ((job!['image_candidates'] as List).isEmpty)
+            const Text(
+              'No supported image files found. Try a new training task.',
+            ),
+          for (final candidate in job['image_candidates'] as List)
+            ListTile(
+              title: Text(candidate['title'] as String),
+              subtitle: SelectableText(
+                "${candidate['url']}\n${candidate['license'] ?? 'License unavailable'}",
+              ),
+            ),
+          if ((job!['image_candidates'] as List).isNotEmpty)
+            FilledButton(
+              onPressed: _busy
+                  ? null
+                  : () => _submit('/jobs/$id/download-images', {
+                      'approved_urls': [
+                        for (final candidate in job['image_candidates'] as List)
+                          candidate['url'],
+                      ],
+                    }),
+              child: const Text('Approve listed image downloads (8 MiB each)'),
+            ),
+        ],
+        if (job?['examples'] case final int count) ...[
+          const SizedBox(height: 16),
+          Text('Dataset · $count examples'),
+        ],
+        if (status == 'dataset_ready') ...[
+          for (final row in job!['preview'] as List)
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text(row['label'] as String),
+              subtitle: Text(
+                row['image'] == null
+                    ? row['text'] as String
+                    : "${row['text']}\n${row['source']}\n${row['license'] ?? 'License unavailable'}",
+              ),
+              leading: row['image'] == null
+                  ? null
+                  : Image.memory(
+                      base64Decode(row['image'] as String),
+                      width: 48,
+                      height: 48,
+                    ),
+            ),
+          TextField(
+            controller: _target,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: _imageRecipe
+                  ? 'Target pixel score (0–1)'
+                  : 'Target macro F1 (0–1)',
+            ),
+          ),
+          SwitchListTile(
+            contentPadding: EdgeInsets.zero,
+            value: _idle,
+            onChanged: _busy ? null : (value) => setState(() => _idle = value),
+            title: const Text('Wait for idle time and AC power'),
+          ),
+          FilledButton(
+            onPressed: _busy ? null : () => _approveTraining(id as String),
+            child: const Text('Approve training and evaluation'),
+          ),
+        ],
+        if (metrics != null) ...[
+          const SizedBox(height: 16),
+          Text(metrics['algorithm'].toString()),
+          if (webImages) ...[
+            Text(
+              'Held-out pixel similarity: ${_score(metrics['held_out_pixel_similarity'])}',
+            ),
+            const Text(
+              'Pixel similarity measures color differences. Review prompt relevance in preview.',
+            ),
+            for (final prompt in metrics['test_prompts'] as List)
+              SelectableText(prompt as String),
+          ] else if (_imageRecipe) ...[
+            Text(
+              'Held-out pixel accuracy: ${_score(metrics['held_out_pixel_accuracy'])}',
+            ),
+            Text('Target: ${_score(metrics['target_pixel_accuracy'])}'),
+          ] else ...[
+            Text(
+              'Validation macro F1: ${_score(metrics['validation_macro_f1'])}',
+            ),
+            Text('Held-out macro F1: ${_score(metrics['test_macro_f1'])}'),
+            Text('Target: ${_score(metrics['target_macro_f1'])}'),
+          ],
+        ],
+        if (status == 'preview_ready' || status == 'passed') ...[
+          const SizedBox(height: 20),
+          Text('Model preview', style: Theme.of(context).textTheme.titleMedium),
+          Text('Candidate ${(id as String).substring(0, 8)}'),
+          Text(
+            webImages
+                ? 'Try a held-out caption listed above. This experimental model generates 48 × 48 images.'
+                : _imageRecipe
+                ? 'Try a red circle and a blue square. Use up to three circles, squares, or triangles in red, green, blue, yellow, or purple.'
+                : 'Enter representative examples and review the predicted labels.',
+          ),
+          for (final (speaker, text, image) in _predictions)
+            if (image == null)
+              _message(speaker, text)
+            else
+              Align(
+                alignment: Alignment.centerLeft,
+                child: Image.memory(
+                  base64Decode(image),
+                  width: 192,
+                  height: 192,
+                  filterQuality: FilterQuality.none,
+                  semanticLabel: 'Generated image',
+                ),
+              ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _previewInput,
+            readOnly: _busy,
+            onSubmitted: (_) => _predict(id),
+            decoration: InputDecoration(
+              border: const OutlineInputBorder(),
+              hintText: 'Enter an example',
+              suffixIcon: IconButton(
+                tooltip: 'Send to trained model',
+                onPressed: _busy ? null : () => _predict(id),
+                icon: const Icon(Icons.arrow_upward),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (metrics?['passed'] != true)
+            const Text(
+              'The model must meet the evaluation target before release.',
+            ),
+          if (status == 'preview_ready' && !webImages)
+            FilledButton(
+              onPressed:
+                  _busy || _predictions.isEmpty || metrics?['passed'] != true
+                  ? null
+                  : () => _submit('/jobs/$id/release', {}),
+              child: const Text('Approve predictions and release'),
+            ),
+        ],
+        if (job?['output'] case final String output) ...[
+          const SizedBox(height: 16),
+          const Text('Model, dataset, and evaluation report'),
+          SelectableText(output),
+          OutlinedButton.icon(
+            onPressed: () {
+              final filename = _imageRecipe ? 'model.json' : 'model.joblib';
+              Clipboard.setData(ClipboardData(text: '$output/$filename'));
+              ScaffoldMessenger.of(
+                context,
+              ).showSnackBar(SnackBar(content: Text('$filename path copied')));
+            },
+            icon: const Icon(Icons.copy_outlined),
+            label: Text(
+              _imageRecipe ? 'Copy JSON model path' : 'Copy Joblib model path',
+            ),
+          ),
+        ],
+      ],
     );
   }
 
   /// Formats a training metric for display.
   String _score(dynamic value) => (value as num).toStringAsFixed(3);
 
-  /// Starts the approved plan with the selected dataset source.
-  void _start(Map job, Map plan, String mode) {
+  /// Starts training on the approved dataset.
+  void _approveTraining(String id) {
     final target = double.tryParse(_target.text);
     if (target == null || !target.isFinite || target <= 0 || target > 1) {
       setState(
@@ -302,11 +760,35 @@ class _StudioPageState extends State<StudioPage> {
       );
       return;
     }
-    _submit('/jobs/${job['id']}/start', {
-      'mode': mode,
-      'target': target,
-      'idle': _idle,
-      if (mode == 'web') 'approved_queries': plan['queries'],
+    _submit('/jobs/$id/start', {'target': target, 'idle': _idle});
+  }
+
+  /// Sends one example to the trained candidate and adds its label to the preview.
+  Future<void> _predict(String id) async {
+    final text = _previewInput.text.trim();
+    if (_busy || text.isEmpty) return;
+    setState(() {
+      _busy = true;
+      _error = null;
     });
+    try {
+      final result = await _request('/jobs/$id/preview', {'text': text});
+      if (!mounted) return;
+      setState(() {
+        _predictions.addAll([
+          ('You', text, null),
+          (
+            'Trained model',
+            result['label'] as String? ?? '',
+            result['image'] as String?,
+          ),
+        ]);
+        _previewInput.clear();
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
   }
 }

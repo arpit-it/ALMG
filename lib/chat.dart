@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -49,6 +50,8 @@ class _ChatPageState extends State<ChatPage> {
   String? _replyStatus;
   String? _interruptedReply;
   String _search = '';
+  Timer? _searchTimer;
+  bool _recall = true;
   bool _checking = false;
   bool _backendOffline = false;
   bool _runtimeStopped = false;
@@ -57,10 +60,79 @@ class _ChatPageState extends State<ChatPage> {
   String? _restartError;
   bool _showSettings = false;
 
+  final _drafts = <String, String>{};
+  String? _retryToken;
+  String? _retryPayload;
+  Future<void> _draftWrites = Future<void>.value();
+  bool _draftsLoaded = false;
+
+  File get _chatPreferences => File(
+    '${Platform.environment['APPDATA'] ?? Platform.environment['HOME'] ?? Directory.systemTemp.path}'
+    '${Platform.isMacOS ? '/Library/Application Support' : ''}/ALMG/chat-preferences.json',
+  );
+
+  String get _draftKey => _chatId ?? 'new:${_projectId ?? 'personal'}';
+
+  Future<void> _loadChatPreferences() async {
+    try {
+      final saved = jsonDecode(await _chatPreferences.readAsString()) as Map;
+      if (!mounted) return;
+      final drafts = saved['drafts'];
+      if (drafts is Map<String, dynamic>) {
+        for (final entry in drafts.entries) {
+          if (entry.value case final String draft) _drafts[entry.key] = draft;
+        }
+      }
+      setState(() => _recall = saved['recall'] != false);
+      if (_input.text.isEmpty) _input.text = _drafts[_draftKey] ?? '';
+    } on FileSystemException {
+      // The first session has no saved preferences.
+    } on TypeError {
+      // Ignore preferences written in an unsupported format.
+    } on FormatException {
+      // An interrupted or invalid preferences file can be replaced.
+    } finally {
+      if (mounted) {
+        _draftsLoaded = true;
+        _rememberDraft();
+      }
+    }
+  }
+
+  void _rememberDraft() {
+    if (!_draftsLoaded || _sending) return;
+    if (_input.text == (_drafts[_draftKey] ?? '')) return;
+    if (_input.text.isEmpty) {
+      _drafts.remove(_draftKey);
+    } else {
+      _drafts[_draftKey] = _input.text;
+    }
+    _saveChatPreferences();
+  }
+
+  void _saveChatPreferences() {
+    final snapshot = jsonEncode({'recall': _recall, 'drafts': _drafts});
+    _draftWrites = _draftWrites.then((_) async {
+      final file = _chatPreferences;
+      try {
+        await file.parent.create(recursive: true);
+        final temporary = File('${file.path}.tmp');
+        await temporary.writeAsString(snapshot);
+        await temporary.rename(file.path);
+      } on FileSystemException catch (error) {
+        if (mounted) {
+          setState(() => _error = 'Could not save chat preferences. $error');
+        }
+      }
+    });
+  }
+
   /// Registers keyboard shortcuts and loads the initial backend state.
   @override
   void initState() {
     super.initState();
+    _input.addListener(_rememberDraft);
+    unawaited(_loadChatPreferences());
     FocusManager.instance.addEarlyKeyEventHandler(_sendShortcut);
     _refresh();
     _loadHistory();
@@ -271,10 +343,17 @@ class _ChatPageState extends State<ChatPage> {
   Future<void> _loadHistory() async {
     try {
       final projectId = _projectId;
+      final query = _search;
       final result = await _request(
-        projectId == null ? '/chats' : '/chats?project_id=$projectId',
+        Uri(
+          path: '/chats',
+          queryParameters: {
+            'project_id': ?projectId,
+            if (query.isNotEmpty) 'q': query,
+          },
+        ).toString(),
       );
-      if (mounted && _projectId == projectId) {
+      if (mounted && _projectId == projectId && _search == query) {
         setState(() => _chats = result['chats'] as List);
       }
     } catch (error) {
@@ -447,7 +526,7 @@ class _ChatPageState extends State<ChatPage> {
       setState(() {
         _chatId = id;
         _attachment = null;
-        _input.clear();
+        _input.text = _drafts[_draftKey] ?? '';
         _messages
           ..clear()
           ..addAll(messages);
@@ -469,7 +548,7 @@ class _ChatPageState extends State<ChatPage> {
       _replyStatus = null;
       _messages.clear();
       _interruptedReply = null;
-      _input.clear();
+      _input.text = _drafts[_draftKey] ?? '';
       _error = null;
     });
   }
@@ -536,8 +615,33 @@ class _ChatPageState extends State<ChatPage> {
       if (!mounted || chat != _chatId || project != _projectId || _sending) {
         return;
       }
+      final extension = file.name.split('.').last.toLowerCase();
+      String? extracted;
+      if (Platform.isMacOS &&
+          {
+            'pdf',
+            'png',
+            'jpg',
+            'jpeg',
+            'heic',
+            'tiff',
+            'webp',
+          }.contains(extension)) {
+        const channel = MethodChannel('almg/attachments');
+        extracted = await channel.invokeMethod<String>('extract', {
+          'format': extension,
+          'bytes': bytes,
+        });
+      }
+      if (!mounted || chat != _chatId || project != _projectId || _sending) {
+        return;
+      }
       setState(() {
-        _attachment = {'name': file.name, 'data': base64Encode(bytes)};
+        _attachment = {
+          'name': file.name,
+          'data': base64Encode(bytes),
+          'extracted': ?extracted,
+        };
         _error = null;
       });
       _composerFocus.requestFocus();
@@ -551,6 +655,24 @@ class _ChatPageState extends State<ChatPage> {
     final text = _input.text.trim();
     if (text.isEmpty || _sending || _openingChat || _deleting) return;
     final attachment = _attachment;
+    final draftKey = _draftKey;
+    final payload = {
+      'id': _chatId,
+      'text': text,
+      'project_id': _projectId,
+      'attachment': ?attachment,
+      'recall': _recall,
+    };
+    final fingerprint = jsonEncode(payload);
+    if (_retryPayload != fingerprint) {
+      final random = Random.secure();
+      _retryPayload = fingerprint;
+      _retryToken = List.generate(
+        32,
+        (_) => random.nextInt(16).toRadixString(16),
+      ).join();
+    }
+
     final answer = {'role': 'assistant', 'content': ''};
     setState(() {
       _sending = true;
@@ -572,12 +694,7 @@ class _ChatPageState extends State<ChatPage> {
     try {
       final response = await _openRequest(
         '/chats/stream',
-        body: {
-          'id': _chatId,
-          'text': text,
-          'project_id': _projectId,
-          'attachment': ?attachment,
-        },
+        body: {...payload, 'token': _retryToken},
       );
       if (response.statusCode != 200) {
         await response.drain<void>();
@@ -619,6 +736,10 @@ class _ChatPageState extends State<ChatPage> {
           _messages.removeRange(_messages.length - 2, _messages.length);
           _input.text = text;
         } else {
+          _retryPayload = null;
+          _retryToken = null;
+          _drafts.remove(draftKey);
+          _saveChatPreferences();
           _chatId = id;
           _attachment = null;
           answer['content'] = result['reply'] as String;
@@ -779,6 +900,7 @@ class _ChatPageState extends State<ChatPage> {
   /// Releases the chat controllers, timers, and network client.
   @override
   void dispose() {
+    _searchTimer?.cancel();
     _poll?.cancel();
     _client.close(force: true);
     FocusManager.instance.removeEarlyKeyEventHandler(_sendShortcut);
@@ -812,7 +934,7 @@ class _ChatPageState extends State<ChatPage> {
         actions: [
           IconButton(
             tooltip: 'Training',
-            onPressed: ready && !_backendOffline
+            onPressed: _model != null && !_backendOffline
                 ? () => Navigator.of(context).push(
                     MaterialPageRoute<void>(
                       builder: (_) => widget.trainingPage,
@@ -869,19 +991,35 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
+  Future<void> _exportMarkdown(String id, String title) async {
+    try {
+      final result = await _request('/chats/$id');
+      final document = StringBuffer('# $title\n');
+      for (final message in result['messages'] as List) {
+        final speaker = message['role'] == 'user' ? 'You' : 'Qwen';
+        document.writeln('\n## $speaker\n');
+        if (message['file_name'] case final String name when name.isNotEmpty) {
+          document.writeln('Attachment: $name\n');
+        }
+        document.writeln(message['content']);
+      }
+      await Clipboard.setData(ClipboardData(text: document.toString()));
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Conversation copied as Markdown')),
+        );
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   /// Builds the project list, conversation controls, and search field.
   Widget _history({bool modal = false}) {
     final colors = Theme.of(context).colorScheme;
     final busy = _sending || _openingChat || _deleting;
     return StatefulBuilder(
       builder: (context, refreshHistory) {
-        final filtered = _chats
-            .where(
-              (chat) => (chat['title'] as String).toLowerCase().contains(
-                _search.toLowerCase().trim(),
-              ),
-            )
-            .toList();
         return ColoredBox(
           color: colors.surfaceContainerLow,
           child: Padding(
@@ -1034,16 +1172,20 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                     onChanged: (value) {
                       setState(() => _search = value);
-                      refreshHistory(() {});
+                      _searchTimer?.cancel();
+                      _searchTimer = Timer(
+                        const Duration(milliseconds: 250),
+                        _loadHistory,
+                      );
                     },
                   ),
                   const SizedBox(height: 8),
                   ListView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
-                    itemCount: filtered.length,
+                    itemCount: _chats.length,
                     itemBuilder: (context, index) {
-                      final chat = filtered[index] as Map;
+                      final chat = _chats[index] as Map;
                       final id = chat['id'] as String;
                       return ListTile(
                         dense: true,
@@ -1071,7 +1213,9 @@ class _ChatPageState extends State<ChatPage> {
                           enabled: !busy,
                           onSelected: (action) {
                             if (modal) Navigator.pop(context);
-                            if (action == 'move') {
+                            if (action == 'export') {
+                              _exportMarkdown(id, chat['title'] as String);
+                            } else if (action == 'move') {
                               _moveChat(id);
                             } else if (action == 'delete') {
                               _delete(id, chat['title'] as String);
@@ -1080,6 +1224,10 @@ class _ChatPageState extends State<ChatPage> {
                             }
                           },
                           itemBuilder: (_) => [
+                            const PopupMenuItem(
+                              value: 'export',
+                              child: Text('Copy as Markdown'),
+                            ),
                             const PopupMenuItem(
                               value: 'rename',
                               child: Text('Rename'),
@@ -1334,6 +1482,13 @@ class _ChatPageState extends State<ChatPage> {
                     ),
                     onDeleted: () => setState(() => _attachment = null),
                   ),
+                ),
+              if (_attachment?['extracted'] case final String text
+                  when !_sending)
+                Text(
+                  text.isEmpty
+                      ? 'No readable text found. Describe the attachment in your message.'
+                      : 'Extracted ${text.characters.length} characters for Qwen.',
                 ),
               TextField(
                 focusNode: _composerFocus,
@@ -1599,6 +1754,21 @@ class _ChatPageState extends State<ChatPage> {
                         ),
                     ],
                   ),
+              ]),
+              const SizedBox(height: 16),
+              _settingsSection(Icons.history, 'Conversation memory', [
+                SwitchListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('Use other conversations'),
+                  subtitle: const Text(
+                    'Use related messages from other chats in the same project.',
+                  ),
+                  value: _recall,
+                  onChanged: (value) {
+                    setState(() => _recall = value);
+                    _saveChatPreferences();
+                  },
+                ),
               ]),
             ],
           ),

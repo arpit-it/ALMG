@@ -37,6 +37,42 @@ class ChatHistoryTest(unittest.TestCase):
         self.assertEqual(len(chat_history.messages(branch)), 4)
         self.assertEqual({chat["id"] for chat in chat_history.list_chats(project)}, {source, branch})
 
+    def test_search_and_recall_respect_project_scope(self):
+        project = chat_history.create_project("Work")["id"]
+        source = chat_history.send(None, "Garden orchid notes", lambda _: "Blue Finch", project_id=project)["id"]
+        self.assertEqual([chat["id"] for chat in chat_history.list_chats(project, "BLUE FINCH")], [source])
+        self.assertEqual(chat_history.list_chats(None, "Blue Finch"), [])
+
+        def reply(messages):
+            self.assertTrue(all(message["role"] != "system" for message in messages))
+            return "No recalled context"
+
+        chat_history.send(None, "Garden orchid question", reply, project_id=project, recall=False)
+
+    def test_retried_message_returns_committed_turn_once(self):
+        token = "a" * 32
+        first = chat_history.send(None, "Hello", lambda _: "Hi", token=token)
+        second = chat_history.send(None, "Hello", lambda _: self.fail("Generated twice"), token=token)
+        self.assertEqual(first, second)
+        self.assertEqual(len(chat_history.messages(first["id"])), 2)
+
+    def test_pdf_excerpt_survives_branch(self):
+        project = chat_history.create_project("Work")["id"]
+        chat_history.update_project(project, "Cite sources.")
+        chat_history.add_project_file(project, "manual.txt", "Orchid care instructions")
+        attachment = {"name": "guide.pdf", "data": "/w==", "extracted": "Page 2\nWater weekly"}
+        source = chat_history.send(None, "Read this", lambda _: "Done", attachment=attachment, project_id=project)["id"]
+        branch = chat_history.branch(source, 2)["id"]
+
+        def reply(messages):
+            self.assertIn("Page 2", messages[-1]["content"])
+            self.assertIn("Cite sources.", messages[0]["content"])
+            self.assertIn("Orchid care instructions", messages[0]["content"])
+            return "Water weekly"
+
+        chat_history.send(branch, "Orchid care instructions", reply)
+        self.assertEqual(len(chat_history.messages(source)), 2)
+
     def test_failed_generation_does_not_save_a_turn(self):
         """Keep the chat list empty if inference returns an empty reply."""
         with self.assertRaises(ValueError):
