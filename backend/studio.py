@@ -1034,7 +1034,9 @@ class Handler(BaseHTTPRequestHandler):
                     if action == "edit-queries" and status == "approval":
                         queries = data.get("queries")
                         if (not isinstance(queries, list)
-                                or len(queries) != len(job["plan"]["queries"])
+                                or len(queries) > len(job["plan"]["queries"])
+                                or (job.get("recipe") != "classifier"
+                                    and len(queries) != len(job["plan"]["queries"]))
                                 or any(not isinstance(query, str) or not 0 < len(query.strip()) <= 160
                                        for query in queries)):
                             raise ValueError("Enter a query of 1 to 160 characters for each item.")

@@ -711,6 +711,9 @@ class _StudioPageState extends State<StudioPage> {
                   maxLength: 160,
                   decoration: InputDecoration(
                     labelText: '$itemName ${index + 1}',
+                    helperText: !labels && !_imageRecipe
+                        ? 'Leave blank to remove this query'
+                        : null,
                   ),
                   onChanged: (value) => values[index] = value,
                 ),
@@ -723,7 +726,12 @@ class _StudioPageState extends State<StudioPage> {
             child: const Text('Cancel'),
           ),
           FilledButton(
-            onPressed: () => Navigator.pop(context, values),
+            onPressed: () => Navigator.pop(
+              context,
+              !labels && !_imageRecipe
+                  ? values.where((value) => value.trim().isNotEmpty).toList()
+                  : values,
+            ),
             child: Text('Save $field'),
           ),
         ],

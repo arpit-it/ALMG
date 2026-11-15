@@ -95,7 +95,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Editing the query after an empty result cleared the previous error in the
   isolated Mac app and required fresh approval. In the rebuilt Mac app,
   typing immediately after opening the query editor updated its first field
-  without a click and saving kept approval pending. Live collection remains to be
+  without a click and saving kept approval pending. Clearing the last query
+  in the rebuilt Mac app removed web approval and left local generation and
+  CSV import available. Live collection remains to be
   verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
