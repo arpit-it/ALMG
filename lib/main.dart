@@ -1176,7 +1176,8 @@ class _StudioPageState extends State<StudioPage> {
               ),
             ),
             const Text(
-              'Web collection sends these queries to Brave Search. Local generation uses Qwen on this device.',
+              'Web collection sends these queries to Brave Search. ALMG uses '
+              'search result excerpts and records their source URLs.',
             ),
             for (final query in plan['queries'] as List)
               SelectableText('• $query'),

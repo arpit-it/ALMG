@@ -71,7 +71,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   empty and stale approvals leave the job pending and start no worker.
   In the isolated Mac app, approving the displayed fixture query populated
   the dataset preview and left training awaiting separate approval. This test
-  used a local search response. Live collection remains to be verified.
+  used a local search response. The rebuilt Mac app showed the exact query,
+  Brave Search as the destination, and how ALMG uses excerpts and records
+  source URLs before approval. Live collection remains to be verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
