@@ -876,6 +876,11 @@ class Handler(BaseHTTPRequestHandler):
                         job.update(status="creating_dataset", mode=mode)
                         worker = (prepare_dataset, (job,))
                     elif action == "start" and status == "dataset_ready":
+                        if job.get("recipe") == "classifier":
+                            present = {row["label"] for row in TRAINING_DATA.get(job["id"], [])}
+                            missing = [label for label in job["plan"]["labels"] if label not in present]
+                            if missing:
+                                raise ValueError("No dataset examples for: " + ", ".join(missing))
                         target = float(data["target"])
                         if not 0 < target <= 1:
                             raise ValueError("Enter a score between 0 and 1.")

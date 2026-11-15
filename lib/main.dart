@@ -1222,6 +1222,14 @@ class _StudioPageState extends State<StudioPage> {
           Text('Dataset · $count examples'),
         ],
         if (status == 'dataset_ready') ...[
+          if (job?['label_counts'] case final Map counts)
+            for (final entry in counts.entries.where(
+              (entry) => entry.value == 0,
+            ))
+              Text(
+                'No dataset examples for ${entry.key}.',
+                style: TextStyle(color: Theme.of(context).colorScheme.error),
+              ),
           if (job?['label_counts'] case final Map counts
               when counts.isNotEmpty) ...[
             Text(
@@ -1255,7 +1263,11 @@ class _StudioPageState extends State<StudioPage> {
             title: const Text('Wait for idle time and AC power'),
           ),
           FilledButton(
-            onPressed: _busy ? null : () => _approveTraining(id as String),
+            onPressed:
+                _busy ||
+                    ((job['label_counts'] as Map?)?.containsValue(0) ?? false)
+                ? null
+                : () => _approveTraining(id as String),
             child: const Text('Approve training and evaluation'),
           ),
         ],
