@@ -553,6 +553,20 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({"error": str(error)}, 404)
         if self.path == "/model":
             return self.respond(inference.status())
+        if route.path == "/models":
+            projects = {item["id"]: item["name"] for item in chat_history.list_projects()}
+            with LOCK:
+                models = [
+                    {"id": job["id"], "name": job["prompt"],
+                     "project": projects.get(job.get("project_id"), "Unknown project"),
+                     "project_id": job.get("project_id"), "recipe": job.get("recipe", "classifier"),
+                     "status": job["status"],
+                     "created_at": next((entry["timestamp"] for entry in job.get("activity", [])), None)}
+                    for job in reversed(list(JOBS.values()))
+                    if job["status"] == "passed" or (
+                        job["status"] == "preview_ready" and job["id"] in CANDIDATES)
+                ]
+            return self.respond({"models": models})
         if route.path == "/jobs":
             project_id = parse_qs(route.query).get("project_id", [None])[0]
             with LOCK:

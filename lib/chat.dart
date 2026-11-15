@@ -13,10 +13,11 @@ import 'project_settings.dart';
 /// Displays local conversations and links to model settings and training.
 class ChatPage extends StatefulWidget {
   /// Creates the chat workspace with its training destination.
-  const ChatPage({super.key, required this.trainingPage});
+  const ChatPage({super.key, required this.trainingPage, this.modelLibraryPage});
 
   /// Screen opened by the training action.
   final Widget trainingPage;
+  final Widget? modelLibraryPage;
 
   /// Creates the state that owns the chat session.
   @override
@@ -932,6 +933,14 @@ class _ChatPageState extends State<ChatPage> {
         backgroundColor: colors.surface,
         shape: Border(bottom: BorderSide(color: colors.outlineVariant)),
         actions: [
+          if (widget.modelLibraryPage case final Widget library)
+            IconButton(
+              tooltip: 'Model Library',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(builder: (_) => library),
+              ),
+              icon: const Icon(Icons.inventory_2_outlined),
+            ),
           IconButton(
             tooltip: 'Training',
             onPressed: _model != null && !_backendOffline

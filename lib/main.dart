@@ -28,14 +28,95 @@ class ModelStudio extends StatelessWidget {
       fontFamily: 'Inter',
       useMaterial3: true,
     ),
-    home: const ChatPage(trainingPage: StudioPage()),
+    home: const ChatPage(trainingPage: StudioPage(), modelLibraryPage: ModelLibraryPage()),
+  );
+}
+
+/// Lists local models across training projects.
+class ModelLibraryPage extends StatefulWidget {
+  const ModelLibraryPage({super.key});
+
+  @override
+  State<ModelLibraryPage> createState() => _ModelLibraryPageState();
+}
+
+class _ModelLibraryPageState extends State<ModelLibraryPage> {
+  final _client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
+  late Future<List<dynamic>> _models = _load();
+
+  Future<List<dynamic>> _load() async {
+    final request = await _client.getUrl(Uri.parse('http://127.0.0.1:8766/models'));
+    request.headers.set('X-Model-Studio', 'desktop');
+    final response = await request.close().timeout(const Duration(seconds: 8));
+    final data = jsonDecode(await response.transform(utf8.decoder).join()) as Map;
+    if (response.statusCode != 200) {
+      throw FormatException(data['error']?.toString() ?? 'Could not load models.');
+    }
+    return data['models'] as List;
+  }
+
+  @override
+  void dispose() {
+    _client.close(force: true);
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+    appBar: AppBar(
+      title: const Text('Model Library'),
+      actions: [
+        IconButton(
+          tooltip: 'Refresh models',
+          onPressed: () => setState(() => _models = _load()),
+          icon: const Icon(Icons.refresh),
+        ),
+      ],
+    ),
+    body: FutureBuilder<List<dynamic>>(
+      future: _models,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return const Center(child: Text('Could not load models. Check the local backend and refresh.'));
+        }
+        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        final models = snapshot.data!;
+        if (models.isEmpty) return const Center(child: Text('Trained candidates and releases will appear here.'));
+        return ListView.builder(
+          itemCount: models.length,
+          itemBuilder: (context, index) {
+            final model = models[index] as Map;
+            final created = model['created_at'] as num?;
+            final date = created == null ? '' : ' · ${MaterialLocalizations.of(context).formatCompactDate(
+              DateTime.fromMillisecondsSinceEpoch((created * 1000).round()),
+            )}';
+            final recipe = switch (model['recipe']) {
+              'diffusion' => '500M diffusion',
+              'text_to_image' => 'Text to image',
+              _ => 'Text classifier',
+            };
+            return ListTile(
+              leading: const Icon(Icons.memory),
+              title: Text(model['name'] as String, maxLines: 2, overflow: TextOverflow.ellipsis),
+              subtitle: Text("${model['project']} · $recipe · ${model['status'] == 'passed' ? 'Released' : 'Candidate'}$date"),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
+                builder: (_) => StudioPage(initialModel: model['id'] as String),
+              )),
+            );
+          },
+        );
+      },
+    ),
   );
 }
 
 /// Presents the workflow for planning and training a text classifier.
 class StudioPage extends StatefulWidget {
   /// Creates the classifier training page.
-  const StudioPage({super.key});
+  const StudioPage({super.key, this.initialModel});
+
+  final String? initialModel;
 
   /// Creates the state for the training workflow.
   @override
@@ -78,7 +159,14 @@ class _StudioPageState extends State<StudioPage> {
         () => _projects = (response['projects'] as List)
             .cast<Map<String, dynamic>>(),
       );
-      if (_projects.isNotEmpty) {
+      if (widget.initialModel case final String id) {
+        final job = await _request('/jobs/$id');
+        if (!mounted) return;
+        if (job['project_id'] case final String projectId) {
+          await _selectProject(projectId);
+        }
+        if (mounted) _openSession(job);
+      } else if (_projects.isNotEmpty) {
         await _selectProject(_projects.first['id'] as String);
       }
     } catch (error) {
