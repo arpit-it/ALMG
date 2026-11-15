@@ -1249,10 +1249,16 @@ class _StudioPageState extends State<StudioPage> {
           const SizedBox(height: 16),
           Text('Dataset · $count examples'),
         ],
-        if (status == 'queued' || status == 'waiting_idle')
+        if (status == 'queued' ||
+            status == 'waiting_idle' ||
+            status == 'training')
           OutlinedButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/cancel', {}),
-            child: const Text('Cancel queued training'),
+            child: Text(
+              status == 'training'
+                  ? 'Cancel training'
+                  : 'Cancel queued training',
+            ),
           ),
         if (status == 'dataset_ready') ...[
           if ((job?['duplicate_rows'] as int? ?? 0) > 0)

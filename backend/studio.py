@@ -559,6 +559,10 @@ def prepare_dataset(job, imported_rows=None):
         update(job, status="failed", error=str(error))
 
 
+class TrainingCancelled(Exception):
+    """Stop a training worker at its next progress boundary."""
+
+
 def run(job):
     """Train and evaluate an approved dataset, then wait for inference preview."""
     try:
@@ -582,6 +586,9 @@ def run(job):
             store_job(job)
             rows = TRAINING_DATA.pop(job["id"])
         def report(message):
+            with LOCK:
+                if job["status"] == "cancelled":
+                    raise TrainingCancelled()
             activity(job, message)
         if job.get("mode") == "web_images":
             model, rows, metrics = image_recipe.train_web(rows, job["target"], report)
@@ -589,20 +596,27 @@ def run(job):
             model, rows, metrics = image_recipe.train(rows, job["target"], report)
         else:
             model, rows, metrics = train(rows, job["plan"]["labels"], job["target"], report=report)
-        work = ROOT / "training-sessions" / job["id"]
-        (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
-        if job.get("recipe") == "text_to_image":
-            (work / "candidate.json").write_text(json.dumps(model), encoding="utf-8")
-        else:
-            joblib.dump(model, work / "candidate.joblib")
-        activity(job, "Evaluation complete. Waiting for inference preview and release approval.")
         with LOCK:
+            if job["status"] == "cancelled":
+                return
+            work = ROOT / "training-sessions" / job["id"]
+            (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
+            if job.get("recipe") == "text_to_image":
+                (work / "candidate.json").write_text(json.dumps(model), encoding="utf-8")
+            else:
+                joblib.dump(model, work / "candidate.joblib")
             CANDIDATES[job["id"]] = (model, rows, metrics)
             job.update(status="preview_ready", metrics=metrics, examples=len(rows),
                        preview_count=0, candidate_directory=str(work))
             store_job(job)
+        activity(job, "Evaluation complete. Waiting for inference preview and release approval.")
+    except TrainingCancelled:
+        return
     except Exception as error:
-        update(job, status="failed", error=str(error))
+        with LOCK:
+            if job["status"] != "cancelled":
+                job.update(status="failed", error=str(error))
+                store_job(job)
 
 
 def export_candidate(job, candidate):
@@ -950,7 +964,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the exact search queries first.")
                         job.update(status="creating_dataset", mode=mode)
                         worker = (prepare_dataset, (job,))
-                    elif action == "cancel" and status in ("queued", "waiting_idle"):
+                    elif action == "cancel" and status in ("queued", "waiting_idle", "training"):
                         job.update(status="cancelled", error=None)
                         store_job(job)
                         TRAINING_DATA.pop(job["id"], None)
