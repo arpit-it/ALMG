@@ -203,7 +203,6 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
                             ? ''
                             : ' · ${MaterialLocalizations.of(context).formatCompactDate(DateTime.fromMillisecondsSinceEpoch((created * 1000).round()))}';
                         final recipe = switch (model['recipe']) {
-                          'diffusion' => '500M diffusion',
                           'text_to_image' => 'Text to image',
                           _ => 'Text classifier',
                         };
@@ -813,7 +812,7 @@ class _StudioPageState extends State<StudioPage> {
                 "${candidate['url']}\n${candidate['license'] ?? 'License unavailable'}",
               ),
             ),
-          if ((job!['image_candidates'] as List).isNotEmpty)
+          if ((job['image_candidates'] as List).isNotEmpty)
             FilledButton(
               onPressed: _busy
                   ? null

@@ -3,6 +3,7 @@
 import base64
 import io
 import re
+import unicodedata
 
 import numpy as np
 from PIL import Image
@@ -112,13 +113,15 @@ def web_dataset(candidates, read_image, report):
                 if image.format not in {"JPEG", "PNG", "WEBP"} or image.width * image.height > 24_000_000:
                     raise ValueError("Unsupported image format or dimensions.")
                 thumbnail = image.convert("RGB").resize((SIZE, SIZE), Image.Resampling.LANCZOS)
+            caption = re.sub(r"_+", " ", candidate["title"].rsplit(".", 1)[0]).strip()
+            if not any(character.isalpha() for character in caption):
+                report(f"Skipped {candidate['title']}: filename has no caption text.")
+                continue
             signature = hashlib.sha256(thumbnail.tobytes()).hexdigest()
             if signature in seen:
+                report(f"Skipped {candidate['title']}: duplicate image.")
                 continue
             seen.add(signature)
-            caption = re.sub(r"[_]+", " ", candidate["title"].rsplit(".", 1)[0]).strip()
-            if not re.search(r"[a-zA-Z]", caption):
-                continue
             with io.BytesIO() as output:
                 thumbnail.save(output, format="PNG")
                 encoded = base64.b64encode(output.getvalue()).decode("ascii")
@@ -131,9 +134,14 @@ def web_dataset(candidates, read_image, report):
     if len(rows) < 5:
         raise ValueError("At least five distinct captioned images are needed. Try a broader query.")
     rows.sort(key=lambda row: row["sha256"])
-    test_captions = {row["text"].casefold() for row in rows[::5]}
-    for row in rows:
-        row["split"] = "test" if row["text"].casefold() in test_captions else "train"
+    # Hold punctuation and Unicode formatting variants together across the split.
+    groups = [
+        tuple(re.findall(r"[^\W_]+", unicodedata.normalize("NFKC", row["text"]).casefold()))
+        for row in rows
+    ]
+    test_captions = set(list(dict.fromkeys(groups))[::5])
+    for row, group in zip(rows, groups):
+        row["split"] = "test" if group in test_captions else "train"
     if sum(row["split"] == "train" for row in rows) < 3:
         raise ValueError("Need more distinct captions for training and evaluation.")
     return rows

@@ -6,6 +6,7 @@ import platform
 from pickle import UnpicklingError
 import re
 import socket
+import ssl
 import signal
 import subprocess
 import sys
@@ -18,8 +19,9 @@ from html import unescape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlsplit
-from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler
+from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler, HTTPSHandler
 
+import certifi
 import joblib
 from sklearn.base import clone
 from sklearn.dummy import DummyClassifier
@@ -39,7 +41,9 @@ else:
 
 ROOT = Path(os.environ.get("STUDIO_DATA", Path(__file__).resolve().parent / "runs"))
 MODEL = inference.MODEL
-LOCAL = build_opener(ProxyHandler({}))
+TLS = ssl.create_default_context()
+TLS.load_verify_locations(certifi.where())
+LOCAL = build_opener(ProxyHandler({}), HTTPSHandler(context=TLS))
 LOCK = threading.Lock()
 JOBS = {}
 CHAT_STREAMS = {}
@@ -453,7 +457,7 @@ def read_approved_image(url):
     if location.scheme != "https" or location.netloc != "upload.wikimedia.org":
         raise ValueError("Image is outside the approved Commons host.")
     request = Request(url, headers={"User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)"})
-    with build_opener(NoImageRedirects()).open(request, timeout=15) as response:
+    with build_opener(NoImageRedirects(), HTTPSHandler(context=TLS)).open(request, timeout=15) as response:
         limit = 8 * 1024 * 1024
         payload = response.read(limit + 1)
         if len(payload) > limit:
@@ -552,16 +556,13 @@ def export_candidate(job, candidate):
 
 def missing_model_files(job):
     """Check the local files required to run a saved model."""
-    image = job.get("recipe") in ("text_to_image", "diffusion")
+    image = job.get("recipe") == "text_to_image"
     if job["status"] == "passed":
         folder = ROOT / job["id"]
         files = ["model.json" if image else "model.joblib"]
     else:
         folder = ROOT / "training-sessions" / job["id"]
         files = ["candidate.json" if image else "candidate.joblib"]
-        if job.get("recipe") == "diffusion":
-            folder = ROOT / "projects" / job["project_id"] / job["id"]
-            files.append("diffusion.pt")
     return [name for name in files if not (folder / name).is_file()]
 
 
@@ -812,7 +813,7 @@ class Handler(BaseHTTPRequestHandler):
                         target = float(data["target"])
                         if not 0 < target <= 1:
                             raise ValueError("Enter a score between 0 and 1.")
-                        job.update(status="queued", target=target, idle=data.get("idle") is True)
+                        job.update(status="queued", target=target, idle=data.get("idle") is True, error=None)
                         worker = (run, (job,))
                     elif action == "preview" and status in ("preview_ready", "passed"):
                         prompt = data["text"].strip()
