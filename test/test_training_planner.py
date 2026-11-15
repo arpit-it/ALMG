@@ -1,7 +1,9 @@
 """Offline coverage for goal-based training workflow selection."""
 
+import io
+import json
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from backend import studio
 
@@ -53,3 +55,21 @@ class TrainingPlannerTest(unittest.TestCase):
         self.assertEqual(job["recipe"], "classifier")
         self.assertEqual(job["status"], "approval")
         self.assertEqual(job["plan"], proposal)
+
+    def test_web_collection_rejects_empty_or_stale_approval(self):
+        for proposed, approved in (([], []), (["updated query"], ["old query"])):
+            with self.subTest(proposed=proposed, approved=approved):
+                job = {"status": "approval", "recipe": "classifier",
+                       "plan": {"queries": proposed}}
+                body = json.dumps({"mode": "web", "approved_queries": approved}).encode()
+                handler = Mock(path="/jobs/fixture/prepare",
+                               headers={"Content-Length": str(len(body))},
+                               rfile=io.BytesIO(body))
+                with patch.object(studio, "JOBS", {"fixture": job}), \
+                     patch.object(studio.threading, "Thread") as worker:
+                    studio.Handler.do_POST(handler)
+                handler.respond.assert_called_once_with(
+                    {"error": "Approve the exact search queries first."}, 400
+                )
+                self.assertEqual(job["status"], "approval")
+                worker.assert_not_called()
