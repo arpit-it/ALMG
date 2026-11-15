@@ -1040,7 +1040,10 @@ class Handler(BaseHTTPRequestHandler):
                                 or any(not isinstance(query, str) or not 0 < len(query.strip()) <= 160
                                        for query in queries)):
                             raise ValueError("Enter a query of 1 to 160 characters for each item.")
-                        job["plan"] = {**job["plan"], "queries": [query.strip() for query in queries]}
+                        queries = [query.strip() for query in queries]
+                        if len(set(queries)) != len(queries):
+                            raise ValueError("Remove repeated search queries before saving.")
+                        job["plan"] = {**job["plan"], "queries": queries}
                         job["error"] = None
                         store_job(job)
                         return self.respond({"id": job["id"]})

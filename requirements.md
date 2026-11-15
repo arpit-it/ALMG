@@ -99,6 +99,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   in the rebuilt Mac app removed web approval and left local generation and
   CSV import available. The rebuilt Mac app also accepted a new query on
   that empty proposal and showed it with web approval still pending.
+  Saving the same query twice in the isolated Mac app showed a validation
+  message and kept the original proposal pending approval.
   Live collection remains to be verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
