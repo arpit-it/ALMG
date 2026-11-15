@@ -258,9 +258,8 @@ class _StudioPageState extends State<StudioPage> {
   final _previewInput = TextEditingController();
   final _conversation = <(String, String)>[];
   final _predictions = <(String, String, String?)>[];
-  String _recipe = 'text_to_image';
 
-  bool get _imageRecipe => (_job?['recipe'] ?? _recipe) == 'text_to_image';
+  bool get _imageRecipe => _job?['recipe'] == 'text_to_image';
   Map<String, dynamic>? _job;
   String? _error;
   bool _busy = false;
@@ -352,7 +351,6 @@ class _StudioPageState extends State<StudioPage> {
     _resetSession();
     setState(() {
       _job = job;
-      _recipe = job['recipe'] as String? ?? 'classifier';
       _conversation.addAll(
         (job['messages'] as List? ?? []).map((text) => ('You', text as String)),
       );
@@ -559,6 +557,7 @@ class _StudioPageState extends State<StudioPage> {
         (status == null ||
             {
               'approval',
+              'clarification',
               'preview_ready',
               'failed',
               'passed',
@@ -580,28 +579,12 @@ class _StudioPageState extends State<StudioPage> {
                 const Text(
                   'Create a project in Chat to begin a training conversation.',
                 ),
-              if (_job == null && !_busy)
-                DropdownButton<String>(
-                  value: _recipe,
-                  items: const [
-                    DropdownMenuItem(
-                      value: 'text_to_image',
-                      child: Text('Text to image'),
-                    ),
-                    DropdownMenuItem(
-                      value: 'classifier',
-                      child: Text('Text classifier'),
-                    ),
-                  ],
-                  onChanged: (value) => setState(() => _recipe = value!),
-                ),
-              Text(
-                _imageRecipe
-                    ? 'Train a small generator for single colored shapes using synthetic examples.'
-                    : 'Describe the text to classify and the categories it should recognize.',
-              ),
+              if (_job == null)
+                const Text('Describe what the model should do and give an example of its input and output.'),
               for (final (speaker, message) in _conversation)
                 _message(speaker, message),
+              if (_job?['planner_message'] case final String explanation)
+                _message('Qwen', explanation),
               if (_job?['plan'] case final Map plan when !_imageRecipe)
                 _message(
                   'Qwen',
@@ -663,7 +646,7 @@ class _StudioPageState extends State<StudioPage> {
   Future<void> _sendGoal() async {
     final text = _prompt.text.trim();
     if (text.length < 5) return;
-    final previous = {'approval', 'preview_ready'}.contains(_job?['status'])
+    final previous = {'approval', 'clarification', 'preview_ready'}.contains(_job?['status'])
         ? (_job!['prompt'] as String?)
         : null;
     final goal = previous == null
@@ -683,7 +666,6 @@ class _StudioPageState extends State<StudioPage> {
     });
     await _submit('/jobs', {
       'project_id': _project,
-      'recipe': _recipe,
       'prompt': goal,
       'message': text,
       if (previous != null) 'previous_id': _job?['id'],
@@ -701,6 +683,7 @@ class _StudioPageState extends State<StudioPage> {
     final states = {
       'planning': 'Qwen is drafting the plan',
       'approval': 'Dataset approval required',
+      'clarification': 'Waiting for more details',
       'searching_images': 'Searching for images',
       'image_candidates': 'Image search results',
       'creating_dataset': 'Preparing dataset',
@@ -762,6 +745,8 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (job?['error'] case final String error) SelectableText(error),
+        if (plan != null)
+          Text(_imageRecipe ? 'Workflow: Text to image' : 'Workflow: Text classification'),
         if (plan != null && !_imageRecipe) ...[
           const SizedBox(height: 16),
           Text('Labels: ${(plan['labels'] as List).join(', ')}'),

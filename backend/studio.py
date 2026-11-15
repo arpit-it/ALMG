@@ -70,6 +70,34 @@ def ask(system, data):
     return result
 
 
+TRAINING_RECIPES = {
+    "classifier": "Supervised text classification. Compare candidate classifiers and evaluate a held-out split.",
+    "text_to_image": "Experimental 48×48 image generation from captioned Commons images or synthetic shapes.",
+}
+
+
+def choose_recipe(goal):
+    """Ask Qwen to route a goal using only the registered training capabilities."""
+    result = ask(
+        'Select one registered recipe that can deliver the requested result. '
+        'Return JSON with recipe (a registered ID or null), reason (short text), '
+        'and query (one short public search query for text_to_image). If the goal '
+        'is unclear, ask a clarifying question in reason with recipe=null. '
+        'If it needs an unsupported recipe or combination, explain the limitation '
+        'with recipe=null. Do not execute tools or include private details in queries.',
+        {"goal": goal, "recipes": TRAINING_RECIPES},
+    )
+    recipe, reason = result.get("recipe"), result.get("reason")
+    if not isinstance(reason, str) or not reason.strip() or len(reason) > 600:
+        raise ValueError("Qwen did not return a valid workflow explanation.")
+    if recipe is not None and (not isinstance(recipe, str) or recipe not in TRAINING_RECIPES):
+        raise ValueError("Qwen proposed an unavailable training recipe.")
+    query = result.get("query")
+    if recipe == "text_to_image" and (not isinstance(query, str) or not 0 < len(query.strip()) <= 160):
+        raise ValueError("Qwen did not return a valid image search query.")
+    return recipe, reason.strip(), query
+
+
 def plan(prompt):
     """Build a dataset plan from the requested classification task."""
     result = ask(
@@ -337,19 +365,28 @@ def restore_jobs():
             output = ROOT / job["id"]
             if job["status"] == "exporting" and output.is_dir():
                 job.update(status="passed", output=str(output))
-            elif job["status"] == "dataset_ready":
+            elif job["status"] in ("dataset_ready", "queued", "waiting_idle"):
                 TRAINING_DATA[job["id"]] = json.loads(
-                    (record.parent / job["id"] / "dataset.json").read_text(encoding="utf-8")
+                    ((ROOT / "training-sessions" / job["id"]) / "dataset.json").read_text(encoding="utf-8")
                 )
+                if job["status"] != "dataset_ready":
+                    job.update(status="dataset_ready",
+                               error="The backend restarted before training began. Approve training to queue it again.")
+                    store_job(job)
             elif job["status"] == "preview_ready":
-                work = record.parent / job["id"]
+                work = ROOT / "training-sessions" / job["id"]
                 if job.get("recipe") == "text_to_image":
                     candidate = json.loads((work / "candidate.json").read_text(encoding="utf-8"))
                 else:
                     candidate = joblib.load(work / "candidate.joblib")
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
-            elif job["status"] not in ("approval", "failed", "passed", "needs_review"):
+            elif job["status"] == "approval" and job.get("recipe") == "text_to_image":
+                proposal = job.get("plan") or {"labels": []}
+                if not proposal.get("queries"):
+                    proposal["queries"] = [job["prompt"].strip()[:160]]
+                    job["plan"] = proposal
+            elif job["status"] not in ("approval", "image_candidates", "clarification", "failed", "passed", "needs_review"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -721,8 +758,8 @@ class Handler(BaseHTTPRequestHandler):
                 prompt = data["prompt"].strip()
                 if not 5 <= len(prompt) <= 3000:
                     raise ValueError("Enter a goal of 5 to 3000 characters.")
-                recipe = data.get("recipe", "classifier")
-                if recipe not in ("classifier", "text_to_image"):
+                recipe = data.get("recipe")
+                if recipe is not None and (not isinstance(recipe, str) or recipe not in TRAINING_RECIPES):
                     raise ValueError("Unknown training recipe.")
                 project_id = data.get("project_id")
                 if not isinstance(project_id, str) or not project_id:
@@ -817,14 +854,22 @@ class Handler(BaseHTTPRequestHandler):
     def make_plan(job):
         """Generate the dataset plan and record success or failure on the job."""
         try:
-            if job.get("recipe") == "text_to_image":
-                activity(job, "Local shape dataset plan ready. Waiting for approval.")
-                update(job, plan={"labels": [], "queries": [job["prompt"].strip()[:160]]}, status="approval")
-                return
-            activity(job, "Qwen is drafting labels and data collection queries from the model goal.")
-            proposal = plan(job["prompt"])
+            recipe = job.get("recipe")
+            reason = None
+            query = job["prompt"].strip()[:160]
+            if recipe is None:
+                activity(job, "Qwen is choosing a training workflow.")
+                recipe, reason, query = choose_recipe(job["prompt"])
+                if recipe is None:
+                    update(job, planner_message=reason, status="clarification")
+                    return
+            if recipe == "text_to_image":
+                proposal = {"labels": [], "queries": [query.strip()]}
+            else:
+                activity(job, "Qwen is drafting labels and data collection queries from the model goal.")
+                proposal = plan(job["prompt"])
             activity(job, "Plan ready. Waiting for dataset approval.")
-            update(job, plan=proposal, status="approval")
+            update(job, recipe=recipe, planner_message=reason, plan=proposal, status="approval")
         except Exception as error:
             update(job, status="failed", error=str(error))
 
