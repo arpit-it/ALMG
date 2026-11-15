@@ -567,6 +567,8 @@ def prepare_dataset(job, imported_rows=None):
             rows = image_recipe.dataset()
         else:
             rows = collect(job) if job["mode"] == "web" else synthesize(job)
+            if job["mode"] == "web" and not rows:
+                raise ValueError("No usable examples found. Edit the web queries or choose a local dataset.")
         work = ROOT / "training-sessions" / job["id"]
         work.mkdir(parents=True, exist_ok=True)
         (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
