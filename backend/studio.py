@@ -625,7 +625,10 @@ def prepare_dataset(job, imported_rows=None):
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:
-        update(job, status="failed", error=str(error))
+        if job.get("mode") == "web":
+            update(job, status="approval", mode=None, error=str(error))
+        else:
+            update(job, status="failed", error=str(error))
 
 
 class TrainingCancelled(Exception):
@@ -1023,11 +1026,11 @@ class Handler(BaseHTTPRequestHandler):
                         urls = [candidate["url"] for candidate in job["image_candidates"]]
                         if not urls or data.get("approved_urls") != urls:
                             raise ValueError("Approve the exact candidate URLs before downloading.")
-                        job.update(status="creating_dataset", mode="web_images")
+                        job.update(status="creating_dataset", error=None, mode="web_images")
                         worker = (prepare_dataset, (job,))
                     elif action == "import-csv" and status == "approval" and job.get("recipe") == "classifier":
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
-                        job.update(status="creating_dataset", mode="local_csv")
+                        job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))
                     elif action == "prepare" and status == "approval":
                         mode = data.get("mode")
@@ -1040,7 +1043,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the exact search queries first.")
                         if mode == "web" and not os.environ.get("BRAVE_SEARCH_API_KEY"):
                             raise ValueError("Set BRAVE_SEARCH_API_KEY on the Python backend to use web search.")
-                        job.update(status="creating_dataset", mode=mode)
+                        job.update(status="creating_dataset", error=None, mode=mode)
                         worker = (prepare_dataset, (job,))
                     elif action == "cancel" and status in ("queued", "waiting_idle", "training"):
                         job.update(status="cancelled", error=None)
