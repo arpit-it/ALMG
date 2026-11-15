@@ -1039,6 +1039,7 @@ class Handler(BaseHTTPRequestHandler):
                                        for query in queries)):
                             raise ValueError("Enter a query of 1 to 160 characters for each item.")
                         job["plan"] = {**job["plan"], "queries": [query.strip() for query in queries]}
+                        job["error"] = None
                         store_job(job)
                         return self.respond({"id": job["id"]})
                     if action == "search-images" and status == "approval" and job.get("recipe") == "text_to_image":

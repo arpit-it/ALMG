@@ -92,7 +92,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   examples and URLs in the Mac app before separate training approval.
   A Mac web fixture preserved both original URLs in the preview while the
   saved dataset grouped hostname variants with different ports together.
-  Live collection remains to be verified.
+  Editing the query after an empty result cleared the previous error in the
+  isolated Mac app and required fresh approval. Live collection remains to be
+  verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
