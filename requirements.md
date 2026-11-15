@@ -73,6 +73,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   the dataset preview and left training awaiting separate approval. This test
   used a local search response. Live collection remains to be verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
+  The isolated Mac app showed one billing example and zero shipping examples
+  in the class balance preview while training approval was pending. Dataset
+  import, additional quality flags, and split verification remain open.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
 - [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
 

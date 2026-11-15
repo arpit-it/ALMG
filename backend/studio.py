@@ -483,10 +483,15 @@ def prepare_dataset(job):
         work = ROOT / "training-sessions" / job["id"]
         work.mkdir(parents=True, exist_ok=True)
         (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
+        label_counts = {}
+        if job.get("recipe") == "classifier":
+            label_counts = dict.fromkeys(job["plan"]["labels"], 0)
+            for row in rows:
+                label_counts[row["label"]] += 1
         activity(job, f"Prepared {len(rows)} examples. Waiting for training approval.")
         with LOCK:
             TRAINING_DATA[job["id"]] = rows
-            job.update(status="dataset_ready", examples=len(rows),
+            job.update(status="dataset_ready", examples=len(rows), label_counts=label_counts,
                        preview=[{"text": row["text"][:500], "label": row["label"],
                                  **{key: row[key] for key in ("image", "source", "license") if key in row}}
                                 for row in rows[:5]])

@@ -1222,6 +1222,15 @@ class _StudioPageState extends State<StudioPage> {
           Text('Dataset · $count examples'),
         ],
         if (status == 'dataset_ready') ...[
+          if (job?['label_counts'] case final Map counts
+              when counts.isNotEmpty) ...[
+            Text(
+              'Class balance',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            for (final entry in counts.entries)
+              Text('${entry.key}: ${entry.value}'),
+          ],
           for (final row in job!['preview'] as List)
             ListTile(
               contentPadding: EdgeInsets.zero,
