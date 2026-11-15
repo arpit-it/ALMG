@@ -63,8 +63,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   pending. In the isolated Mac build, changing the proposed macro F1 target
   to 0.92 left dataset approval pending. The isolated Mac app also saved a
   change from 40 to 25 local examples per label without approving generation.
-  An offline fixture produced 25 examples for each of two labels. Verifying
-  provenance in exports remains open.
+  An offline fixture produced 25 examples for each of two labels. The isolated
+  Mac app released a web classifier fixture after inference preview. Its export
+  contained the approved queries and source URLs, with each row linked to its
+  query. Live web consent and collection remain to be verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
 - [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.

@@ -147,7 +147,8 @@ def collect(job):
             group = location.netloc.lower().removeprefix("www.")
             if location.scheme in ("https", "http") and group and len(snippet) >= 40 and snippet not in seen:
                 seen.add(snippet)
-                candidates.append({"text": snippet[:450], "source": source, "group": group})
+                candidates.append({"text": snippet[:450], "source": source,
+                                   "approved_query": query, "group": group})
         time.sleep(1)
     rows = []
     for start in range(0, len(candidates), 15):
@@ -541,6 +542,15 @@ def export_candidate(job, candidate):
             with (files / "dataset.jsonl").open("w", encoding="utf-8") as dataset:
                 for row in rows:
                     dataset.write(json.dumps(row, ensure_ascii=False) + "\n")
+            if job.get("mode") == "web":
+                provenance = {
+                    "approved_queries": job["plan"]["queries"],
+                    "source_urls": sorted({row["source"] for row in rows
+                                           if row.get("source", "").startswith(("http://", "https://"))}),
+                }
+                (files / "dataset-provenance.json").write_text(
+                    json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8",
+                )
             (files / "report.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
             activity(job, "Saving the trained model.")
             if job.get("recipe") == "text_to_image":
