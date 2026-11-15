@@ -104,7 +104,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   fixture showed its two same-label Unicode variants first and reported one
   near-duplicate group while training approval remained pending. A separate
   Mac import grouped “Pay invoice” and “Pay invoice!” together and kept
-  training approval pending. In the rebuilt
+  training approval pending. The isolated Mac app also flagged “Invoice” and
+  “Ｉｎｖｏｉｃｅ!” as one group. Single tokens shorter than five characters
+  still use exact matching. In the rebuilt
   Mac app, a quoted multiline CSV record showed its ending line as 3 and the
   following record showed line 4 while training awaited approval. The isolated
   Mac app also imported the same fixture with carriage-return line endings

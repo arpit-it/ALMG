@@ -203,6 +203,11 @@ def classifier_variant_key(text):
     return tuple(re.findall(r"[^\W_]+", unicodedata.normalize("NFKC", text).casefold()))
 
 
+def comparable_classifier_words(words):
+    """Match phrases and single words long enough to distinguish from codes."""
+    return len(words) >= 2 or (len(words) == 1 and len(words[0]) >= 5)
+
+
 def classifier_split_groups(rows):
     """Keep source groups and normalized text variants in the same split."""
     parents = {}
@@ -215,7 +220,7 @@ def classifier_split_groups(rows):
 
     for row in rows:
         words = classifier_variant_key(row["text"])
-        key = words if len(words) >= 2 else " ".join(row["text"].casefold().split())
+        key = words if comparable_classifier_words(words) else " ".join(row["text"].casefold().split())
         group = root(row["group"])
         related = root(groups_by_words.setdefault(key, group))
         if group != related:
@@ -304,7 +309,7 @@ def train(rows, labels, target, repair=None, report=None):
         for row in repaired:
             key = " ".join(row["text"].casefold().split())
             words = classifier_variant_key(key)
-            if key in known or (len(words) >= 2 and words in known_variants):
+            if key in known or (comparable_classifier_words(words) and words in known_variants):
                 continue
             known.add(key)
             known_variants.add(words)
@@ -571,7 +576,7 @@ def prepare_dataset(job, imported_rows=None):
                 normalized = " ".join(row["text"].casefold().split())
                 labels_by_text.setdefault(normalized, []).append(row["label"])
                 words = classifier_variant_key(normalized)
-                if len(words) >= 2:
+                if comparable_classifier_words(words):
                     texts_by_words.setdefault(words, set()).add(normalized)
                     labels_by_words.setdefault(words, set()).add(row["label"])
         conflicting_variants = sum(
