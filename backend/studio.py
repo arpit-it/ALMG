@@ -511,11 +511,11 @@ def read_classifier_csv(content, labels):
     """Parse a local CSV with text and label columns."""
     if not isinstance(content, str):
         raise ValueError("Choose a UTF-8 CSV file.")
-    reader = csv.DictReader(io.StringIO(content.removeprefix("\ufeff")), strict=True)
-    if reader.fieldnames != ["text", "label"]:
-        raise ValueError("Use CSV columns text,label in that order.")
+    reader = csv.DictReader(io.StringIO(content.removeprefix("\ufeff"), newline=""), strict=True)
     rows = []
     try:
+        if reader.fieldnames != ["text", "label"]:
+            raise ValueError("Use CSV columns text,label in that order.")
         for row in reader:
             body = (row["text"] or "").strip()
             label = (row["label"] or "").strip()
