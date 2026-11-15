@@ -1063,6 +1063,16 @@ class _StudioPageState extends State<StudioPage> {
           const SizedBox(height: 16),
           Text('Labels: ${(plan['labels'] as List).join(', ')}'),
         ],
+        if (status == 'approval' || status == 'dataset_ready')
+          TextField(
+            controller: _target,
+            keyboardType: const TextInputType.numberWithOptions(decimal: true),
+            decoration: InputDecoration(
+              labelText: _imageRecipe
+                  ? 'Target pixel score (0–1)'
+                  : 'Target macro F1 (0–1)',
+            ),
+          ),
         if (status == 'approval' && plan != null) ...[
           if (!_imageRecipe)
             TextButton.icon(
@@ -1180,15 +1190,6 @@ class _StudioPageState extends State<StudioPage> {
                       height: 48,
                     ),
             ),
-          TextField(
-            controller: _target,
-            keyboardType: const TextInputType.numberWithOptions(decimal: true),
-            decoration: InputDecoration(
-              labelText: _imageRecipe
-                  ? 'Target pixel score (0–1)'
-                  : 'Target macro F1 (0–1)',
-            ),
-          ),
           SwitchListTile(
             contentPadding: EdgeInsets.zero,
             value: _idle,
