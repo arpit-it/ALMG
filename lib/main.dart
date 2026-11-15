@@ -110,6 +110,7 @@ class ModelLibraryPage extends StatefulWidget {
 class _ModelLibraryPageState extends State<ModelLibraryPage> {
   final _client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
   late Future<List<dynamic>> _models = _load();
+  String _query = '';
 
   Future<List<dynamic>> _load() async {
     final request = await _client.getUrl(
@@ -158,48 +159,79 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final models = snapshot.data!;
-        if (models.isEmpty) {
+        final allModels = snapshot.data!.cast<Map>();
+        if (allModels.isEmpty) {
           return const Center(
             child: Text('Trained candidates and releases will appear here.'),
           );
         }
-        return ListView.builder(
-          itemCount: models.length,
-          itemBuilder: (context, index) {
-            final model = models[index] as Map;
-            final missing = (model['missing_files'] as List?) ?? const [];
-            final availability = missing.isEmpty
-                ? ''
-                : '\nMissing local files: ${missing.join(', ')}';
-            final created = model['created_at'] as num?;
-            final date = created == null
-                ? ''
-                : ' · ${MaterialLocalizations.of(context).formatCompactDate(DateTime.fromMillisecondsSinceEpoch((created * 1000).round()))}';
-            final recipe = switch (model['recipe']) {
-              'diffusion' => '500M diffusion',
-              'text_to_image' => 'Text to image',
-              _ => 'Text classifier',
-            };
-            return ListTile(
-              leading: const Icon(Icons.memory),
-              title: Text(
-                model['name'] as String,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-              ),
-              subtitle: Text(
-                "${model['project']} · $recipe · ${model['status'] == 'passed' ? 'Released' : 'Candidate'}$date$availability",
-              ),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: missing.isNotEmpty ? null : () => Navigator.of(context).push(
-                MaterialPageRoute<void>(
-                  builder: (_) =>
-                      StudioPage(initialModel: model['id'] as String),
+        final query = _query.trim().toLowerCase();
+        final models = allModels.where((model) {
+          return [
+            model['name'],
+            model['project'],
+          ].any((value) => value.toString().toLowerCase().contains(query));
+        }).toList();
+        return Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: TextFormField(
+                initialValue: _query,
+                onChanged: (value) => setState(() => _query = value),
+                decoration: const InputDecoration(
+                  labelText: 'Search models or projects',
+                  prefixIcon: Icon(Icons.search),
+                  border: OutlineInputBorder(),
                 ),
               ),
-            );
-          },
+            ),
+            Expanded(
+              child: models.isEmpty
+                  ? const Center(child: Text('No matching models.'))
+                  : ListView.builder(
+                      itemCount: models.length,
+                      itemBuilder: (context, index) {
+                        final model = models[index];
+                        final missing =
+                            (model['missing_files'] as List?) ?? const [];
+                        final availability = missing.isEmpty
+                            ? ''
+                            : '\nMissing local files: ${missing.join(', ')}';
+                        final created = model['created_at'] as num?;
+                        final date = created == null
+                            ? ''
+                            : ' · ${MaterialLocalizations.of(context).formatCompactDate(DateTime.fromMillisecondsSinceEpoch((created * 1000).round()))}';
+                        final recipe = switch (model['recipe']) {
+                          'diffusion' => '500M diffusion',
+                          'text_to_image' => 'Text to image',
+                          _ => 'Text classifier',
+                        };
+                        return ListTile(
+                          leading: const Icon(Icons.memory),
+                          title: Text(
+                            model['name'] as String,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          subtitle: Text(
+                            "${model['project']} · $recipe · ${model['status'] == 'passed' ? 'Released' : 'Candidate'}$date$availability",
+                          ),
+                          trailing: const Icon(Icons.chevron_right),
+                          onTap: missing.isNotEmpty
+                              ? null
+                              : () => Navigator.of(context).push(
+                                  MaterialPageRoute<void>(
+                                    builder: (_) => StudioPage(
+                                      initialModel: model['id'] as String,
+                                    ),
+                                  ),
+                                ),
+                        );
+                      },
+                    ),
+            ),
+          ],
         );
       },
     ),
