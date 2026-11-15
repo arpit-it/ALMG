@@ -438,6 +438,10 @@ def restore_jobs():
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
                 job["candidate_directory"] = str(work)
+            elif job["status"] == "creating_dataset" and job.get("mode") == "web":
+                job.update(status="approval", mode=None,
+                           error="Web collection was interrupted. Review and approve the queries to retry.")
+                store_job(job)
             elif job["status"] == "approval" and job.get("recipe") == "text_to_image":
                 proposal = job.get("plan") or {"labels": []}
                 if not proposal.get("queries"):
