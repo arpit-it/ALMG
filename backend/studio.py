@@ -200,7 +200,11 @@ def synthesize(job):
 
 def classifier_variant_key(text):
     """Return matching words for Unicode presentation and punctuation variants."""
-    return tuple(re.findall(r"[^\W_]+", unicodedata.normalize("NFKC", text).casefold()))
+    normalized = unicodedata.normalize("NFKC", text).casefold()
+    return tuple("".join(
+        char if unicodedata.category(char)[0] in ("L", "M", "N") else " "
+        for char in normalized
+    ).split())
 
 
 def comparable_classifier_words(words):

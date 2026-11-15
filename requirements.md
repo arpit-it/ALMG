@@ -122,6 +122,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Mac app trained a 32-row CSV with a duplicate shared by two source groups
   and reached inference preview with held-out macro F1 of 1.000. The saved
   split assigned both groups to the test set and excluded the duplicate.
+  A Mac CSV import grouped a Devanagari punctuation variant while preserving
+  a distinct vowel mark and showing no false label conflict.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
   After a backend restart, the isolated Mac app reopened a saved classifier
   candidate with its activity, held-out score, and folder containing the model
