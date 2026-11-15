@@ -114,3 +114,35 @@ class ModelSetupTest(unittest.TestCase):
             self.assertEqual(setup.status()["phase"], "pausing")
             with self.assertRaises(Paused):
                 setup.check_stop()
+
+    def test_resume_after_restart_verifies_partial_checkpoint(self):
+        """Resume a partial checkpoint from disk and verify the completed file."""
+        import httpx2 as httpx
+
+        with tempfile.TemporaryDirectory() as directory:
+            setup = ModelSetup("example/model", Path(directory))
+            name = "model.safetensors"
+            data = b"weights"
+            digest = hashlib.sha256(data).hexdigest()
+            manifest = {"revision": "test", "files": [[name, len(data), digest]]}
+            setup.write(setup.manifest_path, manifest)
+            setup.partial(name, digest).write_bytes(data[:3])
+
+            restarted = ModelSetup("example/model", Path(directory))
+            self.assertEqual(restarted.status()["phase"], "paused")
+            self.assertEqual(restarted.status()["downloaded_bytes"], 3)
+
+            def serve_range(request):
+                self.assertEqual(request.headers["Range"], "bytes=3-")
+                return httpx.Response(
+                    206, headers={"Content-Range": "bytes 3-6/7"}, content=data[3:]
+                )
+
+            with httpx.Client(transport=httpx.MockTransport(serve_range)) as client:
+                with patch("huggingface_hub.utils.get_session", return_value=client):
+                    with patch.object(restarted, "manifest", return_value=manifest):
+                        restarted.run("resume")
+
+            self.assertEqual(restarted.status()["phase"], "ready", restarted.status())
+            self.assertEqual((Path(directory) / name).read_bytes(), data)
+            self.assertFalse(restarted.partial(name, digest).exists())

@@ -37,7 +37,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and Restart backend restored Connected and Verified and ready to use.
   Offline tests now cover acknowledgment before shutdown and rejection of
   stop requests for manually started backends. Automated restart coverage
-  remains pending.
+  remains pending. An offline checkpoint test covers resuming a partial file
+  after restart and verifying its checksum. In the isolated Mac app, Settings
+  resumed the local fixture and reported Verified and ready to use.
 
 ## P1 · Make text-classifier training reliable
 
