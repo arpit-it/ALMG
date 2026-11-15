@@ -680,13 +680,18 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
-  /// Sends a training command and refreshes the returned job.
-  Future<void> _editQueries(String id, List queries) async {
-    final values = queries.cast<String>().toList();
+  Future<void> _editPlanItems(
+    String id,
+    List items, {
+    bool labels = false,
+  }) async {
+    final values = items.cast<String>().toList();
+    final itemName = labels ? 'Label' : 'Query';
+    final field = labels ? 'labels' : 'queries';
     final edited = await showDialog<List<String>>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Edit web queries'),
+        title: Text(labels ? 'Edit labels' : 'Edit web queries'),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -695,7 +700,9 @@ class _StudioPageState extends State<StudioPage> {
                 TextFormField(
                   initialValue: values[index],
                   maxLength: 160,
-                  decoration: InputDecoration(labelText: 'Query ${index + 1}'),
+                  decoration: InputDecoration(
+                    labelText: '$itemName ${index + 1}',
+                  ),
                   onChanged: (value) => values[index] = value,
                 ),
             ],
@@ -708,13 +715,13 @@ class _StudioPageState extends State<StudioPage> {
           ),
           FilledButton(
             onPressed: () => Navigator.pop(context, values),
-            child: const Text('Save queries'),
+            child: Text('Save $field'),
           ),
         ],
       ),
     );
     if (edited != null && mounted) {
-      await _submit('/jobs/$id/edit-queries', {'queries': edited});
+      await _submit('/jobs/$id/edit-$field', {field: edited});
     }
   }
 
@@ -1057,6 +1064,18 @@ class _StudioPageState extends State<StudioPage> {
           Text('Labels: ${(plan['labels'] as List).join(', ')}'),
         ],
         if (status == 'approval' && plan != null) ...[
+          if (!_imageRecipe)
+            TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () => _editPlanItems(
+                      id as String,
+                      plan['labels'] as List,
+                      labels: true,
+                    ),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Edit labels'),
+            ),
           const SizedBox(height: 12),
           if (_imageRecipe)
             const Text(
@@ -1087,7 +1106,7 @@ class _StudioPageState extends State<StudioPage> {
             TextButton.icon(
               onPressed: _busy
                   ? null
-                  : () => _editQueries(id as String, plan['queries'] as List),
+                  : () => _editPlanItems(id as String, plan['queries'] as List),
               icon: const Icon(Icons.edit_outlined),
               label: const Text('Edit web queries'),
             ),

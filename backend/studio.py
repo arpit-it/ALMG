@@ -805,6 +805,19 @@ class Handler(BaseHTTPRequestHandler):
                     if job is None:
                         raise ValueError("Training task not found.")
                     status = job["status"]
+                    if action == "edit-labels" and status == "approval" and job.get("recipe") == "classifier":
+                        labels = data.get("labels")
+                        if (not isinstance(labels, list)
+                                or len(labels) != len(job["plan"]["labels"])
+                                or any(not isinstance(label, str) or not 0 < len(label.strip()) <= 160
+                                       for label in labels)):
+                            raise ValueError("Enter one label of 1 to 160 characters per item.")
+                        labels = [label.strip() for label in labels]
+                        if len({label.casefold() for label in labels}) != len(labels):
+                            raise ValueError("Labels must be distinct.")
+                        job["plan"] = {**job["plan"], "labels": labels}
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     if action == "edit-queries" and status == "approval":
                         queries = data.get("queries")
                         if (not isinstance(queries, list)
