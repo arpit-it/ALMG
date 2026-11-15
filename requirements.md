@@ -114,6 +114,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Importing a CSV with a blank label showed the line number and missing-label
   error in the isolated Mac app and left dataset approval pending. After rebuilding,
   the same import displayed the validation message without the exception prefix.
+  The Mac app imported a CSV with an optional `group` column and showed all
+  three examples awaiting training approval. A local split fixture verified
+  that differently worded rows sharing a group stay together.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
   After a backend restart, the isolated Mac app reopened a saved classifier
   candidate with its activity, held-out score, and folder containing the model

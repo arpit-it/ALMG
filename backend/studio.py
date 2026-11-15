@@ -514,24 +514,27 @@ def read_classifier_csv(content, labels):
     reader = csv.reader(io.StringIO(content.removeprefix("\ufeff"), newline=""), strict=True)
     rows = []
     try:
-        if next(reader, None) != ["text", "label"]:
-            raise ValueError("Use CSV columns text,label in that order.")
+        header = next(reader, None)
+        if header not in (["text", "label"], ["text", "label", "group"]):
+            raise ValueError("Use CSV columns text,label with an optional third group column.")
         for row in reader:
             if not row:
                 continue
-            if len(row) > 2:
+            if len(row) > len(header):
                 raise ValueError(f"CSV line {reader.line_num} has extra columns. Quote text that contains commas.")
             body = row[0].strip()
-            label = row[1].strip() if len(row) == 2 else ""
+            label = row[1].strip() if len(row) >= 2 else ""
             if not label:
                 raise ValueError(f"CSV line {reader.line_num} is missing a label.")
             if label not in labels:
                 raise ValueError(f"CSV line {reader.line_num} has a label outside the approved list.")
             if not 1 <= len(body) <= 3000:
                 raise ValueError(f"CSV line {reader.line_num} needs 1 to 3000 characters of text.")
+            source_group = row[2].strip() if len(row) == 3 else ""
             rows.append({"text": body, "label": label, "source": "local-csv",
                          "csv_end_line": reader.line_num,
-                         "group": " ".join(body.casefold().split())})
+                         "group": ("source:" + source_group if source_group else
+                                   "text:" + " ".join(body.casefold().split()))})
     except csv.Error as error:
         raise ValueError(f"Invalid CSV near line {reader.line_num}.") from error
     if not rows:
