@@ -69,7 +69,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   query. The isolated Mac app hid web approval for an empty query list,
   and the backend rejected an empty approval. Offline tests confirm that
   empty and stale approvals leave the job pending and start no worker.
-  Live collection remains to be verified.
+  In the isolated Mac app, approving the displayed fixture query populated
+  the dataset preview and left training awaiting separate approval. This test
+  used a local search response. Live collection remains to be verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
 - [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
