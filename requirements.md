@@ -45,7 +45,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   chat showed the interruption and restored the prompt after a fixture emitted
   a delta and failed. An offline stream test confirms no failed turn is saved.
   In a fail-once fixture in Mac Chat, resending the restored draft produced
-  one saved prompt and one reply.
+  one saved prompt and one reply. The offline stream test now also checks
+  that retrying with the same message token saves exactly one turn.
 
 ## P1 · Make text-classifier training reliable
 

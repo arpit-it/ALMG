@@ -32,3 +32,17 @@ class ChatStreamTest(unittest.TestCase):
                 ])
                 self.assertNotIn(events[0]["request_id"], studio.CHAT_STREAMS)
                 self.assertEqual(chat_history.list_chats(), [])
+
+                retry = Mock(wfile=io.BytesIO())
+                with patch.object(studio.inference, "reply", return_value="Recovered"):
+                    studio.Handler.stream_chat(retry, prompt)
+
+                retry_events = [
+                    json.loads(line) for line in retry.wfile.getvalue().splitlines()
+                ]
+                chat_id = retry_events[-1]["done"]["id"]
+                self.assertEqual(len(chat_history.list_chats()), 1)
+                self.assertEqual(
+                    [message["content"] for message in chat_history.messages(chat_id)],
+                    ["Summarize the fixture", "Recovered"],
+                )
