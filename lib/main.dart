@@ -13,12 +13,12 @@ import 'chat.dart';
 /// Starts the Flutter desktop application.
 void main() => runApp(const ModelStudio());
 
-/// Defines the ALMG theme and initial chat route.
+/// Defines the ALMG theme and launch dashboard.
 class ModelStudio extends StatelessWidget {
   /// Creates the root ALMG application.
   const ModelStudio({super.key});
 
-  /// Creates the themed application and its chat screen.
+  /// Creates the themed application and its dashboard.
   @override
   Widget build(BuildContext context) => MaterialApp(
     title: appName,
@@ -28,8 +28,75 @@ class ModelStudio extends StatelessWidget {
       fontFamily: 'Inter',
       useMaterial3: true,
     ),
-    home: const ChatPage(trainingPage: StudioPage(), modelLibraryPage: ModelLibraryPage()),
+    home: const DashboardPage(),
   );
+}
+
+/// Provides a launch point for the three ALMG workspaces.
+class DashboardPage extends StatelessWidget {
+  const DashboardPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    final destinations = <(String, String, IconData, Widget)>[
+      (
+        'New Model Training',
+        'Start a training conversation in a project.',
+        Icons.model_training_outlined,
+        const StudioPage(),
+      ),
+      (
+        'Model Library',
+        'Open and run a saved candidate or release.',
+        Icons.inventory_2_outlined,
+        const ModelLibraryPage(),
+      ),
+      (
+        'Chat',
+        'Open your conversations, projects, and model settings.',
+        Icons.chat_bubble_outline,
+        const ChatPage(
+          trainingPage: StudioPage(),
+          modelLibraryPage: ModelLibraryPage(),
+        ),
+      ),
+    ];
+    return Scaffold(
+      appBar: AppBar(title: const Text('ALMG')),
+      body: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 760),
+          child: ListView(
+            padding: const EdgeInsets.all(24),
+            children: [
+              Text(
+                'Dashboard',
+                style: Theme.of(context).textTheme.headlineMedium,
+              ),
+              const SizedBox(height: 20),
+              for (final (title, description, icon, destination)
+                  in destinations)
+                Card(
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 20,
+                      vertical: 10,
+                    ),
+                    leading: Icon(icon),
+                    title: Text(title),
+                    subtitle: Text(description),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute<void>(builder: (_) => destination),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 /// Lists local models across training projects.
@@ -45,12 +112,17 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
   late Future<List<dynamic>> _models = _load();
 
   Future<List<dynamic>> _load() async {
-    final request = await _client.getUrl(Uri.parse('http://127.0.0.1:8766/models'));
+    final request = await _client.getUrl(
+      Uri.parse('http://127.0.0.1:8766/models'),
+    );
     request.headers.set('X-Model-Studio', 'desktop');
     final response = await request.close().timeout(const Duration(seconds: 8));
-    final data = jsonDecode(await response.transform(utf8.decoder).join()) as Map;
+    final data =
+        jsonDecode(await response.transform(utf8.decoder).join()) as Map;
     if (response.statusCode != 200) {
-      throw FormatException(data['error']?.toString() ?? 'Could not load models.');
+      throw FormatException(
+        data['error']?.toString() ?? 'Could not load models.',
+      );
     }
     return data['models'] as List;
   }
@@ -77,19 +149,29 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
       future: _models,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
-          return const Center(child: Text('Could not load models. Check the local backend and refresh.'));
+          return const Center(
+            child: Text(
+              'Could not load models. Check the local backend and refresh.',
+            ),
+          );
         }
-        if (!snapshot.hasData) return const Center(child: CircularProgressIndicator());
+        if (!snapshot.hasData) {
+          return const Center(child: CircularProgressIndicator());
+        }
         final models = snapshot.data!;
-        if (models.isEmpty) return const Center(child: Text('Trained candidates and releases will appear here.'));
+        if (models.isEmpty) {
+          return const Center(
+            child: Text('Trained candidates and releases will appear here.'),
+          );
+        }
         return ListView.builder(
           itemCount: models.length,
           itemBuilder: (context, index) {
             final model = models[index] as Map;
             final created = model['created_at'] as num?;
-            final date = created == null ? '' : ' · ${MaterialLocalizations.of(context).formatCompactDate(
-              DateTime.fromMillisecondsSinceEpoch((created * 1000).round()),
-            )}';
+            final date = created == null
+                ? ''
+                : ' · ${MaterialLocalizations.of(context).formatCompactDate(DateTime.fromMillisecondsSinceEpoch((created * 1000).round()))}';
             final recipe = switch (model['recipe']) {
               'diffusion' => '500M diffusion',
               'text_to_image' => 'Text to image',
@@ -97,12 +179,21 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
             };
             return ListTile(
               leading: const Icon(Icons.memory),
-              title: Text(model['name'] as String, maxLines: 2, overflow: TextOverflow.ellipsis),
-              subtitle: Text("${model['project']} · $recipe · ${model['status'] == 'passed' ? 'Released' : 'Candidate'}$date"),
+              title: Text(
+                model['name'] as String,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              subtitle: Text(
+                "${model['project']} · $recipe · ${model['status'] == 'passed' ? 'Released' : 'Candidate'}$date",
+              ),
               trailing: const Icon(Icons.chevron_right),
-              onTap: () => Navigator.of(context).push(MaterialPageRoute<void>(
-                builder: (_) => StudioPage(initialModel: model['id'] as String),
-              )),
+              onTap: () => Navigator.of(context).push(
+                MaterialPageRoute<void>(
+                  builder: (_) =>
+                      StudioPage(initialModel: model['id'] as String),
+                ),
+              ),
             );
           },
         );

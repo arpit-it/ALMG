@@ -8,6 +8,11 @@ void main() {
     tester,
   ) async {
     await tester.pumpWidget(const ModelStudio());
+    expect(find.text('Dashboard'), findsOneWidget);
+    expect(find.text('Model Library'), findsOneWidget);
+    expect(find.text('New Model Training'), findsOneWidget);
+    await tester.tap(find.text('Chat'));
+    await tester.pumpAndSettle();
     expect(find.text('Local model setup is required'), findsOneWidget);
     expect(find.text('Message Qwen'), findsNothing);
     await tester.tap(find.byTooltip('Open Settings'));
