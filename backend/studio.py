@@ -511,16 +511,18 @@ def read_classifier_csv(content, labels):
     """Parse a local CSV with text and label columns."""
     if not isinstance(content, str):
         raise ValueError("Choose a UTF-8 CSV file.")
-    reader = csv.DictReader(io.StringIO(content.removeprefix("\ufeff"), newline=""), strict=True)
+    reader = csv.reader(io.StringIO(content.removeprefix("\ufeff"), newline=""), strict=True)
     rows = []
     try:
-        if reader.fieldnames != ["text", "label"]:
+        if next(reader, None) != ["text", "label"]:
             raise ValueError("Use CSV columns text,label in that order.")
         for row in reader:
-            body = (row["text"] or "").strip()
-            label = (row["label"] or "").strip()
-            if None in row:
+            if not row:
+                continue
+            if len(row) > 2:
                 raise ValueError(f"CSV line {reader.line_num} has extra columns. Quote text that contains commas.")
+            body = row[0].strip()
+            label = row[1].strip() if len(row) == 2 else ""
             if not label:
                 raise ValueError(f"CSV line {reader.line_num} is missing a label.")
             if label not in labels:
