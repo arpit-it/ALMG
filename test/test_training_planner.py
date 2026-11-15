@@ -73,3 +73,21 @@ class TrainingPlannerTest(unittest.TestCase):
                 )
                 self.assertEqual(job["status"], "approval")
                 worker.assert_not_called()
+
+    def test_training_keeps_punctuation_variants_in_one_split(self):
+        rows = [
+            {"text": f"{phrase} case {case}{punctuation}", "label": label,
+             "group": f"{label}-{case}-{punctuation}", "source": "local-csv"}
+            for label, phrase in (("billing", "Refund invoice charge"),
+                                  ("shipping", "Parcel courier delivery"))
+            for case in range(12)
+            for punctuation in ("?", "!")
+        ]
+
+        _, evaluated, _ = studio.train(rows, ["billing", "shipping"], 0.8)
+
+        assignments = {row["text"]: row["split"] for row in evaluated}
+        self.assertEqual(set(assignments.values()), {"train", "validation", "test"})
+        for prompt, split in assignments.items():
+            if prompt.endswith("?"):
+                self.assertEqual(split, assignments[prompt[:-1] + "!"])

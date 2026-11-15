@@ -85,6 +85,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   fixture verified that punctuation variants and related source rows share
   a split group. The isolated Mac app trained a 48-row fixture with 24 such
   groups and reached inference preview with held-out macro F1 of 1.000.
+  A regression test checks the recorded train, validation, and test assignments
+  for each pair. Ambiguity beyond conflicting labels and near duplicates
+  beyond punctuation variants remain open.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
 - [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
 
