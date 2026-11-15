@@ -141,6 +141,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   second Mac run reached preview with held-out macro F1 of 0.245 and kept
   the novel example while rejecting a variant of a removed duplicate. A
   full run through release and reload with this retry enabled remains open.
+  After restarting the isolated backend, the Mac app ran the saved retry
+  candidate on an unseen invoice prompt and predicted billing. Release stayed
+  disabled because the candidate missed its evaluation target.
 
 ## P2 · Improve chat and project work
 
