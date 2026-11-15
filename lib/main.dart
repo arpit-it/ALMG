@@ -681,6 +681,43 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   /// Sends a training command and refreshes the returned job.
+  Future<void> _editQueries(String id, List queries) async {
+    final values = queries.cast<String>().toList();
+    final edited = await showDialog<List<String>>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Edit web queries'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              for (var index = 0; index < values.length; index++)
+                TextFormField(
+                  initialValue: values[index],
+                  maxLength: 160,
+                  decoration: InputDecoration(labelText: 'Query ${index + 1}'),
+                  onChanged: (value) => values[index] = value,
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('Cancel'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, values),
+            child: const Text('Save queries'),
+          ),
+        ],
+      ),
+    );
+    if (edited != null && mounted) {
+      await _submit('/jobs/$id/edit-queries', {'queries': edited});
+    }
+  }
+
   Future<void> _submit(String path, Map<String, dynamic> body) async {
     setState(() {
       _error = null;
@@ -1046,6 +1083,14 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ],
           const SizedBox(height: 12),
+          if ((plan['queries'] as List).isNotEmpty)
+            TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () => _editQueries(id as String, plan['queries'] as List),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Edit web queries'),
+            ),
           Wrap(
             spacing: 8,
             runSpacing: 8,

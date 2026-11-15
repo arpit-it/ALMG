@@ -805,6 +805,16 @@ class Handler(BaseHTTPRequestHandler):
                     if job is None:
                         raise ValueError("Training task not found.")
                     status = job["status"]
+                    if action == "edit-queries" and status == "approval":
+                        queries = data.get("queries")
+                        if (not isinstance(queries, list)
+                                or len(queries) != len(job["plan"]["queries"])
+                                or any(not isinstance(query, str) or not 0 < len(query.strip()) <= 160
+                                       for query in queries)):
+                            raise ValueError("Enter a query of 1 to 160 characters for each item.")
+                        job["plan"] = {**job["plan"], "queries": [query.strip() for query in queries]}
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     if action == "search-images" and status == "approval" and job.get("recipe") == "text_to_image":
                         if not job["plan"]["queries"] or data.get("approved_queries") != job["plan"]["queries"]:
                             raise ValueError("Approve the exact image search query first.")
