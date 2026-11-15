@@ -136,7 +136,7 @@ def collect(job):
         raise ValueError("Set BRAVE_SEARCH_API_KEY on the Python backend to use web search.")
     candidates = []
     seen = set()
-    queries = job["plan"]["queries"]
+    queries = list(dict.fromkeys(job["plan"]["queries"]))
     for index, query in enumerate(queries, start=1):
         activity(job, f"Searching Brave for approved query {index} of {len(queries)}.")
         url = "https://api.search.brave.com/res/v1/web/search?" + urlencode({
