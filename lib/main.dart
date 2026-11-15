@@ -707,6 +707,7 @@ class _StudioPageState extends State<StudioPage> {
               for (var index = 0; index < values.length; index++)
                 TextFormField(
                   initialValue: values[index],
+                  autofocus: index == 0,
                   maxLength: 160,
                   decoration: InputDecoration(
                     labelText: '$itemName ${index + 1}',
