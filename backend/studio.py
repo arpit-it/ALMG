@@ -594,19 +594,19 @@ def prepare_dataset(job, imported_rows=None):
             return (len(set(labels_by_text.get(normalized, ()))) > 1
                     or len(labels_by_words.get(classifier_variant_key(normalized), ())) > 1)
 
+        def duplicate_kind(row):
+            normalized = " ".join(row["text"].casefold().split())
+            if len(labels_by_text.get(normalized, ())) > 1:
+                return "exact"
+            if len(texts_by_words.get(classifier_variant_key(normalized), ())) > 1:
+                return "near"
+            return None
+
         preview_rows = rows[:5]
         if job.get("recipe") == "classifier" and job.get("mode") == "local_csv":
-            def review_priority(row):
-                normalized = " ".join(row["text"].casefold().split())
-                if has_label_conflict(row):
-                    return 0
-                if len(labels_by_text[normalized]) > 1:
-                    return 1
-                if len(texts_by_words.get(classifier_variant_key(normalized), ())) > 1:
-                    return 1
-                return 2
-
-            preview_rows = sorted(rows, key=review_priority)[:5]
+            preview_rows = sorted(
+                rows, key=lambda row: (not has_label_conflict(row), duplicate_kind(row) is None)
+            )[:5]
         activity(job, f"Prepared {len(rows)} examples. Waiting for training approval.")
         with LOCK:
             TRAINING_DATA[job["id"]] = rows
@@ -617,6 +617,7 @@ def prepare_dataset(job, imported_rows=None):
                                           sum(len(set(labels)) > 1 for labels in labels_by_text.values())),
                        preview=[{"text": row["text"][:500], "label": row["label"],
                                  "label_conflict": has_label_conflict(row),
+                                 "duplicate_kind": duplicate_kind(row),
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),

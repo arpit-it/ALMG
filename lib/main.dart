@@ -1312,6 +1312,8 @@ class _StudioPageState extends State<StudioPage> {
                 row['image'] == null
                     ? [
                         row['text'] as String,
+                        if (row['duplicate_kind'] == 'exact') 'Duplicate text',
+                        if (row['duplicate_kind'] == 'near') 'Near-duplicate text',
                         if (row['csv_end_line'] case final int line)
                           'CSV record ends on line $line',
                         if (row['csv_group'] case final String group)
