@@ -2,6 +2,7 @@ name: ALMG release
 
 on:
   push:
+    branches: [main]
     tags:
       - 'v*.*.*'
 
@@ -12,6 +13,8 @@ jobs:
   build:
     runs-on: macos-15
     timeout-minutes: 30
+    outputs:
+      release_tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -29,13 +32,26 @@ jobs:
           flutter analyze --fatal-infos
           flutter test
           python -W error -m unittest discover -s test -p 'test_*.py'
+      - name: Resolve release version
+        id: version
+        shell: bash
+        run: |
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            version="${GITHUB_REF_NAME#v}"
+            tag="$GITHUB_REF_NAME"
+          else
+            version="$(sed -nE 's/^version: ([0-9]+\.[0-9]+\.[0-9]+)([-+].*)?$/\1/p' pubspec.yaml)"
+            tag="v$version-main.$GITHUB_RUN_NUMBER"
+          fi
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Build and package
         env:
           FLUTTER_MACOS_ARM64_ONLY: "true"
+          VERSION: ${{ steps.version.outputs.version }}
         run: |
-          version="${GITHUB_REF_NAME#v}"
-          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
-          flutter build macos --release --build-name="$version" --build-number="$GITHUB_RUN_NUMBER"
+          flutter build macos --release --build-name="$VERSION" --build-number="$GITHUB_RUN_NUMBER"
           app="ALMG - Automated Language Model Generator.app"
           [[ "$(lipo -archs "build/macos/Build/Products/Release/$app/Contents/MacOS/${app%.app}")" == arm64 ]]
           mkdir -p release/package/backend
@@ -65,8 +81,15 @@ jobs:
       - name: Publish the GitHub release
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
+        shell: bash
         run: |
           sha256sum --check ALMG-macOS-arm64.zip.sha256
-          gh release create "$GITHUB_REF_NAME" ALMG-macOS-arm64.zip ALMG-macOS-arm64.zip.sha256 \
-            --repo "$GITHUB_REPOSITORY" --verify-tag --generate-notes \
-            --title "ALMG $GITHUB_REF_NAME"
+          if [[ "$GITHUB_REF_TYPE" == tag ]]; then
+            options=(--verify-tag)
+          else
+            options=(--target "$GITHUB_SHA" --prerelease)
+          fi
+          gh release create "$RELEASE_TAG" ALMG-macOS-arm64.zip ALMG-macOS-arm64.zip.sha256 \
+            --repo "$GITHUB_REPOSITORY" "${options[@]}" --generate-notes \
+            --title "ALMG $RELEASE_TAG"

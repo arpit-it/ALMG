@@ -80,10 +80,10 @@ this build. The idle setting gates the start; running jobs continue if you retur
 
 ## GitHub releases
 
-Push a version tag such as `v1.0.0` to run the release workflow. GitHub Actions
-checks the source, builds ALMG for Apple silicon, and publishes the ZIP and its
-SHA-256 checksum on the tag's GitHub Release. The workflow uses a macOS ARM64
-runner. [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+Each push to `main` triggers a macOS build and publishes a prerelease such as
+`v1.0.0-main.12` if checks pass. The workflow attaches the app ZIP and SHA-256
+checksum to the repository's GitHub Release. Push a version tag such as `v1.0.0`
+to publish a stable release. The workflow uses a macOS ARM64 runner. [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 
 Extract the ZIP and use the Python setup instructions above from the extracted
 folder. Open the included ALMG app bundle in Finder. The archive includes the
