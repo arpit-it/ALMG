@@ -103,6 +103,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   evaluated the recovered run against its original 0.92 target. Resuming from
   a training checkpoint remains open.
 - [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
+  The rebuilt Mac app ran one opt-in retry from validation errors using a local
+  Qwen fixture and reported a separate held-out score. The saved dataset
+  included the novel retry example and rejected the punctuation variant. A
+  full run through release and reload with this retry enabled remains open.
 
 ## P2 · Improve chat and project work
 

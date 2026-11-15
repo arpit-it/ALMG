@@ -197,6 +197,11 @@ def synthesize(job):
     return rows
 
 
+def punctuation_variant_key(text):
+    """Return the words used to group examples that differ in punctuation."""
+    return tuple(re.findall(r"[^\W_]+", text.casefold()))
+
+
 def classifier_split_groups(rows):
     """Keep source groups and punctuation variants in the same split."""
     parents = {}
@@ -208,7 +213,7 @@ def classifier_split_groups(rows):
         return group
 
     for row in rows:
-        words = tuple(re.findall(r"[^\W_]+", row["text"].casefold()))
+        words = punctuation_variant_key(row["text"])
         if len(words) < 3:
             continue
         group = root(row["group"])
@@ -288,15 +293,18 @@ def train(rows, labels, target, repair=None, report=None):
             if y[i] != predicted
         ]
         try:
-            repaired = repair(mistakes[:12])
+            repaired = repair(mistakes[:12]) if mistakes else []
         except (OSError, ValueError, TypeError, KeyError) as error:
             repair_error = str(error)
         known = {" ".join(text.casefold().split()) for text in x}
+        known_variants = {punctuation_variant_key(text) for text in x}
         for row in repaired:
             key = " ".join(row["text"].casefold().split())
-            if key in known:
+            words = punctuation_variant_key(key)
+            if key in known or (len(words) >= 3 and words in known_variants):
                 continue
             known.add(key)
+            known_variants.add(words)
             row["split"] = "repair_candidate"
             rows.append(row)
             x.append(row["text"])
@@ -546,7 +554,7 @@ def prepare_dataset(job, imported_rows=None):
                 label_counts[row["label"]] += 1
                 normalized = " ".join(row["text"].casefold().split())
                 labels_by_text.setdefault(normalized, []).append(row["label"])
-                words = tuple(re.findall(r"[^\W_]+", normalized))
+                words = punctuation_variant_key(normalized)
                 if len(words) >= 3:
                     texts_by_words.setdefault(words, set()).add(normalized)
         activity(job, f"Prepared {len(rows)} examples. Waiting for training approval.")
@@ -600,7 +608,14 @@ def run(job):
         elif job.get("recipe") == "text_to_image":
             model, rows, metrics = image_recipe.train(rows, job["target"], report)
         else:
-            model, rows, metrics = train(rows, job["plan"]["labels"], job["target"], report=report)
+            def repair(mistakes):
+                report("Generating one additional batch from validation mistakes.")
+                return repair_synthetic(job, mistakes)
+
+            model, rows, metrics = train(
+                rows, job["plan"]["labels"], job["target"],
+                repair=repair if job.get("allow_repair") else None, report=report,
+            )
         with LOCK:
             if job["status"] == "cancelled":
                 return
@@ -983,7 +998,8 @@ class Handler(BaseHTTPRequestHandler):
                         target = float(data["target"])
                         if not 0 < target <= 1:
                             raise ValueError("Enter a score between 0 and 1.")
-                        job.update(status="queued", target=target, idle=data.get("idle") is True, error=None)
+                        job.update(status="queued", target=target, idle=data.get("idle") is True,
+                                   allow_repair=data.get("allow_repair") is True, error=None)
                         worker = (run, (job,))
                     elif action == "preview" and status in ("preview_ready", "passed"):
                         prompt = data["text"].strip()

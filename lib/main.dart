@@ -524,6 +524,7 @@ class _StudioPageState extends State<StudioPage> {
   String? _error;
   bool _busy = false;
   bool _idle = true;
+  bool _allowRepair = false;
   Timer? _poll;
   String? _activeJob;
 
@@ -589,6 +590,7 @@ class _StudioPageState extends State<StudioPage> {
       _previewInput.clear();
       _target.text = '0.80';
       _idle = true;
+      _allowRepair = false;
     });
   }
 
@@ -617,6 +619,7 @@ class _StudioPageState extends State<StudioPage> {
       _job = job;
       if (job['target'] case final num target) _target.text = target.toString();
       if (job['idle'] case final bool idle) _idle = idle;
+      _allowRepair = job['allow_repair'] == true;
       _conversation.addAll(
         (job['messages'] as List? ?? []).map((text) => ('You', text as String)),
       );
@@ -1315,6 +1318,18 @@ class _StudioPageState extends State<StudioPage> {
             onChanged: _busy ? null : (value) => setState(() => _idle = value),
             title: const Text('Wait for idle time and AC power'),
           ),
+          if (!_imageRecipe)
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              value: _allowRepair,
+              onChanged: _busy
+                  ? null
+                  : (value) => setState(() => _allowRepair = value),
+              title: const Text('Allow one retry with local examples'),
+              subtitle: const Text(
+                'Qwen uses validation mistakes to generate additional training examples.',
+              ),
+            ),
           FilledButton(
             onPressed:
                 _busy ||
@@ -1443,7 +1458,11 @@ class _StudioPageState extends State<StudioPage> {
       );
       return;
     }
-    _submit('/jobs/$id/start', {'target': target, 'idle': _idle});
+    _submit('/jobs/$id/start', {
+      'target': target,
+      'idle': _idle,
+      'allow_repair': _allowRepair,
+    });
   }
 
   /// Sends one example to the trained candidate and adds its label to the preview.
