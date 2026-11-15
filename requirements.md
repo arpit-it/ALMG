@@ -124,6 +124,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   split assigned both groups to the test set and excluded the duplicate.
   A Mac CSV import grouped a Devanagari punctuation variant while preserving
   a distinct vowel mark and showing no false label conflict.
+  The isolated Mac app accepted spaces around the text, label, and group
+  headers and previewed both rows while training awaited approval.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
   After a backend restart, the isolated Mac app reopened a saved classifier
   candidate with its activity, held-out score, and folder containing the model

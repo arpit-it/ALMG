@@ -525,7 +525,7 @@ def read_classifier_csv(content, labels):
     reader = csv.reader(io.StringIO(content.removeprefix("\ufeff"), newline=""), strict=True)
     rows = []
     try:
-        header = next(reader, None)
+        header = [column.strip() for column in next(reader, [])]
         if header not in (["text", "label"], ["text", "label", "group"]):
             raise ValueError("Use CSV columns text,label with an optional third group column.")
         for row in reader:
