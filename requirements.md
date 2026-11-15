@@ -98,7 +98,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Reopening this fixture in the rebuilt Mac app showed the instruction to
   review conflicting labels before approving training. A fresh import in the
   rebuilt Mac app marked both conflicting preview rows and left the unrelated
-  example unmarked, with training approval still pending.
+  example unmarked, with training approval still pending. A seven-row CSV
+  imported through the isolated Mac app showed its last two rows first in
+  the five-row preview because their labels conflicted.
   Importing a CSV with a blank label showed the line number and missing-label
   error in the isolated Mac app and left dataset approval pending. After rebuilding,
   the same import displayed the validation message without the exception prefix.

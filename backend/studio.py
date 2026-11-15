@@ -571,6 +571,14 @@ def prepare_dataset(job, imported_rows=None):
                                     for text in texts_by_words[words])
             for words, labels in labels_by_words.items()
         )
+        def has_label_conflict(row):
+            normalized = " ".join(row["text"].casefold().split())
+            return (len(set(labels_by_text.get(normalized, ()))) > 1
+                    or len(labels_by_words.get(classifier_variant_key(normalized), ())) > 1)
+
+        preview_rows = rows[:5]
+        if job.get("recipe") == "classifier" and job.get("mode") == "local_csv":
+            preview_rows = sorted(rows, key=has_label_conflict, reverse=True)[:5]
         activity(job, f"Prepared {len(rows)} examples. Waiting for training approval.")
         with LOCK:
             TRAINING_DATA[job["id"]] = rows
@@ -580,12 +588,9 @@ def prepare_dataset(job, imported_rows=None):
                        conflicting_texts=(conflicting_variants +
                                           sum(len(set(labels)) > 1 for labels in labels_by_text.values())),
                        preview=[{"text": row["text"][:500], "label": row["label"],
-                                 "label_conflict": (
-                                     len(set(labels_by_text.get(" ".join(row["text"].casefold().split()), []))) > 1
-                                     or len(labels_by_words.get(classifier_variant_key(row["text"]), ())) > 1
-                                 ),
+                                 "label_conflict": has_label_conflict(row),
                                  **{key: row[key] for key in ("image", "source", "license") if key in row}}
-                                for row in rows[:5]])
+                                for row in preview_rows])
             store_job(job)
     except Exception as error:
         update(job, status="failed", error=str(error))
