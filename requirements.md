@@ -83,7 +83,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   an interrupted collection fixture with the original query and required
   fresh approval before retrying. A local collection fixture with billing
   examples only returned to dataset approval and identified shipping as the
-  missing class. Live collection remains to be verified.
+  missing class. With an approved offline search fixture, the rebuilt Mac
+  app showed the approved query and each example’s source URL before separate
+  training approval. Live collection remains to be verified.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
