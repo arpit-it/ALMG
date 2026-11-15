@@ -1303,7 +1303,11 @@ class _StudioPageState extends State<StudioPage> {
           for (final row in job!['preview'] as List)
             ListTile(
               contentPadding: EdgeInsets.zero,
-              title: Text(row['label'] as String),
+              title: Text(
+                row['label_conflict'] == true
+                    ? "${row['label']} · Conflicting label"
+                    : row['label'] as String,
+              ),
               subtitle: Text(
                 row['image'] == null
                     ? row['text'] as String

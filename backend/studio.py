@@ -580,6 +580,10 @@ def prepare_dataset(job, imported_rows=None):
                        conflicting_texts=(conflicting_variants +
                                           sum(len(set(labels)) > 1 for labels in labels_by_text.values())),
                        preview=[{"text": row["text"][:500], "label": row["label"],
+                                 "label_conflict": (
+                                     len(set(labels_by_text.get(" ".join(row["text"].casefold().split()), []))) > 1
+                                     or len(labels_by_words.get(classifier_variant_key(row["text"]), ())) > 1
+                                 ),
                                  **{key: row[key] for key in ("image", "source", "license") if key in row}}
                                 for row in rows[:5]])
             store_job(job)
