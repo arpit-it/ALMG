@@ -102,7 +102,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   imported through the isolated Mac app showed its last two rows first in
   the five-row preview because their labels conflicted. A second seven-row
   fixture showed its two same-label Unicode variants first and reported one
-  near-duplicate group while training approval remained pending.
+  near-duplicate group while training approval remained pending. In the rebuilt
+  Mac app, a quoted multiline CSV record showed its ending line as 3 and the
+  following record showed line 4 while training awaited approval.
   Importing a CSV with a blank label showed the line number and missing-label
   error in the isolated Mac app and left dataset approval pending. After rebuilding,
   the same import displayed the validation message without the exception prefix.

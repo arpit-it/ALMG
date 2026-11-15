@@ -528,6 +528,7 @@ def read_classifier_csv(content, labels):
             if not 1 <= len(body) <= 3000:
                 raise ValueError(f"CSV line {reader.line_num} needs 1 to 3000 characters of text.")
             rows.append({"text": body, "label": label, "source": "local-csv",
+                         "csv_end_line": reader.line_num,
                          "group": " ".join(body.casefold().split())})
     except csv.Error as error:
         raise ValueError(f"Invalid CSV near line {reader.line_num}.") from error
@@ -599,7 +600,7 @@ def prepare_dataset(job, imported_rows=None):
                                           sum(len(set(labels)) > 1 for labels in labels_by_text.values())),
                        preview=[{"text": row["text"][:500], "label": row["label"],
                                  "label_conflict": has_label_conflict(row),
-                                 **{key: row[key] for key in ("image", "source", "license") if key in row}}
+                                 **{key: row[key] for key in ("image", "source", "license", "csv_end_line") if key in row}}
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:

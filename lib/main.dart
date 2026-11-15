@@ -1310,7 +1310,11 @@ class _StudioPageState extends State<StudioPage> {
               ),
               subtitle: Text(
                 row['image'] == null
-                    ? row['text'] as String
+                    ? [
+                        row['text'] as String,
+                        if (row['csv_end_line'] case final int line)
+                          'CSV record ends on line $line',
+                      ].join('\n')
                     : "${row['text']}\n${row['source']}\n${row['license'] ?? 'License unavailable'}",
               ),
               leading: row['image'] == null
