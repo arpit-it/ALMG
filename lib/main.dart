@@ -1272,7 +1272,7 @@ class _StudioPageState extends State<StudioPage> {
             Text('Duplicate rows: ${job?['duplicate_rows']}'),
           if ((job?['near_duplicate_groups'] as int? ?? 0) > 0)
             Text(
-              'Near-duplicate groups (punctuation variants): ${job?['near_duplicate_groups']}',
+              'Near-duplicate groups (Unicode and punctuation variants): ${job?['near_duplicate_groups']}',
             ),
           if ((job?['conflicting_texts'] as int? ?? 0) > 0)
             Text(
