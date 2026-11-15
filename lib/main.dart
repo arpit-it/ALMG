@@ -725,6 +725,27 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _importDataset(String id) async {
+    try {
+      final file = await openFile(
+        acceptedTypeGroups: [
+          const XTypeGroup(label: 'CSV', extensions: ['csv']),
+        ],
+      );
+      if (file == null || !mounted || _activeJob != id) return;
+      if (await file.length() > 30000) {
+        throw const FormatException('Choose a CSV file up to 30 KB.');
+      }
+      final csv = await file.readAsString();
+      if (!mounted || _activeJob != id) return;
+      await _submit('/jobs/$id/import-csv', {'csv': csv});
+    } catch (error) {
+      if (mounted && _activeJob == id) {
+        setState(() => _error = error.toString());
+      }
+    }
+  }
+
   Future<void> _editDatasetSize(String id, int current) async {
     var input = current.toString();
     final count = await showDialog<int>(
@@ -1179,6 +1200,11 @@ class _StudioPageState extends State<StudioPage> {
                     : () => _submit('/jobs/$id/prepare', {'mode': 'synthetic'}),
                 child: const Text('Approve local dataset'),
               ),
+              if (!_imageRecipe)
+                OutlinedButton(
+                  onPressed: _busy ? null : () => _importDataset(id as String),
+                  child: const Text('Import labeled CSV'),
+                ),
               if (!_imageRecipe && (plan['queries'] as List).isNotEmpty)
                 OutlinedButton(
                   onPressed: _busy

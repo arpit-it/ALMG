@@ -1,5 +1,7 @@
 """Local job API for prompt-driven text classifiers."""
+import csv
 import ctypes
+import io
 import json
 import os
 import platform
@@ -469,10 +471,35 @@ def read_approved_image(url):
         return payload
 
 
-def prepare_dataset(job):
+def read_classifier_csv(content, labels):
+    """Parse a local CSV with text and label columns."""
+    if not isinstance(content, str):
+        raise ValueError("Choose a UTF-8 CSV file.")
+    reader = csv.DictReader(io.StringIO(content.removeprefix("\ufeff")), strict=True)
+    if reader.fieldnames != ["text", "label"]:
+        raise ValueError("Use CSV columns text,label in that order.")
+    rows = []
+    try:
+        for row in reader:
+            body = (row["text"] or "").strip()
+            label = (row["label"] or "").strip()
+            if None in row or label not in labels or not 1 <= len(body) <= 3000:
+                raise ValueError(f"CSV line {reader.line_num} needs text and a proposed label.")
+            rows.append({"text": body, "label": label, "source": "local-csv",
+                         "group": " ".join(body.casefold().split())})
+    except csv.Error as error:
+        raise ValueError(f"Invalid CSV near line {reader.line_num}.") from error
+    if not rows:
+        raise ValueError("The CSV contains no examples.")
+    return rows
+
+
+def prepare_dataset(job, imported_rows=None):
     """Collect and save the approved dataset, then wait for training approval."""
     try:
-        if job.get("mode") == "web_images":
+        if imported_rows is not None:
+            rows = imported_rows
+        elif job.get("mode") == "web_images":
             rows = image_recipe.web_dataset(job["image_candidates"], read_approved_image,
                                             lambda message: activity(job, message))
         elif job.get("recipe") == "text_to_image":
@@ -864,6 +891,10 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the exact candidate URLs before downloading.")
                         job.update(status="creating_dataset", mode="web_images")
                         worker = (prepare_dataset, (job,))
+                    elif action == "import-csv" and status == "approval" and job.get("recipe") == "classifier":
+                        rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
+                        job.update(status="creating_dataset", mode="local_csv")
+                        worker = (prepare_dataset, (job, rows))
                     elif action == "prepare" and status == "approval":
                         mode = data.get("mode")
                         if mode not in ("web", "synthetic"):
