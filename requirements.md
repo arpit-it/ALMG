@@ -130,6 +130,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   that the Unicode variants share a split group and an unrelated row stays separate.
   In the isolated Mac app, importing the variants with different labels
   showed one conflicting-label group and left training awaiting approval.
+  A four-row CSV submitted to the isolated backend combined exact repeats
+  and punctuation variants with conflicting labels. The running Mac app
+  showed two duplicate rows and one conflicting group, with training still
+  awaiting approval.
   Reopening this fixture in the rebuilt Mac app showed the instruction to
   review conflicting labels before approving training. A fresh import in the
   rebuilt Mac app marked both conflicting preview rows and left the unrelated

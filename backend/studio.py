@@ -608,11 +608,12 @@ def prepare_dataset(job, imported_rows=None):
                 if comparable_classifier_words(words):
                     texts_by_words.setdefault(words, set()).add(normalized)
                     labels_by_words.setdefault(words, set()).add(row["label"])
-        conflicting_variants = sum(
-            len(labels) > 1 and all(len(set(labels_by_text[text])) == 1
-                                    for text in texts_by_words[words])
-            for words, labels in labels_by_words.items()
+        conflicting_groups = sum(len(labels) > 1 for labels in labels_by_words.values())
+        conflicting_groups += sum(
+            len(set(labels)) > 1 and not comparable_classifier_words(classifier_variant_key(text))
+            for text, labels in labels_by_text.items()
         )
+
         def has_label_conflict(row):
             normalized = " ".join(row["text"].casefold().split())
             return (len(set(labels_by_text.get(normalized, ()))) > 1
@@ -637,8 +638,7 @@ def prepare_dataset(job, imported_rows=None):
             job.update(status="dataset_ready", examples=len(rows), label_counts=label_counts,
                        duplicate_rows=sum(len(labels) - 1 for labels in labels_by_text.values()),
                        near_duplicate_groups=sum(len(texts) > 1 for texts in texts_by_words.values()),
-                       conflicting_texts=(conflicting_variants +
-                                          sum(len(set(labels)) > 1 for labels in labels_by_text.values())),
+                       conflicting_texts=conflicting_groups,
                        preview=[{"text": row["text"][:500], "label": row["label"],
                                  "label_conflict": has_label_conflict(row),
                                  "duplicate_kind": duplicate_kind(row),
