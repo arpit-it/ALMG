@@ -32,7 +32,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Qwen answered `42` in Chat, and the prompt and reply were both visible
   after quitting, relaunching, and reopening the conversation.
 - [ ] Document signing and notarization requirements for public distribution. Verify the downloaded app opens on a clean Mac.
-- [ ] Add automated checks for pull requests. Run Flutter analysis, widget tests, and offline Python tests. Cover the macOS stop and restart flow, interrupted replies, attachment persistence, and checkpoint download recovery.
+- [x] Add automated checks for pull requests. Run Flutter analysis, widget tests, and offline Python tests. Cover the macOS stop and restart flow, interrupted replies, attachment persistence, and checkpoint download recovery.
   Verified in isolated macOS Settings: Stop runtime showed Runtime stopped,
   and Restart backend restored Connected and Verified and ready to use.
   Offline tests now cover acknowledgment before shutdown and rejection of
@@ -48,7 +48,11 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   a delta and failed. An offline stream test confirms no failed turn is saved.
   In a fail-once fixture in Mac Chat, resending the restored draft produced
   one saved prompt and one reply. The offline stream test now also checks
-  that retrying with the same message token saves exactly one turn.
+  that retrying with the same message token saves exactly one turn. Offline
+  tests cover attachment persistence, and the isolated Mac app showed the
+  attached filename and Qwen’s correct fixture code after relaunch. The pull
+  request workflow runs Flutter analysis, Flutter tests, and the offline
+  Python suite. All three checks passed locally.
 
 ## P1 · Make text-classifier training reliable
 
