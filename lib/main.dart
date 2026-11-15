@@ -129,7 +129,18 @@ class _DashboardPageState extends State<DashboardPage> {
           data['error']?.toString() ?? 'Could not create project.',
         );
       }
-      if (mounted) setState(() => _dashboard = _load());
+      if (!mounted) return;
+      setState(() => _dashboard = _load());
+      final projectId = data['id'] as String;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('${project['name']} created'),
+          action: SnackBarAction(
+            label: 'Open Model Training',
+            onPressed: () => _open(StudioPage(initialProject: projectId)),
+          ),
+        ),
+      );
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context)

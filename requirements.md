@@ -364,12 +364,12 @@ for existing models.
 - [ ] Open the exact training session from its row with progress and pending
   actions. Open **Run Model** for the selected model version and restore the
   selected chat with its project context.
-- [ ] Provide **Add Project** on the Dashboard. Collect a project name and a
+- [x] Provide **Add Project** on the Dashboard. Collect a project name and a
   local directory, save both, and offer **Open Model Training** with the new
   project selected.
   Verified on macOS: naming a project and choosing a folder saves both values
-  and adds the card to the grid. The explicit post-create Training shortcut
-  still needs live verification.
+  and adds the card to the grid. The post-create **Open Model Training**
+  action opened a fresh conversation with the new project selected.
 - [ ] Validate that the selected directory is writable before training.
   Store datasets, checkpoints, models, and reports for new runs in an
   ALMG-managed subfolder. Resolve existing runs at their recorded locations
