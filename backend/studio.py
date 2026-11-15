@@ -197,6 +197,27 @@ def synthesize(job):
     return rows
 
 
+def classifier_split_groups(rows):
+    """Keep source groups and punctuation variants in the same split."""
+    parents = {}
+    groups_by_words = {}
+
+    def root(group):
+        while group in parents:
+            group = parents[group]
+        return group
+
+    for row in rows:
+        words = tuple(re.findall(r"[^\W_]+", row["text"].casefold()))
+        if len(words) < 3:
+            continue
+        group = root(row["group"])
+        related = root(groups_by_words.setdefault(words, group))
+        if group != related:
+            parents[group] = related
+    return [root(row["group"]) for row in rows]
+
+
 def train(rows, labels, target, repair=None, report=None):
     # Keep duplicate text out of every split, including conflicting labels.
     """Compare classifiers, optionally repair the dataset, and evaluate on held-out data."""
@@ -206,7 +227,7 @@ def train(rows, labels, target, repair=None, report=None):
     rows = [row for row in rows if counts[" ".join(row["text"].casefold().split())] == 1]
     x = [row["text"] for row in rows]
     y = [row["label"] for row in rows]
-    groups = [row["group"] for row in rows]
+    groups = classifier_split_groups(rows)
     if any(y.count(label) < 8 for label in labels) or len(set(groups)) < 5:
         raise ValueError("Too few distinct examples or independent sources per label. Revise the prompt or source mode.")
     needed = set(labels)
