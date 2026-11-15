@@ -146,11 +146,13 @@ def collect(job):
         for result in results.get("web", {}).get("results", []):
             source = result.get("url", "")
             snippet = unescape(re.sub(r"<[^>]+>", "", result.get("description", ""))).strip()
+            snippet = snippet[:450].rstrip()
+            snippet_key = " ".join(snippet.casefold().split())
             location = urlsplit(source)
             group = location.netloc.lower().removeprefix("www.")
-            if location.scheme in ("https", "http") and group and len(snippet) >= 40 and snippet not in seen:
-                seen.add(snippet)
-                candidates.append({"text": snippet[:450], "source": source,
+            if location.scheme in ("https", "http") and group and len(snippet) >= 40 and snippet_key not in seen:
+                seen.add(snippet_key)
+                candidates.append({"text": snippet, "source": source,
                                    "approved_query": query, "group": group})
         time.sleep(1)
     rows = []
