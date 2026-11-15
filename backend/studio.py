@@ -215,7 +215,7 @@ def classifier_split_groups(rows):
 
     for row in rows:
         words = classifier_variant_key(row["text"])
-        if len(words) < 3:
+        if len(words) < 2:
             continue
         group = root(row["group"])
         related = root(groups_by_words.setdefault(words, group))
@@ -302,7 +302,7 @@ def train(rows, labels, target, repair=None, report=None):
         for row in repaired:
             key = " ".join(row["text"].casefold().split())
             words = classifier_variant_key(key)
-            if key in known or (len(words) >= 3 and words in known_variants):
+            if key in known or (len(words) >= 2 and words in known_variants):
                 continue
             known.add(key)
             known_variants.add(words)
@@ -566,7 +566,7 @@ def prepare_dataset(job, imported_rows=None):
                 normalized = " ".join(row["text"].casefold().split())
                 labels_by_text.setdefault(normalized, []).append(row["label"])
                 words = classifier_variant_key(normalized)
-                if len(words) >= 3:
+                if len(words) >= 2:
                     texts_by_words.setdefault(words, set()).add(normalized)
                     labels_by_words.setdefault(words, set()).add(row["label"])
         conflicting_variants = sum(
