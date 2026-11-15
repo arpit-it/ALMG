@@ -1248,6 +1248,12 @@ class _StudioPageState extends State<StudioPage> {
           Text('Dataset · $count examples'),
         ],
         if (status == 'dataset_ready') ...[
+          if ((job?['duplicate_rows'] as int? ?? 0) > 0)
+            Text('Duplicate rows: ${job?['duplicate_rows']}'),
+          if ((job?['conflicting_texts'] as int? ?? 0) > 0)
+            Text(
+              'Examples with conflicting labels: ${job?['conflicting_texts']}',
+            ),
           if (job?['label_counts'] case final Map counts)
             for (final entry in counts.entries.where(
               (entry) => entry.value == 0,

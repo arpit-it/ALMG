@@ -79,7 +79,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   rejected a direct start request. The rebuilt Mac app imported a labeled CSV
   through the file picker and showed both class counts and example texts,
   including a quoted comma, while training approval remained pending.
-  Additional quality flags and split verification remain open.
+  The rebuilt app flagged two duplicate rows and one text with conflicting
+  labels in a local fixture. Near-duplicate detection and split verification
+  remain open.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
 - [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
 
