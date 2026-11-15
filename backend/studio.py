@@ -628,7 +628,7 @@ def prepare_dataset(job, imported_rows=None):
             return None
 
         preview_rows = rows[:5]
-        if job.get("recipe") == "classifier" and job.get("mode") == "local_csv":
+        if job.get("recipe") == "classifier":
             preview_rows = sorted(
                 rows, key=lambda row: (not has_label_conflict(row), duplicate_kind(row) is None)
             )[:5]

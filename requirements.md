@@ -173,6 +173,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   group B on the unrelated row before training approval.
   In the rebuilt Mac app, both repeated rows showed Duplicate text and both
   punctuation variants showed Near-duplicate text. Training awaited approval.
+  The isolated Mac app reopened a seven-row offline search fixture and
+  showed the last two rows first because their labels conflicted. Training
+  still awaited approval.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
   After a backend restart, the isolated Mac app reopened a saved classifier
   candidate with its activity, held-out score, and folder containing the model
