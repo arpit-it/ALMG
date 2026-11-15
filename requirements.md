@@ -16,7 +16,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   passed SHA-256 verification and contained the app and backend source. The
   ARM64-only build was confirmed with `lipo`, and the app opened to the
   Dashboard after extraction from the verified ZIP. The GitHub tag-triggered
-  workflow and its published release assets still need verification.
+  workflow still needs verification. The published main-branch prerelease
+  `v1.0.0-main.1` contained the ZIP and checksum. The downloaded ZIP passed
+  SHA-256 verification, contained the backend source and ARM64 app, and opened
+  to Chat on the existing Mac installation.
 - [ ] Test a fresh installation on an Apple silicon Mac. Follow the documented Python setup, register the backend, download and verify the checkpoint, send a chat message, and confirm that history survives a relaunch.
 - [ ] Document signing and notarization requirements for public distribution. Verify the downloaded app opens on a clean Mac.
 - [ ] Add automated checks for pull requests. Run Flutter analysis, widget tests, and offline Python tests. Cover the macOS stop and restart flow, interrupted replies, attachment persistence, and checkpoint download recovery.
