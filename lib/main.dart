@@ -1386,6 +1386,12 @@ class _StudioPageState extends State<StudioPage> {
               child: const Text('Approve predictions and release'),
             ),
         ],
+        if (status == 'preview_ready' &&
+            job?['candidate_directory'] is String) ...[
+          const SizedBox(height: 16),
+          const Text('Candidate model and dataset folder'),
+          SelectableText(job!['candidate_directory'] as String),
+        ],
         if (job?['output'] case final String output) ...[
           const SizedBox(height: 16),
           const Text('Model, dataset, and evaluation report'),

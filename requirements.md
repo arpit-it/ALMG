@@ -89,6 +89,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   for each pair. Ambiguity beyond conflicting labels and near duplicates
   beyond punctuation variants remain open.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
+  After a backend restart, the isolated Mac app reopened a saved classifier
+  candidate with its activity, held-out score, and folder containing the model
+  and dataset. Cancellation and checkpoint resume remain open.
 - [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
 
 ## P2 · Improve chat and project work

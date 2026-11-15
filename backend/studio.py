@@ -412,6 +412,7 @@ def restore_jobs():
                     candidate = joblib.load(work / "candidate.joblib")
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
+                job["candidate_directory"] = str(work)
             elif job["status"] == "approval" and job.get("recipe") == "text_to_image":
                 proposal = job.get("plan") or {"labels": []}
                 if not proposal.get("queries"):
@@ -586,7 +587,8 @@ def run(job):
         activity(job, "Evaluation complete. Waiting for inference preview and release approval.")
         with LOCK:
             CANDIDATES[job["id"]] = (model, rows, metrics)
-            job.update(status="preview_ready", metrics=metrics, examples=len(rows), preview_count=0)
+            job.update(status="preview_ready", metrics=metrics, examples=len(rows),
+                       preview_count=0, candidate_directory=str(work))
             store_job(job)
     except Exception as error:
         update(job, status="failed", error=str(error))
