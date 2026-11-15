@@ -587,6 +587,8 @@ class _StudioPageState extends State<StudioPage> {
       _predictions.clear();
       _prompt.clear();
       _previewInput.clear();
+      _target.text = '0.80';
+      _idle = true;
     });
   }
 
@@ -613,6 +615,8 @@ class _StudioPageState extends State<StudioPage> {
     _resetSession();
     setState(() {
       _job = job;
+      if (job['target'] case final num target) _target.text = target.toString();
+      if (job['idle'] case final bool idle) _idle = idle;
       _conversation.addAll(
         (job['messages'] as List? ?? []).map((text) => ('You', text as String)),
       );
