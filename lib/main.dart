@@ -694,6 +694,8 @@ class _StudioPageState extends State<StudioPage> {
     bool labels = false,
   }) async {
     final values = items.cast<String>().toList();
+    final classifierQueries = !labels && !_imageRecipe;
+    if (classifierQueries && values.length < 6) values.add('');
     final itemName = labels ? 'Label' : 'Query';
     final field = labels ? 'labels' : 'queries';
     final edited = await showDialog<List<String>>(
@@ -1205,7 +1207,7 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ],
           const SizedBox(height: 12),
-          if ((plan['queries'] as List).isNotEmpty)
+          if (!_imageRecipe || (plan['queries'] as List).isNotEmpty)
             TextButton.icon(
               onPressed: _busy
                   ? null

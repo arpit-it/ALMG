@@ -1034,7 +1034,7 @@ class Handler(BaseHTTPRequestHandler):
                     if action == "edit-queries" and status == "approval":
                         queries = data.get("queries")
                         if (not isinstance(queries, list)
-                                or len(queries) > len(job["plan"]["queries"])
+                                or len(queries) > 6
                                 or (job.get("recipe") != "classifier"
                                     and len(queries) != len(job["plan"]["queries"]))
                                 or any(not isinstance(query, str) or not 0 < len(query.strip()) <= 160
