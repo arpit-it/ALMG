@@ -126,6 +126,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   a distinct vowel mark and showing no false label conflict.
   The isolated Mac app accepted spaces around the text, label, and group
   headers and previewed both rows while training awaited approval.
+  A second Mac import read the columns in group, label, text order and
+  showed one correctly labeled example per class before training approval.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
   After a backend restart, the isolated Mac app reopened a saved classifier
   candidate with its activity, held-out score, and folder containing the model

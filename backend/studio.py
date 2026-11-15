@@ -526,22 +526,23 @@ def read_classifier_csv(content, labels):
     rows = []
     try:
         header = [column.strip() for column in next(reader, [])]
-        if header not in (["text", "label"], ["text", "label", "group"]):
-            raise ValueError("Use CSV columns text,label with an optional third group column.")
+        if sorted(header) not in (["label", "text"], ["group", "label", "text"]):
+            raise ValueError("Use CSV columns named text and label, with an optional group column.")
         for row in reader:
             if not row:
                 continue
             if len(row) > len(header):
                 raise ValueError(f"CSV line {reader.line_num} has extra columns. Quote text that contains commas.")
-            body = row[0].strip()
-            label = row[1].strip() if len(row) >= 2 else ""
+            values = dict(zip(header, row))
+            body = values.get("text", "").strip()
+            label = values.get("label", "").strip()
             if not label:
                 raise ValueError(f"CSV line {reader.line_num} is missing a label.")
             if label not in labels:
                 raise ValueError(f"CSV line {reader.line_num} has a label outside the approved list.")
             if not 1 <= len(body) <= 3000:
                 raise ValueError(f"CSV line {reader.line_num} needs 1 to 3000 characters of text.")
-            source_group = row[2].strip() if len(row) == 3 else ""
+            source_group = values.get("group", "").strip()
             rows.append({"text": body, "label": label, "source": "local-csv",
                          "csv_end_line": reader.line_num,
                          "group": ("source:" + source_group if source_group else
