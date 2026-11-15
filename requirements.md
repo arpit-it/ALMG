@@ -93,6 +93,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   now labels the count as Unicode and punctuation variants, verified after
   rebuilding and reopening the saved dataset. A local fixture also verified
   that the Unicode variants share a split group and an unrelated row stays separate.
+  In the isolated Mac app, importing the variants with different labels
+  showed one conflicting-label group and left training awaiting approval.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
   After a backend restart, the isolated Mac app reopened a saved classifier
   candidate with its activity, held-out score, and folder containing the model

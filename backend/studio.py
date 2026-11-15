@@ -549,6 +549,7 @@ def prepare_dataset(job, imported_rows=None):
         label_counts = {}
         labels_by_text = {}
         texts_by_words = {}
+        labels_by_words = {}
         if job.get("recipe") == "classifier":
             label_counts = dict.fromkeys(job["plan"]["labels"], 0)
             for row in rows:
@@ -558,13 +559,20 @@ def prepare_dataset(job, imported_rows=None):
                 words = classifier_variant_key(normalized)
                 if len(words) >= 3:
                     texts_by_words.setdefault(words, set()).add(normalized)
+                    labels_by_words.setdefault(words, set()).add(row["label"])
+        conflicting_variants = sum(
+            len(labels) > 1 and all(len(set(labels_by_text[text])) == 1
+                                    for text in texts_by_words[words])
+            for words, labels in labels_by_words.items()
+        )
         activity(job, f"Prepared {len(rows)} examples. Waiting for training approval.")
         with LOCK:
             TRAINING_DATA[job["id"]] = rows
             job.update(status="dataset_ready", examples=len(rows), label_counts=label_counts,
                        duplicate_rows=sum(len(labels) - 1 for labels in labels_by_text.values()),
                        near_duplicate_groups=sum(len(texts) > 1 for texts in texts_by_words.values()),
-                       conflicting_texts=sum(len(set(labels)) > 1 for labels in labels_by_text.values()),
+                       conflicting_texts=(conflicting_variants +
+                                          sum(len(set(labels)) > 1 for labels in labels_by_text.values())),
                        preview=[{"text": row["text"][:500], "label": row["label"],
                                  **{key: row[key] for key in ("image", "source", "license") if key in row}}
                                 for row in rows[:5]])
