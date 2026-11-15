@@ -134,16 +134,20 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   beginning. The rebuilt Mac app retained the saved idle preference and
   evaluated the recovered run against its original 0.92 target. Resuming from
   a training checkpoint remains open.
-- [ ] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
+- [x] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
   The rebuilt Mac app ran one opt-in retry from validation errors using a local
   Qwen fixture and reported a separate held-out score. The saved dataset
   included the novel retry example and rejected the punctuation variant. A
   second Mac run reached preview with held-out macro F1 of 0.245 and kept
-  the novel example while rejecting a variant of a removed duplicate. A
-  full run through release and reload with this retry enabled remains open.
+  the novel example while rejecting a variant of a removed duplicate.
   After restarting the isolated backend, the Mac app ran the saved retry
   candidate on an unseen invoice prompt and predicted billing. Release stayed
-  disabled because the candidate missed its evaluation target.
+  disabled because the candidate missed its evaluation target. With a passing
+  local retry fixture, the Mac app approved training, reported validation
+  macro F1 of 0.748 and held-out macro F1 of 0.667 against a target of 0.590,
+  and released the model, dataset, and evaluation report after preview approval.
+  Reloading the exported model reproduced the preview label “shipping” for
+  “Silver ticket status,” and the report recorded the second training round.
 
 ## P2 · Improve chat and project work
 
