@@ -215,10 +215,9 @@ def classifier_split_groups(rows):
 
     for row in rows:
         words = classifier_variant_key(row["text"])
-        if len(words) < 2:
-            continue
+        key = words if len(words) >= 2 else " ".join(row["text"].casefold().split())
         group = root(row["group"])
-        related = root(groups_by_words.setdefault(words, group))
+        related = root(groups_by_words.setdefault(key, group))
         if group != related:
             parents[group] = related
     return [root(row["group"]) for row in rows]
@@ -230,10 +229,12 @@ def train(rows, labels, target, repair=None, report=None):
     if report:
         report("Removing duplicate examples and creating training, validation, and test splits.")
     counts = Counter(" ".join(row["text"].casefold().split()) for row in rows)
-    rows = [row for row in rows if counts[" ".join(row["text"].casefold().split())] == 1]
+    distinct = [(row, group) for row, group in zip(rows, classifier_split_groups(rows))
+                if counts[" ".join(row["text"].casefold().split())] == 1]
+    rows = [row for row, _ in distinct]
+    groups = [group for _, group in distinct]
     x = [row["text"] for row in rows]
     y = [row["label"] for row in rows]
-    groups = classifier_split_groups(rows)
     if any(y.count(label) < 8 for label in labels) or len(set(groups)) < 5:
         raise ValueError("Too few distinct examples or independent sources per label. Revise the prompt or source mode.")
     needed = set(labels)

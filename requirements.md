@@ -116,7 +116,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   the same import displayed the validation message without the exception prefix.
   The Mac app imported a CSV with an optional `group` column and showed all
   three examples awaiting training approval. A local split fixture verified
-  that differently worded rows sharing a group stay together.
+  that differently worded rows sharing a group stay together. The isolated
+  Mac app trained a 32-row CSV with a duplicate shared by two source groups
+  and reached inference preview with held-out macro F1 of 1.000. The saved
+  split assigned both groups to the test set and excluded the duplicate.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
   After a backend restart, the isolated Mac app reopened a saved classifier
   candidate with its activity, held-out score, and folder containing the model
