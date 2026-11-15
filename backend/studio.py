@@ -617,6 +617,9 @@ def prepare_dataset(job, imported_rows=None):
                                           sum(len(set(labels)) > 1 for labels in labels_by_text.values())),
                        preview=[{"text": row["text"][:500], "label": row["label"],
                                  "label_conflict": has_label_conflict(row),
+                                 **({"csv_group": row["group"].removeprefix("source:")}
+                                    if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
+                                    else {}),
                                  **{key: row[key] for key in ("image", "source", "license", "csv_end_line") if key in row}}
                                 for row in preview_rows])
             store_job(job)

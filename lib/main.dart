@@ -1314,6 +1314,8 @@ class _StudioPageState extends State<StudioPage> {
                         row['text'] as String,
                         if (row['csv_end_line'] case final int line)
                           'CSV record ends on line $line',
+                        if (row['csv_group'] case final String group)
+                          'Source group: $group',
                       ].join('\n')
                     : "${row['text']}\n${row['source']}\n${row['license'] ?? 'License unavailable'}",
               ),
