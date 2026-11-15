@@ -418,7 +418,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "clarification", "failed", "passed", "needs_review"):
+            elif job["status"] not in ("approval", "image_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -562,13 +562,24 @@ def prepare_dataset(job, imported_rows=None):
 def run(job):
     """Train and evaluate an approved dataset, then wait for inference preview."""
     try:
+        with LOCK:
+            if job["status"] != "queued":
+                return
+            if job["idle"]:
+                job["status"] = "waiting_idle"
+                store_job(job)
         if job["idle"]:
-            update(job, status="waiting_idle")
             activity(job, "Waiting for the device to be idle and connected to AC power.")
             while not idle_ready():
+                with LOCK:
+                    if job["status"] != "waiting_idle":
+                        return
                 time.sleep(2)
-        update(job, status="training")
         with LOCK:
+            if job["status"] not in ("queued", "waiting_idle"):
+                return
+            job["status"] = "training"
+            store_job(job)
             rows = TRAINING_DATA.pop(job["id"])
         def report(message):
             activity(job, message)
@@ -939,6 +950,11 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the exact search queries first.")
                         job.update(status="creating_dataset", mode=mode)
                         worker = (prepare_dataset, (job,))
+                    elif action == "cancel" and status in ("queued", "waiting_idle"):
+                        job.update(status="cancelled", error=None)
+                        store_job(job)
+                        TRAINING_DATA.pop(job["id"], None)
+                        return self.respond({"id": job["id"]})
                     elif action == "start" and status == "dataset_ready":
                         if job.get("recipe") == "classifier":
                             present = {row["label"] for row in TRAINING_DATA.get(job["id"], [])}

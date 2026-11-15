@@ -205,6 +205,7 @@ class _DashboardPageState extends State<DashboardPage> {
                     'approval' ||
                     'image_candidates' ||
                     'dataset_ready' => 'Awaiting approval',
+                    'cancelled' => 'Training cancelled',
                     'waiting_idle' => 'Waiting for idle time',
                     'clarification' => 'Waiting for details',
                     'failed' => 'Failed',
@@ -1053,6 +1054,7 @@ class _StudioPageState extends State<StudioPage> {
       'searching_images': 'Searching for images',
       'image_candidates': 'Image search results',
       'creating_dataset': 'Preparing dataset',
+      'cancelled': 'Training cancelled',
       'dataset_ready': 'Training approval required',
       'queued': 'Training queued',
       'waiting_idle': 'Waiting for idle time and AC power',
@@ -1247,6 +1249,11 @@ class _StudioPageState extends State<StudioPage> {
           const SizedBox(height: 16),
           Text('Dataset · $count examples'),
         ],
+        if (status == 'queued' || status == 'waiting_idle')
+          OutlinedButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/cancel', {}),
+            child: const Text('Cancel queued training'),
+          ),
         if (status == 'dataset_ready') ...[
           if ((job?['duplicate_rows'] as int? ?? 0) > 0)
             Text('Duplicate rows: ${job?['duplicate_rows']}'),
