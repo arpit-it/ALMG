@@ -87,7 +87,11 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   groups and reached inference preview with held-out macro F1 of 1.000.
   A regression test checks the recorded train, validation, and test assignments
   for each pair. Ambiguity beyond conflicting labels and near duplicates
-  beyond punctuation variants remain open.
+  beyond normalized text variants remain open. In the rebuilt isolated app,
+  importing a three-row CSV with ASCII and full-width invoice text showed
+  one near-duplicate group and left training awaiting approval. The preview
+  label still says punctuation variants. A local fixture also verified that
+  the Unicode variants share a split group and an unrelated row stays separate.
 - [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
   After a backend restart, the isolated Mac app reopened a saved classifier
   candidate with its activity, held-out score, and folder containing the model

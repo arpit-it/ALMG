@@ -15,6 +15,7 @@ import sys
 import threading
 from tempfile import TemporaryDirectory
 import time
+import unicodedata
 import uuid
 from collections import Counter
 from html import unescape
@@ -197,13 +198,13 @@ def synthesize(job):
     return rows
 
 
-def punctuation_variant_key(text):
-    """Return the words used to group examples that differ in punctuation."""
-    return tuple(re.findall(r"[^\W_]+", text.casefold()))
+def classifier_variant_key(text):
+    """Return matching words for Unicode presentation and punctuation variants."""
+    return tuple(re.findall(r"[^\W_]+", unicodedata.normalize("NFKC", text).casefold()))
 
 
 def classifier_split_groups(rows):
-    """Keep source groups and punctuation variants in the same split."""
+    """Keep source groups and normalized text variants in the same split."""
     parents = {}
     groups_by_words = {}
 
@@ -213,7 +214,7 @@ def classifier_split_groups(rows):
         return group
 
     for row in rows:
-        words = punctuation_variant_key(row["text"])
+        words = classifier_variant_key(row["text"])
         if len(words) < 3:
             continue
         group = root(row["group"])
@@ -297,10 +298,10 @@ def train(rows, labels, target, repair=None, report=None):
         except (OSError, ValueError, TypeError, KeyError) as error:
             repair_error = str(error)
         known = {" ".join(text.casefold().split()) for text in x}
-        known_variants = {punctuation_variant_key(text) for text in x}
+        known_variants = {classifier_variant_key(text) for text in x}
         for row in repaired:
             key = " ".join(row["text"].casefold().split())
-            words = punctuation_variant_key(key)
+            words = classifier_variant_key(key)
             if key in known or (len(words) >= 3 and words in known_variants):
                 continue
             known.add(key)
@@ -554,7 +555,7 @@ def prepare_dataset(job, imported_rows=None):
                 label_counts[row["label"]] += 1
                 normalized = " ".join(row["text"].casefold().split())
                 labels_by_text.setdefault(normalized, []).append(row["label"])
-                words = punctuation_variant_key(normalized)
+                words = classifier_variant_key(normalized)
                 if len(words) >= 3:
                     texts_by_words.setdefault(words, set()).add(normalized)
         activity(job, f"Prepared {len(rows)} examples. Waiting for training approval.")
