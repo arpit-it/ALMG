@@ -37,7 +37,6 @@ jobs:
           flutter test
           python -W error -m unittest discover -s test -p 'test_*.py'
       - name: Resolve release version
-        if: github.event_name == 'push'
         id: version
         shell: bash
         run: |
@@ -52,7 +51,6 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Build and package
-        if: github.event_name == 'push'
         env:
           FLUTTER_MACOS_ARM64_ONLY: "true"
           VERSION: ${{ steps.version.outputs.version }}
