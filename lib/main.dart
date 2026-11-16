@@ -1192,7 +1192,7 @@ class _StudioPageState extends State<StudioPage> {
                 'Local examples per label: ${plan['synthetic_examples_per_label'] ?? 40}',
               ),
             ),
-            const Text(
+            if ((plan['queries'] as List).isNotEmpty) const Text(
               'Web collection sends these queries to English Wikipedia '
               '(en.wikipedia.org). ALMG uses '
               'search result excerpts and records their source URLs.',

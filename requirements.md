@@ -167,6 +167,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   queries and Wikimedia Commons (commons.wikimedia.org) for image queries before
   approval in local fixtures. Provider selection, custom sites, and page approval
   for text collection remain open.
+  Clearing both fixture queries in the rebuilt Mac app hid the Wikipedia
+  disclosure and web approval while leaving local generation and CSV import.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
