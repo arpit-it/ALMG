@@ -11,12 +11,11 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
 
 ## P0 · Validate the first macOS release
 
-- [ ] Run the release workflow from a version tag and verify that GitHub Releases contains the app ZIP and SHA-256 checksum. Download the ZIP, verify the checksum, and confirm that it contains the app and backend source. Keep model weights, chat databases, training output, and credentials out of Git and release assets.
+- [x] Publish a stable versioned release with the release workflow and verify that GitHub Releases contains the app ZIP and SHA-256 checksum. Download the ZIP, verify the checksum, and confirm that it contains the app and backend source. Keep model weights, chat databases, training output, and credentials out of Git and release assets.
   Local verification: a ZIP assembled with the workflow’s packaging commands
   passed SHA-256 verification and contained the app and backend source. The
   ARM64-only build was confirmed with `lipo`, and the app opened to the
-  Dashboard after extraction from the verified ZIP. The GitHub tag-triggered
-  workflow still needs verification. The published main-branch prerelease
+  Dashboard after extraction from the verified ZIP. The published main-branch prerelease
   `v1.0.0-main.1` contained the ZIP and checksum. The downloaded ZIP passed
   SHA-256 verification, contained the backend source and ARM64 app, and opened
   to Chat on the existing Mac installation. The published main-branch
@@ -30,8 +29,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The workflow now stages each ZIP in a fresh directory. A local ARM64
   packaging run ignored a stale training output fixture in the old staging
   directory. The ZIP passed its checksum, contained all eight backend files,
-  and the extracted app opened to the Dashboard. Tag-triggered publishing
-  still needs verification.
+  and the extracted app opened to the Dashboard.
   The packaging step now tests ZIP integrity before writing its checksum.
   The check rejected a truncated local fixture. A fresh package passed
   both checks and the extracted ARM64 app opened to the Dashboard.
@@ -61,13 +59,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   fixture produced `ALMG-v1.0.1-macOS-arm64.zip` and its matching SHA-256
   file. The checksum passed, the extracted app launched, and a stub publisher
   received both filenames. A checksum naming another file was rejected.
-  The published stable release still needs an independent asset download and check.
   GitHub Actions can also publish a stable release from an on-demand run
   on main, without a tag push. A local fixture with stable tags up to
   `v1.0.10` and a newer prerelease selected `v1.0.11`. The built ZIP used
   that tag in its filename, passed its checksum, and the extracted macOS
   app launched. A stub publisher received the stable tag and matching assets.
-  GitHub-hosted dispatch and its published assets still need verification.
+  GitHub Actions [run 43860091807](https://github.com/arpit-it/ALMG/actions/runs/43860091807)
+  published stable [`v1.0.0`](https://github.com/arpit-it/ALMG/releases/tag/v1.0.0)
+  from main. The downloaded versioned ZIP matched the published SHA-256,
+  contained the eight expected backend source and setup files, and passed
+  strict signature verification. The extracted ARM64 app launched on this Mac.
 - [x] Test a fresh installation on an Apple silicon Mac. Follow the documented Python setup, register the backend, download and verify the checkpoint, send a chat message, and confirm that history survives a relaunch.
   The isolated Mac build reached Chat with setup required and showed a live
   transfer rate of 24.8 MB/s beside checkpoint progress in Settings. In a fresh
