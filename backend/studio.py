@@ -129,8 +129,8 @@ def plan(prompt):
     return {"labels": [s.strip() for s in labels], "queries": [s.strip() for s in queries]}
 
 
-def collect(job):
-    """Collect and label web examples for a job with approved search queries."""
+def discover_text(job):
+    """Find candidate excerpts using approved Wikipedia queries."""
     candidates = []
     seen = set()
     queries = list(dict.fromkeys(job["plan"]["queries"]))
@@ -157,6 +157,22 @@ def collect(job):
                 candidates.append({"text": snippet, "source": source,
                                    "approved_query": query, "group": source})
         time.sleep(1)
+    return candidates
+
+
+def search_text(job):
+    try:
+        candidates = discover_text(job)
+        if not candidates:
+            raise ValueError("No usable excerpts found. Edit the web queries or choose a local dataset.")
+        update(job, status="text_candidates", text_candidates=candidates)
+    except Exception as error:
+        update(job, status="approval", error=str(error))
+
+
+def collect(job):
+    """Label the excerpts reviewed and approved for this dataset."""
+    candidates = job["text_candidates"]
     rows = []
     for start in range(0, len(candidates), 15):
         batch = candidates[start:start + 15]
@@ -501,7 +517,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -1130,6 +1146,12 @@ class Handler(BaseHTTPRequestHandler):
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
                         job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))
+                    elif action == "use-text-excerpts" and status == "text_candidates":
+                        urls = [candidate["source"] for candidate in job["text_candidates"]]
+                        if not urls or data.get("approved_urls") != urls:
+                            raise ValueError("Approve the exact candidate URLs first.")
+                        job.update(status="creating_dataset", error=None, mode="web")
+                        worker = (prepare_dataset, (job,))
                     elif action == "prepare" and status == "approval":
                         mode = data.get("mode")
                         if mode not in ("web", "synthetic"):
@@ -1139,8 +1161,12 @@ class Handler(BaseHTTPRequestHandler):
                         if mode == "web" and (not job["plan"]["queries"]
                                               or data.get("approved_queries") != job["plan"]["queries"]):
                             raise ValueError("Approve the exact search queries first.")
-                        job.update(status="creating_dataset", error=None, mode=mode)
-                        worker = (prepare_dataset, (job,))
+                        if mode == "web":
+                            job.update(status="searching_text", error=None)
+                            worker = (search_text, (job,))
+                        else:
+                            job.update(status="creating_dataset", error=None, mode=mode)
+                            worker = (prepare_dataset, (job,))
                     elif action == "cancel" and status in ("queued", "waiting_idle", "training"):
                         job.update(status="cancelled", error=None)
                         store_job(job)

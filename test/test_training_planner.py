@@ -219,6 +219,7 @@ class WikipediaCollectionTest(unittest.TestCase):
         with patch.object(studio, "request_json", return_value={"pages": [page, page]}) as request, \
              patch.object(studio, "activity"), patch.object(studio.time, "sleep"), \
              patch.object(studio, "ask", return_value={"rows": [{"index": 0, "label": "billing"}]}):
+            job["text_candidates"] = studio.discover_text(job)
             rows = studio.collect(job)
         request.assert_called_once()
         endpoint = studio.urlsplit(request.call_args.args[0])

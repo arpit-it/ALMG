@@ -673,6 +673,7 @@ class _StudioPageState extends State<StudioPage> {
         'queued',
         'waiting_idle',
         'searching_images',
+        'searching_text',
         'creating_dataset',
         'training',
         'exporting',
@@ -1079,6 +1080,8 @@ class _StudioPageState extends State<StudioPage> {
       'approval': 'Dataset approval required',
       'clarification': 'Waiting for more details',
       'searching_images': 'Searching for images',
+      'searching_text': 'Searching Wikipedia',
+      'text_candidates': 'Review Wikipedia sources',
       'image_candidates': 'Image search results',
       'creating_dataset': 'Preparing dataset',
       'cancelled': 'Training cancelled',
@@ -1251,6 +1254,21 @@ class _StudioPageState extends State<StudioPage> {
                   child: const Text('Approve web queries'),
                 ),
             ],
+          ),
+        ],
+        if (status == 'text_candidates') ...[
+          for (final candidate in job!['text_candidates'] as List)
+            SelectableText("${candidate['source']}"),
+          FilledButton(
+            onPressed: _busy
+                ? null
+                : () => _submit('/jobs/$id/use-text-excerpts', {
+                    'approved_urls': [
+                      for (final candidate in job['text_candidates'] as List)
+                        candidate['source'],
+                    ],
+                  }),
+            child: const Text('Approve excerpts from listed sources'),
           ),
         ],
         if (status == 'image_candidates') ...[
