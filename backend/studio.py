@@ -270,7 +270,13 @@ def train(rows, labels, target, repair=None, report=None):
     groups = [group for _, group in distinct]
     x = [row["text"] for row in rows]
     y = [row["label"] for row in rows]
-    if any(y.count(label) < 8 for label in labels) or len(set(groups)) < 5:
+    retained_counts = Counter(y)
+    underrepresented = [label for label in labels if retained_counts[label] < 8]
+    if underrepresented:
+        details = ", ".join(f"{label} ({retained_counts[label]})" for label in underrepresented)
+        raise ValueError(f"Training needs at least 8 usable examples per label after exclusions. "
+                         f"Add examples for {details}.")
+    if len(set(groups)) < 5:
         raise ValueError("Too few distinct examples or independent sources per label. Revise the prompt or source mode.")
     needed = set(labels)
     split = None

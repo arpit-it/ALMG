@@ -133,6 +133,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   standalone accent with punctuation and displayed two distinct Devanagari
   words without the warning. Training still required approval.
   A regression test covers both standalone and attached combining marks.
+  Starting training on a three-row fixture in the isolated Mac app showed
+  the minimum of eight usable examples per label and named both shortfalls
+  with their counts, billing with one and shipping with two.
   In the rebuilt isolated app,
   importing a three-row CSV with ASCII and full-width invoice text showed
   one near-duplicate group and left training awaiting approval. The preview
