@@ -185,6 +185,8 @@ def search_text(job):
         if error.code in {301, 302, 303, 307, 308}:
             message = ("Wikipedia redirected the approved search. ALMG stopped before "
                        "contacting the redirect destination. Try again or choose a local dataset.")
+        elif error.code == 429:
+            message = "Wikipedia is limiting search requests. Try again later or choose a local dataset."
         update(job, status="approval", error=message)
     except Exception as error:
         update(job, status="approval", error=str(error))
