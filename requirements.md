@@ -178,6 +178,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   URL together before excerpt approval.
   In the rebuilt Mac app, deselecting one of three fixture sources and
   approving the selection prepared only the other two excerpts.
+  Clearing all three selections disabled excerpt approval in the rebuilt Mac
+  app, and reselecting one source enabled approval again.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing

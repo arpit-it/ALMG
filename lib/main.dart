@@ -1289,7 +1289,11 @@ class _StudioPageState extends State<StudioPage> {
               ),
             ),
           FilledButton(
-            onPressed: _busy
+            onPressed: _busy ||
+                    (job['text_candidates'] as List).every(
+                      (candidate) =>
+                          _excludedTextSources.contains(candidate['source']),
+                    )
                 ? null
                 : () => _submit('/jobs/$id/use-text-excerpts', {
                     'approved_urls': [
