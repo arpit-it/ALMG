@@ -249,6 +249,16 @@ def classifier_split_groups(rows):
     return [root(row["group"]) for row in rows]
 
 
+def validate_classifier_counts(counts, labels):
+    """Reject a dataset with too few usable examples for any label."""
+    underrepresented = [label for label in labels if counts.get(label, 0) < 8]
+    if underrepresented:
+        details = ", ".join(f"{label} ({counts.get(label, 0)})" for label in underrepresented)
+        raise ValueError(
+            f"Training needs at least 8 usable examples per label after exclusions. Add examples for {details}."
+        )
+
+
 def train(rows, labels, target, repair=None, report=None):
     # Keep duplicate text out of every split, including conflicting labels.
     """Compare classifiers, optionally repair the dataset, and evaluate on held-out data."""
@@ -270,12 +280,7 @@ def train(rows, labels, target, repair=None, report=None):
     groups = [group for _, group in distinct]
     x = [row["text"] for row in rows]
     y = [row["label"] for row in rows]
-    retained_counts = Counter(y)
-    underrepresented = [label for label in labels if retained_counts[label] < 8]
-    if underrepresented:
-        details = ", ".join(f"{label} ({retained_counts[label]})" for label in underrepresented)
-        raise ValueError(f"Training needs at least 8 usable examples per label after exclusions. "
-                         f"Add examples for {details}.")
+    validate_classifier_counts(Counter(y), labels)
     if len(set(groups)) < 5:
         raise ValueError("Too few distinct examples or independent sources per label. Revise the prompt or source mode.")
     needed = set(labels)
@@ -1132,6 +1137,8 @@ class Handler(BaseHTTPRequestHandler):
                             missing = [label for label in job["plan"]["labels"] if label not in present]
                             if missing:
                                 raise ValueError("No dataset examples for: " + ", ".join(missing))
+                            if job.get("usable_counts"):
+                                validate_classifier_counts(job["usable_counts"], job["plan"]["labels"])
                         target = float(data["target"])
                         if not 0 < target <= 1:
                             raise ValueError("Enter a score between 0 and 1.")

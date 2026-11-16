@@ -145,6 +145,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Replacing that dataset with a CSV missing a label showed the line 2
   error and preserved both examples. An offline regression test verifies
   that validation rejects the replacement before starting a worker.
+  Approving the two-example fixture in the isolated Mac app reported one
+  usable example for each label against the minimum of eight. The backend
+  kept the dataset ready and the Mac app still offered CSV replacement.
   In the rebuilt isolated app,
   importing a three-row CSV with ASCII and full-width invoice text showed
   one near-duplicate group and left training awaiting approval. The preview
