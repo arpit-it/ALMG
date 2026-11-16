@@ -1298,8 +1298,8 @@ class _StudioPageState extends State<StudioPage> {
             ),
           if ((job?['conflicting_texts'] as int? ?? 0) > 0)
             Text(
-              'Examples with conflicting labels: ${job?['conflicting_texts']}. '
-              'Review the labels before approving training.',
+              'Groups with conflicting labels: ${job?['conflicting_texts']}. '
+              'Training and evaluation skip these examples.',
             ),
           if (job?['label_counts'] case final Map counts)
             for (final entry in counts.entries.where(
