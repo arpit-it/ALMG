@@ -160,6 +160,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Importing an invalid CSV through the native Open panel in the isolated Mac
   app identified the unrecognized label 'biling' on line 2, left dataset
   approval pending, and showed zero examples.
+  The rebuilt Mac app rejected a non-UTF-8 CSV selected in the native Open
+  panel and asked the user to save it as UTF-8. Dataset approval stayed
+  pending with zero examples.
   The Mac app imported a CSV with an optional `group` column and showed all
   three examples awaiting training approval. A local split fixture verified
   that differently worded rows sharing a group stay together. The isolated

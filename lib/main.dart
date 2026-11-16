@@ -755,7 +755,12 @@ class _StudioPageState extends State<StudioPage> {
       if (await file.length() > 30000) {
         throw const FormatException('Choose a CSV file up to 30 KB.');
       }
-      final csv = await file.readAsString();
+      final String csv;
+      try {
+        csv = utf8.decode(await file.readAsBytes());
+      } on FormatException {
+        throw const FormatException('Save the CSV as UTF-8 and try again.');
+      }
       if (!mounted || _activeJob != id) return;
       await _submit('/jobs/$id/import-csv', {'csv': csv});
     } catch (error) {
