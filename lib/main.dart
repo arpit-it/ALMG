@@ -1139,7 +1139,8 @@ class _StudioPageState extends State<StudioPage> {
             ],
           ),
         ],
-        if (job?['error'] case final String error) SelectableText(error),
+        if (job?['error'] case final String error when _error == null)
+          SelectableText(error),
         if (plan != null)
           Text(
             _imageRecipe

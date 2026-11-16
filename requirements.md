@@ -166,6 +166,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Two CSVs selected through the isolated Mac app reported missing text
   and text exceeding 3000 characters on line 2, respectively. Both left
   dataset approval pending with zero examples.
+  Retrying through the native Open panel in the rebuilt Mac app showed the
+  new missing-text error and hid the saved unrecognized-label error.
   The Mac app imported a CSV with an optional `group` column and showed all
   three examples awaiting training approval. A local split fixture verified
   that differently worded rows sharing a group stay together. The isolated
