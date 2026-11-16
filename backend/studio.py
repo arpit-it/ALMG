@@ -661,7 +661,12 @@ def prepare_dataset(job, imported_rows=None):
             return None
 
         preview_rows = rows[:5]
+        usable_counts = {}
         if job.get("recipe") == "classifier":
+            usable_counts = dict.fromkeys(label_counts, 0)
+            for row in rows:
+                if not has_label_conflict(row) and duplicate_kind(row) != "exact":
+                    usable_counts[row["label"]] += 1
             preview_rows = sorted(
                 rows, key=lambda row: (not has_label_conflict(row),
                                        bool(classifier_variant_key(row["text"])),
@@ -671,6 +676,7 @@ def prepare_dataset(job, imported_rows=None):
         with LOCK:
             TRAINING_DATA[job["id"]] = rows
             job.update(status="dataset_ready", examples=len(rows), label_counts=label_counts,
+                       usable_counts=usable_counts,
                        duplicate_rows=sum(len(labels) - 1 for labels in labels_by_text.values()),
                        near_duplicate_groups=sum(len(texts) > 1 for texts in texts_by_words.values()),
                        conflicting_texts=conflicting_groups,

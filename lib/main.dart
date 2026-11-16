@@ -1290,6 +1290,12 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ),
         if (status == 'dataset_ready') ...[
+          if (job?['usable_counts'] case final Map counts)
+            for (final entry in counts.entries)
+              if ((entry.value as int) < 8)
+                Text(
+                  '${entry.key} has ${entry.value} usable examples. Training needs 8 per label.',
+                ),
           if ((job?['symbol_only_rows'] as int? ?? 0) > 0)
             Text('Rows without letters or numbers: ${job?['symbol_only_rows']}'),
           if ((job?['duplicate_rows'] as int? ?? 0) > 0)
