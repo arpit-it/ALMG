@@ -521,6 +521,7 @@ class _StudioPageState extends State<StudioPage> {
 
   bool get _imageRecipe => _job?['recipe'] == 'text_to_image';
   Map<String, dynamic>? _job;
+  final Set<String> _excludedTextSources = {};
   String? _error;
   bool _busy = false;
   bool _idle = true;
@@ -667,7 +668,12 @@ class _StudioPageState extends State<StudioPage> {
     try {
       final job = await _request('/jobs/$id');
       if (!mounted || _activeJob != id) return;
-      setState(() => _job = job);
+      setState(() {
+        if (_job?['id'] != job['id'] || job['status'] != 'text_candidates') {
+          _excludedTextSources.clear();
+        }
+        _job = job;
+      });
       const active = {
         'planning',
         'queued',
@@ -1264,7 +1270,18 @@ class _StudioPageState extends State<StudioPage> {
             child: const Text('Edit web queries'),
           ),
           for (final candidate in job!['text_candidates'] as List)
-            ListTile(
+            CheckboxListTile(
+              value: !_excludedTextSources.contains(candidate['source']),
+              onChanged: _busy
+                  ? null
+                  : (checked) => setState(() {
+                      final source = candidate['source'] as String;
+                      if (checked == true) {
+                        _excludedTextSources.remove(source);
+                      } else {
+                        _excludedTextSources.add(source);
+                      }
+                    }),
               title: SelectableText(candidate['text'] as String),
               subtitle: SelectableText(
                 "Approved query: ${candidate['approved_query']}\n"
@@ -1277,10 +1294,11 @@ class _StudioPageState extends State<StudioPage> {
                 : () => _submit('/jobs/$id/use-text-excerpts', {
                     'approved_urls': [
                       for (final candidate in job['text_candidates'] as List)
-                        candidate['source'],
-                    ],
+                        if (!_excludedTextSources.contains(candidate['source']))
+                          candidate['source'],
+                    ].toSet().toList(),
                   }),
-            child: const Text('Approve excerpts from listed sources'),
+            child: const Text('Approve excerpts from selected sources'),
           ),
         ],
         if (status == 'image_candidates') ...[

@@ -1149,9 +1149,14 @@ class Handler(BaseHTTPRequestHandler):
                         worker = (prepare_dataset, (job, rows))
                     elif action == "use-text-excerpts" and status == "text_candidates":
                         urls = [candidate["source"] for candidate in job["text_candidates"]]
-                        if not urls or data.get("approved_urls") != urls:
-                            raise ValueError("Approve the exact candidate URLs first.")
-                        job.update(status="creating_dataset", error=None, mode="web")
+                        approved = data.get("approved_urls")
+                        if (not isinstance(approved, list) or not approved
+                            or any(not isinstance(url, str) or url not in urls for url in approved)
+                            or len(set(approved)) != len(approved)):
+                            raise ValueError("Select one or more listed candidate URLs first.")
+                        job.update(status="creating_dataset", error=None, mode="web",
+                                   text_candidates=[candidate for candidate in job["text_candidates"]
+                                                    if candidate["source"] in approved])
                         worker = (prepare_dataset, (job,))
                     elif action == "prepare" and status == "approval":
                         mode = data.get("mode")
