@@ -543,7 +543,7 @@ def read_classifier_csv(content, labels):
         if sorted(header) not in (["label", "text"], ["group", "label", "text"]):
             raise ValueError("Use CSV columns named text and label, with an optional group column.")
         for row in reader:
-            if not row:
+            if len(row) <= len(header) and not any(value.strip() for value in row):
                 continue
             if len(row) > len(header):
                 raise ValueError(f"CSV line {reader.line_num} has extra columns. Quote text that contains commas.")

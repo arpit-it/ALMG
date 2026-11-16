@@ -169,6 +169,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   headers and previewed both rows while training awaited approval.
   A second Mac import read the columns in group, label, text order and
   showed one correctly labeled example per class before training approval.
+  A local CSV fixture with whitespace-only and separator-only rows yielded
+  two examples. The isolated Mac app displayed the original ending lines
+  3 and 5, with training approval still pending.
   The rebuilt Mac app displayed source group A on both related CSV rows and
   group B on the unrelated row before training approval.
   In the rebuilt Mac app, both repeated rows showed Duplicate text and both
