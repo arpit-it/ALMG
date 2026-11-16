@@ -157,6 +157,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Importing a CSV with a blank label showed the line number and missing-label
   error in the isolated Mac app and left dataset approval pending. After rebuilding,
   the same import displayed the validation message without the exception prefix.
+  Importing an invalid CSV through the native Open panel in the isolated Mac
+  app identified the unrecognized label 'biling' on line 2, left dataset
+  approval pending, and showed zero examples.
   The Mac app imported a CSV with an optional `group` column and showed all
   three examples awaiting training approval. A local split fixture verified
   that differently worded rows sharing a group stay together. The isolated

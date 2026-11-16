@@ -558,7 +558,10 @@ def read_classifier_csv(content, labels):
             if not label:
                 raise ValueError(f"CSV line {reader.line_num} is missing a label.")
             if label not in labels:
-                raise ValueError(f"CSV line {reader.line_num} has a label outside the approved list.")
+                raise ValueError(
+                    f"CSV line {reader.line_num} has an unrecognized label {label[:160]!r}. "
+                    "Use one of the proposed labels shown in Model creation."
+                )
             if not 1 <= len(body) <= 3000:
                 raise ValueError(f"CSV line {reader.line_num} needs 1 to 3000 characters of text.")
             source_group = values.get("group", "").strip()
