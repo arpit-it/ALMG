@@ -184,6 +184,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   label. Toggling the orchard fruit checkbox cleared only that selection.
   Approving a query in the Mac app against a local HTTP 302 fixture returned
   to dataset approval without following the redirect or showing results.
+  The Mac app explained that Wikipedia redirected the approved search and
+  offered a retry or a local dataset. The loopback fixture logged the original
+  request and no request to the redirect destination.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing

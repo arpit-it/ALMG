@@ -21,6 +21,7 @@ from collections import Counter
 from html import unescape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+from urllib.error import HTTPError
 from urllib.parse import parse_qs, quote, urlencode, urlsplit
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler, HTTPSHandler
 
@@ -174,6 +175,12 @@ def search_text(job):
         if not candidates:
             raise ValueError("No usable excerpts found. Edit the web queries or choose a local dataset.")
         update(job, status="text_candidates", text_candidates=candidates)
+    except HTTPError as error:
+        message = str(error)
+        if error.code in {301, 302, 303, 307, 308}:
+            message = ("Wikipedia redirected the approved search. ALMG stopped before "
+                       "contacting the redirect destination. Try again or choose a local dataset.")
+        update(job, status="approval", error=message)
     except Exception as error:
         update(job, status="approval", error=str(error))
 
