@@ -123,3 +123,20 @@ Extract the ZIP and use the Python setup instructions above from the extracted
 folder. Open the included ALMG app bundle in Finder. The archive includes the
 backend source and requires Python 3.12 and a separate model download. It uses
 local signing and does not include Apple notarization.
+
+### Signing and notarization for public distribution
+
+Sign the release app and its bundled executables with a Developer ID
+Application certificate. Enable Hardened Runtime, use a secure timestamp,
+and exclude the debugger entitlement from the release build.
+[Apple signing and notarization requirements](https://developer.apple.com/documentation/security/notarizing-macos-software-before-distribution)
+
+Submit a ZIP containing the signed app using Apple's `notarytool`. After
+Apple accepts it, use `stapler` to attach and validate the ticket on the
+app bundle. Package the stapled app with the backend source and generate
+the SHA-256 checksum from that final ZIP.
+[Apple command-line notarization workflow](https://developer.apple.com/documentation/security/customizing-the-notarization-workflow)
+
+Download the published ZIP on a clean Apple silicon Mac, verify the
+checksum, extract it with Archive Utility, and open ALMG in Finder with
+Gatekeeper enabled. Confirm the Dashboard loads.
