@@ -82,6 +82,7 @@ jobs:
           unzip -tq ALMG-macOS-arm64.zip
           ditto -x -k ALMG-macOS-arm64.zip "$package_dir/extracted"
           codesign --verify --deep --strict "$package_dir/extracted/$app"
+          diff -qr "$package_dir/backend" "$package_dir/extracted/backend"
           shasum -a 256 ALMG-macOS-arm64.zip > ALMG-macOS-arm64.zip.sha256
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push'
