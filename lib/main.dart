@@ -1270,22 +1270,25 @@ class _StudioPageState extends State<StudioPage> {
             child: const Text('Edit web queries'),
           ),
           for (final candidate in job!['text_candidates'] as List)
-            CheckboxListTile(
-              value: !_excludedTextSources.contains(candidate['source']),
-              onChanged: _busy
-                  ? null
-                  : (checked) => setState(() {
-                      final source = candidate['source'] as String;
-                      if (checked == true) {
-                        _excludedTextSources.remove(source);
-                      } else {
-                        _excludedTextSources.add(source);
-                      }
-                    }),
+            ListTile(
               title: SelectableText(candidate['text'] as String),
               subtitle: SelectableText(
                 "Approved query: ${candidate['approved_query']}\n"
                 "${candidate['source']}",
+              ),
+              trailing: Checkbox(
+                value: !_excludedTextSources.contains(candidate['source']),
+                onChanged: _busy
+                    ? null
+                    : (checked) => setState(() {
+                        final source = candidate['source'] as String;
+                        if (checked == true) {
+                          _excludedTextSources.remove(source);
+                        } else {
+                          _excludedTextSources.add(source);
+                        }
+                      }),
+                semanticLabel: "Include ${candidate['source']}",
               ),
             ),
           FilledButton(
