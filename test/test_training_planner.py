@@ -76,6 +76,13 @@ class TrainingPlannerTest(unittest.TestCase):
                 self.assertEqual(job["status"], "approval")
                 worker.assert_not_called()
 
+    def test_classifier_matching_preserves_attached_vowel_marks(self):
+        self.assertEqual(studio.classifier_variant_key("\u0301?!"), ())
+        self.assertNotEqual(
+            studio.classifier_variant_key("का"),
+            studio.classifier_variant_key("क"),
+        )
+
     def test_training_keeps_punctuation_variants_in_one_split(self):
         rows = [
             {"text": f"{phrase} case {case}{punctuation}", "label": label,

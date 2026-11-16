@@ -132,6 +132,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   the preview shows at most five rows. The isolated Mac app counted one
   standalone accent with punctuation and displayed two distinct Devanagari
   words without the warning. Training still required approval.
+  A regression test covers both standalone and attached combining marks.
   In the rebuilt isolated app,
   importing a three-row CSV with ASCII and full-width invoice text showed
   one near-duplicate group and left training awaiting approval. The preview
