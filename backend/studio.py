@@ -141,7 +141,8 @@ def plan(prompt):
 def discover_text(job):
     """Find candidate excerpts using approved Wikipedia queries."""
     candidates = []
-    seen = set()
+    seen_snippets = set()
+    seen_sources = set()
     queries = list(dict.fromkeys(job["plan"]["queries"]))
     for index, query in enumerate(queries, start=1):
         activity(job, f"Searching Wikipedia for approved query {index} of {len(queries)}.")
@@ -164,8 +165,9 @@ def discover_text(job):
             snippet = unescape(re.sub(r"<[^>]+>", "", description)).strip()
             snippet = snippet[:450].rstrip()
             snippet_key = " ".join(snippet.casefold().split())
-            if len(snippet) >= 40 and snippet_key not in seen:
-                seen.add(snippet_key)
+            if len(snippet) >= 40 and snippet_key not in seen_snippets and source not in seen_sources:
+                seen_snippets.add(snippet_key)
+                seen_sources.add(source)
                 candidates.append({"text": snippet, "source": source,
                                    "approved_query": query, "group": source})
         time.sleep(1)
