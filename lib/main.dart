@@ -1203,8 +1203,8 @@ class _StudioPageState extends State<StudioPage> {
             ),
             if ((plan['queries'] as List).isNotEmpty) const Text(
               'Web collection sends these queries to English Wikipedia '
-              '(en.wikipedia.org). ALMG uses '
-              'search result excerpts and records their source URLs.',
+              '(en.wikipedia.org), with up to 20 results per query. '
+              'Review the excerpts and source URLs before approving them for the dataset.',
             ),
             for (final query in plan['queries'] as List)
               SelectableText('• $query'),
