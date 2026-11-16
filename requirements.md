@@ -142,6 +142,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   A six-row CSV imported in the isolated Mac app showed one usable example
   per label after excluding both copies of a duplicate and both rows of a
   conflicting pair. Preview and training now share the exclusion rules.
+  The rebuilt Mac app reopened that dataset, reported one repeated row,
+  and explained that training and evaluation skip every copy. Training
+  still required approval.
   The rebuilt Mac app replaced that four-example dataset with a two-example
   CSV through the Open panel in the same training conversation. The preview
   showed the new examples and training still required approval.
