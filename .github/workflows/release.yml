@@ -16,6 +16,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     outputs:
+      archive: ${{ steps.version.outputs.archive }}
       release_tag: ${{ steps.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
@@ -49,10 +50,12 @@ jobs:
           fi
           [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]
           echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "archive=ALMG-$tag-macOS-arm64.zip" >> "$GITHUB_OUTPUT"
           echo "tag=$tag" >> "$GITHUB_OUTPUT"
       - name: Build and package
         env:
           FLUTTER_MACOS_ARM64_ONLY: "true"
+          ARCHIVE: ${{ steps.version.outputs.archive }}
           VERSION: ${{ steps.version.outputs.version }}
         run: |
           flutter build macos --release --build-name="$VERSION" --build-number="$GITHUB_RUN_NUMBER"
@@ -77,20 +80,20 @@ jobs:
           cp backend/chat_history.py backend/image_recipe.py backend/inference.py \
             backend/model_setup.py backend/register-macos-service.py backend/studio.py \
             backend/requirements.txt backend/start-backend.command "$package_dir/backend/"
-          ditto -c -k "$package_dir" release/ALMG-macOS-arm64.zip
+          ditto -c -k "$package_dir" release/"$ARCHIVE"
           cd release
-          unzip -tq ALMG-macOS-arm64.zip
-          ditto -x -k ALMG-macOS-arm64.zip "$package_dir/extracted"
+          unzip -tq "$ARCHIVE"
+          ditto -x -k "$ARCHIVE" "$package_dir/extracted"
           codesign --verify --deep --strict "$package_dir/extracted/$app"
           diff -qr "$package_dir/backend" "$package_dir/extracted/backend"
-          shasum -a 256 ALMG-macOS-arm64.zip > ALMG-macOS-arm64.zip.sha256
+          shasum -a 256 "$ARCHIVE" > "$ARCHIVE.sha256"
       - uses: actions/upload-artifact@v4
         if: github.event_name == 'push'
         with:
           name: almg-macos
           path: |
-            release/ALMG-macOS-arm64.zip
-            release/ALMG-macOS-arm64.zip.sha256
+            release/${{ steps.version.outputs.archive }}
+            release/${{ steps.version.outputs.archive }}.sha256
           if-no-files-found: error
 
   publish:
@@ -105,21 +108,22 @@ jobs:
           name: almg-macos
       - name: Publish the GitHub release
         env:
+          ARCHIVE: ${{ needs.build.outputs.archive }}
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
         shell: bash
         run: |
-          checksum="$(cat ALMG-macOS-arm64.zip.sha256)"
-          if [[ ! "$checksum" =~ ^[0-9a-f]{64}[[:blank:]][[:blank:]]ALMG-macOS-arm64\.zip$ ]]; then
-            echo "Expected a SHA-256 checksum for ALMG-macOS-arm64.zip." >&2
+          checksum="$(cat "$ARCHIVE.sha256")"
+          if [[ ! "$checksum" =~ ^[0-9a-f]{64}"  $ARCHIVE"$ ]]; then
+            echo "Expected a SHA-256 checksum for $ARCHIVE." >&2
             exit 1
           fi
-          sha256sum --check ALMG-macOS-arm64.zip.sha256
+          sha256sum --check "$ARCHIVE.sha256"
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             options=(--verify-tag)
           else
             options=(--target "$GITHUB_SHA" --prerelease)
           fi
-          gh release create "$RELEASE_TAG" ALMG-macOS-arm64.zip ALMG-macOS-arm64.zip.sha256 \
+          gh release create "$RELEASE_TAG" "$ARCHIVE" "$ARCHIVE.sha256" \
             --repo "$GITHUB_REPOSITORY" "${options[@]}" --generate-notes \
             --title "ALMG $RELEASE_TAG"
