@@ -119,6 +119,27 @@ class TrainingPlannerTest(unittest.TestCase):
         self.assertEqual(job["status"], "dataset_ready")
         worker.assert_not_called()
 
+    def test_classifier_label_group_shortfall_does_not_queue_training(self):
+        labels = ["billing", "shipping"]
+        job = {"id": "fixture", "status": "dataset_ready", "recipe": "classifier",
+               "plan": {"labels": labels}}
+        rows = [{"label": label, "group": label if label == "billing" else str(i), "text": f"{label} example {i}"}
+                for label in labels for i in range(8)]
+        body = b'{"target": 0.8}'
+        handler = Mock(path="/jobs/fixture/start",
+                       headers={"Content-Length": str(len(body))},
+                       rfile=io.BytesIO(body))
+        with patch.object(studio, "JOBS", {"fixture": job}), \
+             patch.object(studio, "TRAINING_DATA", {"fixture": rows}), \
+             patch.object(studio.threading, "Thread") as worker:
+            studio.Handler.do_POST(handler)
+        handler.respond.assert_called_once_with(
+            {"error": "Each label needs at least 3 independent groups to appear in training, "
+                      "validation, and test. Add groups for billing (1)."}, 400
+        )
+        self.assertEqual(job["status"], "dataset_ready")
+        worker.assert_not_called()
+
     def test_invalid_csv_replacement_preserves_ready_dataset(self):
         job = {"status": "dataset_ready", "recipe": "classifier",
                "plan": {"labels": ["billing", "shipping"]}, "examples": 2}

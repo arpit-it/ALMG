@@ -259,12 +259,23 @@ def validate_classifier_counts(counts, labels):
         )
 
 
-def validate_classifier_groups(groups):
-    group_count = len(set(groups))
+def validate_classifier_groups(groups, row_labels, labels):
+    groups_by_label = {label: set() for label in labels}
+    for group, label in zip(groups, row_labels):
+        groups_by_label[label].add(group)
+    group_count = len(set().union(*groups_by_label.values()))
     if group_count < 5:
         raise ValueError(
             f"Training needs at least 5 independent groups for evaluation. "
             f"The usable examples form {group_count}. Add examples from more independent groups."
+        )
+
+    shortfalls = [f"{label} ({len(groups_by_label[label])})"
+                  for label in labels if len(groups_by_label[label]) < 3]
+    if shortfalls:
+        raise ValueError(
+            "Each label needs at least 3 independent groups to appear in training, "
+            "validation, and test. Add groups for " + ", ".join(shortfalls) + "."
         )
 
 
@@ -295,7 +306,7 @@ def train(rows, labels, target, repair=None, report=None):
     x = [row["text"] for row in rows]
     y = [row["label"] for row in rows]
     validate_classifier_counts(Counter(y), labels)
-    validate_classifier_groups(groups)
+    validate_classifier_groups(groups, y, labels)
     needed = set(labels)
     split = None
     for seed in range(12):
@@ -1154,7 +1165,10 @@ class Handler(BaseHTTPRequestHandler):
                             counts = Counter(rows[index]["label"] for index in usable)
                             validate_classifier_counts(counts, job["plan"]["labels"])
                             groups = classifier_split_groups(rows)
-                            validate_classifier_groups(groups[index] for index in usable)
+                            validate_classifier_groups(
+                                (groups[index] for index in usable),
+                                (rows[index]["label"] for index in usable), job["plan"]["labels"],
+                            )
                         target = float(data["target"])
                         if not 0 < target <= 1:
                             raise ValueError("Enter a score between 0 and 1.")

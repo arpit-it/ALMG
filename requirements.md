@@ -141,6 +141,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   With the updated backend, approving that local fixture in the Mac app
   showed the two-group shortfall immediately and left approval available.
   A regression test confirms no training worker is queued.
+  A second local Mac fixture passed the overall group minimum but had
+  only two billing groups. Approval named billing and its count, explained
+  the three-way split requirement, and left approval available.
   The rebuilt Mac app reopened a four-row fixture and showed one usable
   example per label after excluding a conflicting pair. Both shortfalls
   appeared before training approval.
