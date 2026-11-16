@@ -62,6 +62,12 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   file. The checksum passed, the extracted app launched, and a stub publisher
   received both filenames. A checksum naming another file was rejected.
   The published stable release still needs an independent asset download and check.
+  GitHub Actions can also publish a stable release from an on-demand run
+  on main, without a tag push. A local fixture with stable tags up to
+  `v1.0.10` and a newer prerelease selected `v1.0.11`. The built ZIP used
+  that tag in its filename, passed its checksum, and the extracted macOS
+  app launched. A stub publisher received the stable tag and matching assets.
+  GitHub-hosted dispatch and its published assets still need verification.
 - [x] Test a fresh installation on an Apple silicon Mac. Follow the documented Python setup, register the backend, download and verify the checkpoint, send a chat message, and confirm that history survives a relaunch.
   The isolated Mac build reached Chat with setup required and showed a live
   transfer rate of 24.8 MB/s beside checkpoint progress in Settings. In a fresh

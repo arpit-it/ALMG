@@ -116,8 +116,10 @@ in [requirements.md](requirements.md).
 
 Each push to `main` triggers a macOS build and publishes a prerelease such as
 `v1.0.0-main.12` if checks pass. The workflow attaches the app ZIP and SHA-256
-checksum to the repository's GitHub Release. Push a version tag such as `v1.0.0`
-to publish a stable release. The workflow uses a macOS ARM64 runner. [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
+checksum to the repository's GitHub Release. To publish a stable release, run
+**ALMG release** from GitHub Actions on `main`. The workflow creates the next
+patch tag after the highest stable tag and includes it in the ZIP and checksum
+filenames. If there is no stable tag, it uses the version in `pubspec.yaml`. The workflow uses a macOS ARM64 runner. [GitHub-hosted runners](https://docs.github.com/en/actions/reference/runners/github-hosted-runners)
 
 Extract the ZIP and use the Python setup instructions above from the extracted
 folder. Open the included ALMG app bundle in Finder. The archive includes the
