@@ -253,9 +253,9 @@ def train(rows, labels, target, repair=None, report=None):
     if report:
         report("Removing duplicate examples and creating training, validation, and test splits.")
     original_texts = [row["text"] for row in rows]
-    counts = Counter(" ".join(text.casefold().split()) for text in original_texts)
+    counts = Counter(map(classifier_exact_key, original_texts))
     distinct = [(row, group) for row, group in zip(rows, classifier_split_groups(rows))
-                if counts[" ".join(row["text"].casefold().split())] == 1]
+                if counts[classifier_exact_key(row["text"])] == 1]
     rows = [row for row, _ in distinct]
     groups = [group for _, group in distinct]
     x = [row["text"] for row in rows]

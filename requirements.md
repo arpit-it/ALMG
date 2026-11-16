@@ -179,6 +179,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The isolated Mac preview showed one duplicate and one conflict for two
   Unicode encodings of café. The unaccented cafe row had neither warning.
   A local split check kept both accented encodings together.
+  Training in the isolated Mac app reached inference preview with held-out
+  macro F1 of 1.000. The saved training dataset contained all three splits
+  and excluded both accented duplicates.
   The isolated Mac app accepted spaces around the text, label, and group
   headers and previewed both rows while training awaited approval.
   A second Mac import read the columns in group, label, text order and
