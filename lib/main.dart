@@ -1264,7 +1264,13 @@ class _StudioPageState extends State<StudioPage> {
             child: const Text('Edit web queries'),
           ),
           for (final candidate in job!['text_candidates'] as List)
-            SelectableText("${candidate['source']}"),
+            ListTile(
+              title: SelectableText(candidate['text'] as String),
+              subtitle: SelectableText(
+                "Approved query: ${candidate['approved_query']}\n"
+                "${candidate['source']}",
+              ),
+            ),
           FilledButton(
             onPressed: _busy
                 ? null
