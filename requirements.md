@@ -136,6 +136,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Starting training on a three-row fixture in the isolated Mac app showed
   the minimum of eight usable examples per label and named both shortfalls
   with their counts, billing with one and shipping with two.
+  A 16-row fixture run in the isolated Mac app reported that its examples
+  formed two independent groups against the five-group evaluation minimum.
   The rebuilt Mac app reopened a four-row fixture and showed one usable
   example per label after excluding a conflicting pair. Both shortfalls
   appeared before training approval.

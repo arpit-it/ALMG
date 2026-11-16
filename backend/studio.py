@@ -286,8 +286,12 @@ def train(rows, labels, target, repair=None, report=None):
     x = [row["text"] for row in rows]
     y = [row["label"] for row in rows]
     validate_classifier_counts(Counter(y), labels)
-    if len(set(groups)) < 5:
-        raise ValueError("Too few distinct examples or independent sources per label. Revise the prompt or source mode.")
+    group_count = len(set(groups))
+    if group_count < 5:
+        raise ValueError(
+            f"Training needs at least 5 independent groups for evaluation. "
+            f"The usable examples form {group_count}. Add examples from more independent groups."
+        )
     needed = set(labels)
     split = None
     for seed in range(12):
