@@ -146,6 +146,8 @@ def discover_text(job):
     queries = list(dict.fromkeys(job["plan"]["queries"]))
     result_limit = 20
     for index, query in enumerate(queries, start=1):
+        if index > 1:
+            time.sleep(1)
         activity(job, f"Searching Wikipedia for approved query {index} of {len(queries)}.")
         url = "https://en.wikipedia.org/w/rest.php/v1/search/page?" + urlencode({
             "q": query, "limit": result_limit,
@@ -171,7 +173,6 @@ def discover_text(job):
                 seen_sources.add(source)
                 candidates.append({"text": snippet, "source": source,
                                    "approved_query": query, "group": source})
-        time.sleep(1)
     return candidates
 
 
