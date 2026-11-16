@@ -150,6 +150,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   kept the dataset ready and the Mac app still offered CSV replacement.
   An offline regression test confirms that rejecting the approval leaves
   the dataset ready and starts no training worker.
+  Approving a saved dataset without usable counts in the isolated Mac app
+  also reported one usable example per label and kept CSV replacement
+  available.
   In the rebuilt isolated app,
   importing a three-row CSV with ASCII and full-width invoice text showed
   one near-duplicate group and left training awaiting approval. The preview

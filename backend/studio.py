@@ -259,13 +259,9 @@ def validate_classifier_counts(counts, labels):
         )
 
 
-def train(rows, labels, target, repair=None, report=None):
-    # Keep duplicate text out of every split, including conflicting labels.
-    """Compare classifiers, optionally repair the dataset, and evaluate on held-out data."""
-    if report:
-        report("Removing duplicates and conflicting examples before splitting the dataset.")
-    original_texts = [row["text"] for row in rows]
-    counts = Counter(map(classifier_exact_key, original_texts))
+def usable_classifier_indices(rows):
+    """Identify rows that survive duplicate and label conflict checks."""
+    counts = Counter(classifier_exact_key(row["text"]) for row in rows)
     variant_labels = {}
     for row in rows:
         words = classifier_variant_key(row["text"])
@@ -273,9 +269,18 @@ def train(rows, labels, target, repair=None, report=None):
             variant_labels.setdefault(words, set()).add(row["label"])
     conflicting_variants = {words for words, labels_for_text in variant_labels.items()
                             if len(labels_for_text) > 1}
-    distinct = [(row, group) for row, group in zip(rows, classifier_split_groups(rows))
-                if counts[classifier_exact_key(row["text"])] == 1
-                and classifier_variant_key(row["text"]) not in conflicting_variants]
+    return [index for index, row in enumerate(rows)
+            if counts[classifier_exact_key(row["text"])] == 1
+            and classifier_variant_key(row["text"]) not in conflicting_variants]
+
+
+def train(rows, labels, target, repair=None, report=None):
+    """Compare classifiers, optionally repair the dataset, and evaluate on held-out data."""
+    if report:
+        report("Removing duplicates and conflicting examples before splitting the dataset.")
+    original_texts = [row["text"] for row in rows]
+    split_groups = classifier_split_groups(rows)
+    distinct = [(rows[index], split_groups[index]) for index in usable_classifier_indices(rows)]
     rows = [row for row, _ in distinct]
     groups = [group for _, group in distinct]
     x = [row["text"] for row in rows]
@@ -1133,12 +1138,16 @@ class Handler(BaseHTTPRequestHandler):
                         return self.respond({"id": job["id"]})
                     elif action == "start" and status == "dataset_ready":
                         if job.get("recipe") == "classifier":
-                            present = {row["label"] for row in TRAINING_DATA.get(job["id"], [])}
+                            rows = TRAINING_DATA.get(job["id"], [])
+                            present = {row["label"] for row in rows}
                             missing = [label for label in job["plan"]["labels"] if label not in present]
                             if missing:
                                 raise ValueError("No dataset examples for: " + ", ".join(missing))
-                            if job.get("usable_counts"):
-                                validate_classifier_counts(job["usable_counts"], job["plan"]["labels"])
+                            counts = job.get("usable_counts")
+                            if counts is None:
+                                counts = Counter(rows[index]["label"]
+                                                 for index in usable_classifier_indices(rows))
+                            validate_classifier_counts(counts, job["plan"]["labels"])
                         target = float(data["target"])
                         if not 0 < target <= 1:
                             raise ValueError("Enter a score between 0 and 1.")
