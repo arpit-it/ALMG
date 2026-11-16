@@ -259,6 +259,15 @@ def validate_classifier_counts(counts, labels):
         )
 
 
+def validate_classifier_groups(groups):
+    group_count = len(set(groups))
+    if group_count < 5:
+        raise ValueError(
+            f"Training needs at least 5 independent groups for evaluation. "
+            f"The usable examples form {group_count}. Add examples from more independent groups."
+        )
+
+
 def usable_classifier_indices(rows):
     """Identify rows that survive duplicate and label conflict checks."""
     counts = Counter(classifier_exact_key(row["text"]) for row in rows)
@@ -286,12 +295,7 @@ def train(rows, labels, target, repair=None, report=None):
     x = [row["text"] for row in rows]
     y = [row["label"] for row in rows]
     validate_classifier_counts(Counter(y), labels)
-    group_count = len(set(groups))
-    if group_count < 5:
-        raise ValueError(
-            f"Training needs at least 5 independent groups for evaluation. "
-            f"The usable examples form {group_count}. Add examples from more independent groups."
-        )
+    validate_classifier_groups(groups)
     needed = set(labels)
     split = None
     for seed in range(12):
@@ -1146,11 +1150,11 @@ class Handler(BaseHTTPRequestHandler):
                             missing = [label for label in job["plan"]["labels"] if label not in present]
                             if missing:
                                 raise ValueError("No dataset examples for: " + ", ".join(missing))
-                            counts = job.get("usable_counts")
-                            if counts is None:
-                                counts = Counter(rows[index]["label"]
-                                                 for index in usable_classifier_indices(rows))
+                            usable = usable_classifier_indices(rows)
+                            counts = Counter(rows[index]["label"] for index in usable)
                             validate_classifier_counts(counts, job["plan"]["labels"])
+                            groups = classifier_split_groups(rows)
+                            validate_classifier_groups(groups[index] for index in usable)
                         target = float(data["target"])
                         if not 0 < target <= 1:
                             raise ValueError("Enter a score between 0 and 1.")

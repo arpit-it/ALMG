@@ -84,7 +84,9 @@ class TrainingPlannerTest(unittest.TestCase):
         handler = Mock(path="/jobs/fixture/start",
                        headers={"Content-Length": str(len(body))},
                        rfile=io.BytesIO(body))
-        rows = [{"label": "billing"}, {"label": "shipping"}]
+        rows = [{"label": "billing", "text": "invoice"}] + [
+            {"label": "shipping", "text": f"delivery {i}"} for i in range(8)
+        ]
         with patch.object(studio, "JOBS", {"fixture": job}), \
              patch.object(studio, "TRAINING_DATA", {"fixture": rows}), \
              patch.object(studio.threading, "Thread") as worker:
@@ -92,6 +94,27 @@ class TrainingPlannerTest(unittest.TestCase):
         handler.respond.assert_called_once_with(
             {"error": "Training needs at least 8 usable examples per label after exclusions. "
                       "Add examples for billing (1)."}, 400
+        )
+        self.assertEqual(job["status"], "dataset_ready")
+        worker.assert_not_called()
+
+    def test_classifier_group_shortfall_does_not_queue_training(self):
+        labels = ["billing", "shipping"]
+        job = {"id": "fixture", "status": "dataset_ready", "recipe": "classifier",
+               "plan": {"labels": labels}}
+        rows = [{"label": label, "group": label, "text": f"{label} example {i}"}
+                for label in labels for i in range(8)]
+        body = b'{"target": 0.8}'
+        handler = Mock(path="/jobs/fixture/start",
+                       headers={"Content-Length": str(len(body))},
+                       rfile=io.BytesIO(body))
+        with patch.object(studio, "JOBS", {"fixture": job}), \
+             patch.object(studio, "TRAINING_DATA", {"fixture": rows}), \
+             patch.object(studio.threading, "Thread") as worker:
+            studio.Handler.do_POST(handler)
+        handler.respond.assert_called_once_with(
+            {"error": "Training needs at least 5 independent groups for evaluation. "
+                      "The usable examples form 2. Add examples from more independent groups."}, 400
         )
         self.assertEqual(job["status"], "dataset_ready")
         worker.assert_not_called()

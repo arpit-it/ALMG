@@ -138,6 +138,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   with their counts, billing with one and shipping with two.
   A 16-row fixture run in the isolated Mac app reported that its examples
   formed two independent groups against the five-group evaluation minimum.
+  With the updated backend, approving that local fixture in the Mac app
+  showed the two-group shortfall immediately and left approval available.
+  A regression test confirms no training worker is queued.
   The rebuilt Mac app reopened a four-row fixture and showed one usable
   example per label after excluding a conflicting pair. Both shortfalls
   appeared before training approval.
