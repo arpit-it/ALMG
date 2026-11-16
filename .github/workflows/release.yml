@@ -98,6 +98,11 @@ jobs:
           RELEASE_TAG: ${{ needs.build.outputs.release_tag }}
         shell: bash
         run: |
+          checksum="$(cat ALMG-macOS-arm64.zip.sha256)"
+          if [[ ! "$checksum" =~ ^[0-9a-f]{64}[[:blank:]][[:blank:]]ALMG-macOS-arm64\.zip$ ]]; then
+            echo "Expected a SHA-256 checksum for ALMG-macOS-arm64.zip." >&2
+            exit 1
+          fi
           sha256sum --check ALMG-macOS-arm64.zip.sha256
           if [[ "$GITHUB_REF_TYPE" == tag ]]; then
             options=(--verify-tag)

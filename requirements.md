@@ -35,6 +35,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The packaging step now tests ZIP integrity before writing its checksum.
   The check rejected a truncated local fixture. A fresh package passed
   both checks and the extracted ARM64 app opened to the Dashboard.
+  The publish step now requires the checksum to name the release ZIP.
+  With a local tag fixture and a stub publisher, a checksum for an unrelated
+  file stopped publication. The correct checksum passed and the ZIP opened
+  to the Dashboard after extraction.
 - [x] Test a fresh installation on an Apple silicon Mac. Follow the documented Python setup, register the backend, download and verify the checkpoint, send a chat message, and confirm that history survives a relaunch.
   The isolated Mac build reached Chat with setup required and showed a live
   transfer rate of 24.8 MB/s beside checkpoint progress in Settings. In a fresh
