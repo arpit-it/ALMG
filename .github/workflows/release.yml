@@ -58,6 +58,12 @@ jobs:
           flutter build macos --release --build-name="$VERSION" --build-number="$GITHUB_RUN_NUMBER"
           app="ALMG - Automated Language Model Generator.app"
           [[ "$(lipo -archs "build/macos/Build/Products/Release/$app/Contents/MacOS/${app%.app}")" == arm64 ]]
+          bundle_version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' \
+            "build/macos/Build/Products/Release/$app/Contents/Info.plist")"
+          if [[ "$bundle_version" != "$VERSION" ]]; then
+            echo "Expected app version $VERSION, found $bundle_version." >&2
+            exit 1
+          fi
           mkdir -p release
           package_dir="$(mktemp -d "${RUNNER_TEMP}/almg-package.XXXXXXXX")"
           trap 'rm -rf -- "$package_dir"' EXIT
