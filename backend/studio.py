@@ -151,7 +151,10 @@ def discover_text(job):
         results = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
         }, opener=DISCOVERY)
-        for result in results.get("pages", []):
+        pages = results.get("pages") if isinstance(results, dict) else None
+        if not isinstance(pages, list):
+            raise ValueError("Wikipedia returned an invalid search response. Try again or choose a local dataset.")
+        for result in pages:
             if not isinstance(result, dict):
                 continue
             page, description = result.get("key"), result.get("excerpt")
