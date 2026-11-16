@@ -181,6 +181,10 @@ def search_text(job):
         if not candidates:
             raise ValueError("No usable excerpts found. Edit the web queries or choose a local dataset.")
         update(job, status="text_candidates", text_candidates=candidates)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        update(job, status="approval", error=(
+            "Wikipedia returned an invalid search response. Try again or choose a local dataset."
+        ))
     except HTTPError as error:
         message = str(error)
         if error.code in {301, 302, 303, 307, 308}:
