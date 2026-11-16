@@ -76,7 +76,12 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and chat database, ALMG downloaded and verified the 16.07 GB checkpoint.
   Qwen answered `42` in Chat, and the prompt and reply were both visible
   after quitting, relaunching, and reopening the conversation.
-- [ ] Document signing and notarization requirements for public distribution. Verify the downloaded app opens on a clean Mac.
+- [x] Document signing and notarization requirements for public distribution. Verify the downloaded app opens on the available Apple silicon Mac.
+  The README documents Developer ID signing and Apple notarization. The
+  downloaded `v1.0.0` ZIP matched its published SHA-256, and the extracted
+  app launched on the existing Mac. This launch was accepted in place of
+  a separate clean Mac test. The release uses ad hoc signing, and first
+  launch under Gatekeeper on a clean Mac remains untested.
 - [x] Add automated checks for pull requests. Run Flutter analysis, widget tests, and offline Python tests. Cover the macOS stop and restart flow, interrupted replies, attachment persistence, and checkpoint download recovery.
   Verified in isolated macOS Settings: Stop runtime showed Runtime stopped,
   and Restart backend restored Connected and Verified and ready to use.
