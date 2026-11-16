@@ -192,6 +192,8 @@ def search_text(job):
                        "contacting the redirect destination. Try again or choose a local dataset.")
         elif error.code == 429:
             message = "Wikipedia is limiting search requests. Try again later or choose a local dataset."
+        elif 500 <= error.code < 600:
+            message = "Wikipedia search is temporarily unavailable. Try again later or choose a local dataset."
         update(job, status="approval", error=message)
     except Exception as error:
         update(job, status="approval", error=str(error))

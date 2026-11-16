@@ -199,6 +199,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   usable result at position 20 and excluded the result at position 21.
   A local HTTP 200 fixture with a non-JSON body returned the Mac app to
   dataset approval and displayed the invalid search response message.
+  An approved search against a local HTTP 503 fixture returned the Mac app
+  to dataset approval with a temporary outage message and a local option.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
