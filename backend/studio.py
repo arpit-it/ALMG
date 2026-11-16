@@ -208,6 +208,11 @@ def synthesize(job):
     return rows
 
 
+def classifier_exact_key(text):
+    """Match case, whitespace, and canonically equivalent Unicode text."""
+    return " ".join(unicodedata.normalize("NFC", text.casefold()).split())
+
+
 def classifier_variant_key(text):
     """Return matching words for Unicode presentation and punctuation variants."""
     normalized = unicodedata.normalize("NFKC", text).casefold()
@@ -234,7 +239,7 @@ def classifier_split_groups(rows):
 
     for row in rows:
         words = classifier_variant_key(row["text"])
-        key = words if comparable_classifier_words(words) else " ".join(row["text"].casefold().split())
+        key = words if comparable_classifier_words(words) else classifier_exact_key(row["text"])
         group = root(row["group"])
         related = root(groups_by_words.setdefault(key, group))
         if group != related:
@@ -318,10 +323,10 @@ def train(rows, labels, target, repair=None, report=None):
             repaired = repair(mistakes[:12]) if mistakes else []
         except (OSError, ValueError, TypeError, KeyError) as error:
             repair_error = str(error)
-        known = {" ".join(text.casefold().split()) for text in original_texts}
+        known = {classifier_exact_key(text) for text in original_texts}
         known_variants = {classifier_variant_key(text) for text in original_texts}
         for row in repaired:
-            key = " ".join(row["text"].casefold().split())
+            key = classifier_exact_key(row["text"])
             words = classifier_variant_key(key)
             if key in known or (comparable_classifier_words(words) and words in known_variants):
                 continue
@@ -602,7 +607,7 @@ def prepare_dataset(job, imported_rows=None):
             label_counts = dict.fromkeys(job["plan"]["labels"], 0)
             for row in rows:
                 label_counts[row["label"]] += 1
-                normalized = " ".join(row["text"].casefold().split())
+                normalized = classifier_exact_key(row["text"])
                 labels_by_text.setdefault(normalized, []).append(row["label"])
                 words = classifier_variant_key(normalized)
                 if comparable_classifier_words(words):
@@ -615,12 +620,12 @@ def prepare_dataset(job, imported_rows=None):
         )
 
         def has_label_conflict(row):
-            normalized = " ".join(row["text"].casefold().split())
+            normalized = classifier_exact_key(row["text"])
             return (len(set(labels_by_text.get(normalized, ()))) > 1
                     or len(labels_by_words.get(classifier_variant_key(normalized), ())) > 1)
 
         def duplicate_kind(row):
-            normalized = " ".join(row["text"].casefold().split())
+            normalized = classifier_exact_key(row["text"])
             if len(labels_by_text.get(normalized, ())) > 1:
                 return "exact"
             if len(texts_by_words.get(classifier_variant_key(normalized), ())) > 1:
