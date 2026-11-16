@@ -544,7 +544,11 @@ def read_classifier_csv(content, labels):
     reader = csv.reader(io.StringIO(content.removeprefix("\ufeff"), newline=""), strict=True)
     rows = []
     try:
-        header = [column.strip() for column in next(reader, [])]
+        header = next(
+            ([column.strip() for column in row] for row in reader
+             if any(column.strip() for column in row)),
+            [],
+        )
         if sorted(header) not in (["label", "text"], ["group", "label", "text"]):
             raise ValueError("Use CSV columns named text and label, with an optional group column.")
         for row in reader:

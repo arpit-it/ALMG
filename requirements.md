@@ -186,6 +186,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   A local CSV fixture with whitespace-only and separator-only rows yielded
   two examples. The isolated Mac app displayed the original ending lines
   3 and 5, with training approval still pending.
+  The isolated Mac app imported a CSV with two blank rows before its
+  header and previewed both examples at their original lines, 4 and 5.
+  Training approval remained pending.
   The rebuilt Mac app displayed source group A on both related CSV rows and
   group B on the unrelated row before training approval.
   In the rebuilt Mac app, both repeated rows showed Duplicate text and both
