@@ -652,7 +652,9 @@ def prepare_dataset(job, imported_rows=None):
         preview_rows = rows[:5]
         if job.get("recipe") == "classifier":
             preview_rows = sorted(
-                rows, key=lambda row: (not has_label_conflict(row), duplicate_kind(row) is None)
+                rows, key=lambda row: (not has_label_conflict(row),
+                                       bool(classifier_variant_key(row["text"])),
+                                       duplicate_kind(row) is None)
             )[:5]
         activity(job, f"Prepared {len(rows)} examples. Waiting for training approval.")
         with LOCK:
@@ -663,6 +665,8 @@ def prepare_dataset(job, imported_rows=None):
                        conflicting_texts=conflicting_groups,
                        preview=[{"text": row["text"][:500], "label": row["label"],
                                  "label_conflict": has_label_conflict(row),
+                                 "no_words": (job.get("recipe") == "classifier"
+                                              and not classifier_variant_key(row["text"])),
                                  "duplicate_kind": duplicate_kind(row),
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")

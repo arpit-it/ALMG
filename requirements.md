@@ -124,7 +124,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   groups and reached inference preview with held-out macro F1 of 1.000.
   A regression test checks the recorded train, validation, and test assignments
   for each pair. Ambiguity beyond conflicting labels and near duplicates
-  beyond normalized text variants remain open. In the rebuilt isolated app,
+  beyond normalized text variants remain open. A six-row fixture prepared
+  by the backend and reopened in the rebuilt Mac app surfaced the final
+  symbol-only row at line 7 with a label review warning. Training approval
+  remained pending. In the rebuilt isolated app,
   importing a three-row CSV with ASCII and full-width invoice text showed
   one near-duplicate group and left training awaiting approval. The preview
   now labels the count as Unicode and punctuation variants, verified after

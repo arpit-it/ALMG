@@ -1330,6 +1330,8 @@ class _StudioPageState extends State<StudioPage> {
                 row['image'] == null
                     ? [
                         row['text'] as String,
+                        if (row['no_words'] == true)
+                          'No letters or numbers. Check the label.',
                         if (row['duplicate_kind'] == 'exact') 'Duplicate text',
                         if (row['duplicate_kind'] == 'near') 'Near-duplicate text',
                         if (row['csv_end_line'] case final int line)
