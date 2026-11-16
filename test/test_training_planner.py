@@ -76,6 +76,26 @@ class TrainingPlannerTest(unittest.TestCase):
                 self.assertEqual(job["status"], "approval")
                 worker.assert_not_called()
 
+    def test_undersized_classifier_approval_does_not_queue_training(self):
+        job = {"id": "fixture", "status": "dataset_ready", "recipe": "classifier",
+               "plan": {"labels": ["billing", "shipping"]},
+               "usable_counts": {"billing": 1, "shipping": 8}}
+        body = b'{"target": 0.8}'
+        handler = Mock(path="/jobs/fixture/start",
+                       headers={"Content-Length": str(len(body))},
+                       rfile=io.BytesIO(body))
+        rows = [{"label": "billing"}, {"label": "shipping"}]
+        with patch.object(studio, "JOBS", {"fixture": job}), \
+             patch.object(studio, "TRAINING_DATA", {"fixture": rows}), \
+             patch.object(studio.threading, "Thread") as worker:
+            studio.Handler.do_POST(handler)
+        handler.respond.assert_called_once_with(
+            {"error": "Training needs at least 8 usable examples per label after exclusions. "
+                      "Add examples for billing (1)."}, 400
+        )
+        self.assertEqual(job["status"], "dataset_ready")
+        worker.assert_not_called()
+
     def test_invalid_csv_replacement_preserves_ready_dataset(self):
         job = {"status": "dataset_ready", "recipe": "classifier",
                "plan": {"labels": ["billing", "shipping"]}, "examples": 2}
