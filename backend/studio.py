@@ -620,6 +620,7 @@ def prepare_dataset(job, imported_rows=None):
         labels_by_text = {}
         texts_by_words = {}
         labels_by_words = {}
+        symbol_only_rows = 0
         if job.get("recipe") == "classifier":
             label_counts = dict.fromkeys(job["plan"]["labels"], 0)
             for row in rows:
@@ -627,6 +628,8 @@ def prepare_dataset(job, imported_rows=None):
                 normalized = classifier_exact_key(row["text"])
                 labels_by_text.setdefault(normalized, []).append(row["label"])
                 words = classifier_variant_key(normalized)
+                if not words:
+                    symbol_only_rows += 1
                 if comparable_classifier_words(words):
                     texts_by_words.setdefault(words, set()).add(normalized)
                     labels_by_words.setdefault(words, set()).add(row["label"])
@@ -663,6 +666,7 @@ def prepare_dataset(job, imported_rows=None):
                        duplicate_rows=sum(len(labels) - 1 for labels in labels_by_text.values()),
                        near_duplicate_groups=sum(len(texts) > 1 for texts in texts_by_words.values()),
                        conflicting_texts=conflicting_groups,
+                       symbol_only_rows=symbol_only_rows,
                        preview=[{"text": row["text"][:500], "label": row["label"],
                                  "label_conflict": has_label_conflict(row),
                                  "no_words": (job.get("recipe") == "classifier"

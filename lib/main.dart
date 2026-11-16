@@ -1290,6 +1290,8 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ),
         if (status == 'dataset_ready') ...[
+          if ((job?['symbol_only_rows'] as int? ?? 0) > 0)
+            Text('Rows without letters or numbers: ${job?['symbol_only_rows']}'),
           if ((job?['duplicate_rows'] as int? ?? 0) > 0)
             Text('Duplicate rows: ${job?['duplicate_rows']}'),
           if ((job?['near_duplicate_groups'] as int? ?? 0) > 0)
