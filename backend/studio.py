@@ -562,8 +562,10 @@ def read_classifier_csv(content, labels):
                     f"CSV line {reader.line_num} has an unrecognized label {label[:160]!r}. "
                     "Use one of the proposed labels shown in Model creation."
                 )
-            if not 1 <= len(body) <= 3000:
-                raise ValueError(f"CSV line {reader.line_num} needs 1 to 3000 characters of text.")
+            if not body:
+                raise ValueError(f"CSV line {reader.line_num} is missing text.")
+            if len(body) > 3000:
+                raise ValueError(f"CSV line {reader.line_num} exceeds 3000 characters of text.")
             source_group = values.get("group", "").strip()
             rows.append({"text": body, "label": label, "source": "local-csv",
                          "csv_end_line": reader.line_num,
