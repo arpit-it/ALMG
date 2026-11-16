@@ -106,7 +106,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
 
 ## P1 · Make text-classifier training reliable
 
-- [ ] Let users review and edit labels, dataset requirements, success metrics, and any web queries before training. Require approval before sending queries or fetching source pages, and store approved queries and source URLs with the dataset.
+- [x] Let users review and edit labels, dataset requirements, success metrics, and any web queries before training. Require approval before sending queries or fetching source pages, and store approved queries and source URLs with the dataset.
   Verified in the Mac app: saving an edited query updates the visible proposal
   and leaves search awaiting separate approval. In the rebuilt Mac app, replacing
   a proposed classifier label updated the plan while dataset approval remained
@@ -158,7 +158,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   In the rebuilt Mac app, approving two English Wikipedia queries against a
   local fixture produced two labeled preview rows with their approved queries
   and source URLs. Training remained pending.
-  Live collection remains to be verified.
+  In the Mac app, approving two queries returned 40 live English Wikipedia
+  excerpts. A local labeling fixture assigned 20 rows per class. Every saved
+  row recorded its approved query and source URL. The app showed the dataset
+  preview and waited for separate training approval.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
