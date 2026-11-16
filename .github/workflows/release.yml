@@ -69,6 +69,10 @@ jobs:
           trap 'rm -rf -- "$package_dir"' EXIT
           mkdir "$package_dir/backend"
           ditto "build/macos/Build/Products/Release/$app" "$package_dir/$app"
+          # Refresh the local signatures after Flutter assembles the release bundle.
+          codesign --force --sign - "$package_dir/$app/Contents/Frameworks/App.framework"
+          codesign --force --sign - --preserve-metadata=identifier,entitlements,flags "$package_dir/$app"
+          codesign --verify --deep --strict "$package_dir/$app"
           cp README.md PROJECT_TASKS.md "$package_dir/"
           cp backend/chat_history.py backend/image_recipe.py backend/inference.py \
             backend/model_setup.py backend/register-macos-service.py backend/studio.py \

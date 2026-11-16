@@ -47,6 +47,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   release version. A local version mismatch stopped packaging. With the
   matching version, the ZIP passed SHA-256 verification and the extracted
   app opened to the Dashboard.
+  Packaging now refreshes and verifies the local ad hoc signatures.
+  A fixture with an invalid nested signature passed strict verification
+  after packaging and extraction. Its ZIP passed SHA-256 verification and
+  the extracted app opened to the Dashboard.
 - [x] Test a fresh installation on an Apple silicon Mac. Follow the documented Python setup, register the backend, download and verify the checkpoint, send a chat message, and confirm that history survives a relaunch.
   The isolated Mac build reached Chat with setup required and showed a live
   transfer rate of 24.8 MB/s beside checkpoint progress in Settings. In a fresh
