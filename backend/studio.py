@@ -46,7 +46,15 @@ ROOT = Path(os.environ.get("STUDIO_DATA", Path(__file__).resolve().parent / "run
 MODEL = inference.MODEL
 TLS = ssl.create_default_context()
 TLS.load_verify_locations(certifi.where())
+class NoRedirects(HTTPRedirectHandler):
+    """Require a new approval if an approved URL redirects."""
+
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+
 LOCAL = build_opener(ProxyHandler({}), HTTPSHandler(context=TLS))
+DISCOVERY = build_opener(ProxyHandler({}), NoRedirects(), HTTPSHandler(context=TLS))
 LOCK = threading.Lock()
 JOBS = {}
 CHAT_STREAMS = {}
@@ -54,13 +62,13 @@ TRAINING_DATA = {}
 CANDIDATES = {}
 
 
-def request_json(url, payload=None, headers=None, timeout=30):
+def request_json(url, payload=None, headers=None, timeout=30, *, opener=LOCAL):
     """Read or post JSON through the configured HTTP opener."""
     request = Request(
         url, None if payload is None else json.dumps(payload).encode(),
         {"Content-Type": "application/json", **(headers or {})},
     )
-    with LOCAL.open(request, timeout=timeout) as response:
+    with opener.open(request, timeout=timeout) as response:
         return json.loads(response.read(2_000_000))
 
 
@@ -141,7 +149,7 @@ def discover_text(job):
         })
         results = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
-        })
+        }, opener=DISCOVERY)
         for result in results.get("pages", []):
             if not isinstance(result, dict):
                 continue
@@ -571,20 +579,13 @@ def search_images(job):
         update(job, status="failed", error=str(error))
 
 
-class NoImageRedirects(HTTPRedirectHandler):
-    """Require a new approval if an approved URL redirects."""
-
-    def redirect_request(self, req, fp, code, msg, headers, newurl):
-        return None
-
-
 def read_approved_image(url):
     """Read up to eight MiB from a reviewed Commons image URL."""
     location = urlsplit(url)
     if location.scheme != "https" or location.netloc != "upload.wikimedia.org":
         raise ValueError("Image is outside the approved Commons host.")
     request = Request(url, headers={"User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)"})
-    with build_opener(NoImageRedirects(), HTTPSHandler(context=TLS)).open(request, timeout=15) as response:
+    with build_opener(NoRedirects(), HTTPSHandler(context=TLS)).open(request, timeout=15) as response:
         limit = 8 * 1024 * 1024
         payload = response.read(limit + 1)
         if len(payload) > limit:
