@@ -1103,7 +1103,8 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the exact candidate URLs before downloading.")
                         job.update(status="creating_dataset", error=None, mode="web_images")
                         worker = (prepare_dataset, (job,))
-                    elif action == "import-csv" and status == "approval" and job.get("recipe") == "classifier":
+                    elif (action == "import-csv" and status in ("approval", "dataset_ready")
+                          and job.get("recipe") == "classifier"):
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
                         job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))

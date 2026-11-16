@@ -1290,6 +1290,11 @@ class _StudioPageState extends State<StudioPage> {
             ),
           ),
         if (status == 'dataset_ready') ...[
+          if (!_imageRecipe)
+            OutlinedButton(
+              onPressed: _busy ? null : () => _importDataset(id as String),
+              child: const Text('Replace dataset with CSV'),
+            ),
           if (job?['usable_counts'] case final Map counts)
             for (final entry in counts.entries)
               if ((entry.value as int) < 8)

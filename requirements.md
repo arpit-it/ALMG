@@ -139,6 +139,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac app reopened a four-row fixture and showed one usable
   example per label after excluding a conflicting pair. Both shortfalls
   appeared before training approval.
+  The rebuilt Mac app replaced that four-example dataset with a two-example
+  CSV through the Open panel in the same training conversation. The preview
+  showed the new examples and training still required approval.
   In the rebuilt isolated app,
   importing a three-row CSV with ASCII and full-width invoice text showed
   one near-duplicate group and left training awaiting approval. The preview
