@@ -85,10 +85,17 @@ class TrainingPlannerTest(unittest.TestCase):
             for case in range(12)
             for punctuation in ("?", "!")
         ]
+        conflicting_texts = {"Tracking charge?", "Tracking charge!"}
+        rows.extend([
+            {"text": "Tracking charge?", "label": "billing", "group": "conflict-1"},
+            {"text": "Tracking charge!", "label": "shipping", "group": "conflict-2"},
+        ])
 
         _, evaluated, _ = studio.train(rows, ["billing", "shipping"], 0.8)
 
         assignments = {row["text"]: row["split"] for row in evaluated}
+        self.assertTrue(conflicting_texts.isdisjoint(assignments))
+        self.assertEqual(len(assignments), 48)
         self.assertEqual(set(assignments.values()), {"train", "validation", "test"})
         for prompt, split in assignments.items():
             if prompt.endswith("?"):

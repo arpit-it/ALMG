@@ -185,6 +185,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   A second run approved in the isolated Mac app also reached inference
   preview with held-out macro F1 of 1.000. All three saved splits excluded
   both punctuation variants flagged for conflicting labels.
+  The automated split test now checks that conflicting variants are
+  excluded and all 48 same-label examples stay in their assigned splits.
   The isolated Mac app accepted spaces around the text, label, and group
   headers and previewed both rows while training awaited approval.
   A second Mac import read the columns in group, label, text order and
