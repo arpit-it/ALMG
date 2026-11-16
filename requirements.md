@@ -129,7 +129,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   symbol-only row at line 7 with a label review warning. Training approval
   remained pending. A second fixture reopened in the rebuilt Mac app
   counted all six symbol-only rows in a seven-example dataset even though
-  the preview shows at most five rows. In the rebuilt isolated app,
+  the preview shows at most five rows. The isolated Mac app counted one
+  standalone accent with punctuation and displayed two distinct Devanagari
+  words without the warning. Training still required approval.
+  In the rebuilt isolated app,
   importing a three-row CSV with ASCII and full-width invoice text showed
   one near-duplicate group and left training awaiting approval. The preview
   now labels the count as Unicode and punctuation variants, verified after

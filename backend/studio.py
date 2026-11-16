@@ -216,10 +216,12 @@ def classifier_exact_key(text):
 def classifier_variant_key(text):
     """Return matching words for Unicode presentation and punctuation variants."""
     normalized = unicodedata.normalize("NFKC", text).casefold()
-    return tuple("".join(
+    words = "".join(
         char if unicodedata.category(char)[0] in ("L", "M", "N") else " "
         for char in normalized
-    ).split())
+    ).split()
+    return tuple(word for word in words
+                 if any(unicodedata.category(char)[0] in ("L", "N") for char in word))
 
 
 def comparable_classifier_words(words):
