@@ -144,10 +144,11 @@ def discover_text(job):
     seen_snippets = set()
     seen_sources = set()
     queries = list(dict.fromkeys(job["plan"]["queries"]))
+    result_limit = 20
     for index, query in enumerate(queries, start=1):
         activity(job, f"Searching Wikipedia for approved query {index} of {len(queries)}.")
         url = "https://en.wikipedia.org/w/rest.php/v1/search/page?" + urlencode({
-            "q": query, "limit": 20,
+            "q": query, "limit": result_limit,
         })
         results = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
@@ -155,7 +156,7 @@ def discover_text(job):
         pages = results.get("pages") if isinstance(results, dict) else None
         if not isinstance(pages, list):
             raise ValueError("Wikipedia returned an invalid search response. Try again or choose a local dataset.")
-        for result in pages:
+        for result in pages[:result_limit]:
             if not isinstance(result, dict):
                 continue
             page, description = result.get("key"), result.get("excerpt")
