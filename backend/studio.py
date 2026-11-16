@@ -21,7 +21,7 @@ from collections import Counter
 from html import unescape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlencode, urlsplit
+from urllib.parse import parse_qs, quote, urlencode, urlsplit
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler, HTTPSHandler
 
 import certifi
@@ -131,37 +131,31 @@ def plan(prompt):
 
 def collect(job):
     """Collect and label web examples for a job with approved search queries."""
-    key = os.environ.get("BRAVE_SEARCH_API_KEY")
-    if not key:
-        raise ValueError("Set BRAVE_SEARCH_API_KEY on the Python backend to use web search.")
     candidates = []
     seen = set()
     queries = list(dict.fromkeys(job["plan"]["queries"]))
     for index, query in enumerate(queries, start=1):
-        activity(job, f"Searching Brave for approved query {index} of {len(queries)}.")
-        url = "https://api.search.brave.com/res/v1/web/search?" + urlencode({
-            "q": query, "count": 20, "text_decorations": "false",
+        activity(job, f"Searching Wikipedia for approved query {index} of {len(queries)}.")
+        url = "https://en.wikipedia.org/w/rest.php/v1/search/page?" + urlencode({
+            "q": query, "limit": 20,
         })
-        results = request_json(url, headers={"X-Subscription-Token": key})
-        for result in results.get("web", {}).get("results", []):
+        results = request_json(url, headers={
+            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+        })
+        for result in results.get("pages", []):
             if not isinstance(result, dict):
                 continue
-            source = result.get("url")
-            description = result.get("description")
-            if not isinstance(source, str) or not isinstance(description, str):
+            page, description = result.get("key"), result.get("excerpt")
+            if not isinstance(page, str) or not page or not isinstance(description, str):
                 continue
-            try:
-                location = urlsplit(source)
-            except ValueError:
-                continue
+            source = "https://en.wikipedia.org/wiki/" + quote(page, safe="")
             snippet = unescape(re.sub(r"<[^>]+>", "", description)).strip()
             snippet = snippet[:450].rstrip()
             snippet_key = " ".join(snippet.casefold().split())
-            group = (location.hostname or "").rstrip(".").removeprefix("www.")
-            if location.scheme in ("https", "http") and group and len(snippet) >= 40 and snippet_key not in seen:
+            if len(snippet) >= 40 and snippet_key not in seen:
                 seen.add(snippet_key)
                 candidates.append({"text": snippet, "source": source,
-                                   "approved_query": query, "group": group})
+                                   "approved_query": query, "group": source})
         time.sleep(1)
     rows = []
     for start in range(0, len(candidates), 15):
@@ -1145,8 +1139,6 @@ class Handler(BaseHTTPRequestHandler):
                         if mode == "web" and (not job["plan"]["queries"]
                                               or data.get("approved_queries") != job["plan"]["queries"]):
                             raise ValueError("Approve the exact search queries first.")
-                        if mode == "web" and not os.environ.get("BRAVE_SEARCH_API_KEY"):
-                            raise ValueError("Set BRAVE_SEARCH_API_KEY on the Python backend to use web search.")
                         job.update(status="creating_dataset", error=None, mode=mode)
                         worker = (prepare_dataset, (job,))
                     elif action == "cancel" and status in ("queued", "waiting_idle", "training"):

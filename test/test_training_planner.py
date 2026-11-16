@@ -208,3 +208,25 @@ class TrainingPlannerTest(unittest.TestCase):
                 self.assertIn("saved dataset", studio.JOBS[job_id]["error"])
                 self.assertEqual(studio.TRAINING_DATA[job_id], rows)
                 worker.assert_not_called()
+
+
+class WikipediaCollectionTest(unittest.TestCase):
+    def test_search_excerpt_keeps_approved_query_and_article_url(self):
+        query = "invoice & receipt"
+        job = {"prompt": "Classify text", "plan": {"labels": ["billing"], "queries": [query]}}
+        page = {"key": "Invoice / Receipt", "excerpt":
+                "An <span>invoice</span> lists the goods and charges owed by a buyer."}
+        with patch.object(studio, "request_json", return_value={"pages": [page, page]}) as request, \
+             patch.object(studio, "activity"), patch.object(studio.time, "sleep"), \
+             patch.object(studio, "ask", return_value={"rows": [{"index": 0, "label": "billing"}]}):
+            rows = studio.collect(job)
+        request.assert_called_once()
+        endpoint = studio.urlsplit(request.call_args.args[0])
+        self.assertEqual(endpoint.netloc, "en.wikipedia.org")
+        self.assertEqual(studio.parse_qs(endpoint.query)["q"], [query])
+        self.assertNotIn("X-Subscription-Token", request.call_args.kwargs["headers"])
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["approved_query"], query)
+        self.assertEqual(rows[0]["source"], "https://en.wikipedia.org/wiki/Invoice%20%2F%20Receipt")
+        self.assertEqual(rows[0]["label"], "billing")
+        self.assertNotIn("<span>", rows[0]["text"])

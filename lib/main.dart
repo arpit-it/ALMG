@@ -1193,7 +1193,7 @@ class _StudioPageState extends State<StudioPage> {
               ),
             ),
             const Text(
-              'Web collection sends these queries to Brave Search. ALMG uses '
+              'Web collection sends these queries to English Wikipedia. ALMG uses '
               'search result excerpts and records their source URLs.',
             ),
             for (final query in plan['queries'] as List)

@@ -64,9 +64,8 @@ currently use `backend/runs` by default.
 1. Describe the text and labels, such as classifying customer support messages
    into billing, shipping, and returns.
 2. Review Qwen's labels and exact proposed search queries. Choose synthetic
-   examples for a local run, or approve the queries to use Brave Search excerpts.
-   For web mode, set `BRAVE_SEARCH_API_KEY` in the backend environment before
-   starting it. Use sources and an API plan that permit your intended data use.
+   examples for a local run, or approve the queries to use English Wikipedia search excerpts.
+   Review the source URLs and applicable reuse terms before training.
 3. Review the dataset preview, set the macro F1 target, and approve training
    and evaluation. By default the job waits for AC power and 10 minutes
    without input. Leave the computer awake and keep the backend running.
