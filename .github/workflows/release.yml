@@ -60,13 +60,16 @@ jobs:
           flutter build macos --release --build-name="$VERSION" --build-number="$GITHUB_RUN_NUMBER"
           app="ALMG - Automated Language Model Generator.app"
           [[ "$(lipo -archs "build/macos/Build/Products/Release/$app/Contents/MacOS/${app%.app}")" == arm64 ]]
-          mkdir -p release/package/backend
-          ditto "build/macos/Build/Products/Release/$app" "release/package/$app"
-          cp README.md PROJECT_TASKS.md release/package/
+          mkdir -p release
+          package_dir="$(mktemp -d "${RUNNER_TEMP}/almg-package.XXXXXXXX")"
+          trap 'rm -rf -- "$package_dir"' EXIT
+          mkdir "$package_dir/backend"
+          ditto "build/macos/Build/Products/Release/$app" "$package_dir/$app"
+          cp README.md PROJECT_TASKS.md "$package_dir/"
           cp backend/chat_history.py backend/image_recipe.py backend/inference.py \
             backend/model_setup.py backend/register-macos-service.py backend/studio.py \
-            backend/requirements.txt backend/start-backend.command release/package/backend/
-          ditto -c -k release/package release/ALMG-macOS-arm64.zip
+            backend/requirements.txt backend/start-backend.command "$package_dir/backend/"
+          ditto -c -k "$package_dir" release/ALMG-macOS-arm64.zip
           cd release
           shasum -a 256 ALMG-macOS-arm64.zip > ALMG-macOS-arm64.zip.sha256
       - uses: actions/upload-artifact@v4
