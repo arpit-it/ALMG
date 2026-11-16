@@ -76,6 +76,23 @@ class TrainingPlannerTest(unittest.TestCase):
                 self.assertEqual(job["status"], "approval")
                 worker.assert_not_called()
 
+    def test_invalid_csv_replacement_preserves_ready_dataset(self):
+        job = {"status": "dataset_ready", "recipe": "classifier",
+               "plan": {"labels": ["billing", "shipping"]}, "examples": 2}
+        original_job = job.copy()
+        body = json.dumps({"csv": "text,label\nInvoice,\n"}).encode()
+        handler = Mock(path="/jobs/fixture/import-csv",
+                       headers={"Content-Length": str(len(body))},
+                       rfile=io.BytesIO(body))
+        with patch.object(studio, "JOBS", {"fixture": job}), \
+             patch.object(studio.threading, "Thread") as worker:
+            studio.Handler.do_POST(handler)
+        handler.respond.assert_called_once_with(
+            {"error": "CSV line 2 is missing a label."}, 400
+        )
+        self.assertEqual(job, original_job)
+        worker.assert_not_called()
+
     def test_classifier_matching_preserves_attached_vowel_marks(self):
         self.assertEqual(studio.classifier_variant_key("\u0301?!"), ())
         self.assertNotEqual(
