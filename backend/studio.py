@@ -21,7 +21,7 @@ from collections import Counter
 from html import unescape
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.error import HTTPError
+from urllib.error import HTTPError, URLError
 from urllib.parse import parse_qs, quote, urlencode, urlsplit
 from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHandler, HTTPSHandler
 
@@ -195,6 +195,10 @@ def search_text(job):
         elif 500 <= error.code < 600:
             message = "Wikipedia search is temporarily unavailable. Try again later or choose a local dataset."
         update(job, status="approval", error=message)
+    except (URLError, TimeoutError):
+        update(job, status="approval", error=(
+            "Could not reach Wikipedia search. Check your connection, try again, or choose a local dataset."
+        ))
     except Exception as error:
         update(job, status="approval", error=str(error))
 
