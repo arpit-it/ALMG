@@ -674,9 +674,8 @@ def prepare_dataset(job, imported_rows=None):
         usable_counts = {}
         if job.get("recipe") == "classifier":
             usable_counts = dict.fromkeys(label_counts, 0)
-            for row in rows:
-                if not has_label_conflict(row) and duplicate_kind(row) != "exact":
-                    usable_counts[row["label"]] += 1
+            for index in usable_classifier_indices(rows):
+                usable_counts[rows[index]["label"]] += 1
             preview_rows = sorted(
                 rows, key=lambda row: (not has_label_conflict(row),
                                        bool(classifier_variant_key(row["text"])),
