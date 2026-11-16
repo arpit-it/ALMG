@@ -70,7 +70,11 @@ def request_json(url, payload=None, headers=None, timeout=30, *, opener=LOCAL):
         {"Content-Type": "application/json", **(headers or {})},
     )
     with opener.open(request, timeout=timeout) as response:
-        return json.loads(response.read(2_000_000))
+        limit = 2_000_000
+        body = response.read(limit + 1)
+        if len(body) > limit:
+            raise ValueError("The server response exceeded the download limit.")
+        return json.loads(body)
 
 
 def ask(system, data):
