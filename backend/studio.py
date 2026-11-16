@@ -251,11 +251,19 @@ def train(rows, labels, target, repair=None, report=None):
     # Keep duplicate text out of every split, including conflicting labels.
     """Compare classifiers, optionally repair the dataset, and evaluate on held-out data."""
     if report:
-        report("Removing duplicate examples and creating training, validation, and test splits.")
+        report("Removing duplicates and conflicting examples before splitting the dataset.")
     original_texts = [row["text"] for row in rows]
     counts = Counter(map(classifier_exact_key, original_texts))
+    variant_labels = {}
+    for row in rows:
+        words = classifier_variant_key(row["text"])
+        if comparable_classifier_words(words):
+            variant_labels.setdefault(words, set()).add(row["label"])
+    conflicting_variants = {words for words, labels_for_text in variant_labels.items()
+                            if len(labels_for_text) > 1}
     distinct = [(row, group) for row, group in zip(rows, classifier_split_groups(rows))
-                if counts[classifier_exact_key(row["text"])] == 1]
+                if counts[classifier_exact_key(row["text"])] == 1
+                and classifier_variant_key(row["text"]) not in conflicting_variants]
     rows = [row for row, _ in distinct]
     groups = [group for _, group in distinct]
     x = [row["text"] for row in rows]

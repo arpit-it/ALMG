@@ -182,6 +182,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Training in the isolated Mac app reached inference preview with held-out
   macro F1 of 1.000. The saved training dataset contained all three splits
   and excluded both accented duplicates.
+  A second run approved in the isolated Mac app also reached inference
+  preview with held-out macro F1 of 1.000. All three saved splits excluded
+  both punctuation variants flagged for conflicting labels.
   The isolated Mac app accepted spaces around the text, label, and group
   headers and previewed both rows while training awaited approval.
   A second Mac import read the columns in group, label, text order and
