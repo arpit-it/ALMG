@@ -1193,14 +1193,18 @@ class _StudioPageState extends State<StudioPage> {
               ),
             ),
             const Text(
-              'Web collection sends these queries to English Wikipedia. ALMG uses '
+              'Web collection sends these queries to English Wikipedia '
+              '(en.wikipedia.org). ALMG uses '
               'search result excerpts and records their source URLs.',
             ),
             for (final query in plan['queries'] as List)
               SelectableText('• $query'),
           ],
           if (_imageRecipe && (plan['queries'] as List).isNotEmpty) ...[
-            const Text('Wikimedia Commons · up to 20 results'),
+            const Text(
+              'Image search sends these queries to Wikimedia Commons '
+              '(commons.wikimedia.org) and returns up to 20 results.',
+            ),
             for (final query in plan['queries'] as List)
               SelectableText(query as String),
             OutlinedButton(
