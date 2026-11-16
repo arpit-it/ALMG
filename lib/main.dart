@@ -1257,6 +1257,12 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'text_candidates') ...[
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => _editPlanItems(id as String, plan!['queries'] as List),
+            child: const Text('Edit web queries'),
+          ),
           for (final candidate in job!['text_candidates'] as List)
             SelectableText("${candidate['source']}"),
           FilledButton(
