@@ -623,11 +623,13 @@ def search_images(job):
             if (location.scheme == "https" and location.netloc == "upload.wikimedia.org"
                     and info.get("mime") in ("image/jpeg", "image/png", "image/webp")):
                 raw_license = info.get("extmetadata", {}).get("LicenseShortName", {}).get("value", "")
-                license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120]
+                license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120] if isinstance(raw_license, str) else ""
+                if not license_name:
+                    continue
                 candidates.append({"title": page["title"].removeprefix("File:"),
-                                   "url": source, "license": license_name or None})
+                                   "url": source, "license": license_name})
         if not candidates:
-            raise ValueError("No supported image files found. Edit the search or choose a local dataset.")
+            raise ValueError("No supported images with license information found. Edit the search or choose a local dataset.")
         update(job, status="image_candidates", image_candidates=candidates)
     except HTTPError as error:
         message = str(error)
