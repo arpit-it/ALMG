@@ -212,6 +212,7 @@ def search_text(job):
         candidates = discover_text(job)
         if not candidates:
             raise ValueError("No usable excerpts found. Edit the web queries or choose a local dataset.")
+        activity(job, f"Found {len(candidates)} Wikipedia excerpts for review.")
         update(job, status="text_candidates", text_candidates=candidates)
     except (json.JSONDecodeError, UnicodeDecodeError):
         update(job, status="approval", error=(
@@ -690,6 +691,7 @@ def search_images(job):
                 "Wikimedia Commons found fewer than five eligible images. "
                 "Try a broader query or choose a local dataset."
             )
+        activity(job, f"Found {len(candidates)} Wikimedia Commons images for review.")
         update(job, status="image_candidates", image_candidates=candidates)
     except (json.JSONDecodeError, UnicodeDecodeError):
         update(job, status="approval", image_candidates=[], error=(
