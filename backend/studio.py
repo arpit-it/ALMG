@@ -616,7 +616,9 @@ def search_images(job):
         if "error" in response:
             raise ValueError("Wikimedia Commons rejected the image search.")
         candidates = []
-        for page in response.get("query", {}).get("pages", {}).values():
+        for index, page in enumerate(response.get("query", {}).get("pages", {}).values()):
+            if index >= IMAGE_SEARCH_LIMIT:
+                break
             info = next(iter(page.get("imageinfo", [])), {})
             source = info.get("url", "")
             location = urlsplit(source)

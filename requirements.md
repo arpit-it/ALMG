@@ -246,6 +246,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and its URL at download approval and omitted the result with no license.
   Approving an older saved Commons result without license information
   in the Mac app returned to dataset approval without starting a download.
+  After approving a Commons fixture that returned 21 results, the Mac app
+  showed candidate 20 immediately before the download approval button.
   A local fixture in the Mac app returned a malformed Unicode excerpt and
   a usable excerpt with a malformed title. After query and excerpt approval,
   the dataset preview showed three usable examples, retained the source with
