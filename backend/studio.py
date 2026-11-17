@@ -185,6 +185,7 @@ def discover_text(job):
             except UnicodeEncodeError:
                 continue
             source = "https://en.wikipedia.org/wiki/" + encoded_page
+            page_key = unicodedata.normalize("NFC", page).replace(" ", "_")
             snippet = " ".join(unescape(re.sub(r"<[^>]+>", "", description)).split())
             snippet = snippet[:450].rstrip()
             try:
@@ -194,9 +195,9 @@ def discover_text(job):
             if any(unicodedata.category(char) == "Cc" for char in snippet):
                 continue
             snippet_key = snippet.casefold()
-            if len(snippet) >= 40 and snippet_key not in seen_snippets and source not in seen_sources:
+            if len(snippet) >= 40 and snippet_key not in seen_snippets and page_key not in seen_sources:
                 seen_snippets.add(snippet_key)
-                seen_sources.add(source)
+                seen_sources.add(page_key)
                 title = result.get("title")
                 title = title.strip()[:255] if isinstance(title, str) else ""
                 try:
