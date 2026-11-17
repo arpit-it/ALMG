@@ -398,6 +398,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   updated URL. Website crawling and collection remain open.
   Clearing the fixture website in the rebuilt Mac app and saving settings
   removed its entry from the discovery catalog.
+  In the rebuilt Mac app, project settings rejected a numeric IP and
+  saved an HTTPS domain URL that appeared in the discovery catalog.
+  Website access checks and crawling remain open.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
