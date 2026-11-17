@@ -131,6 +131,8 @@ def web_dataset(candidates, read_image, report):
                          "title": candidate["title"]}
             if "approved_query" in candidate:
                 row["approved_query"] = candidate["approved_query"]
+            if "license_url" in candidate:
+                row["license_url"] = candidate["license_url"]
             rows.append(row)
             report(f"Prepared image {len(rows)}: {caption}")
         except (OSError, ValueError, Image.DecompressionBombError) as error:

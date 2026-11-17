@@ -1683,6 +1683,8 @@ class _StudioPageState extends State<StudioPage> {
                         row['text'],
                         row['source'],
                         row['license'] ?? 'License unavailable',
+                        if (row['license_url'] case final String licenseUrl)
+                          'License terms: $licenseUrl',
                         if (row['title'] case final String title when title.isNotEmpty)
                           _commonsFilePage(title),
                         if (row['approved_query'] case final String query)
