@@ -165,6 +165,8 @@ def discover_text(job):
         results = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
         }, opener=DISCOVERY)
+        if isinstance(results, dict) and "error" in results:
+            raise ValueError("Wikipedia rejected the search. Try again or choose a local dataset.")
         pages = results.get("pages") if isinstance(results, dict) else None
         if not isinstance(pages, list):
             raise ValueError("Wikipedia returned an invalid search response. Try again or choose a local dataset.")

@@ -343,6 +343,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   result whose page identifier had leading and trailing spaces.
   A Commons fixture with an unexpected response structure returned the Mac
   app to approval with an invalid response message and a retry option.
+  The Mac app returned to approval when a Wikipedia fixture sent an error
+  alongside article results. It displayed a retry or local dataset option.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
