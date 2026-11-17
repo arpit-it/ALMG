@@ -419,6 +419,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   address and displayed the HTTPS requirement in plain language.
   Closing a draft website edit in the rebuilt Mac app returned to the
   catalog without reloading the project. Saving refreshed the displayed URL.
+  The rebuilt Mac app rejected a fixture hostname longer than 253
+  characters even though each DNS label fit its own length limit.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
