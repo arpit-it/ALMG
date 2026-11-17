@@ -645,8 +645,10 @@ def search_images(job):
         }, opener=DISCOVERY)
         if isinstance(response, dict) and "error" in response:
             raise ValueError("Wikimedia Commons rejected the image search.")
-        query_result = response.get("query", {}) if isinstance(response, dict) else None
-        pages = query_result.get("pages", {}) if isinstance(query_result, dict) else None
+        query_result = response.get("query") if isinstance(response, dict) else None
+        pages = query_result.get("pages") if isinstance(query_result, dict) else None
+        if isinstance(response, dict) and "batchcomplete" in response and "query" not in response:
+            pages = {}
         if not isinstance(pages, dict):
             raise ValueError("Wikimedia Commons returned an invalid search response. Try again or choose a local dataset.")
         candidates = []
