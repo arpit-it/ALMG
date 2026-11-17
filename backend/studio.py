@@ -148,19 +148,21 @@ def plan(prompt):
     return {"labels": [s.strip() for s in labels], "queries": [s.strip() for s in queries]}
 
 
+WIKIPEDIA_SEARCH_LIMIT = 20
+
+
 def discover_text(job):
     """Find candidate excerpts using approved Wikipedia queries."""
     candidates = []
     seen_snippets = set()
     seen_sources = set()
     queries = list(dict.fromkeys(job["plan"]["queries"]))
-    result_limit = 20
     for index, query in enumerate(queries, start=1):
         if index > 1:
             time.sleep(1)
         activity(job, f"Searching Wikipedia for approved query {index} of {len(queries)}.")
         url = "https://en.wikipedia.org/w/rest.php/v1/search/page?" + urlencode({
-            "q": query, "limit": result_limit,
+            "q": query, "limit": WIKIPEDIA_SEARCH_LIMIT,
         })
         results = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
@@ -170,7 +172,7 @@ def discover_text(job):
         pages = results.get("pages") if isinstance(results, dict) else None
         if not isinstance(pages, list):
             raise ValueError("Wikipedia returned an invalid search response. Try again or choose a local dataset.")
-        for result in pages[:result_limit]:
+        for result in pages[:WIKIPEDIA_SEARCH_LIMIT]:
             if not isinstance(result, dict):
                 continue
             page, description = result.get("key"), result.get("excerpt")
@@ -1112,6 +1114,10 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({"jobs": sessions})
         with LOCK:
             job = dict(JOBS.get(self.path.removeprefix("/jobs/"), {}))
+        if job:
+            job["search_result_limit"] = (
+                IMAGE_SEARCH_LIMIT if job.get("recipe") == "text_to_image" else WIKIPEDIA_SEARCH_LIMIT
+            )
         self.respond(job or {"error": "Job not found."}, 200 if job else 404)
 
     def stream_chat(self, data):

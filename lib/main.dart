@@ -1189,6 +1189,7 @@ class _StudioPageState extends State<StudioPage> {
       'needs_review': 'Model needs review',
     };
     final activity = (job?['activity'] as List?) ?? const [];
+    final searchLimit = job?['search_result_limit'] as int? ?? 20;
     final working = {
       'planning',
       'creating_dataset',
@@ -1296,7 +1297,7 @@ class _StudioPageState extends State<StudioPage> {
               ),
               Text(
                 'Approving these queries sends them to Wikipedia for up to '
-                '20 results per query and ${(plan['queries'] as List).length * 20} total. '
+                '$searchLimit results per query and ${(plan['queries'] as List).length * searchLimit} total. '
                 'Review the excerpts and source URLs before approving them for the dataset.',
               ),
             ],
@@ -1314,8 +1315,8 @@ class _StudioPageState extends State<StudioPage> {
               title: Text('Wikimedia Commons'),
               subtitle: Text('commons.wikimedia.org · Images and captions'),
             ),
-            const Text(
-              'Approving these queries sends them to this provider for up to 20 results.',
+            Text(
+              'Approving this query sends it to Wikimedia Commons for up to $searchLimit results.',
             ),
             for (final query in plan['queries'] as List)
               SelectableText(query as String),
