@@ -131,7 +131,7 @@ def web_dataset(candidates, read_image, report):
                          "title": candidate["title"]}
             if "approved_query" in candidate:
                 row["approved_query"] = candidate["approved_query"]
-            for field in ("license_url", "artist", "credit"):
+            for field in ("license_url", "artist", "credit", "attribution_required"):
                 if field in candidate:
                     row[field] = candidate[field]
             rows.append(row)

@@ -1563,6 +1563,8 @@ class _StudioPageState extends State<StudioPage> {
                   candidate['license'] ?? 'License unavailable',
                   if (candidate['artist'] case final String artist)
                     'Creator: $artist',
+                  if (candidate['attribution_required'] == true)
+                    'Attribution required',
                   if (candidate['credit'] case final String credit)
                     'Credit: $credit',
                   if (candidate['license_url'] case final String licenseUrl)
@@ -1689,6 +1691,8 @@ class _StudioPageState extends State<StudioPage> {
                         row['license'] ?? 'License unavailable',
                         if (row['artist'] case final String artist)
                           'Creator: $artist',
+                        if (row['attribution_required'] == true)
+                          'Attribution required',
                         if (row['credit'] case final String credit)
                           'Credit: $credit',
                         if (row['license_url'] case final String licenseUrl)

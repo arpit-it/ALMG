@@ -671,7 +671,7 @@ def search_images(job):
             "action": "query", "format": "json", "generator": "search",
             "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": IMAGE_SEARCH_LIMIT,
             "prop": "imageinfo", "iiprop": "url|mime|extmetadata",
-            "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist|Credit",
+            "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist|Credit|AttributionRequired",
         })
         response = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
@@ -734,6 +734,9 @@ def search_images(job):
                         label = " ".join(unescape(re.sub(r"<[^>]+>", "", value)).split())
                         if len(label) <= 255 and valid_commons_metadata_label(label):
                             candidate[field.lower()] = label
+                attribution = metadata.get("AttributionRequired")
+                if isinstance(attribution, dict) and attribution.get("value") == "true":
+                    candidate["attribution_required"] = True
                 candidates.append(candidate)
 
         if not candidates:
@@ -932,7 +935,7 @@ def prepare_dataset(job, imported_rows=None):
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),
-                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "csv_end_line", "approved_query", "title") if key in row}}
+                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "csv_end_line", "approved_query", "title") if key in row}}
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:
