@@ -725,12 +725,12 @@ def search_images(job):
                         and re.fullmatch(r"https://[A-Za-z0-9.-]+/[^\s]*", license_url)
                         and valid_commons_metadata_label(license_url)):
                     candidate["license_url"] = license_url
-                restrictions_value = None
+                unreadable_restrictions = False
                 for field in ("Artist", "Credit", "Restrictions"):
                     entry = metadata.get(field)
                     value = entry.get("value") if isinstance(entry, dict) else None
-                    if field == "Restrictions":
-                        restrictions_value = value.strip() if isinstance(value, str) else value
+                    if field == "Restrictions" and field in metadata:
+                        unreadable_restrictions = not isinstance(value, str) or bool(value.strip())
                     if isinstance(value, str):
                         label = " ".join(unescape(re.sub(r"<[^>]+>", "", value)).split())
                         if len(label) <= 255 and valid_commons_metadata_label(label):
@@ -738,7 +738,7 @@ def search_images(job):
                 attribution = metadata.get("AttributionRequired")
                 if isinstance(attribution, dict) and attribution.get("value") == "true":
                     candidate["attribution_required"] = True
-                if restrictions_value and "restrictions" not in candidate:
+                if unreadable_restrictions and "restrictions" not in candidate:
                     # Keep an unreadable restriction out of the approval list.
                     continue
                 seen_sources.add(source)
