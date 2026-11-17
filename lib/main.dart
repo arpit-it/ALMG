@@ -1409,7 +1409,12 @@ class _StudioPageState extends State<StudioPage> {
             ListTile(
               title: Text(candidate['title'] as String),
               subtitle: SelectableText(
-                "${candidate['url']}\n${candidate['license'] ?? 'License unavailable'}",
+                [
+                  candidate['url'],
+                  candidate['license'] ?? 'License unavailable',
+                  if (candidate['approved_query'] case final String query)
+                    'Approved query: $query',
+                ].join('\n'),
               ),
             ),
           if ((job['image_candidates'] as List).isNotEmpty)
