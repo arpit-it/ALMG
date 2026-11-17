@@ -226,6 +226,11 @@ def search_catalog(job):
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
         }, opener=DISCOVERY)
         candidates = loc_discovery.catalog_candidates(result, query, limit=WIKIPEDIA_SEARCH_LIMIT)
+        if not candidates:
+            update(job, status="approval", error=(
+                "No Library of Congress records were available for review. Edit the query or choose another source."
+            ))
+            return
         activity(job, f"Found {len(candidates)} Library of Congress catalog records for review.")
         update(job, status="catalog_candidates", catalog_candidates=candidates)
     except (OSError, ValueError, IncompleteRead):

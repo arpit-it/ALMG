@@ -28,3 +28,15 @@ class CatalogCandidatesTest(unittest.TestCase):
     def test_rejects_missing_results(self):
         with self.assertRaisesRegex(ValueError, "invalid search response"):
             catalog_candidates({"results": None}, "orchard", limit=20)
+
+    def test_empty_search_returns_to_approval(self):
+        from unittest.mock import patch
+        from backend import studio
+
+        job = {"status": "searching_catalog", "plan": {"queries": ["orchard"]}}
+        with patch.object(studio, "request_json", return_value={"results": []}), \
+             patch.object(studio, "store_job"):
+            studio.search_catalog(job)
+        self.assertEqual(job["status"], "approval")
+        self.assertIn("No Library of Congress records", job["error"])
+        self.assertNotIn("catalog_candidates", job)

@@ -491,6 +491,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   catalog title and URL, excluded a restricted item, and returned to dataset
   approval without collecting records. Reuse checks, page collection and
   other provider adapters remain open.
+  An approved offline Library of Congress search with zero results
+  returned to dataset approval and offered query editing or another source.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
