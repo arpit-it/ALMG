@@ -85,3 +85,26 @@ class CatalogCandidatesTest(unittest.TestCase):
         self.assertNotIn("metadata_reviewed", record)
         self.assertNotIn("advisories", record)
         self.assertEqual(record["reuse_status"], "unverified")
+
+    def test_interrupted_item_review_restores_catalog_without_network(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from backend import studio
+
+        job_id = "a" * 32
+        job = {"id": job_id, "status": "reviewing_catalog_item",
+               "catalog_candidates": [{"source": "https://www.loc.gov/item/12345/",
+                                       "metadata_reviewed": True, "advisories": {"rights": ["Old"]}}]}
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "training-sessions").mkdir()
+            (root / "training-sessions" / (job_id + ".json")).write_text(json.dumps(job))
+            with patch.object(studio, "ROOT", root), patch.object(studio, "JOBS", {}), \
+                 patch.object(studio, "request_json") as request:
+                studio.restore_jobs()
+                restored = studio.JOBS[job_id]
+                self.assertEqual(restored["status"], "catalog_candidates")
+                self.assertNotIn("advisories", restored["catalog_candidates"][0])
+                request.assert_not_called()

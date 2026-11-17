@@ -507,6 +507,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   In the rebuilt Mac app, a second approved item request with malformed
   rights metadata removed the earlier advisories and showed retry guidance
   with reuse rights still unverified.
+  The rebuilt Mac app reopened an interrupted item metadata fixture at
+  catalog review, retained its title and URL, cleared earlier advisories,
+  and loaded fresh statements only after item URL approval.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

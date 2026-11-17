@@ -651,6 +651,15 @@ def restore_jobs():
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
                 job["candidate_directory"] = str(work)
+            elif job["status"] == "reviewing_catalog_item" and job.get("catalog_candidates"):
+                for candidate in job["catalog_candidates"]:
+                    candidate.pop("advisories", None)
+                    candidate.pop("metadata_reviewed", None)
+                    candidate["reuse_status"] = "unverified"
+                job.update(status="catalog_candidates", error=(
+                    "Item metadata loading was interrupted. Review and approve the item URL to retry."
+                ))
+                store_job(job)
             elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
