@@ -72,9 +72,12 @@ def request_json(url, payload=None, headers=None, timeout=30, *, opener=LOCAL):
     )
     with opener.open(request, timeout=timeout) as response:
         limit = 2_000_000
+        expected_length = response.length
         body = response.read(limit + 1)
         if len(body) > limit:
             raise ValueError("The server response exceeded the download limit.")
+        if expected_length is not None and len(body) < expected_length:
+            raise IncompleteRead(body, expected_length - len(body))
         return json.loads(body)
 
 

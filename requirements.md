@@ -295,6 +295,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   one interrupted image and showed the other five in the dataset preview.
   A second Mac fixture supplied fewer bytes than one image response
   declared. ALMG skipped it and previewed the other five images.
+  A local Commons search response declared more bytes than it sent.
+  The Mac app reported the interruption and restored dataset approval.
   A local fixture in the Mac app returned a malformed Unicode excerpt and
   a usable excerpt with a malformed title. After query and excerpt approval,
   the dataset preview showed three usable examples, retained the source with
