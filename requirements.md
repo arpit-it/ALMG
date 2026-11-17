@@ -448,6 +448,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and kept the website editor open with a domain name validation message.
   The rebuilt Mac app rejected a fixture URL with an empty port and
   kept the project website editor open for correction.
+  The rebuilt Mac app reached review for both fixture providers with
+  explicit result limits required. A regression test verified that omitting
+  the limit leaves search awaiting approval and starts no worker.
   The rebuilt Mac app sent the approved provider with the queries.
   Both approved fixture searches reached source review with explicit
   provider approval required. A regression test verified that omitting the

@@ -96,6 +96,27 @@ class TrainingPlannerTest(unittest.TestCase):
                 self.assertEqual(job["status"], "approval")
                 worker.assert_not_called()
 
+    def test_web_search_requires_explicit_result_limit(self):
+        for recipe, action, provider in (
+            ("classifier", "prepare", "wikipedia"),
+            ("text_to_image", "search-images", "commons"),
+        ):
+            with self.subTest(recipe=recipe):
+                job = {"id": "fixture", "status": "approval", "recipe": recipe,
+                       "plan": {"queries": ["fixture query"]}}
+                body = json.dumps({"mode": "web", "approved_queries": ["fixture query"],
+                                   "approved_provider": provider}).encode()
+                handler = Mock(path=f"/jobs/fixture/{action}",
+                               headers={"Content-Length": str(len(body))},
+                               rfile=io.BytesIO(body))
+                with patch.object(studio, "JOBS", {"fixture": job}), patch.object(
+                    studio, "store_job"
+                ), patch.object(studio.threading, "Thread") as worker:
+                    studio.Handler.do_POST(handler)
+                self.assertEqual(job["status"], "approval")
+                self.assertIn("Review the updated limit", job["error"])
+                worker.assert_not_called()
+
     def test_undersized_classifier_approval_does_not_queue_training(self):
         job = {"id": "fixture", "status": "dataset_ready", "recipe": "classifier",
                "plan": {"labels": ["billing", "shipping"]},

@@ -1331,7 +1331,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve Wikimedia Commons before searching for images.")
                         if not job["plan"]["queries"] or data.get("approved_queries") != job["plan"]["queries"]:
                             raise ValueError("Approve the exact image search query first.")
-                        limit = data.get("approved_result_limit", IMAGE_SEARCH_LIMIT)
+                        limit = data.get("approved_result_limit")
                         if type(limit) is not int or limit != IMAGE_SEARCH_LIMIT:
                             job["error"] = "The search result limit changed. Review the updated limit and approve again."
                             store_job(job)
@@ -1413,7 +1413,7 @@ class Handler(BaseHTTPRequestHandler):
                         if mode == "web":
                             if data.get("approved_provider") != "wikipedia":
                                 raise ValueError("Approve English Wikipedia before searching for text.")
-                            limit = data.get("approved_result_limit", WIKIPEDIA_SEARCH_LIMIT)
+                            limit = data.get("approved_result_limit")
                             if type(limit) is not int or limit != WIKIPEDIA_SEARCH_LIMIT:
                                 job["error"] = "The search result limit changed. Review the updated limit and approve again."
                                 store_job(job)
