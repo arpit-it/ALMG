@@ -215,6 +215,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac app showed English Wikipedia for the classifier fixture
   and Wikimedia Commons for the image fixture, with the domain and
   result limit visible before search approval in both plans.
+  Browsing providers in the rebuilt Mac app showed Wikipedia and Commons
+  as available and the seven other starter sources as planned. Closing the
+  catalog left the fixture at dataset approval. Provider selection, custom
+  websites, and full-page collection still need implementation.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing

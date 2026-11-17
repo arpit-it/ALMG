@@ -1073,6 +1073,73 @@ class _StudioPageState extends State<StudioPage> {
     });
   }
 
+  void _showDiscoveryProviders() {
+    showDialog<void>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Web discovery providers'),
+        content: const SizedBox(
+          width: 460,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Available',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                ListTile(
+                  title: Text('English Wikipedia'),
+                  subtitle: Text('Text classification'),
+                ),
+                ListTile(
+                  title: Text('Wikimedia Commons'),
+                  subtitle: Text('Images and captions'),
+                ),
+                Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
+                ListTile(
+                  title: Text('Library of Congress'),
+                  subtitle: Text('Archives and public collections'),
+                ),
+                ListTile(
+                  title: Text('Europe PMC'),
+                  subtitle: Text('Research literature'),
+                ),
+                ListTile(
+                  title: Text('Wikidata'),
+                  subtitle: Text('Entities and knowledge graphs'),
+                ),
+                ListTile(
+                  title: Text('World Bank Open Data'),
+                  subtitle: Text('Development indicators'),
+                ),
+                ListTile(
+                  title: Text('Federal Register'),
+                  subtitle: Text('Public notices and regulations'),
+                ),
+                ListTile(
+                  title: Text('SEC EDGAR'),
+                  subtitle: Text('Company filings'),
+                ),
+                ListTile(
+                  title: Text('Crossref'),
+                  subtitle: Text('Bibliographic metadata'),
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('Close'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// Shows the current proposal, dataset preview, evaluation, and release gate.
   Widget _modelProgress() {
     final job = _job;
@@ -1215,6 +1282,11 @@ class _StudioPageState extends State<StudioPage> {
             for (final query in plan['queries'] as List)
               SelectableText('• $query'),
           ],
+          if ((plan['queries'] as List).isNotEmpty)
+            TextButton(
+              onPressed: _showDiscoveryProviders,
+              child: const Text('Browse discovery providers'),
+            ),
           if (_imageRecipe && (plan['queries'] as List).isNotEmpty) ...[
             const ListTile(
               contentPadding: EdgeInsets.zero,
