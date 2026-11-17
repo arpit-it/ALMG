@@ -1561,6 +1561,8 @@ class _StudioPageState extends State<StudioPage> {
                 [
                   candidate['url'],
                   candidate['license'] ?? 'License unavailable',
+                  if (candidate['license_url'] case final String licenseUrl)
+                    'License terms: $licenseUrl',
                   _commonsFilePage(candidate['title'] as String),
                   if (candidate['approved_query'] case final String query)
                     'Approved query: $query',

@@ -473,6 +473,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   candidates and excluded the result whose download URL had no file path.
   An approved Commons fixture search in the rebuilt Mac app showed six
   candidates and excluded an image with a directional override in its license.
+  After approved Commons fixture search, the rebuilt Mac app displayed
+  the provider-supplied license terms URL before image download approval.
   The rebuilt Mac app sent the approved provider with the queries.
   Both approved fixture searches reached source review with explicit
   provider approval required. A regression test verified that omitting the

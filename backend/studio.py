@@ -671,7 +671,7 @@ def search_images(job):
             "action": "query", "format": "json", "generator": "search",
             "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": IMAGE_SEARCH_LIMIT,
             "prop": "imageinfo", "iiprop": "url|mime|extmetadata",
-            "iiextmetadatafilter": "LicenseShortName",
+            "iiextmetadatafilter": "LicenseShortName|LicenseUrl",
         })
         response = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
@@ -719,9 +719,16 @@ def search_images(job):
                     continue
                 seen_sources.add(source)
                 seen_titles.add(title_key)
-                candidates.append({"title": title,
-                                   "url": source, "license": license_name,
-                                   "approved_query": query})
+                license_url_field = metadata.get("LicenseUrl")
+                license_url = license_url_field.get("value") if isinstance(license_url_field, dict) else None
+                candidate = {"title": title, "url": source, "license": license_name,
+                             "approved_query": query}
+                if (isinstance(license_url, str) and len(license_url) <= 2048
+                        and re.fullmatch(r"https://[A-Za-z0-9.-]+/[^\s]*", license_url)
+                        and valid_commons_metadata_label(license_url)):
+                    candidate["license_url"] = license_url
+                candidates.append(candidate)
+
         if not candidates:
             raise ValueError("Wikimedia Commons found no eligible images with license information. Try a broader query or choose a local dataset.")
         if len(candidates) < 5:
