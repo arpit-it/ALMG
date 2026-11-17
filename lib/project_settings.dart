@@ -148,10 +148,15 @@ class _ProjectSettingsState extends State<ProjectSettings> {
             controller: _sourceWebsite,
             enabled: !_busy,
             keyboardType: TextInputType.url,
-            decoration: const InputDecoration(
+            decoration: InputDecoration(
               labelText: 'Discovery website',
               helperText: 'Saved with the project for future discovery support.',
-              border: OutlineInputBorder(),
+              border: const OutlineInputBorder(),
+              suffixIcon: IconButton(
+                tooltip: 'Clear discovery website',
+                onPressed: _busy ? null : _sourceWebsite.clear,
+                icon: const Icon(Icons.clear),
+              ),
             ),
           ),
           const SizedBox(height: 12),
@@ -191,7 +196,7 @@ class _ProjectSettingsState extends State<ProjectSettings> {
       ),
       FilledButton(
         onPressed: _busy ? null : _save,
-        child: const Text('Save instructions'),
+        child: const Text('Save settings'),
       ),
     ],
   );
