@@ -185,7 +185,10 @@ def discover_text(job):
             except UnicodeEncodeError:
                 continue
             source = "https://en.wikipedia.org/wiki/" + encoded_page
-            page_key = unicodedata.normalize("NFC", page).replace(" ", "_")
+            # MediaWiki treats runs of spaces and underscores as the same title.
+            page_key = re.sub(r"[ _]+", "_", unicodedata.normalize("NFC", page)).strip("_")
+            if not page_key or page_key in {".", ".."}:
+                continue
             snippet = " ".join(unescape(re.sub(r"<[^>]+>", "", description)).split())
             snippet = unicodedata.normalize("NFC", snippet)[:450].rstrip()
             try:

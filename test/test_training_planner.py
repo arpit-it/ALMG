@@ -259,7 +259,9 @@ class WikipediaCollectionTest(unittest.TestCase):
                 "An <span>invoice</span> lists the goods and charges owed by a buyer."}
         malformed = {"key": "Invoice\nReceipt", "excerpt":
                      "This otherwise usable article has a control character in its key."}
-        with patch.object(studio, "request_json", return_value={"pages": [malformed, page, page]}) as request, \
+        alias = {"key": "Invoice__/_Receipt", "excerpt":
+                 "A receipt records what was paid and when the payment happened."}
+        with patch.object(studio, "request_json", return_value={"pages": [malformed, page, alias]}) as request, \
              patch.object(studio, "activity"), patch.object(studio.time, "sleep"), \
              patch.object(studio, "ask", return_value={"rows": [{"index": 0, "label": "billing"}]}):
             job["text_candidates"] = studio.discover_text(job)
