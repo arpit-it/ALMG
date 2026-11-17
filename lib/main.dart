@@ -1660,12 +1660,13 @@ class _StudioPageState extends State<StudioPage> {
                           'CSV record ends on line $line',
                         if (row['csv_group'] case final String group)
                           'Source group: $group',
-                        if (row['approved_query'] case final String query) ...[
-                          if (row['title'] case final String title when title.isNotEmpty)
-                            'Article: $title',
+                        if (row['title'] case final String title when title.isNotEmpty)
+                          'Article: $title',
+                        if (row['approved_query'] case final String query)
                           'Approved query: $query',
-                          'Source: ${row['source']}',
-                        ],
+                        if (row['source'] case final String source
+                            when source.startsWith('https://en.wikipedia.org/wiki/'))
+                          'Source: $source',
                       ].join('\n')
                     : [
                         row['text'],
