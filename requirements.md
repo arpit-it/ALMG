@@ -209,6 +209,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   pause between requests so it no longer delays review after the final query.
   A local search fixture one byte over the response size limit returned the
   Mac app to dataset approval with a download limit message.
+  An interrupted local Wikipedia response returned the Mac app to dataset
+  approval with retry and local dataset options. The provider catalog,
+  custom websites, and full-page collection remain open.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing

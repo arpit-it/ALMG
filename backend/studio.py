@@ -19,6 +19,7 @@ import unicodedata
 import uuid
 from collections import Counter
 from html import unescape
+from http.client import IncompleteRead
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -200,6 +201,10 @@ def search_text(job):
         elif 500 <= error.code < 600:
             message = "Wikipedia search is temporarily unavailable. Try again later or choose a local dataset."
         update(job, status="approval", error=message)
+    except IncompleteRead:
+        update(job, status="approval", error=(
+            "Wikipedia search ended before the response finished. Try again or choose a local dataset."
+        ))
     except (URLError, TimeoutError):
         update(job, status="approval", error=(
             "Could not reach Wikipedia search. Check your connection, try again, or choose a local dataset."
