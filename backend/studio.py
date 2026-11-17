@@ -173,7 +173,8 @@ def discover_text(job):
                 continue
             page, description = result.get("key"), result.get("excerpt")
             if (not isinstance(page, str) or not page.strip()
-                or page in {".", ".."} or not isinstance(description, str)):
+                or page in {".", ".."} or not isinstance(description, str)
+                or any(unicodedata.category(char) == "Cc" for char in page)):
                 continue
             try:
                 encoded_page = quote(page, safe="")

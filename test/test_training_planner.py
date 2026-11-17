@@ -216,11 +216,14 @@ class WikipediaCollectionTest(unittest.TestCase):
         job = {"prompt": "Classify text", "plan": {"labels": ["billing"], "queries": [query]}}
         page = {"key": "Invoice / Receipt", "excerpt":
                 "An <span>invoice</span> lists the goods and charges owed by a buyer."}
-        with patch.object(studio, "request_json", return_value={"pages": [page, page]}) as request, \
+        malformed = {"key": "Invoice\nReceipt", "excerpt":
+                     "This otherwise usable article has a control character in its key."}
+        with patch.object(studio, "request_json", return_value={"pages": [malformed, page, page]}) as request, \
              patch.object(studio, "activity"), patch.object(studio.time, "sleep"), \
              patch.object(studio, "ask", return_value={"rows": [{"index": 0, "label": "billing"}]}):
             job["text_candidates"] = studio.discover_text(job)
             rows = studio.collect(job)
+        self.assertEqual(len(job["text_candidates"]), 1)
         request.assert_called_once()
         endpoint = studio.urlsplit(request.call_args.args[0])
         self.assertEqual(endpoint.netloc, "en.wikipedia.org")
