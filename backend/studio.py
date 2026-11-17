@@ -588,6 +588,12 @@ def restore_jobs():
                     "Web search was interrupted. Review and approve the queries to retry."
                 ))
                 store_job(job)
+            elif (job["status"] == "creating_dataset" and job.get("mode") == "web_images"
+                  and job.get("image_candidates")):
+                job.update(status="image_candidates", mode=None, error=(
+                    "Image collection was interrupted. Review and approve the downloads to retry."
+                ))
+                store_job(job)
             elif job["status"] == "creating_dataset" and job.get("mode") == "web":
                 job.update(status="approval", mode=None,
                            error="Web collection was interrupted. Review and approve the queries to retry.")
