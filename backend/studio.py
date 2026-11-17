@@ -167,7 +167,8 @@ def discover_text(job):
             if not isinstance(result, dict):
                 continue
             page, description = result.get("key"), result.get("excerpt")
-            if not isinstance(page, str) or not page or not isinstance(description, str):
+            if (not isinstance(page, str) or not page.strip()
+                or page in {".", ".."} or not isinstance(description, str)):
                 continue
             source = "https://en.wikipedia.org/wiki/" + quote(page, safe="")
             snippet = unescape(re.sub(r"<[^>]+>", "", description)).strip()
