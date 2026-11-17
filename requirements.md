@@ -474,6 +474,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   In the Mac app, saving the unchanged Commons fixture query kept six
   results in review and preserved one unchecked result. Changing the query
   cleared the review and required fresh search approval.
+  In the rebuilt Mac app, changing the Commons fixture query to
+  "landscape photos" displayed the revised query and a message to approve
+  a new search. The six old results were removed from review.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

@@ -637,8 +637,13 @@ def update(job, **changes):
 def activity(job, message):
     """Record a bounded timeline of work that survives missed UI polls."""
     with LOCK:
-        entry = {"message": message, "timestamp": time.time()}
-        job["activity"] = [*job.get("activity", [])[-99:], entry]
+        append_activity(job, message)
+
+
+def append_activity(job, message):
+    """Add an activity entry while the caller holds LOCK."""
+    entry = {"message": message, "timestamp": time.time()}
+    job["activity"] = [*job.get("activity", [])[-99:], entry]
 
 
 IMAGE_SEARCH_LIMIT = 20
@@ -1363,6 +1368,8 @@ class Handler(BaseHTTPRequestHandler):
                         job.pop("text_candidates", None)
                         job.pop("image_candidates", None)
                         job.update(status="approval", error=None)
+                        if status in ("text_candidates", "image_candidates"):
+                            append_activity(job, "Web queries changed. Review and approve a new search.")
                         store_job(job)
                         return self.respond({"id": job["id"]})
                     if action == "search-images" and status == "approval" and job.get("recipe") == "text_to_image":
