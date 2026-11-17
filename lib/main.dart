@@ -883,7 +883,9 @@ class _StudioPageState extends State<StudioPage> {
         actions: [
           if (_projects.isNotEmpty)
             DropdownButton<String>(
-              value: _project,
+              value: _projects.any((project) => project['id'] == _project)
+                  ? _project
+                  : null,
               hint: const Text('Project'),
               items: [
                 for (final project in _projects)
@@ -1440,8 +1442,10 @@ class _StudioPageState extends State<StudioPage> {
               ),
             ),
           if (imageCandidates.isNotEmpty)
+            const Text('Select at least five images to prepare a dataset.'),
+          if (imageCandidates.isNotEmpty)
             FilledButton(
-              onPressed: _busy || selectedImageUrls.isEmpty
+              onPressed: _busy || selectedImageUrls.length < 5
                   ? null
                   : () => _submit('/jobs/$id/download-images', {
                       'approved_urls': selectedImageUrls,

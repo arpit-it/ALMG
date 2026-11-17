@@ -1260,6 +1260,8 @@ class Handler(BaseHTTPRequestHandler):
                             )
                             store_job(job)
                             return self.respond({"id": job["id"]})
+                        if len(approved) < 5:
+                            raise ValueError("Select at least five images before downloading.")
                         job.update(status="creating_dataset", error=None, mode="web_images",
                                    image_candidates=candidates)
                         worker = (prepare_dataset, (job,))
