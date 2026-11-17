@@ -331,6 +331,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   files from seven results. Two results shared a file title and had different URLs.
   The Mac app returned a saved Commons review to search approval when
   two selected fixture images shared a file title. Downloads did not start.
+  The standard Mac debug bundle was rebuilt in place against a loopback
+  fixture. Approving Wikipedia discovery reached article review in that bundle.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

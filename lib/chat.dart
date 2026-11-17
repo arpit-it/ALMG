@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'project_settings.dart';
+import 'backend_address.dart';
 
 /// Refreshes immediately, then retries while the local backend is unavailable.
 Future<void> retryBackendConnection({
@@ -205,7 +206,7 @@ class _ChatPageState extends State<ChatPage> {
   Future<HttpClientResponse> _openRequest(String path, {Object? body}) async {
     final request = await _client.openUrl(
       body == null ? 'GET' : 'POST',
-      Uri.parse('http://127.0.0.1:8766$path'),
+      Uri.parse('http://127.0.0.1:$backendPort$path'),
     );
     request.headers.set('X-Model-Studio', 'desktop');
     if (body != null) {

@@ -8,6 +8,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'app_name.dart';
+import 'backend_address.dart';
 
 import 'chat.dart';
 
@@ -47,7 +48,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
   Future<Map<String, dynamic>> _load() async {
     final request = await _client.getUrl(
-      Uri.parse('http://127.0.0.1:8766/dashboard'),
+      Uri.parse('http://127.0.0.1:$backendPort/dashboard'),
     );
     request.headers.set('X-Model-Studio', 'desktop');
     final response = await request.close().timeout(const Duration(seconds: 8));
@@ -112,7 +113,7 @@ class _DashboardPageState extends State<DashboardPage> {
     if (project == null || !mounted) return;
     try {
       final request = await _client.postUrl(
-        Uri.parse('http://127.0.0.1:8766/projects'),
+        Uri.parse('http://127.0.0.1:$backendPort/projects'),
       );
       request.headers.set('X-Model-Studio', 'desktop');
       request.headers.contentType = ContentType.json;
@@ -373,7 +374,7 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
 
   Future<List<dynamic>> _load() async {
     final request = await _client.getUrl(
-      Uri.parse('http://127.0.0.1:8766/models'),
+      Uri.parse('http://127.0.0.1:$backendPort/models'),
     );
     request.headers.set('X-Model-Studio', 'desktop');
     final response = await request.close().timeout(const Duration(seconds: 8));
@@ -645,7 +646,7 @@ class _StudioPageState extends State<StudioPage> {
   ]) async {
     final request = await _http.openUrl(
       body == null ? 'GET' : 'POST',
-      Uri.parse('http://127.0.0.1:8766$path'),
+      Uri.parse('http://127.0.0.1:$backendPort$path'),
     );
     request.headers.set('X-Model-Studio', 'desktop');
     if (body != null) {
