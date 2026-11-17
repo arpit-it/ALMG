@@ -1201,18 +1201,28 @@ class _StudioPageState extends State<StudioPage> {
                 'Local examples per label: ${plan['synthetic_examples_per_label'] ?? 40}',
               ),
             ),
-            if ((plan['queries'] as List).isNotEmpty) const Text(
-              'Web collection sends these queries to English Wikipedia '
-              '(en.wikipedia.org), with up to 20 results per query. '
-              'Review the excerpts and source URLs before approving them for the dataset.',
-            ),
+            if ((plan['queries'] as List).isNotEmpty) ...[
+              const ListTile(
+                contentPadding: EdgeInsets.zero,
+                title: Text('English Wikipedia'),
+                subtitle: Text('en.wikipedia.org · Text classification'),
+              ),
+              const Text(
+                'Approving these queries sends them to this provider for up to 20 results per query. '
+                'Review the excerpts and source URLs before approving them for the dataset.',
+              ),
+            ],
             for (final query in plan['queries'] as List)
               SelectableText('• $query'),
           ],
           if (_imageRecipe && (plan['queries'] as List).isNotEmpty) ...[
+            const ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: Text('Wikimedia Commons'),
+              subtitle: Text('commons.wikimedia.org · Images and captions'),
+            ),
             const Text(
-              'Image search sends these queries to Wikimedia Commons '
-              '(commons.wikimedia.org) and returns up to 20 results.',
+              'Approving these queries sends them to this provider for up to 20 results.',
             ),
             for (final query in plan['queries'] as List)
               SelectableText(query as String),
