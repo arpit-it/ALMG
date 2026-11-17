@@ -1239,7 +1239,7 @@ class Handler(BaseHTTPRequestHandler):
                     if action == "search-images" and status == "approval" and job.get("recipe") == "text_to_image":
                         if not job["plan"]["queries"] or data.get("approved_queries") != job["plan"]["queries"]:
                             raise ValueError("Approve the exact image search query first.")
-                        job.update(status="searching_images")
+                        job.update(status="searching_images", error=None)
                         worker = (search_images, (job,))
                     elif action == "download-images" and status == "image_candidates":
                         candidates = job["image_candidates"]
