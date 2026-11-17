@@ -1092,12 +1092,12 @@ class _StudioPageState extends State<StudioPage> {
                 ListTile(
                   title: const Text('English Wikipedia'),
                   trailing: hasQueries && !_imageRecipe ? const Text('Current plan') : null,
-                  subtitle: const Text('Text classification'),
+                  subtitle: const Text('en.wikipedia.org · Text classification'),
                 ),
                 ListTile(
                   title: const Text('Wikimedia Commons'),
                   trailing: hasQueries && _imageRecipe ? const Text('Current plan') : null,
-                  subtitle: const Text('Images and captions'),
+                  subtitle: const Text('commons.wikimedia.org · Images and captions'),
                 ),
                 const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
                 const ListTile(
