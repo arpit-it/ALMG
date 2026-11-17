@@ -56,4 +56,10 @@ def item_advisories(payload):
                 cleaned.append(value)
         if cleaned:
             advisories[field] = cleaned
-    return {"advisories": advisories, "reuse_status": "unverified"}
+    descriptions = item.get("description", [])
+    if not isinstance(descriptions, list) or any(not isinstance(value, str) for value in descriptions):
+        raise ValueError("The catalog item has unreadable description metadata.")
+    text = " ".join(" ".join(descriptions).split())
+    if len(text) > 20000 or any(unicodedata.category(c) in {"Cc", "Cs"} for c in text):
+        raise ValueError("The catalog item has unreadable description metadata.")
+    return {"advisories": advisories, "reuse_status": "unverified", "description": text}

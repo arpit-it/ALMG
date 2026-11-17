@@ -678,7 +678,10 @@ def restore_jobs():
                 store_job(job)
             elif job["status"] == "creating_dataset" and job.get("mode") == "web":
                 if job.get("text_candidates"):
-                    job.update(status="text_candidates", mode=None, error=(
+                    stage = ("catalog_candidates" if job.get("catalog_candidates")
+                             and all(row.get("provider") == "loc" for row in job["text_candidates"])
+                             else "text_candidates")
+                    job.update(status=stage, mode=None, error=(
                         "Excerpt preparation was interrupted. Review and approve the excerpts to retry."
                     ))
                 else:
@@ -946,7 +949,7 @@ def prepare_dataset(job, imported_rows=None):
             rows = image_recipe.dataset()
         else:
             if job["mode"] == "web":
-                activity(job, f"Approved {len(job['text_candidates'])} Wikipedia excerpts for the dataset.")
+                activity(job, f"Approved {len(job['text_candidates'])} source excerpts for the dataset.")
             rows = collect(job) if job["mode"] == "web" else synthesize(job)
             if job["mode"] == "web" and not rows:
                 raise ValueError("No usable examples found. Edit the web queries or choose a local dataset.")
@@ -1025,14 +1028,17 @@ def prepare_dataset(job, imported_rows=None):
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),
-                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "restrictions", "csv_end_line", "approved_query", "title") if key in row}}
+                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "restrictions", "csv_end_line", "approved_query", "title", "provider") if key in row}}
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:
         if job.get("mode") == "web_images":
             update(job, status="image_candidates", mode=None, error=str(error))
         elif job.get("mode") == "web":
-            update(job, status="text_candidates", mode=None, error=str(error))
+            stage = ("catalog_candidates" if job.get("text_candidates")
+                     and all(row.get("provider") == "loc" for row in job["text_candidates"])
+                     else "text_candidates")
+            update(job, status=stage, mode=None, error=str(error))
         else:
             update(job, status="failed", error=str(error))
 
@@ -1549,6 +1555,25 @@ class Handler(BaseHTTPRequestHandler):
                         append_activity(job, "User reuse approval recorded for the catalog item.")
                         store_job(job)
                         return self.respond({"id": job["id"]})
+                    elif action == "use-catalog-descriptions" and status == "catalog_candidates":
+                        approved = data.get("approved_urls")
+                        records = job["catalog_candidates"]
+                        if (not isinstance(approved, list) or not approved
+                                or any(not isinstance(url, str) for url in approved)
+                                or len(set(approved)) != len(approved)):
+                            raise ValueError("Approve the catalog description URLs first.")
+                        selected = [record for record in records if record["source"] in approved]
+                        if (len(selected) != len(approved)
+                                or any(record.get("reuse_status") != "user_approved"
+                                       or not record.get("reuse_approval")
+                                       or record.get("metadata_reviewed") is not True
+                                       or len(record.get("description", "")) < 40 for record in selected)):
+                            raise ValueError("Review each description and record reuse permission before collection.")
+                        job.update(status="creating_dataset", error=None, mode="web",
+                                   text_candidates=[{
+                                       **record, "text": record["description"], "group": record["source"],
+                                   } for record in selected])
+                        worker = (prepare_dataset, (job,))
                     elif action == "close-catalog" and status == "catalog_candidates":
                         job.pop("catalog_candidates", None)
                         job.update(status="approval", error=None)

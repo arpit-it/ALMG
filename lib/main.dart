@@ -1132,6 +1132,7 @@ class _StudioPageState extends State<StudioPage> {
         (provider == null && source.startsWith('https://en.wikipedia.org/wiki/'))) {
       return 'English Wikipedia: $source';
     }
+    if (provider == 'loc') return 'Library of Congress: $source';
     if (provider == 'commons' ||
         (provider == null && source.startsWith('https://upload.wikimedia.org/'))) {
       return 'Wikimedia Commons: $source';
@@ -1518,6 +1519,8 @@ class _StudioPageState extends State<StudioPage> {
                   subtitle: SelectableText(record['source'] as String),
                 ),
                 if (record['metadata_reviewed'] == true) ...[
+                  if (record['description'] case final String text when text.isNotEmpty)
+                    SelectableText('Catalog description: $text'),
                   if ((record['advisories'] as Map).isEmpty)
                     const Text('No rights or access advisories were supplied for this item.'),
                   for (final entry in (record['advisories'] as Map).entries)
@@ -1542,6 +1545,20 @@ class _StudioPageState extends State<StudioPage> {
                   child: const Text('Approve loading item advisories'),
                 ),
               ],
+            ),
+          if ((job?['catalog_candidates'] as List? ?? const []).any(
+              (record) => record['reuse_status'] == 'user_approved' &&
+                  (record['description'] as String? ?? '').length >= 40))
+            OutlinedButton(
+              onPressed: _busy ? null : () => _submit('/jobs/$id/use-catalog-descriptions', {
+                'approved_urls': [
+                  for (final record in job?['catalog_candidates'] as List? ?? const [])
+                    if (record['reuse_status'] == 'user_approved' &&
+                        (record['description'] as String? ?? '').length >= 40)
+                      record['source'],
+                ],
+              }),
+              child: const Text('Approve collection of reuse-approved descriptions'),
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-catalog', {}),

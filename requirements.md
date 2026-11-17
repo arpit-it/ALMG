@@ -514,6 +514,11 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   basis for a local fixture item after advisory review. Refreshing metadata
   removed that approval and required review again. Dataset collection and
   remaining provider adapters are still open.
+  In the rebuilt Mac app, a fixture with two previously reuse-approved
+  catalog descriptions required collection approval before local labeling.
+  Dataset preview showed fruit and astronomy examples with catalog URLs
+  and the approved query. Both saved rows retained the permission basis
+  and advisories. Full document collection and other providers remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

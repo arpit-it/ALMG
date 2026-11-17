@@ -66,6 +66,7 @@ class CatalogCandidatesTest(unittest.TestCase):
                 "rights": ["Contact the rights holder."],
             },
             "reuse_status": "unverified",
+            "description": "",
         })
         with self.assertRaises(ValueError):
             item_advisories({"item": {"rights": "unreadable"}})
@@ -110,3 +111,16 @@ class CatalogCandidatesTest(unittest.TestCase):
                 self.assertEqual(restored["status"], "catalog_candidates")
                 self.assertNotIn("advisories", restored["catalog_candidates"][0])
                 request.assert_not_called()
+
+    def test_description_labeling_preserves_permission_and_provenance(self):
+        from unittest.mock import patch
+        from backend import studio
+        row = {"source": "https://www.loc.gov/item/12345/", "provider": "loc",
+               "text": "An orchard description approved for use in a local test dataset.",
+               "reuse_approval": {"permission_basis": "Local fixture permission"},
+               "approved_query": "orchard"}
+        job = {"text_candidates": [row], "plan": {"labels": ["fruit"]}, "prompt": "Classify text"}
+        with patch.object(studio, "activity"), patch.object(studio, "ask", return_value={
+            "rows": [{"index": 0, "label": "fruit"}],
+        }):
+            self.assertEqual(studio.collect(job), [{**row, "label": "fruit"}])
