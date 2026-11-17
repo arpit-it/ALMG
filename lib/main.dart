@@ -1173,7 +1173,7 @@ class _StudioPageState extends State<StudioPage> {
       final path = '/projects/$projectId';
       final project = await _request(path);
       if (!mounted) return;
-      await showDialog<void>(
+      final saved = await showDialog<bool>(
         context: context,
         builder: (_) => ProjectSettings(
           project: project,
@@ -1182,14 +1182,16 @@ class _StudioPageState extends State<StudioPage> {
         ),
       );
       if (!mounted) return;
-      final updated = await _request(path);
-      if (!mounted) return;
-      setState(() {
-        _projects = [
-          for (final item in _projects)
-            if (item['id'] == projectId) updated else item,
-        ];
-      });
+      if (saved == true) {
+        final updated = await _request(path);
+        if (!mounted) return;
+        setState(() {
+          _projects = [
+            for (final item in _projects)
+              if (item['id'] == projectId) updated else item,
+          ];
+        });
+      }
       if (_project == projectId) await _showDiscoveryProviders(hasQueries);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());

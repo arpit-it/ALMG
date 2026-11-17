@@ -474,7 +474,7 @@ class _ChatPageState extends State<ChatPage> {
     try {
       final project = await _request('/projects/$id');
       if (!mounted || _projectId != id) return;
-      await showDialog<void>(
+      await showDialog<bool>(
         context: context,
         builder: (_) => ProjectSettings(project: project, request: _request),
       );

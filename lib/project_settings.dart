@@ -86,7 +86,7 @@ class _ProjectSettingsState extends State<ProjectSettings> {
           'source_website': _sourceWebsite.text,
       },
     );
-    if (mounted) Navigator.pop(context);
+    if (mounted) Navigator.pop(context, true);
   });
 
   /// Confirms removal of a reference before calling the backend.
