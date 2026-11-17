@@ -1081,6 +1081,9 @@ class _StudioPageState extends State<StudioPage> {
     });
   }
 
+  String _commonsFilePage(String title) =>
+      'File page: https://commons.wikimedia.org/wiki/File:${Uri.encodeComponent(title)}';
+
   Future<void> _showDiscoveryProviders(bool hasQueries) async {
     final projectId = _project;
     final website = _projects
@@ -1548,8 +1551,7 @@ class _StudioPageState extends State<StudioPage> {
                 [
                   candidate['url'],
                   candidate['license'] ?? 'License unavailable',
-                  'File page: https://commons.wikimedia.org/wiki/File:'
-                      "${Uri.encodeComponent(candidate['title'] as String)}",
+                  _commonsFilePage(candidate['title'] as String),
                   if (candidate['approved_query'] case final String query)
                     'Approved query: $query',
                 ].join('\n'),
@@ -1669,6 +1671,8 @@ class _StudioPageState extends State<StudioPage> {
                         row['text'],
                         row['source'],
                         row['license'] ?? 'License unavailable',
+                        if (row['title'] case final String title when title.isNotEmpty)
+                          _commonsFilePage(title),
                         if (row['approved_query'] case final String query)
                           'Approved query: $query',
                       ].join('\n'),

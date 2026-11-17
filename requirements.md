@@ -431,6 +431,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   source and license review guidance beside the image download decision.
   The rebuilt Mac app showed selectable Commons file page URLs beside
   each fixture image download URL and license after search approval.
+  After approving six Commons fixture downloads in the rebuilt Mac app,
+  the dataset preview showed file pages alongside download URLs and licenses.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

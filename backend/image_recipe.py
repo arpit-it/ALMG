@@ -127,7 +127,8 @@ def web_dataset(candidates, read_image, report):
                 encoded = base64.b64encode(output.getvalue()).decode("ascii")
             row = {"text": caption, "label": "Commons filename caption",
                          "source": candidate["url"], "sha256": hashlib.sha256(contents).hexdigest(),
-                         "image": encoded, "license": candidate.get("license")}
+                         "image": encoded, "license": candidate.get("license"),
+                         "title": candidate["title"]}
             if "approved_query" in candidate:
                 row["approved_query"] = candidate["approved_query"]
             rows.append(row)
