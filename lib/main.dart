@@ -1321,6 +1321,7 @@ class _StudioPageState extends State<StudioPage> {
               onPressed: _busy
                   ? null
                   : () => _submit('/jobs/$id/search-images', {
+                      'approved_provider': 'commons',
                       'approved_queries': plan['queries'],
                     }),
               child: const Text('Approve Wikimedia Commons search'),
@@ -1356,6 +1357,7 @@ class _StudioPageState extends State<StudioPage> {
                       ? null
                       : () => _submit('/jobs/$id/prepare', {
                           'mode': 'web',
+                          'approved_provider': 'wikipedia',
                           'approved_queries': plan['queries'],
                         }),
                   child: const Text('Approve Wikipedia search'),
