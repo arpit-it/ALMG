@@ -170,7 +170,11 @@ def discover_text(job):
             if (not isinstance(page, str) or not page.strip()
                 or page in {".", ".."} or not isinstance(description, str)):
                 continue
-            source = "https://en.wikipedia.org/wiki/" + quote(page, safe="")
+            try:
+                encoded_page = quote(page, safe="")
+            except UnicodeEncodeError:
+                continue
+            source = "https://en.wikipedia.org/wiki/" + encoded_page
             snippet = unescape(re.sub(r"<[^>]+>", "", description)).strip()
             snippet = snippet[:450].rstrip()
             snippet_key = " ".join(snippet.casefold().split())

@@ -234,6 +234,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   containing exactly the two selected sources.
   After approving fixture queries in the Mac app, source review showed all
   three valid articles and omitted the result with a dot-segment page key.
+  A second Mac fixture search included an invalid Unicode page key.
+  Source review still showed all three valid articles for approval.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
