@@ -1422,6 +1422,13 @@ class _StudioPageState extends State<StudioPage> {
             ],
           ),
         ],
+        if (status == 'text_candidates' || status == 'image_candidates')
+          TextButton(
+            onPressed: () => _showDiscoveryProviders(
+              (plan?['queries'] as List?)?.isNotEmpty ?? false,
+            ),
+            child: const Text('Browse discovery providers'),
+          ),
         if (status == 'text_candidates') ...[
           TextButton(
             onPressed: _busy

@@ -423,6 +423,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   characters even though each DNS label fit its own length limit.
   Clearing a fixture website in the rebuilt Mac app showed No website
   added in the catalog. Add project website opened the empty editor.
+  In the rebuilt Mac app, the catalog opened from both fixture source
+  reviews, showed the current provider, and returned to the candidate list.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
