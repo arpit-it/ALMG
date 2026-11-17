@@ -203,6 +203,7 @@ def discover_text(job):
 
 def search_text(job):
     try:
+        activity(job, "Approved text search on en.wikipedia.org.")
         candidates = discover_text(job)
         if not candidates:
             raise ValueError("No usable excerpts found. Edit the web queries or choose a local dataset.")
@@ -607,6 +608,7 @@ IMAGE_SEARCH_LIMIT = 20
 def search_images(job):
     """Discover candidate files without downloading image contents."""
     try:
+        activity(job, "Approved image search on commons.wikimedia.org.")
         activity(job, "Searching Wikimedia Commons for image candidates.")
         query = job["plan"]["queries"][0]
         url = "https://commons.wikimedia.org/w/api.php?" + urlencode({
