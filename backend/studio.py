@@ -671,7 +671,7 @@ def search_images(job):
             "action": "query", "format": "json", "generator": "search",
             "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": IMAGE_SEARCH_LIMIT,
             "prop": "imageinfo", "iiprop": "url|mime|extmetadata",
-            "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist|Credit|AttributionRequired",
+            "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions",
         })
         response = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
@@ -727,7 +727,7 @@ def search_images(job):
                         and re.fullmatch(r"https://[A-Za-z0-9.-]+/[^\s]*", license_url)
                         and valid_commons_metadata_label(license_url)):
                     candidate["license_url"] = license_url
-                for field in ("Artist", "Credit"):
+                for field in ("Artist", "Credit", "Restrictions"):
                     entry = metadata.get(field)
                     value = entry.get("value") if isinstance(entry, dict) else None
                     if isinstance(value, str):
@@ -935,7 +935,7 @@ def prepare_dataset(job, imported_rows=None):
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),
-                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "csv_end_line", "approved_query", "title") if key in row}}
+                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "restrictions", "csv_end_line", "approved_query", "title") if key in row}}
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:

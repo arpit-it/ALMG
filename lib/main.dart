@@ -1567,6 +1567,8 @@ class _StudioPageState extends State<StudioPage> {
                     candidate['artist'] == null && candidate['credit'] == null
                         ? 'Attribution required. Check the file page for credit.'
                         : 'Attribution required',
+                  if (candidate['restrictions'] case final String restrictions)
+                    'Reuse restrictions: $restrictions',
                   if (candidate['credit'] case final String credit)
                     'Credit: $credit',
                   if (candidate['license_url'] case final String licenseUrl)
@@ -1698,6 +1700,8 @@ class _StudioPageState extends State<StudioPage> {
                                   row['title'] is String
                               ? 'Attribution required. Check the file page for credit.'
                               : 'Attribution required',
+                        if (row['restrictions'] case final String restrictions)
+                          'Reuse restrictions: $restrictions',
                         if (row['credit'] case final String credit)
                           'Credit: $credit',
                         if (row['license_url'] case final String licenseUrl)
