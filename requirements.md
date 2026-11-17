@@ -479,6 +479,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   app displayed the license terms URL beside the license in dataset preview.
   After approved Commons fixture search, the rebuilt Mac app displayed
   provider-supplied creator attribution as plain text beside the license.
+  The rebuilt Mac app approved six Commons fixture downloads and showed
+  the creator attribution alongside the license in dataset preview.
   The rebuilt Mac app sent the approved provider with the queries.
   Both approved fixture searches reached source review with explicit
   provider approval required. A regression test verified that omitting the

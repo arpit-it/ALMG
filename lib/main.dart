@@ -1685,6 +1685,8 @@ class _StudioPageState extends State<StudioPage> {
                         row['text'],
                         row['source'],
                         row['license'] ?? 'License unavailable',
+                        if (row['artist'] case final String artist)
+                          'Creator: $artist',
                         if (row['license_url'] case final String licenseUrl)
                           'License terms: $licenseUrl',
                         if (row['title'] case final String title when title.isNotEmpty)
