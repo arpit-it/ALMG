@@ -1399,6 +1399,10 @@ class _StudioPageState extends State<StudioPage> {
                 semanticLabel: "Include ${candidate['source']}",
               ),
             ),
+          const Text(
+            'ALMG labels the selected search excerpts locally. '
+            'Approving excerpts does not fetch full articles.',
+          ),
           FilledButton(
             onPressed: _busy || selectedTextUrls.isEmpty
                 ? null
