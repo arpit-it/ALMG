@@ -653,8 +653,8 @@ def valid_commons_metadata_label(label):
 
 
 def commons_title_key(title):
-    """Normalize equivalent spacing in Commons file names."""
-    return " ".join(title.replace("_", " ").split())
+    """Normalize Unicode and spacing in Commons file names."""
+    return " ".join(unicodedata.normalize("NFC", title).replace("_", " ").split())
 
 
 def search_images(job):

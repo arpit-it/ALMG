@@ -435,6 +435,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   the dataset preview showed file pages alongside download URLs and licenses.
   After Commons search approval, the rebuilt Mac app showed six of seven
   fixture results, omitting the duplicate title spelled with an underscore.
+  In the rebuilt Mac app, an approved Commons fixture search kept six
+  results and omitted a duplicate with a canonically equivalent Unicode title.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
