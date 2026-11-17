@@ -1325,6 +1325,7 @@ class _StudioPageState extends State<StudioPage> {
                   ? null
                   : () => _submit('/jobs/$id/search-images', {
                       'approved_provider': 'commons',
+                      'approved_result_limit': searchLimit,
                       'approved_queries': plan['queries'],
                     }),
               child: const Text('Approve Wikimedia Commons search'),
@@ -1361,6 +1362,7 @@ class _StudioPageState extends State<StudioPage> {
                       : () => _submit('/jobs/$id/prepare', {
                           'mode': 'web',
                           'approved_provider': 'wikipedia',
+                          'approved_result_limit': searchLimit,
                           'approved_queries': plan['queries'],
                         }),
                   child: const Text('Approve Wikipedia search'),

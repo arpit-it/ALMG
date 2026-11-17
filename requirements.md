@@ -372,6 +372,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac app used limits supplied by the backend on both approval
   screens. Fixtures advertised four results per Wikipedia query and five
   Commons results. Both approved searches reached source review.
+  The rebuilt Mac app sent the displayed result limit with search approval.
+  A Commons fixture changed its limit from five to six. The first approval
+  returned to review and the second produced six candidates.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
