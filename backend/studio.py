@@ -910,7 +910,7 @@ def prepare_dataset(job, imported_rows=None):
         if job.get("mode") == "web_images":
             update(job, status="image_candidates", mode=None, error=str(error))
         elif job.get("mode") == "web":
-            update(job, status="approval", mode=None, error=str(error))
+            update(job, status="text_candidates", mode=None, error=str(error))
         else:
             update(job, status="failed", error=str(error))
 
