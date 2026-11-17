@@ -1450,6 +1450,11 @@ class _StudioPageState extends State<StudioPage> {
             ),
           if (imageCandidates.isNotEmpty)
             const Text('Select at least five images to prepare a dataset.'),
+          if (selectedImageUrls.length >= 5)
+            Text(
+              'Download from upload.wikimedia.org. '
+              'Up to ${selectedImageUrls.length * 8} MiB total.',
+            ),
           if (imageCandidates.isNotEmpty)
             FilledButton(
               onPressed: _busy || selectedImageUrls.length < 5
