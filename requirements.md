@@ -446,6 +446,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and saved the corrected path with an encoded space intact.
   The rebuilt Mac app rejected a bracketed IPvFuture fixture address
   and kept the website editor open with a domain name validation message.
+  The rebuilt Mac app rejected a fixture URL with an empty port and
+  kept the project website editor open for correction.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
