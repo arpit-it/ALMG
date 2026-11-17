@@ -229,6 +229,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   After excerpt approval, the rebuilt Mac app showed the three fixture
   examples with their source URLs and queries, plus the two available
   article titles, in the dataset preview.
+  A local fixture in the Mac app returned a malformed Unicode excerpt and
+  a usable excerpt with a malformed title. After query and excerpt approval,
+  the dataset preview showed three usable examples, retained the source with
+  the malformed title without its title, and displayed the valid Astronomía title.
   In the rebuilt Mac app, deselecting one of three fixture sources
   changed the approval count to two. Approving produced a dataset preview
   containing exactly the two selected sources.

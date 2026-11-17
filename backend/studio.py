@@ -177,12 +177,20 @@ def discover_text(job):
             source = "https://en.wikipedia.org/wiki/" + encoded_page
             snippet = unescape(re.sub(r"<[^>]+>", "", description)).strip()
             snippet = snippet[:450].rstrip()
+            try:
+                snippet.encode("utf-8")
+            except UnicodeEncodeError:
+                continue
             snippet_key = " ".join(snippet.casefold().split())
             if len(snippet) >= 40 and snippet_key not in seen_snippets and source not in seen_sources:
                 seen_snippets.add(snippet_key)
                 seen_sources.add(source)
                 title = result.get("title")
                 title = title.strip()[:255] if isinstance(title, str) else ""
+                try:
+                    title.encode("utf-8")
+                except UnicodeEncodeError:
+                    title = ""
                 candidates.append({"text": snippet, "source": source, "title": title,
                                    "approved_query": query, "group": source})
     return candidates
