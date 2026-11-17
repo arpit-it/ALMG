@@ -315,6 +315,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   app cleared the review and prompted a new search before downloading.
   The Mac app returned a saved Commons review with a blank file title to
   search approval before starting any downloads.
+  After Wikipedia search approval in the Mac app, source review showed
+  three valid articles and excluded a short excerpt padded with spaces.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

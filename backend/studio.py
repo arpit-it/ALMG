@@ -181,13 +181,13 @@ def discover_text(job):
             except UnicodeEncodeError:
                 continue
             source = "https://en.wikipedia.org/wiki/" + encoded_page
-            snippet = unescape(re.sub(r"<[^>]+>", "", description)).strip()
+            snippet = " ".join(unescape(re.sub(r"<[^>]+>", "", description)).split())
             snippet = snippet[:450].rstrip()
             try:
                 snippet.encode("utf-8")
             except UnicodeEncodeError:
                 continue
-            snippet_key = " ".join(snippet.casefold().split())
+            snippet_key = snippet.casefold()
             if len(snippet) >= 40 and snippet_key not in seen_snippets and source not in seen_sources:
                 seen_snippets.add(snippet_key)
                 seen_sources.add(source)
