@@ -1501,6 +1501,8 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'image_candidates') ...[
+          if (imageCandidates.isNotEmpty)
+            const Text('Review each image’s source and license before approving.'),
           TextButton(
             onPressed: _busy
                 ? null
@@ -1559,7 +1561,6 @@ class _StudioPageState extends State<StudioPage> {
             ),
           if (imageCandidates.isNotEmpty)
             const Text(
-              'Review each image’s source and license before approving. '
               'Select at least five images to prepare a dataset.',
             ),
           if (selectedImageUrls.length >= 5)
