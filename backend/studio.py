@@ -1200,9 +1200,19 @@ class Handler(BaseHTTPRequestHandler):
                         job.update(status="searching_images")
                         worker = (search_images, (job,))
                     elif action == "download-images" and status == "image_candidates":
-                        urls = [candidate["url"] for candidate in job["image_candidates"]]
+                        candidates = job["image_candidates"]
+                        urls = [candidate["url"] for candidate in candidates]
                         if not urls or data.get("approved_urls") != urls:
                             raise ValueError("Approve the exact candidate URLs before downloading.")
+                        if any(not isinstance(candidate.get("license"), str)
+                               or not candidate["license"].strip() for candidate in candidates):
+                            job.update(
+                                status="approval",
+                                image_candidates=[],
+                                error="Some saved images lack license information. Search again or choose a local dataset.",
+                            )
+                            store_job(job)
+                            return self.respond({"id": job["id"]})
                         job.update(status="creating_dataset", error=None, mode="web_images")
                         worker = (prepare_dataset, (job,))
                     elif (action == "import-csv" and status in ("approval", "dataset_ready")
