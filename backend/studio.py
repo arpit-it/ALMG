@@ -610,7 +610,9 @@ def search_images(job):
             "prop": "imageinfo", "iiprop": "url|mime|extmetadata",
             "iiextmetadatafilter": "LicenseShortName",
         })
-        response = request_json(url, headers={"User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)"})
+        response = request_json(url, headers={
+            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+        }, opener=DISCOVERY)
         if "error" in response:
             raise ValueError("Wikimedia Commons rejected the image search.")
         candidates = []
@@ -627,6 +629,12 @@ def search_images(job):
         if not candidates:
             raise ValueError("No supported image files found. Edit the search or choose a local dataset.")
         update(job, status="image_candidates", image_candidates=candidates)
+    except HTTPError as error:
+        message = str(error)
+        if error.code in {301, 302, 303, 307, 308}:
+            message = ("Wikimedia Commons redirected the approved search. ALMG stopped before "
+                       "contacting the redirect destination. Try again or choose a local dataset.")
+        update(job, status="approval", error=message, image_candidates=[])
     except Exception as error:
         update(job, status="approval", error=str(error), image_candidates=[])
 
