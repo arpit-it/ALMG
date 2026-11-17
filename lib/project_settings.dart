@@ -151,7 +151,8 @@ class _ProjectSettingsState extends State<ProjectSettings> {
             keyboardType: TextInputType.url,
             decoration: InputDecoration(
               labelText: 'Discovery website',
-              helperText: 'Saved with the project for future discovery support.',
+              helperText: 'Use an HTTPS URL with a domain name and no query or fragment.',
+              helperMaxLines: 2,
               border: const OutlineInputBorder(),
               suffixIcon: IconButton(
                 tooltip: 'Clear discovery website',
