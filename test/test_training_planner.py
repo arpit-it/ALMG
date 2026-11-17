@@ -265,7 +265,7 @@ class WikipediaCollectionTest(unittest.TestCase):
         pages = [malformed_tail, malformed, page, alias]
         with patch.object(studio, "request_json", return_value={"pages": pages}) as request, \
              patch.object(studio, "activity"), patch.object(studio.time, "sleep"), \
-             patch.object(studio, "ask", return_value={"rows": [{"index": 0, "label": "billing"}]}):
+             patch.object(studio, "ask", return_value={"rows": [None, {"index": 0, "label": "billing"}]}):
             job["text_candidates"] = studio.discover_text(job)
             rows = studio.collect(job)
         self.assertEqual(len(job["text_candidates"]), 1)

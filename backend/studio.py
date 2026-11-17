@@ -264,8 +264,13 @@ def collect(job):
             {"goal": job["prompt"], "labels": job["plan"]["labels"],
              "excerpts": [item["text"] for item in batch]},
         )
+        proposed_rows = result.get("rows")
+        if not isinstance(proposed_rows, list):
+            raise ValueError("Qwen returned invalid excerpt labels. Try again or select a different dataset.")
         used = set()
-        for row in result.get("rows", []):
+        for row in proposed_rows:
+            if not isinstance(row, dict):
+                continue
             index, label = row.get("index"), row.get("label")
             if type(index) is int and 0 <= index < len(batch) and index not in used and label in job["plan"]["labels"]:
                 used.add(index)

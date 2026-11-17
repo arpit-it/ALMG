@@ -465,6 +465,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   After offline Wikipedia search approval in the macOS app, source review
   showed all three valid fixture articles and omitted an excerpt with a
   control character beyond the 450-character preview limit.
+  In the rebuilt Mac app, approving three offline Wikipedia excerpts
+  reached dataset preview with two fruit examples and one astronomy example
+  even though the fixture label response included a malformed row.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
