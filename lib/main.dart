@@ -1447,6 +1447,25 @@ class _StudioPageState extends State<StudioPage> {
             const Text(
               'No supported image files found. Try a new training task.',
             ),
+          if (imageCandidates.isNotEmpty)
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() {
+                      if (selectedImageUrls.length == imageCandidates.length) {
+                        _excludedImageSources.addAll(
+                          imageCandidates.map((candidate) => candidate['url'] as String),
+                        );
+                      } else {
+                        _excludedImageSources.clear();
+                      }
+                    }),
+              child: Text(
+                selectedImageUrls.length == imageCandidates.length
+                    ? 'Clear image selection'
+                    : 'Select all images',
+              ),
+            ),
           for (final candidate in imageCandidates)
             ListTile(
               trailing: Checkbox(
