@@ -1312,7 +1312,7 @@ class _StudioPageState extends State<StudioPage> {
                   : () => _submit('/jobs/$id/search-images', {
                       'approved_queries': plan['queries'],
                     }),
-              child: const Text('Approve image search'),
+              child: const Text('Approve Wikimedia Commons search'),
             ),
           ],
           const SizedBox(height: 12),
@@ -1347,7 +1347,7 @@ class _StudioPageState extends State<StudioPage> {
                           'mode': 'web',
                           'approved_queries': plan['queries'],
                         }),
-                  child: const Text('Approve web queries'),
+                  child: const Text('Approve Wikipedia search'),
                 ),
             ],
           ),
