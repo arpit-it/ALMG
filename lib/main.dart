@@ -1427,7 +1427,9 @@ class _StudioPageState extends State<StudioPage> {
                           candidate['url'],
                       ],
                     }),
-              child: const Text('Approve listed image downloads (8 MiB each)'),
+              child: Text(
+                'Approve ${(job['image_candidates'] as List).length} image downloads (8 MiB each)',
+              ),
             ),
         ],
         if (job?['examples'] case final int count) ...[
