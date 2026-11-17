@@ -401,6 +401,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   In the rebuilt Mac app, project settings rejected a numeric IP and
   saved an HTTPS domain URL that appeared in the discovery catalog.
   Website access checks and crawling remain open.
+  Saving an uppercase HTTPS scheme and host with port 443 in the Mac app
+  displayed a lowercase host without the default port and preserved the path.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
