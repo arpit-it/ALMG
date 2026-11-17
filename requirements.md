@@ -442,6 +442,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac app approved two saved Wikipedia fixture excerpts
   without query metadata and displayed both article titles and source URLs
   in the dataset preview.
+  The rebuilt Mac app rejected an encoded NUL in a fixture website path
+  and saved the corrected path with an encoded space intact.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

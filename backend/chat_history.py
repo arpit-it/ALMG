@@ -8,7 +8,7 @@ import uuid
 from contextlib import closing
 from pathlib import Path
 from threading import Lock
-from urllib.parse import quote, urlsplit
+from urllib.parse import quote, unquote_to_bytes, urlsplit
 
 DATABASE = Path(os.environ.get("STUDIO_CHAT_DB", Path(__file__).parent / "runs" / "chat.sqlite3"))
 SEND_LOCK = Lock()
@@ -356,6 +356,7 @@ def update_project(project_id, instructions, source_website=None):
                          and site.port in (None, 443) and "?" not in source_website and "#" not in source_website
                          and '\\' not in site.path
                          and not re.search(r"%(?![0-9a-fA-F]{2})", site.path)
+                         and not re.search(rb"[\x00-\x1f\x7f]", unquote_to_bytes(site.path))
                          and len(source_website) <= 2048 and len(normalized_website) <= 2048
                          and all(char.isprintable() and not char.isspace() for char in source_website))
             except (ValueError, UnicodeError):
