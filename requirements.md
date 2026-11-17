@@ -491,6 +491,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   directed users to the file page for missing attribution in dataset preview.
   The rebuilt Mac app showed Commons fixture reuse restrictions during
   review and carried them into preview after six approved downloads.
+  In the rebuilt Mac app, an approved Commons fixture search showed six
+  candidates with readable restrictions and excluded a seventh whose
+  restriction exceeded the metadata length limit.
   The rebuilt Mac app sent the approved provider with the queries.
   Both approved fixture searches reached source review with explicit
   provider approval required. A regression test verified that omitting the
