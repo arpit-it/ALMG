@@ -606,6 +606,18 @@ def activity(job, message):
 IMAGE_SEARCH_LIMIT = 20
 
 
+def valid_commons_image_url(url):
+    if not isinstance(url, str) or "#" in url or any(
+        char.isspace() or unicodedata.category(char) == "Cc" for char in url
+    ):
+        return False
+    try:
+        location = urlsplit(url)
+    except ValueError:
+        return False
+    return location.scheme == "https" and location.netloc == "upload.wikimedia.org"
+
+
 def search_images(job):
     """Discover candidate files without downloading image contents."""
     try:
@@ -639,17 +651,7 @@ def search_images(job):
                 continue
             info = images[0]
             source = info.get("url", "")
-            if (not isinstance(source, str) or any(
-                    char.isspace() or unicodedata.category(char) == "Cc" for char in source
-            )):
-                continue
-            try:
-                location = urlsplit(source)
-            except ValueError:
-                continue
-            if (source not in seen_sources
-                    and location.scheme == "https" and location.netloc == "upload.wikimedia.org"
-                    and "#" not in source
+            if (valid_commons_image_url(source) and source not in seen_sources
                     and info.get("mime") in ("image/jpeg", "image/png", "image/webp")):
                 metadata = info.get("extmetadata")
                 license_field = metadata.get("LicenseShortName") if isinstance(metadata, dict) else None
@@ -708,9 +710,8 @@ def search_images(job):
 
 def read_approved_image(url):
     """Read up to eight MiB from a reviewed Commons image URL."""
-    location = urlsplit(url)
-    if location.scheme != "https" or location.netloc != "upload.wikimedia.org":
-        raise ValueError("Image is outside the approved Commons host.")
+    if not valid_commons_image_url(url):
+        raise ValueError("Image URL does not match an eligible Commons download.")
     request = Request(url, headers={"User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)"})
     with DISCOVERY.open(request, timeout=15) as response:
         limit = 8 * 1024 * 1024
@@ -1293,6 +1294,12 @@ class Handler(BaseHTTPRequestHandler):
                                 image_candidates=[],
                                 error="Some saved images lack license information. Search again or choose a local dataset.",
                             )
+                            store_job(job)
+                            return self.respond({"id": job["id"]})
+                        if any(not valid_commons_image_url(candidate["url"]) for candidate in candidates):
+                            job.update(status="approval", image_candidates=[], error=(
+                                "Some saved image URLs are invalid. Search again or choose a local dataset."
+                            ))
                             store_job(job)
                             return self.respond({"id": job["id"]})
                         if len(approved) < 5:
