@@ -651,7 +651,9 @@ def valid_commons_image_url(url):
 
 def valid_commons_metadata_label(label):
     return (isinstance(label, str) and bool(label.strip())
-            and all(unicodedata.category(char) not in {"Cc", "Cs"} for char in label))
+            and all(unicodedata.category(char) not in {"Cc", "Cs"}
+                    and unicodedata.bidirectional(char) not in {"LRE", "RLE", "LRO", "RLO", "PDF", "LRI", "RLI", "FSI", "PDI"}
+                    for char in label))
 
 
 def commons_title_key(title):
