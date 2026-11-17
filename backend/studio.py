@@ -172,7 +172,7 @@ def discover_text(job):
             if not isinstance(result, dict):
                 continue
             page, description = result.get("key"), result.get("excerpt")
-            if (not isinstance(page, str) or not page.strip()
+            if (not isinstance(page, str) or not page or page != page.strip()
                 or page in {".", ".."} or not isinstance(description, str)
                 or any(unicodedata.category(char) == "Cc" for char in page)):
                 continue
