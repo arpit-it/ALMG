@@ -689,6 +689,8 @@ def search_images(job):
                 break
             if not isinstance(page, dict) or not isinstance(page.get("title"), str):
                 continue
+            if not page["title"].startswith("File:"):
+                continue
             images = page.get("imageinfo")
             if not isinstance(images, list) or not images or not isinstance(images[0], dict):
                 continue
