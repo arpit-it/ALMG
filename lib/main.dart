@@ -11,6 +11,7 @@ import 'app_name.dart';
 import 'backend_address.dart';
 
 import 'chat.dart';
+import 'project_settings.dart';
 
 /// Starts the Flutter desktop application.
 void main() => runApp(const ModelStudio());
@@ -1080,8 +1081,9 @@ class _StudioPageState extends State<StudioPage> {
     });
   }
 
-  void _showDiscoveryProviders(bool hasQueries) {
-    showDialog<void>(
+  Future<void> _showDiscoveryProviders(bool hasQueries) async {
+    final projectId = _project;
+    final editWebsite = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Web discovery providers'),
@@ -1154,6 +1156,11 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ),
         actions: [
+          if (projectId != null)
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Edit project website'),
+            ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: const Text('Close'),
@@ -1161,6 +1168,31 @@ class _StudioPageState extends State<StudioPage> {
         ],
       ),
     );
+    if (!mounted || editWebsite != true || projectId == null) return;
+    try {
+      final path = '/projects/$projectId';
+      final project = await _request(path);
+      if (!mounted) return;
+      await showDialog<void>(
+        context: context,
+        builder: (_) => ProjectSettings(
+          project: project,
+          request: (path, {body}) =>
+              _request(path, body as Map<String, dynamic>?),
+        ),
+      );
+      if (!mounted) return;
+      final updated = await _request(path);
+      if (!mounted) return;
+      setState(() {
+        _projects = [
+          for (final item in _projects)
+            if (item['id'] == projectId) updated else item,
+        ];
+      });
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   /// Shows the current proposal, dataset preview, evaluation, and release gate.
