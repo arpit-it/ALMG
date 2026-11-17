@@ -469,6 +469,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and excluded the seventh because its license label exceeded 120 characters.
   An approved Commons fixture search in the rebuilt Mac app showed
   six file candidates and excluded a category result with image metadata.
+  After Commons fixture search approval, the rebuilt Mac app showed six
+  candidates and excluded the result whose download URL had no file path.
   The rebuilt Mac app sent the approved provider with the queries.
   Both approved fixture searches reached source review with explicit
   provider approval required. A regression test verified that omitting the

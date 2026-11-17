@@ -645,7 +645,8 @@ def valid_commons_image_url(url):
         location = urlsplit(url)
     except ValueError:
         return False
-    return location.scheme == "https" and location.netloc == "upload.wikimedia.org"
+    return (location.scheme == "https" and location.netloc == "upload.wikimedia.org"
+            and bool(location.path.strip("/")))
 
 
 def valid_commons_metadata_label(label):
