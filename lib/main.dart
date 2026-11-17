@@ -1081,6 +1081,19 @@ class _StudioPageState extends State<StudioPage> {
     });
   }
 
+  String _datasetSourceLabel(Map row, String source) {
+    final provider = row['provider'];
+    if (provider == 'wikipedia' ||
+        (provider == null && source.startsWith('https://en.wikipedia.org/wiki/'))) {
+      return 'English Wikipedia: $source';
+    }
+    if (provider == 'commons' ||
+        (provider == null && source.startsWith('https://upload.wikimedia.org/'))) {
+      return 'Wikimedia Commons: $source';
+    }
+    return source;
+  }
+
   String _commonsFilePage(String title) =>
       'File page: https://commons.wikimedia.org/wiki/File:${Uri.encodeComponent(title)}';
 
@@ -1687,15 +1700,14 @@ class _StudioPageState extends State<StudioPage> {
                         if (row['approved_query'] case final String query)
                           'Approved query: $query',
                         if (row['source'] case final String source
-                            when source.startsWith('https://en.wikipedia.org/wiki/'))
-                          'English Wikipedia: $source',
+                            when row['provider'] != null ||
+                                source.startsWith('https://en.wikipedia.org/wiki/'))
+                          _datasetSourceLabel(row, source),
                       ].join('\n')
                     : [
                         row['text'],
                         if (row['source'] case final String source)
-                          source.startsWith('https://upload.wikimedia.org/')
-                              ? 'Wikimedia Commons: $source'
-                              : source,
+                          _datasetSourceLabel(row, source),
                         row['license'] ?? 'License unavailable',
                         if (row['artist'] case final String artist)
                           'Creator: $artist',

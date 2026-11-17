@@ -483,6 +483,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   In the rebuilt Mac app, approving six offline Commons images reached
   dataset preview with Wikimedia Commons beside the source URLs and the
   license and approved query. All six saved rows carry the Commons provider ID.
+  The rebuilt Mac app reopened the six saved Commons fixture examples and
+  displayed source attribution from provider IDs. URL fallback remains for
+  older rows. Additional provider adapters and full page collection are open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
