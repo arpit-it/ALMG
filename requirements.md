@@ -375,6 +375,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac app sent the displayed result limit with search approval.
   A Commons fixture changed its limit from five to six. The first approval
   returned to review and the second produced six candidates.
+  A Commons fixture changed its download limit from 8 to 7 MiB per image.
+  The rebuilt Mac app refreshed review to 42 MiB for six images and
+  required another approval before producing the six-example dataset.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

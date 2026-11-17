@@ -632,6 +632,7 @@ def activity(job, message):
 
 
 IMAGE_SEARCH_LIMIT = 20
+IMAGE_DOWNLOAD_LIMIT_MIB = 8
 
 
 def valid_commons_image_url(url):
@@ -751,16 +752,16 @@ def read_approved_image(url):
         raise ValueError("Image URL does not match an eligible Commons download.")
     request = Request(url, headers={"User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)"})
     with DISCOVERY.open(request, timeout=15) as response:
-        limit = 8 * 1024 * 1024
+        limit = IMAGE_DOWNLOAD_LIMIT_MIB * 1024 * 1024
         expected_length = response.length
         if expected_length is not None and expected_length > limit:
-            raise ValueError("Image exceeds the 8 MiB download limit.")
+            raise ValueError(f"Image exceeds the {IMAGE_DOWNLOAD_LIMIT_MIB} MiB download limit.")
         try:
             payload = response.read(limit + 1)
         except IncompleteRead as error:
             raise ValueError("Image download ended before the response finished.") from error
         if len(payload) > limit:
-            raise ValueError("Image exceeds the 8 MiB download limit.")
+            raise ValueError(f"Image exceeds the {IMAGE_DOWNLOAD_LIMIT_MIB} MiB download limit.")
         if expected_length is not None and len(payload) < expected_length:
             raise ValueError("Image download ended before the response finished.")
         return payload
@@ -1118,6 +1119,8 @@ class Handler(BaseHTTPRequestHandler):
             job["search_result_limit"] = (
                 IMAGE_SEARCH_LIMIT if job.get("recipe") == "text_to_image" else WIKIPEDIA_SEARCH_LIMIT
             )
+            if job.get("recipe") == "text_to_image":
+                job["image_download_limit_mib"] = IMAGE_DOWNLOAD_LIMIT_MIB
         self.respond(job or {"error": "Job not found."}, 200 if job else 404)
 
     def stream_chat(self, data):
@@ -1367,6 +1370,11 @@ class Handler(BaseHTTPRequestHandler):
                             return self.respond({"id": job["id"]})
                         if len(approved) < 5:
                             raise ValueError("Select at least five images before downloading.")
+                        limit = data.get("approved_download_limit_mib", IMAGE_DOWNLOAD_LIMIT_MIB)
+                        if type(limit) is not int or limit != IMAGE_DOWNLOAD_LIMIT_MIB:
+                            job["error"] = "The download size limit changed. Review the updated limit and approve again."
+                            store_job(job)
+                            return self.respond({"id": job["id"]})
                         job.update(status="creating_dataset", error=None, mode="web_images",
                                    image_candidates=candidates)
                         worker = (prepare_dataset, (job,))

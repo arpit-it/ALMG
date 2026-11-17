@@ -1190,6 +1190,7 @@ class _StudioPageState extends State<StudioPage> {
     };
     final activity = (job?['activity'] as List?) ?? const [];
     final searchLimit = job?['search_result_limit'] as int? ?? 20;
+    final downloadLimit = job?['image_download_limit_mib'] as int? ?? 8;
     final working = {
       'planning',
       'creating_dataset',
@@ -1457,7 +1458,7 @@ class _StudioPageState extends State<StudioPage> {
           if (selectedImageUrls.length >= 5)
             Text(
               'Download from upload.wikimedia.org. '
-              'Up to ${selectedImageUrls.length * 8} MiB total.',
+              'Up to ${selectedImageUrls.length * downloadLimit} MiB total.',
             ),
           if (imageCandidates.isNotEmpty)
             FilledButton(
@@ -1465,9 +1466,10 @@ class _StudioPageState extends State<StudioPage> {
                   ? null
                   : () => _submit('/jobs/$id/download-images', {
                       'approved_urls': selectedImageUrls,
+                      'approved_download_limit_mib': downloadLimit,
                     }),
               child: Text(
-                'Approve ${selectedImageUrls.length} image downloads (8 MiB each)',
+                'Approve ${selectedImageUrls.length} image downloads ($downloadLimit MiB each)',
               ),
             ),
         ],
