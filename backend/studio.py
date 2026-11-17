@@ -1377,7 +1377,7 @@ class Handler(BaseHTTPRequestHandler):
                             return self.respond({"id": job["id"]})
                         if len(approved) < 5:
                             raise ValueError("Select at least five images before downloading.")
-                        limit = data.get("approved_download_limit_mib", IMAGE_DOWNLOAD_LIMIT_MIB)
+                        limit = data.get("approved_download_limit_mib")
                         if type(limit) is not int or limit != IMAGE_DOWNLOAD_LIMIT_MIB:
                             job["error"] = "The download size limit changed. Review the updated limit and approve again."
                             store_job(job)

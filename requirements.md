@@ -451,6 +451,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac app reached review for both fixture providers with
   explicit result limits required. A regression test verified that omitting
   the limit leaves search awaiting approval and starts no worker.
+  With explicit download limits required, the rebuilt Mac app approved
+  six Commons fixture downloads at 8 MiB each and reached dataset preview.
   The rebuilt Mac app sent the approved provider with the queries.
   Both approved fixture searches reached source review with explicit
   provider approval required. A regression test verified that omitting the
