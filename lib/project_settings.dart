@@ -30,6 +30,9 @@ class _ProjectSettingsState extends State<ProjectSettings> {
   late final _instructions = TextEditingController(
     text: widget.project['instructions'] as String,
   );
+  late final _sourceWebsite = TextEditingController(
+    text: widget.project['source_website'] as String?,
+  );
   bool _busy = false;
   String? _error;
 
@@ -74,7 +77,11 @@ class _ProjectSettingsState extends State<ProjectSettings> {
   Future<void> _save() => _update(() async {
     await widget.request(
       '/projects/instructions',
-      body: {'id': _project['id'], 'instructions': _instructions.text},
+      body: {
+        'id': _project['id'],
+        'instructions': _instructions.text,
+        'source_website': _sourceWebsite.text,
+      },
     );
     if (mounted) Navigator.pop(context);
   });
@@ -111,6 +118,7 @@ class _ProjectSettingsState extends State<ProjectSettings> {
   @override
   void dispose() {
     _instructions.dispose();
+    _sourceWebsite.dispose();
     super.dispose();
   }
 
@@ -132,6 +140,17 @@ class _ProjectSettingsState extends State<ProjectSettings> {
             maxLength: 2000,
             decoration: const InputDecoration(
               labelText: 'Instructions for all project chats',
+              border: OutlineInputBorder(),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _sourceWebsite,
+            enabled: !_busy,
+            keyboardType: TextInputType.url,
+            decoration: const InputDecoration(
+              labelText: 'Discovery website',
+              helperText: 'Saved with the project for future discovery support.',
               border: OutlineInputBorder(),
             ),
           ),

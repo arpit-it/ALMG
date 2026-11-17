@@ -1197,7 +1197,7 @@ class Handler(BaseHTTPRequestHandler):
                 chat_history.delete_chat(data["id"])
                 return self.respond({"ok": True})
             if self.path == "/projects/instructions":
-                chat_history.update_project(data["id"], data["instructions"])
+                chat_history.update_project(data["id"], data["instructions"], data.get("source_website"))
                 return self.respond({"ok": True})
             if self.path == "/projects/files/add":
                 chat_history.add_project_file(data["id"], data["name"], data["content"])

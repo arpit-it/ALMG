@@ -8,6 +8,7 @@ import uuid
 from contextlib import closing
 from pathlib import Path
 from threading import Lock
+from urllib.parse import urlsplit
 
 DATABASE = Path(os.environ.get("STUDIO_CHAT_DB", Path(__file__).parent / "runs" / "chat.sqlite3"))
 SEND_LOCK = Lock()
@@ -47,6 +48,8 @@ def connect():
             db.execute("ALTER TABLE projects ADD COLUMN instructions TEXT NOT NULL DEFAULT ''")
         if "directory" not in {row["name"] for row in db.execute("PRAGMA table_info(projects)")}:
             db.execute("ALTER TABLE projects ADD COLUMN directory TEXT")
+        if "source_website" not in {row["name"] for row in db.execute("PRAGMA table_info(projects)")}:
+            db.execute("ALTER TABLE projects ADD COLUMN source_website TEXT NOT NULL DEFAULT ''")
         columns = {row["name"] for row in db.execute("PRAGMA table_info(messages)")}
         if "file_name" not in columns:
             db.execute("ALTER TABLE messages ADD COLUMN file_name TEXT")
@@ -327,13 +330,29 @@ def project_details(project_id):
         return project
 
 
-def update_project(project_id, instructions):
+def update_project(project_id, instructions, source_website=None):
     """Replace the instructions used for chats in a project."""
     if not isinstance(instructions, str) or len(instructions) > 2000:
         raise ValueError("Project instructions must be at most 2,000 characters.")
+    if source_website is not None:
+        if not isinstance(source_website, str):
+            raise ValueError("Enter a public HTTPS website URL.")
+        source_website = source_website.strip()
+        if source_website:
+            try:
+                site = urlsplit(source_website)
+                valid = (site.scheme == "https" and site.hostname and site.username is None
+                         and site.port in (None, 443) and not site.query and not site.fragment
+                         and len(source_website) <= 2048
+                         and all(char.isprintable() and not char.isspace() for char in source_website))
+            except ValueError:
+                valid = False
+            if not valid:
+                raise ValueError("Enter an HTTPS website URL without credentials, a query, or a fragment.")
     with closing(connect()) as db, db:
         require_project(db, project_id)
-        db.execute("UPDATE projects SET instructions = ? WHERE id = ?", (instructions.strip(), project_id))
+        db.execute("UPDATE projects SET instructions = ?, source_website = COALESCE(?, source_website) WHERE id = ?",
+                   (instructions.strip(), source_website, project_id))
 
 
 def add_project_file(project_id, name, content):

@@ -385,6 +385,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Commons image review exposed each checkbox with its source URL in the
   rebuilt Mac app. Deselecting a labeled URL excluded it from the five
   examples produced after download approval.
+  Project settings in the rebuilt Mac app saved an HTTPS discovery website
+  and displayed it when reopened. This saves one URL per project. Website
+  discovery, access and reuse checks, and page collection remain open.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
