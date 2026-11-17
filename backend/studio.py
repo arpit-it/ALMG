@@ -187,6 +187,8 @@ def discover_text(job):
                 snippet.encode("utf-8")
             except UnicodeEncodeError:
                 continue
+            if any(unicodedata.category(char) == "Cc" for char in snippet):
+                continue
             snippet_key = snippet.casefold()
             if len(snippet) >= 40 and snippet_key not in seen_snippets and source not in seen_sources:
                 seen_snippets.add(snippet_key)
