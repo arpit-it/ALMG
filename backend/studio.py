@@ -616,18 +616,21 @@ def search_images(job):
         if "error" in response:
             raise ValueError("Wikimedia Commons rejected the image search.")
         candidates = []
+        seen_sources = set()
         for index, page in enumerate(response.get("query", {}).get("pages", {}).values()):
             if index >= IMAGE_SEARCH_LIMIT:
                 break
             info = next(iter(page.get("imageinfo", [])), {})
             source = info.get("url", "")
             location = urlsplit(source)
-            if (location.scheme == "https" and location.netloc == "upload.wikimedia.org"
+            if (source not in seen_sources
+                    and location.scheme == "https" and location.netloc == "upload.wikimedia.org"
                     and info.get("mime") in ("image/jpeg", "image/png", "image/webp")):
                 raw_license = info.get("extmetadata", {}).get("LicenseShortName", {}).get("value", "")
                 license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120] if isinstance(raw_license, str) else ""
                 if not license_name:
                     continue
+                seen_sources.add(source)
                 candidates.append({"title": page["title"].removeprefix("File:"),
                                    "url": source, "license": license_name})
         if not candidates:
