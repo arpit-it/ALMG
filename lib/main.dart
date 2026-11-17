@@ -1378,6 +1378,25 @@ class _StudioPageState extends State<StudioPage> {
                 : () => _editPlanItems(id as String, plan!['queries'] as List),
             child: const Text('Edit web queries'),
           ),
+          if (textCandidates.isNotEmpty)
+            TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => setState(() {
+                      if (selectedTextUrls.length == textCandidates.length) {
+                        _excludedTextSources.addAll(
+                          textCandidates.map((candidate) => candidate['source'] as String),
+                        );
+                      } else {
+                        _excludedTextSources.clear();
+                      }
+                    }),
+              child: Text(
+                selectedTextUrls.length == textCandidates.length
+                    ? 'Clear excerpt selection'
+                    : 'Select all excerpts',
+              ),
+            ),
           for (final candidate in textCandidates)
             ListTile(
               title: SelectableText(
