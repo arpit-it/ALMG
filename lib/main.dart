@@ -1564,7 +1564,9 @@ class _StudioPageState extends State<StudioPage> {
                   if (candidate['artist'] case final String artist)
                     'Creator: $artist',
                   if (candidate['attribution_required'] == true)
-                    'Attribution required',
+                    candidate['artist'] == null && candidate['credit'] == null
+                        ? 'Attribution required. Check the file page for credit.'
+                        : 'Attribution required',
                   if (candidate['credit'] case final String credit)
                     'Credit: $credit',
                   if (candidate['license_url'] case final String licenseUrl)
