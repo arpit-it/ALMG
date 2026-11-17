@@ -462,6 +462,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   normalization.
   The rebuilt Mac app exposed each Commons checkbox with its title,
   license, and download URL. Toggling a fixture checkbox excluded the image.
+  In the rebuilt Mac app, Wikipedia selection controls exposed the
+  article title when available and the source URL. Deselecting Astronomía
+  reduced the fixture approval count from three to two.
   The rebuilt Mac app sent the approved provider with the queries.
   Both approved fixture searches reached source review with explicit
   provider approval required. A regression test verified that omitting the

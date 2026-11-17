@@ -1484,7 +1484,13 @@ class _StudioPageState extends State<StudioPage> {
                           _excludedTextSources.add(source);
                         }
                       }),
-                semanticLabel: "Include ${candidate['source']}",
+                semanticLabel: [
+                  if (candidate['title'] case final String title when title.isNotEmpty)
+                    'Include $title'
+                  else
+                    'Include excerpt',
+                  candidate['source'],
+                ].join('. '),
               ),
             ),
           const Text(
