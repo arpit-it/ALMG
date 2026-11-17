@@ -124,3 +124,16 @@ class CatalogCandidatesTest(unittest.TestCase):
             "rows": [{"index": 0, "label": "fruit"}],
         }):
             self.assertEqual(studio.collect(job), [{**row, "label": "fruit"}])
+
+
+    def test_newspaper_issue_paths_keep_segments_and_reject_traversal(self):
+        base = {"title": "Orchard Gazette", "access-restricted": False}
+        payload = {"results": [
+            {**base, "id": "http://www.loc.gov/item/sn85033000/1911-08-10/ed-1/"},
+            {**base, "id": "https://www.loc.gov/item/sn85033000/../outside/"},
+            {**base, "id": "https://www.loc.gov/item/sn85033000/%2e%2e/outside/"},
+        ]}
+        records = catalog_candidates(payload, "orchard", limit=20)
+        self.assertEqual(len(records), 1)
+        self.assertEqual(records[0]["source"],
+                         "https://www.loc.gov/item/sn85033000/1911-08-10/ed-1/")
