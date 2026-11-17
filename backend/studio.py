@@ -1384,6 +1384,15 @@ class Handler(BaseHTTPRequestHandler):
                             )
                             store_job(job)
                             return self.respond({"id": job["id"]})
+                        if any("restrictions" in candidate and (
+                            not valid_commons_metadata_label(candidate["restrictions"])
+                            or len(candidate["restrictions"]) > 255
+                        ) for candidate in candidates):
+                            job.update(status="approval", image_candidates=[], error=(
+                                "Some saved images have unreadable reuse restrictions. Search again or choose a local dataset."
+                            ))
+                            store_job(job)
+                            return self.respond({"id": job["id"]})
                         if any(not valid_commons_image_url(candidate["url"]) for candidate in candidates):
                             job.update(status="approval", image_candidates=[], error=(
                                 "Some saved image URLs are invalid. Search again or choose a local dataset."

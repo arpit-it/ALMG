@@ -496,6 +496,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   restriction exceeded the metadata length limit.
   The rebuilt Mac app showed six Commons fixture candidates after approval
   and excluded the result with an array in place of restriction text.
+  Approving a saved Commons fixture with an unreadable restriction in the
+  rebuilt Mac app returned to search approval and started no downloads.
   The rebuilt Mac app sent the approved provider with the queries.
   Both approved fixture searches reached source review with explicit
   provider approval required. A regression test verified that omitting the
