@@ -405,6 +405,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   displayed a lowercase host without the default port and preserved the path.
   In the rebuilt Mac app, project settings rejected an incomplete URL
   escape and displayed the corrected escaped path in the discovery catalog.
+  The rebuilt Mac app encoded brackets in a saved website path and kept
+  an existing space escape intact. A backend fixture verified UTF-8 encoding.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
