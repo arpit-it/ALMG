@@ -352,7 +352,7 @@ def update_project(project_id, instructions, source_website=None):
                     hostname, re.IGNORECASE,
                 )
                 valid = (site.scheme == "https" and dns_name and len(hostname.removesuffix(".")) <= 253
-                         and site.username is None
+                         and site.username is None and not site.netloc.startswith("[")
                          and site.port in (None, 443) and "?" not in source_website and "#" not in source_website
                          and '\\' not in site.path
                          and not re.search(r"%(?![0-9a-fA-F]{2})", site.path)
