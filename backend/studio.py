@@ -1245,8 +1245,12 @@ class Handler(BaseHTTPRequestHandler):
                     elif action == "download-images" and status == "image_candidates":
                         candidates = job["image_candidates"]
                         urls = [candidate["url"] for candidate in candidates]
-                        if not urls or data.get("approved_urls") != urls:
+                        approved = data.get("approved_urls")
+                        if (not isinstance(approved, list) or not approved
+                                or any(not isinstance(url, str) or url not in urls for url in approved)
+                                or len(set(approved)) != len(approved)):
                             raise ValueError("Approve the exact candidate URLs before downloading.")
+                        candidates = [candidate for candidate in candidates if candidate["url"] in approved]
                         if any(not isinstance(candidate.get("license"), str)
                                or not candidate["license"].strip() for candidate in candidates):
                             job.update(
@@ -1256,7 +1260,8 @@ class Handler(BaseHTTPRequestHandler):
                             )
                             store_job(job)
                             return self.respond({"id": job["id"]})
-                        job.update(status="creating_dataset", error=None, mode="web_images")
+                        job.update(status="creating_dataset", error=None, mode="web_images",
+                                   image_candidates=candidates)
                         worker = (prepare_dataset, (job,))
                     elif (action == "import-csv" and status in ("approval", "dataset_ready")
                           and job.get("recipe") == "classifier"):

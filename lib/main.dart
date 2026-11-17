@@ -522,6 +522,7 @@ class _StudioPageState extends State<StudioPage> {
   bool get _imageRecipe => _job?['recipe'] == 'text_to_image';
   Map<String, dynamic>? _job;
   final Set<String> _excludedTextSources = {};
+  final Set<String> _excludedImageSources = {};
   String? _error;
   bool _busy = false;
   bool _idle = true;
@@ -671,6 +672,9 @@ class _StudioPageState extends State<StudioPage> {
       setState(() {
         if (_job?['id'] != job['id'] || job['status'] != 'text_candidates') {
           _excludedTextSources.clear();
+        }
+        if (_job?['id'] != job['id'] || job['status'] != 'image_candidates') {
+          _excludedImageSources.clear();
         }
         _job = job;
       });
@@ -1150,6 +1154,11 @@ class _StudioPageState extends State<StudioPage> {
     final status = job?['status'];
     final plan = job?['plan'] as Map?;
     final metrics = job?['metrics'] as Map?;
+    final imageCandidates = job?['image_candidates'] as List? ?? const [];
+    final selectedImageUrls = [
+      for (final candidate in imageCandidates)
+        if (!_excludedImageSources.contains(candidate['url'])) candidate['url'],
+    ];
     final textCandidates = job?['text_candidates'] as List? ?? const [];
     final selectedTextUrls = {
       for (final candidate in textCandidates)
@@ -1401,12 +1410,25 @@ class _StudioPageState extends State<StudioPage> {
                 : () => _editPlanItems(id as String, plan!['queries'] as List),
             child: const Text('Edit web queries'),
           ),
-          if ((job!['image_candidates'] as List).isEmpty)
+          if (imageCandidates.isEmpty)
             const Text(
               'No supported image files found. Try a new training task.',
             ),
-          for (final candidate in job['image_candidates'] as List)
+          for (final candidate in imageCandidates)
             ListTile(
+              trailing: Checkbox(
+                value: !_excludedImageSources.contains(candidate['url']),
+                onChanged: _busy
+                    ? null
+                    : (checked) => setState(() {
+                        final url = candidate['url'] as String;
+                        if (checked == true) {
+                          _excludedImageSources.remove(url);
+                        } else {
+                          _excludedImageSources.add(url);
+                        }
+                      }),
+              ),
               title: Text(candidate['title'] as String),
               subtitle: SelectableText(
                 [
@@ -1417,18 +1439,15 @@ class _StudioPageState extends State<StudioPage> {
                 ].join('\n'),
               ),
             ),
-          if ((job['image_candidates'] as List).isNotEmpty)
+          if (imageCandidates.isNotEmpty)
             FilledButton(
-              onPressed: _busy
+              onPressed: _busy || selectedImageUrls.isEmpty
                   ? null
                   : () => _submit('/jobs/$id/download-images', {
-                      'approved_urls': [
-                        for (final candidate in job['image_candidates'] as List)
-                          candidate['url'],
-                      ],
+                      'approved_urls': selectedImageUrls,
                     }),
               child: Text(
-                'Approve ${(job['image_candidates'] as List).length} image downloads (8 MiB each)',
+                'Approve ${selectedImageUrls.length} image downloads (8 MiB each)',
               ),
             ),
         ],

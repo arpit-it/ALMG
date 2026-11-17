@@ -283,6 +283,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   each Commons candidate's URL and license before download approval.
   The rebuilt Mac app showed six fixture downloads and the 8 MiB
   per-image limit on the approval button. Approval prepared six images.
+  The rebuilt Mac app let me deselect one of six Commons candidates.
+  Approving the five remaining downloads saved exactly those five URLs
+  in the fixture dataset and left training awaiting approval.
   A local fixture in the Mac app returned a malformed Unicode excerpt and
   a usable excerpt with a malformed title. After query and excerpt approval,
   the dataset preview showed three usable examples, retained the source with
