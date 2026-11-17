@@ -498,6 +498,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The Mac app returned to dataset approval after an offline Library of
   Congress HTTP 429 response and offered waiting or choosing another source.
   The fixture test observed one request per approval.
+  After approving an offline catalog search in the rebuilt Mac app, an
+  item with a legacy HTTP identifier appeared in review with its HTTPS URL.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

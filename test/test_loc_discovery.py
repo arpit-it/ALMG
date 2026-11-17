@@ -11,7 +11,7 @@ class CatalogCandidatesTest(unittest.TestCase):
             "access-restricted": False,
         }
         results = [
-            valid,
+            {**valid, "id": "http://www.loc.gov/item/12345/"},
             {**valid, "id": "https://www.loc.gov/item/12345"},
             {**valid, "id": "https://www.loc.gov/item/restricted/", "access-restricted": True},
             {**valid, "id": "https://www.loc.gov.evil.example/item/external/"},

@@ -17,7 +17,7 @@ def catalog_candidates(payload, query, *, limit):
         title = item.get("title")
         if not isinstance(source, str) or not isinstance(title, str):
             continue
-        item_id = re.fullmatch(r"https://www\.loc\.gov/item/([A-Za-z0-9_-]+)/?", source)
+        item_id = re.fullmatch(r"https?://www\.loc\.gov/item/([A-Za-z0-9_-]+)/?", source)
         title = title.strip()
         if not item_id or not title or any(unicodedata.category(c) in {"Cc", "Cs"} for c in title):
             continue
