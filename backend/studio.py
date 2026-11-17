@@ -668,6 +668,10 @@ def search_images(job):
         elif 500 <= error.code < 600:
             message = "Wikimedia Commons search is temporarily unavailable. Try again later or choose a local dataset."
         update(job, status="approval", error=message, image_candidates=[])
+    except IncompleteRead:
+        update(job, status="approval", image_candidates=[], error=(
+            "Wikimedia Commons search ended before the response finished. Try again or choose a local dataset."
+        ))
     except Exception as error:
         update(job, status="approval", error=str(error), image_candidates=[])
 
