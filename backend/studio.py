@@ -595,8 +595,13 @@ def restore_jobs():
                 ))
                 store_job(job)
             elif job["status"] == "creating_dataset" and job.get("mode") == "web":
-                job.update(status="approval", mode=None,
-                           error="Web collection was interrupted. Review and approve the queries to retry.")
+                if job.get("text_candidates"):
+                    job.update(status="text_candidates", mode=None, error=(
+                        "Excerpt preparation was interrupted. Review and approve the excerpts to retry."
+                    ))
+                else:
+                    job.update(status="approval", mode=None,
+                               error="Web collection was interrupted. Review and approve the queries to retry.")
                 store_job(job)
             elif job["status"] == "approval" and job.get("recipe") == "text_to_image":
                 proposal = job.get("plan") or {"labels": []}
