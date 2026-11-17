@@ -504,6 +504,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   metadata URL before a separate approval loaded rights and access
   advisories. Review showed the permission-required statement alongside
   public-viewing access. Reuse approval and dataset collection remain open.
+  In the rebuilt Mac app, a second approved item request with malformed
+  rights metadata removed the earlier advisories and showed retry guidance
+  with reuse rights still unverified.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

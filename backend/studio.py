@@ -261,9 +261,16 @@ def review_catalog_item(job, source):
             append_activity(job, "Item advisories loaded. Review the rights and access statements.")
             store_job(job)
     except (OSError, ValueError, IncompleteRead):
-        update(job, status="catalog_candidates", error=(
-            "Catalog item advisories could not be loaded. Review the URL and approve another attempt."
-        ))
+        with LOCK:
+            for record in job["catalog_candidates"]:
+                if record["source"] == source:
+                    record.pop("advisories", None)
+                    record.pop("metadata_reviewed", None)
+                    record["reuse_status"] = "unverified"
+            job.update(status="catalog_candidates", error=(
+                "Catalog item advisories could not be loaded. Review the URL and approve another attempt."
+            ))
+            store_job(job)
 
 
 def search_text(job):
