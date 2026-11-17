@@ -671,7 +671,7 @@ def search_images(job):
             "action": "query", "format": "json", "generator": "search",
             "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": IMAGE_SEARCH_LIMIT,
             "prop": "imageinfo", "iiprop": "url|mime|extmetadata",
-            "iiextmetadatafilter": "LicenseShortName|LicenseUrl",
+            "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist",
         })
         response = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
@@ -727,6 +727,12 @@ def search_images(job):
                         and re.fullmatch(r"https://[A-Za-z0-9.-]+/[^\s]*", license_url)
                         and valid_commons_metadata_label(license_url)):
                     candidate["license_url"] = license_url
+                artist_field = metadata.get("Artist")
+                artist_value = artist_field.get("value") if isinstance(artist_field, dict) else None
+                if isinstance(artist_value, str):
+                    artist = " ".join(unescape(re.sub(r"<[^>]+>", "", artist_value)).split())
+                    if len(artist) <= 255 and valid_commons_metadata_label(artist):
+                        candidate["artist"] = artist
                 candidates.append(candidate)
 
         if not candidates:

@@ -1561,6 +1561,8 @@ class _StudioPageState extends State<StudioPage> {
                 [
                   candidate['url'],
                   candidate['license'] ?? 'License unavailable',
+                  if (candidate['artist'] case final String artist)
+                    'Creator: $artist',
                   if (candidate['license_url'] case final String licenseUrl)
                     'License terms: $licenseUrl',
                   _commonsFilePage(candidate['title'] as String),
