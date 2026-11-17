@@ -348,12 +348,14 @@ def update_project(project_id, instructions, source_website=None):
                 )
                 valid = (site.scheme == "https" and dns_name and site.username is None
                          and site.port in (None, 443) and "?" not in source_website and "#" not in source_website
+                         and '\\' not in site.path
+                         and not re.search(r"%(?![0-9a-fA-F]{2})", site.path)
                          and len(source_website) <= 2048
                          and all(char.isprintable() and not char.isspace() for char in source_website))
             except (ValueError, UnicodeError):
                 valid = False
             if not valid:
-                raise ValueError("Enter an HTTPS website URL with a domain name, without credentials, a query, or a fragment.")
+                raise ValueError("Enter a valid HTTPS website URL with a domain name and no credentials, query, or fragment.")
             source_website = f"https://{site.hostname}{site.path}"
     with closing(connect()) as db, db:
         require_project(db, project_id)
