@@ -650,6 +650,7 @@ def search_images(job):
             raise ValueError("Wikimedia Commons returned an invalid search response. Try again or choose a local dataset.")
         candidates = []
         seen_sources = set()
+        seen_titles = set()
         for index, page in enumerate(pages.values()):
             if index >= IMAGE_SEARCH_LIMIT:
                 break
@@ -671,13 +672,14 @@ def search_images(job):
                 if not valid_commons_metadata_label(license_name):
                     continue
                 title = page["title"].removeprefix("File:").strip()
-                if not valid_commons_metadata_label(title):
+                if not valid_commons_metadata_label(title) or title in seen_titles:
                     continue
                 try:
                     source.encode("utf-8")
                 except UnicodeEncodeError:
                     continue
                 seen_sources.add(source)
+                seen_titles.add(title)
                 candidates.append({"title": title,
                                    "url": source, "license": license_name,
                                    "approved_query": query})
