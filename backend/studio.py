@@ -1218,7 +1218,7 @@ class Handler(BaseHTTPRequestHandler):
                         job["error"] = None
                         store_job(job)
                         return self.respond({"id": job["id"]})
-                    if action == "edit-queries" and status in ("approval", "text_candidates"):
+                    if action == "edit-queries" and status in ("approval", "text_candidates", "image_candidates"):
                         queries = data.get("queries")
                         if (not isinstance(queries, list)
                                 or len(queries) > 6
@@ -1232,6 +1232,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Remove repeated search queries before saving.")
                         job["plan"] = {**job["plan"], "queries": queries}
                         job.pop("text_candidates", None)
+                        job.pop("image_candidates", None)
                         job.update(status="approval", error=None)
                         store_job(job)
                         return self.respond({"id": job["id"]})

@@ -1395,6 +1395,12 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'image_candidates') ...[
+          TextButton(
+            onPressed: _busy
+                ? null
+                : () => _editPlanItems(id as String, plan!['queries'] as List),
+            child: const Text('Edit web queries'),
+          ),
           if ((job!['image_candidates'] as List).isEmpty)
             const Text(
               'No supported image files found. Try a new training task.',

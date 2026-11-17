@@ -267,6 +267,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   response returned to dataset approval with retry and local dataset options.
   A simulated Commons connection failure displayed connection guidance
   and restored the approval controls in the Mac app.
+  In the rebuilt Mac app, editing a Commons query from download review
+  removed the previous candidates and returned the revised query to
+  search approval.
   A local fixture in the Mac app returned a malformed Unicode excerpt and
   a usable excerpt with a malformed title. After query and excerpt approval,
   the dataset preview showed three usable examples, retained the source with
