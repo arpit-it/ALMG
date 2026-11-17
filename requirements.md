@@ -457,6 +457,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   the source and license guidance above the six candidates.
   An approved Wikipedia fixture search in the rebuilt Mac app showed four
   distinct excerpts, omitting the duplicate with equivalent Unicode text.
+  The rebuilt Mac app retained three approved Wikipedia search results
+  and omitted the fixture excerpt that fell below the minimum after Unicode
+  normalization.
   The rebuilt Mac app sent the approved provider with the queries.
   Both approved fixture searches reached source review with explicit
   provider approval required. A regression test verified that omitting the

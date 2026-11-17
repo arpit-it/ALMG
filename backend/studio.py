@@ -187,7 +187,7 @@ def discover_text(job):
             source = "https://en.wikipedia.org/wiki/" + encoded_page
             page_key = unicodedata.normalize("NFC", page).replace(" ", "_")
             snippet = " ".join(unescape(re.sub(r"<[^>]+>", "", description)).split())
-            snippet = snippet[:450].rstrip()
+            snippet = unicodedata.normalize("NFC", snippet)[:450].rstrip()
             try:
                 snippet.encode("utf-8")
             except UnicodeEncodeError:
