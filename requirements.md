@@ -449,6 +449,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac app rejected a fixture URL with an empty port and
   kept the project website editor open for correction.
   The rebuilt Mac app sent the approved provider with the queries.
+  Both approved fixture searches reached source review with explicit
+  provider approval required. A regression test verified that omitting the
+  provider leaves search awaiting approval and starts no worker.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
   reached source review, and Activity history recorded each approved host.

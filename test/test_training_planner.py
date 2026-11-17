@@ -76,6 +76,26 @@ class TrainingPlannerTest(unittest.TestCase):
                 self.assertEqual(job["status"], "approval")
                 worker.assert_not_called()
 
+    def test_web_search_requires_explicit_provider_approval(self):
+        for recipe, action, message in (
+            ("classifier", "prepare", "Approve English Wikipedia before searching for text."),
+            ("text_to_image", "search-images", "Approve Wikimedia Commons before searching for images."),
+        ):
+            with self.subTest(recipe=recipe):
+                job = {"status": "approval", "recipe": recipe,
+                       "plan": {"queries": ["fixture query"]}}
+                body = json.dumps({"mode": "web", "approved_queries": ["fixture query"]}).encode()
+                handler = Mock(path=f"/jobs/fixture/{action}",
+                               headers={"Content-Length": str(len(body))},
+                               rfile=io.BytesIO(body))
+                with patch.object(studio, "JOBS", {"fixture": job}), patch.object(
+                    studio.threading, "Thread"
+                ) as worker:
+                    studio.Handler.do_POST(handler)
+                handler.respond.assert_called_once_with({"error": message}, 400)
+                self.assertEqual(job["status"], "approval")
+                worker.assert_not_called()
+
     def test_undersized_classifier_approval_does_not_queue_training(self):
         job = {"id": "fixture", "status": "dataset_ready", "recipe": "classifier",
                "plan": {"labels": ["billing", "shipping"]},

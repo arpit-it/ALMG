@@ -1327,7 +1327,7 @@ class Handler(BaseHTTPRequestHandler):
                         store_job(job)
                         return self.respond({"id": job["id"]})
                     if action == "search-images" and status == "approval" and job.get("recipe") == "text_to_image":
-                        if data.get("approved_provider", "commons") != "commons":
+                        if data.get("approved_provider") != "commons":
                             raise ValueError("Approve Wikimedia Commons before searching for images.")
                         if not job["plan"]["queries"] or data.get("approved_queries") != job["plan"]["queries"]:
                             raise ValueError("Approve the exact image search query first.")
@@ -1411,7 +1411,7 @@ class Handler(BaseHTTPRequestHandler):
                                               or data.get("approved_queries") != job["plan"]["queries"]):
                             raise ValueError("Approve the exact search queries first.")
                         if mode == "web":
-                            if data.get("approved_provider", "wikipedia") != "wikipedia":
+                            if data.get("approved_provider") != "wikipedia":
                                 raise ValueError("Approve English Wikipedia before searching for text.")
                             limit = data.get("approved_result_limit", WIKIPEDIA_SEARCH_LIMIT)
                             if type(limit) is not int or limit != WIKIPEDIA_SEARCH_LIMIT:
