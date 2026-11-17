@@ -663,7 +663,7 @@ def search_images(job):
                 if not isinstance(raw_license, str):
                     continue
                 license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120]
-                if not license_name:
+                if not license_name or any(unicodedata.category(char) == "Cc" for char in license_name):
                     continue
                 title = page["title"].removeprefix("File:").strip()
                 if not title:
