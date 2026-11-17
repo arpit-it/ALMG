@@ -226,6 +226,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac classifier displayed titles beside excerpts and source
   URLs after approved fixture searches. Results without titles remained
   available for review.
+  After excerpt approval, the rebuilt Mac app showed the three fixture
+  examples with their source URLs and queries, plus the two available
+  article titles, in the dataset preview.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing

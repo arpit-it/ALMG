@@ -1502,6 +1502,8 @@ class _StudioPageState extends State<StudioPage> {
                         if (row['csv_group'] case final String group)
                           'Source group: $group',
                         if (row['approved_query'] case final String query) ...[
+                          if (row['title'] case final String title when title.isNotEmpty)
+                            'Article: $title',
                           'Approved query: $query',
                           'Source: ${row['source']}',
                         ],
