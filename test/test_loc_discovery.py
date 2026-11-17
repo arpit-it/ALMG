@@ -40,3 +40,17 @@ class CatalogCandidatesTest(unittest.TestCase):
         self.assertEqual(job["status"], "approval")
         self.assertIn("No Library of Congress records", job["error"])
         self.assertNotIn("catalog_candidates", job)
+
+    def test_rate_limit_does_not_retry_without_approval(self):
+        from unittest.mock import patch
+        from urllib.error import HTTPError
+        from backend import studio
+
+        job = {"status": "searching_catalog", "plan": {"queries": ["orchard"]}}
+        rate_limit = HTTPError("https://www.loc.gov/search/", 429, "Too Many Requests", {}, None)
+        with patch.object(studio, "request_json", side_effect=rate_limit) as request, \
+             patch.object(studio, "store_job"):
+            studio.search_catalog(job)
+        request.assert_called_once()
+        self.assertEqual(job["status"], "approval")
+        self.assertIn("Try again later", job["error"])

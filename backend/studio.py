@@ -233,6 +233,14 @@ def search_catalog(job):
             return
         activity(job, f"Found {len(candidates)} Library of Congress catalog records for review.")
         update(job, status="catalog_candidates", catalog_candidates=candidates)
+    except HTTPError as error:
+        if error.code == 429:
+            message = "The Library of Congress is limiting searches. Try again later or choose another source."
+        elif 300 <= error.code < 400:
+            message = "The Library of Congress redirected the search. ALMG stopped before contacting the new destination."
+        else:
+            message = f"Library of Congress search failed (HTTP {error.code}). Try again or choose another source."
+        update(job, status="approval", error=message)
     except (OSError, ValueError, IncompleteRead):
         update(job, status="approval", error=(
             "Library of Congress search failed. Try again or choose a different source."
