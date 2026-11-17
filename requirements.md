@@ -345,6 +345,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   app to approval with an invalid response message and a retry option.
   The Mac app returned to approval when a Wikipedia fixture sent an error
   alongside article results. It displayed a retry or local dataset option.
+  Approved Wikipedia and Commons fixture searches returning HTTP 403
+  displayed the provider, status code, and recovery options in the Mac app.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

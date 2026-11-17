@@ -221,7 +221,8 @@ def search_text(job):
             "Wikipedia returned an invalid search response. Try again or choose a local dataset."
         ))
     except HTTPError as error:
-        message = str(error)
+        message = (f"Wikipedia search failed (HTTP {error.code}). "
+                   "Try again or choose a local dataset.")
         if error.code in {301, 302, 303, 307, 308}:
             message = ("Wikipedia redirected the approved search. ALMG stopped before "
                        "contacting the redirect destination. Try again or choose a local dataset.")
@@ -702,7 +703,8 @@ def search_images(job):
             "Wikimedia Commons returned an invalid search response. Try again or choose a local dataset."
         ))
     except HTTPError as error:
-        message = str(error)
+        message = (f"Wikimedia Commons search failed (HTTP {error.code}). "
+                   "Try again or choose a local dataset.")
         if error.code in {301, 302, 303, 307, 308}:
             message = ("Wikimedia Commons redirected the approved search. ALMG stopped before "
                        "contacting the redirect destination. Try again or choose a local dataset.")
