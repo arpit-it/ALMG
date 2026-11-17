@@ -76,13 +76,15 @@ class CatalogCandidatesTest(unittest.TestCase):
 
         source = "https://www.loc.gov/item/12345/"
         record = {"source": source, "metadata_reviewed": True,
-                  "advisories": {"rights": ["Earlier statement"]}}
+                  "advisories": {"rights": ["Earlier statement"]},
+                  "reuse_approval": {"permission_basis": "Earlier permission"}}
         job = {"status": "reviewing_catalog_item", "catalog_candidates": [record]}
         with patch.object(studio, "request_json", side_effect=ValueError("invalid metadata")), \
              patch.object(studio, "store_job"):
             studio.review_catalog_item(job, source)
         self.assertEqual(job["status"], "catalog_candidates")
         self.assertNotIn("metadata_reviewed", record)
+        self.assertNotIn("reuse_approval", record)
         self.assertNotIn("advisories", record)
         self.assertEqual(record["reuse_status"], "unverified")
 

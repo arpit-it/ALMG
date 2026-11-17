@@ -257,6 +257,7 @@ def review_catalog_item(job, source):
             for record in job["catalog_candidates"]:
                 if record["source"] == source:
                     record.update(review, metadata_reviewed=True)
+                    record.pop("reuse_approval", None)
             job.update(status="catalog_candidates", error=None)
             append_activity(job, "Item advisories loaded. Review the rights and access statements.")
             store_job(job)
@@ -266,6 +267,7 @@ def review_catalog_item(job, source):
                 if record["source"] == source:
                     record.pop("advisories", None)
                     record.pop("metadata_reviewed", None)
+                    record.pop("reuse_approval", None)
                     record["reuse_status"] = "unverified"
             job.update(status="catalog_candidates", error=(
                 "Catalog item advisories could not be loaded. Review the URL and approve another attempt."
@@ -655,6 +657,7 @@ def restore_jobs():
                 for candidate in job["catalog_candidates"]:
                     candidate.pop("advisories", None)
                     candidate.pop("metadata_reviewed", None)
+                    candidate.pop("reuse_approval", None)
                     candidate["reuse_status"] = "unverified"
                 job.update(status="catalog_candidates", error=(
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
@@ -1528,6 +1531,24 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve a listed catalog item URL first.")
                         job.update(status="reviewing_catalog_item", error=None)
                         worker = (review_catalog_item, (job, source))
+                    elif action == "approve-catalog-reuse" and status == "catalog_candidates":
+                        source = data.get("approved_url")
+                        record = next((record for record in job["catalog_candidates"]
+                                       if record["source"] == source), None)
+                        basis = data.get("permission_basis")
+                        if (record is None or record.get("metadata_reviewed") is not True
+                                or data.get("confirmed") is not True
+                                or not isinstance(basis, str) or not 10 <= len(basis.strip()) <= 2000):
+                            raise ValueError("Review item advisories and enter the basis for permission to reuse this item.")
+                        record["reuse_approval"] = {
+                            "permission_basis": basis.strip(), "timestamp": time.time(),
+                            "source": source, "advisories": record["advisories"],
+                        }
+                        record["reuse_status"] = "user_approved"
+                        job["error"] = None
+                        append_activity(job, "User reuse approval recorded for the catalog item.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "close-catalog" and status == "catalog_candidates":
                         job.pop("catalog_candidates", None)
                         job.update(status="approval", error=None)

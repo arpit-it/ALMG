@@ -1083,6 +1083,49 @@ class _StudioPageState extends State<StudioPage> {
     });
   }
 
+  Future<void> _approveCatalogReuse(String id, Map record) async {
+    var basis = '';
+    final approved = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Approve item reuse'),
+        content: SizedBox(
+          width: 460,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SelectableText(record['source'] as String),
+              const Text('Confirm you have permission to use this item for the project dataset. Record the license, permission, or other basis you reviewed.'),
+              TextField(
+                autofocus: true,
+                minLines: 2,
+                maxLines: 4,
+                maxLength: 2000,
+                decoration: const InputDecoration(labelText: 'Basis for reuse permission'),
+                onChanged: (value) => basis = value,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Confirm reuse permission'),
+          ),
+        ],
+      ),
+    );
+    if (approved == true && mounted) {
+      await _submit('/jobs/$id/approve-catalog-reuse', {
+        'approved_url': record['source'],
+        'permission_basis': basis,
+        'confirmed': true,
+      });
+    }
+  }
+
   String _datasetSourceLabel(Map row, String source) {
     final provider = row['provider'];
     if (provider == 'wikipedia' ||
@@ -1461,7 +1504,7 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'catalog_candidates') ...[
-          const Text('Catalog preview only. Reuse rights are unverified and no records will enter the dataset.'),
+          const Text('Review the item advisories and record permission before dataset collection.'),
           if ((job?['catalog_candidates'] as List?)?.firstOrNull
               case final Map record)
             if (record['approved_query'] case final String query)
@@ -1481,7 +1524,13 @@ class _StudioPageState extends State<StudioPage> {
                     SelectableText(
                       "${entry.key}: ${(entry.value as List).join('\n')}",
                     ),
-                  const Text('Reuse permission requires review of the item advisories.'),
+                  if (record['reuse_approval'] case final Map approval)
+                    SelectableText('User reuse approval: ${approval['permission_basis']}')
+                  else
+                    TextButton(
+                      onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map),
+                      child: const Text('Record reuse approval'),
+                    ),
                 ],
                 Text(
                   'Loads item metadata from ${record['source']}?fo=json.',
