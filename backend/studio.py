@@ -1357,6 +1357,8 @@ class Handler(BaseHTTPRequestHandler):
                         queries = [query.strip() for query in queries]
                         if len(set(queries)) != len(queries):
                             raise ValueError("Remove repeated search queries before saving.")
+                        if queries == job["plan"]["queries"] and status in ("text_candidates", "image_candidates"):
+                            return self.respond({"id": job["id"]})
                         job["plan"] = {**job["plan"], "queries": queries}
                         job.pop("text_candidates", None)
                         job.pop("image_candidates", None)
