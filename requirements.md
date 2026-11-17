@@ -391,6 +391,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The discovery catalog in the rebuilt Mac app displayed the saved fixture
   website with discovery unavailable. Closing the catalog left Wikipedia
   search awaiting approval. Website crawling remains open.
+  The rebuilt Mac catalog showed the fixture URL in its own Project website
+  section and displayed its discovery availability.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

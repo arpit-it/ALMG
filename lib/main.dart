@@ -1110,10 +1110,16 @@ class _StudioPageState extends State<StudioPage> {
                   if (project['id'] == _project)
                     if (project['source_website'] case final String website
                         when website.isNotEmpty)
-                      ListTile(
-                        title: const Text('Saved project website'),
-                        subtitle: SelectableText('$website\nDiscovery unavailable'),
-                      ),
+                      ...[
+                        const Text(
+                          'Project website',
+                          style: TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                        ListTile(
+                          title: SelectableText(website),
+                          subtitle: const Text('Discovery unavailable'),
+                        ),
+                      ],
                 const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
                 const ListTile(
                   title: Text('Library of Congress'),
