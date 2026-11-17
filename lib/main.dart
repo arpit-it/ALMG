@@ -1294,8 +1294,9 @@ class _StudioPageState extends State<StudioPage> {
                 title: Text('English Wikipedia'),
                 subtitle: Text('en.wikipedia.org · Text classification'),
               ),
-              const Text(
-                'Approving these queries sends them to this provider for up to 20 results per query. '
+              Text(
+                'Approving these queries sends them to Wikipedia for up to '
+                '20 results per query and ${(plan['queries'] as List).length * 20} total. '
                 'Review the excerpts and source URLs before approving them for the dataset.',
               ),
             ],
