@@ -672,6 +672,10 @@ def search_images(job):
         update(job, status="approval", image_candidates=[], error=(
             "Wikimedia Commons search ended before the response finished. Try again or choose a local dataset."
         ))
+    except (URLError, TimeoutError):
+        update(job, status="approval", image_candidates=[], error=(
+            "Could not reach Wikimedia Commons. Check your connection, try again, or choose a local dataset."
+        ))
     except Exception as error:
         update(job, status="approval", error=str(error), image_candidates=[])
 
