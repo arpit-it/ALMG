@@ -1073,56 +1073,58 @@ class _StudioPageState extends State<StudioPage> {
     });
   }
 
-  void _showDiscoveryProviders() {
+  void _showDiscoveryProviders(bool hasQueries) {
     showDialog<void>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('Web discovery providers'),
-        content: const SizedBox(
+        content: SizedBox(
           width: 460,
           child: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
+                const Text(
                   'Available',
                   style: TextStyle(fontWeight: FontWeight.bold),
                 ),
                 ListTile(
-                  title: Text('English Wikipedia'),
-                  subtitle: Text('Text classification'),
+                  title: const Text('English Wikipedia'),
+                  trailing: hasQueries && !_imageRecipe ? const Text('Current plan') : null,
+                  subtitle: const Text('Text classification'),
                 ),
                 ListTile(
-                  title: Text('Wikimedia Commons'),
-                  subtitle: Text('Images and captions'),
+                  title: const Text('Wikimedia Commons'),
+                  trailing: hasQueries && _imageRecipe ? const Text('Current plan') : null,
+                  subtitle: const Text('Images and captions'),
                 ),
-                Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
-                ListTile(
+                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
+                const ListTile(
                   title: Text('Library of Congress'),
                   subtitle: Text('Archives and public collections'),
                 ),
-                ListTile(
+                const ListTile(
                   title: Text('Europe PMC'),
                   subtitle: Text('Research literature'),
                 ),
-                ListTile(
+                const ListTile(
                   title: Text('Wikidata'),
                   subtitle: Text('Entities and knowledge graphs'),
                 ),
-                ListTile(
+                const ListTile(
                   title: Text('World Bank Open Data'),
                   subtitle: Text('Development indicators'),
                 ),
-                ListTile(
+                const ListTile(
                   title: Text('Federal Register'),
                   subtitle: Text('Public notices and regulations'),
                 ),
-                ListTile(
+                const ListTile(
                   title: Text('SEC EDGAR'),
                   subtitle: Text('Company filings'),
                 ),
-                ListTile(
+                const ListTile(
                   title: Text('Crossref'),
                   subtitle: Text('Bibliographic metadata'),
                 ),
@@ -1283,7 +1285,8 @@ class _StudioPageState extends State<StudioPage> {
               SelectableText('• $query'),
           ],
           TextButton(
-            onPressed: _showDiscoveryProviders,
+            onPressed: () =>
+                _showDiscoveryProviders((plan['queries'] as List).isNotEmpty),
             child: const Text('Browse discovery providers'),
           ),
           if (_imageRecipe && (plan['queries'] as List).isNotEmpty) ...[
