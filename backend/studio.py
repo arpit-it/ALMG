@@ -797,7 +797,9 @@ def prepare_dataset(job, imported_rows=None):
         if imported_rows is not None:
             rows = imported_rows
         elif job.get("mode") == "web_images":
-            rows = image_recipe.web_dataset(job["image_candidates"], read_approved_image,
+            candidates = job["image_candidates"]
+            activity(job, f"Approved {len(candidates)} image downloads from upload.wikimedia.org.")
+            rows = image_recipe.web_dataset(candidates, read_approved_image,
                                             lambda message: activity(job, message))
         elif job.get("recipe") == "text_to_image":
             activity(job, "Rendering a local dataset of prompt and image pairs.")
