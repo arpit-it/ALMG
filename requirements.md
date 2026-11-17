@@ -275,6 +275,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   With the shared direct HTTP opener wired into Commons downloads,
   the Mac app separately approved a local fixture search and download
   and previewed six images with their source URLs and licenses.
+  A second Mac fixture run confirmed that all six saved image rows
+  retained the approved Commons query.
   A local fixture in the Mac app returned a malformed Unicode excerpt and
   a usable excerpt with a malformed title. After query and excerpt approval,
   the dataset preview showed three usable examples, retained the source with

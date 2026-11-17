@@ -650,7 +650,8 @@ def search_images(job):
                     continue
                 seen_sources.add(source)
                 candidates.append({"title": page["title"].removeprefix("File:"),
-                                   "url": source, "license": license_name})
+                                   "url": source, "license": license_name,
+                                   "approved_query": query})
         if not candidates:
             raise ValueError("No supported images with license information found. Edit the search or choose a local dataset.")
         update(job, status="image_candidates", image_candidates=candidates)
