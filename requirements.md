@@ -219,6 +219,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   as available and the seven other starter sources as planned. Closing the
   catalog left the fixture at dataset approval. Provider selection, custom
   websites, and full-page collection still need implementation.
+  In the rebuilt Mac app, removing all classifier fixture queries kept
+  the catalog accessible and removed the web search approval button.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing

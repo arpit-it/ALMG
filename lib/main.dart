@@ -1282,11 +1282,10 @@ class _StudioPageState extends State<StudioPage> {
             for (final query in plan['queries'] as List)
               SelectableText('• $query'),
           ],
-          if ((plan['queries'] as List).isNotEmpty)
-            TextButton(
-              onPressed: _showDiscoveryProviders,
-              child: const Text('Browse discovery providers'),
-            ),
+          TextButton(
+            onPressed: _showDiscoveryProviders,
+            child: const Text('Browse discovery providers'),
+          ),
           if (_imageRecipe && (plan['queries'] as List).isNotEmpty) ...[
             const ListTile(
               contentPadding: EdgeInsets.zero,
