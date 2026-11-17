@@ -276,6 +276,7 @@ class WikipediaCollectionTest(unittest.TestCase):
         self.assertNotIn("X-Subscription-Token", request.call_args.kwargs["headers"])
         self.assertEqual(len(rows), 1)
         self.assertEqual(rows[0]["approved_query"], query)
+        self.assertEqual(rows[0]["provider"], "wikipedia")
         self.assertEqual(rows[0]["source"], "https://en.wikipedia.org/wiki/Invoice%20%2F%20Receipt")
         self.assertEqual(rows[0]["label"], "billing")
         self.assertNotIn("<span>", rows[0]["text"])

@@ -1688,7 +1688,7 @@ class _StudioPageState extends State<StudioPage> {
                           'Approved query: $query',
                         if (row['source'] case final String source
                             when source.startsWith('https://en.wikipedia.org/wiki/'))
-                          'Source: $source',
+                          'English Wikipedia: $source',
                       ].join('\n')
                     : [
                         row['text'],

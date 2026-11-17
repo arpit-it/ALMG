@@ -211,7 +211,7 @@ def discover_text(job):
                 if any(unicodedata.category(char) == "Cc" for char in title):
                     title = ""
                 candidates.append({"text": snippet, "source": source, "title": title,
-                                   "approved_query": query, "group": source})
+                                   "approved_query": query, "group": source, "provider": "wikipedia"})
     return candidates
 
 
