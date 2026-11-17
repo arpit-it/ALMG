@@ -1083,6 +1083,9 @@ class _StudioPageState extends State<StudioPage> {
 
   Future<void> _showDiscoveryProviders(bool hasQueries) async {
     final projectId = _project;
+    final website = _projects
+        .where((project) => project['id'] == projectId)
+        .firstOrNull?['source_website'] as String? ?? '';
     final editWebsite = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -1108,20 +1111,19 @@ class _StudioPageState extends State<StudioPage> {
                   trailing: hasQueries && _imageRecipe ? const Text('Current plan') : null,
                   subtitle: const Text('commons.wikimedia.org · Images and captions'),
                 ),
-                for (final project in _projects)
-                  if (project['id'] == _project)
-                    if (project['source_website'] case final String website
-                        when website.isNotEmpty)
-                      ...[
-                        const Text(
-                          'Project website',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        ListTile(
-                          title: SelectableText(website),
-                          subtitle: const Text('Discovery unavailable'),
-                        ),
-                      ],
+                if (projectId != null) ...[
+                  const Text(
+                    'Project website',
+                    style: TextStyle(fontWeight: FontWeight.bold),
+                  ),
+                  if (website.isEmpty)
+                    const ListTile(title: Text('No website added'))
+                  else
+                    ListTile(
+                      title: SelectableText(website),
+                      subtitle: const Text('Discovery unavailable'),
+                    ),
+                ],
                 const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
                 const ListTile(
                   title: Text('Library of Congress'),
@@ -1159,7 +1161,7 @@ class _StudioPageState extends State<StudioPage> {
           if (projectId != null)
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: const Text('Edit project website'),
+              child: Text(website.isEmpty ? 'Add project website' : 'Edit project website'),
             ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
