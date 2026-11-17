@@ -289,6 +289,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The rebuilt Mac app displayed the five-image minimum and kept four
   selected Commons results in review. Selecting a fifth let me approve
   the downloads and preview the fixture dataset.
+  With only one eligible Commons image in a local fixture, the Mac app
+  returned to search approval and offered a broader query or local data.
   A local fixture in the Mac app returned a malformed Unicode excerpt and
   a usable excerpt with a malformed title. After query and excerpt approval,
   the dataset preview showed three usable examples, retained the source with

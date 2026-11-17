@@ -654,6 +654,11 @@ def search_images(job):
                                    "approved_query": query})
         if not candidates:
             raise ValueError("No supported images with license information found. Edit the search or choose a local dataset.")
+        if len(candidates) < 5:
+            raise ValueError(
+                "Wikimedia Commons found fewer than five eligible images. "
+                "Try a broader query or choose a local dataset."
+            )
         update(job, status="image_candidates", image_candidates=candidates)
     except (json.JSONDecodeError, UnicodeDecodeError):
         update(job, status="approval", image_candidates=[], error=(
