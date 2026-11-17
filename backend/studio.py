@@ -194,7 +194,7 @@ def discover_text(job):
                 continue
             if any(unicodedata.category(char) == "Cc" for char in snippet):
                 continue
-            snippet_key = snippet.casefold()
+            snippet_key = unicodedata.normalize("NFC", snippet.casefold())
             if len(snippet) >= 40 and snippet_key not in seen_snippets and page_key not in seen_sources:
                 seen_snippets.add(snippet_key)
                 seen_sources.add(page_key)
