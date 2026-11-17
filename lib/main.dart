@@ -1128,33 +1128,34 @@ class _StudioPageState extends State<StudioPage> {
                     ),
                 ],
                 const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('Library of Congress'),
-                  subtitle: Text('Archives and public collections'),
+                  subtitle: Text('loc.gov · Archives and public collections'),
                 ),
                 const ListTile(
                   title: Text('Europe PMC'),
-                  subtitle: Text('Research literature'),
+                  subtitle: Text('europepmc.org · Research literature'),
                 ),
                 const ListTile(
                   title: Text('Wikidata'),
-                  subtitle: Text('Entities and knowledge graphs'),
+                  subtitle: Text('wikidata.org · Entities and knowledge graphs'),
                 ),
                 const ListTile(
                   title: Text('World Bank Open Data'),
-                  subtitle: Text('Development indicators'),
+                  subtitle: Text('data.worldbank.org · Development indicators'),
                 ),
                 const ListTile(
                   title: Text('Federal Register'),
-                  subtitle: Text('Public notices and regulations'),
+                  subtitle: Text('federalregister.gov · Public notices and regulations'),
                 ),
                 const ListTile(
                   title: Text('SEC EDGAR'),
-                  subtitle: Text('Company filings'),
+                  subtitle: Text('sec.gov · Company filings'),
                 ),
                 const ListTile(
                   title: Text('Crossref'),
-                  subtitle: Text('Bibliographic metadata'),
+                  subtitle: Text('crossref.org · Bibliographic metadata'),
                 ),
               ],
             ),

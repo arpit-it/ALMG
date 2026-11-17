@@ -468,6 +468,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   In the rebuilt Mac app, approving three offline Wikipedia excerpts
   reached dataset preview with two fruit examples and one astronomy example
   even though the fixture label response included a malformed row.
+  In the rebuilt Mac app, the Commons fixture catalog showed Wikimedia
+  Commons as the current plan and all seven planned providers with their
+  domains and an explicit unavailable notice. Those adapters remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
