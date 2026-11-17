@@ -694,12 +694,15 @@ def read_approved_image(url):
     request = Request(url, headers={"User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)"})
     with DISCOVERY.open(request, timeout=15) as response:
         limit = 8 * 1024 * 1024
+        expected_length = response.length
         try:
             payload = response.read(limit + 1)
         except IncompleteRead as error:
             raise ValueError("Image download ended before the response finished.") from error
         if len(payload) > limit:
             raise ValueError("Image exceeds the 8 MiB download limit.")
+        if expected_length is not None and len(payload) < expected_length:
+            raise ValueError("Image download ended before the response finished.")
         return payload
 
 
