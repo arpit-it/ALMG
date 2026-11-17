@@ -415,6 +415,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   directly to the discovery catalog and displayed the saved URL.
   The rebuilt Mac app showed the HTTPS URL format before editing, then
   saved a matching fixture address and displayed it in the discovery catalog.
+  The rebuilt Mac app kept settings open after rejecting a fixture HTTP
+  address and displayed the HTTPS requirement in plain language.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

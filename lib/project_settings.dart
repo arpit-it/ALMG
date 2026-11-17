@@ -45,6 +45,8 @@ class _ProjectSettingsState extends State<ProjectSettings> {
       await action();
       final project = await widget.request('/projects/${_project['id']}');
       if (mounted) setState(() => _project = project);
+    } on FormatException catch (error) {
+      if (mounted) setState(() => _error = error.message);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     } finally {
