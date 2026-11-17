@@ -813,7 +813,9 @@ def prepare_dataset(job, imported_rows=None):
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:
-        if job.get("mode") == "web":
+        if job.get("mode") == "web_images":
+            update(job, status="approval", mode=None, image_candidates=[], error=str(error))
+        elif job.get("mode") == "web":
             update(job, status="approval", mode=None, error=str(error))
         else:
             update(job, status="failed", error=str(error))
