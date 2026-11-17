@@ -686,6 +686,7 @@ class _StudioPageState extends State<StudioPage> {
         'waiting_idle',
         'searching_images',
         'searching_text',
+        'searching_catalog',
         'creating_dataset',
         'training',
         'exporting',
@@ -1140,12 +1141,12 @@ class _StudioPageState extends State<StudioPage> {
                       subtitle: const Text('Discovery unavailable'),
                     ),
                 ],
-                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
-                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('Library of Congress'),
-                  subtitle: Text('loc.gov · Archives and public collections'),
+                  subtitle: Text('www.loc.gov · Catalog preview for text classification'),
                 ),
+                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('Europe PMC'),
                   subtitle: Text('europepmc.org · Research literature'),
@@ -1242,6 +1243,8 @@ class _StudioPageState extends State<StudioPage> {
       'clarification': 'Waiting for more details',
       'searching_images': 'Searching for images',
       'searching_text': 'Searching Wikipedia',
+      'searching_catalog': 'Searching the Library of Congress',
+      'catalog_candidates': 'Review Library of Congress records',
       'text_candidates': 'Review Wikipedia sources',
       'image_candidates': 'Image search results',
       'creating_dataset': 'Preparing dataset',
@@ -1437,6 +1440,34 @@ class _StudioPageState extends State<StudioPage> {
                   child: const Text('Approve Wikipedia search'),
                 ),
             ],
+          ),
+        ],
+        if (status == 'approval' && !_imageRecipe &&
+            plan != null && (plan['queries'] as List).isNotEmpty) ...[
+          Text(
+            'Library of Congress catalog preview · www.loc.gov. '
+            'Sends the first query for up to $searchLimit records.',
+          ),
+          SelectableText((plan['queries'] as List).first as String),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/search-catalog', {
+              'approved_provider': 'loc',
+              'approved_query': (plan['queries'] as List).first,
+              'approved_result_limit': searchLimit,
+            }),
+            child: const Text('Approve Library of Congress search'),
+          ),
+        ],
+        if (status == 'catalog_candidates') ...[
+          const Text('Catalog preview only. Reuse rights are unverified and no records will enter the dataset.'),
+          for (final record in job?['catalog_candidates'] as List? ?? const [])
+            ListTile(
+              title: Text(record['title'] as String),
+              subtitle: SelectableText(record['source'] as String),
+            ),
+          TextButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/close-catalog', {}),
+            child: const Text('Return to dataset approval'),
           ),
         ],
         if (status == 'text_candidates' || status == 'image_candidates')

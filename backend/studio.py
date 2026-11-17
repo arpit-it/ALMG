@@ -38,11 +38,12 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import chat_history, image_recipe, inference
+    from . import chat_history, image_recipe, inference, loc_discovery
 else:
     import chat_history
     import inference
     import image_recipe
+    import loc_discovery
 
 ROOT = Path(os.environ.get("STUDIO_DATA", Path(__file__).resolve().parent / "runs"))
 MODEL = inference.MODEL
@@ -213,6 +214,24 @@ def discover_text(job):
                 candidates.append({"text": snippet, "source": source, "title": title,
                                    "approved_query": query, "group": source, "provider": "wikipedia"})
     return candidates
+
+
+def search_catalog(job):
+    try:
+        query = job["plan"]["queries"][0]
+        url = "https://www.loc.gov/search/?" + urlencode({
+            "q": query, "fo": "json", "c": WIKIPEDIA_SEARCH_LIMIT,
+        })
+        result = request_json(url, headers={
+            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+        }, opener=DISCOVERY)
+        candidates = loc_discovery.catalog_candidates(result, query, limit=WIKIPEDIA_SEARCH_LIMIT)
+        activity(job, f"Found {len(candidates)} Library of Congress catalog records for review.")
+        update(job, status="catalog_candidates", catalog_candidates=candidates)
+    except (OSError, ValueError, IncompleteRead):
+        update(job, status="approval", error=(
+            "Library of Congress search failed. Try again or choose a different source."
+        ))
 
 
 def search_text(job):
@@ -593,7 +612,7 @@ def restore_jobs():
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
                 job["candidate_directory"] = str(work)
-            elif job["status"] in ("searching_text", "searching_images"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.update(status="approval", error=(
@@ -620,7 +639,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -1350,7 +1369,7 @@ class Handler(BaseHTTPRequestHandler):
                         job["error"] = None
                         store_job(job)
                         return self.respond({"id": job["id"]})
-                    if action == "edit-queries" and status in ("approval", "text_candidates", "image_candidates"):
+                    if action == "edit-queries" and status in ("approval", "text_candidates", "image_candidates", "catalog_candidates"):
                         queries = data.get("queries")
                         if (not isinstance(queries, list)
                                 or len(queries) > 6
@@ -1362,13 +1381,14 @@ class Handler(BaseHTTPRequestHandler):
                         queries = [query.strip() for query in queries]
                         if len(set(queries)) != len(queries):
                             raise ValueError("Remove repeated search queries before saving.")
-                        if queries == job["plan"]["queries"] and status in ("text_candidates", "image_candidates"):
+                        if queries == job["plan"]["queries"] and status in ("text_candidates", "image_candidates", "catalog_candidates"):
                             return self.respond({"id": job["id"]})
                         job["plan"] = {**job["plan"], "queries": queries}
                         job.pop("text_candidates", None)
                         job.pop("image_candidates", None)
+                        job.pop("catalog_candidates", None)
                         job.update(status="approval", error=None)
-                        if status in ("text_candidates", "image_candidates"):
+                        if status in ("text_candidates", "image_candidates", "catalog_candidates"):
                             append_activity(job, "Web queries changed. Review and approve a new search.")
                         store_job(job)
                         return self.respond({"id": job["id"]})
@@ -1445,6 +1465,20 @@ class Handler(BaseHTTPRequestHandler):
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
                         job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))
+                    elif action == "search-catalog" and status == "approval" and job.get("recipe") == "classifier":
+                        queries = job["plan"]["queries"]
+                        if (not queries or data.get("approved_query") != queries[0]
+                                or data.get("approved_provider") != "loc"
+                                or data.get("approved_result_limit") != WIKIPEDIA_SEARCH_LIMIT):
+                            raise ValueError("Approve the Library of Congress query and result limit first.")
+                        job.update(status="searching_catalog", error=None)
+                        worker = (search_catalog, (job,))
+                    elif action == "close-catalog" and status == "catalog_candidates":
+                        job.pop("catalog_candidates", None)
+                        job.update(status="approval", error=None)
+                        append_activity(job, "Catalog review closed. Choose a dataset source.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "use-text-excerpts" and status == "text_candidates":
                         urls = [candidate["source"] for candidate in job["text_candidates"]]
                         approved = data.get("approved_urls")
