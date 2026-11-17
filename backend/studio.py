@@ -620,9 +620,19 @@ def search_images(job):
         for index, page in enumerate(response.get("query", {}).get("pages", {}).values()):
             if index >= IMAGE_SEARCH_LIMIT:
                 break
-            info = next(iter(page.get("imageinfo", [])), {})
+            if not isinstance(page, dict) or not isinstance(page.get("title"), str):
+                continue
+            images = page.get("imageinfo")
+            if not isinstance(images, list) or not images or not isinstance(images[0], dict):
+                continue
+            info = images[0]
             source = info.get("url", "")
-            location = urlsplit(source)
+            if not isinstance(source, str):
+                continue
+            try:
+                location = urlsplit(source)
+            except ValueError:
+                continue
             if (source not in seen_sources
                     and location.scheme == "https" and location.netloc == "upload.wikimedia.org"
                     and info.get("mime") in ("image/jpeg", "image/png", "image/webp")):

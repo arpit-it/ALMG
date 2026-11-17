@@ -250,6 +250,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   showed candidate 20 immediately before the download approval button.
   A Commons fixture with repeated image URLs showed a single candidate
   at download approval in the Mac app.
+  With a malformed Commons entry followed by a valid image, the Mac app
+  opened download review and showed the valid candidate.
   A local fixture in the Mac app returned a malformed Unicode excerpt and
   a usable excerpt with a malformed title. After query and excerpt approval,
   the dataset preview showed three usable examples, retained the source with
