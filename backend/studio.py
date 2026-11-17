@@ -698,6 +698,8 @@ def read_approved_image(url):
     with DISCOVERY.open(request, timeout=15) as response:
         limit = 8 * 1024 * 1024
         expected_length = response.length
+        if expected_length is not None and expected_length > limit:
+            raise ValueError("Image exceeds the 8 MiB download limit.")
         try:
             payload = response.read(limit + 1)
         except IncompleteRead as error:
