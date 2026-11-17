@@ -80,7 +80,8 @@ class _ProjectSettingsState extends State<ProjectSettings> {
       body: {
         'id': _project['id'],
         'instructions': _instructions.text,
-        'source_website': _sourceWebsite.text,
+        if (_sourceWebsite.text != (widget.project['source_website'] ?? ''))
+          'source_website': _sourceWebsite.text,
       },
     );
     if (mounted) Navigator.pop(context);
