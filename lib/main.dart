@@ -1692,7 +1692,10 @@ class _StudioPageState extends State<StudioPage> {
                       ].join('\n')
                     : [
                         row['text'],
-                        row['source'],
+                        if (row['source'] case final String source)
+                          source.startsWith('https://upload.wikimedia.org/')
+                              ? 'Wikimedia Commons: $source'
+                              : source,
                         row['license'] ?? 'License unavailable',
                         if (row['artist'] case final String artist)
                           'Creator: $artist',

@@ -128,7 +128,7 @@ def web_dataset(candidates, read_image, report):
             row = {"text": caption, "label": "Commons filename caption",
                          "source": candidate["url"], "sha256": hashlib.sha256(contents).hexdigest(),
                          "image": encoded, "license": candidate.get("license"),
-                         "title": candidate["title"]}
+                         "title": candidate["title"], "provider": "commons"}
             if "approved_query" in candidate:
                 row["approved_query"] = candidate["approved_query"]
             for field in ("license_url", "artist", "credit", "attribution_required", "restrictions"):
