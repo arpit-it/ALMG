@@ -382,6 +382,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   selections and restored them with Select all. Approval previewed three examples.
   Commons image review in the rebuilt Mac app cleared the six fixture
   selections and restored them with Select all. Approval previewed six examples.
+  Commons image review exposed each checkbox with its source URL in the
+  rebuilt Mac app. Deselecting a labeled URL excluded it from the five
+  examples produced after download approval.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

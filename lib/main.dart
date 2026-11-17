@@ -1470,6 +1470,7 @@ class _StudioPageState extends State<StudioPage> {
             ListTile(
               trailing: Checkbox(
                 value: !_excludedImageSources.contains(candidate['url']),
+                semanticLabel: "Include ${candidate['url']}",
                 onChanged: _busy
                     ? null
                     : (checked) => setState(() {
