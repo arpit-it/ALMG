@@ -1463,8 +1463,11 @@ class _StudioPageState extends State<StudioPage> {
                     : candidate['text'] as String,
               ),
               subtitle: SelectableText(
-                "Approved query: ${candidate['approved_query']}\n"
-                "${candidate['source']}",
+                [
+                  if (candidate['approved_query'] case final String query)
+                    'Approved query: $query',
+                  candidate['source'],
+                ].join('\n'),
               ),
               trailing: Checkbox(
                 value: !_excludedTextSources.contains(candidate['source']),
