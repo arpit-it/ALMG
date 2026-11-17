@@ -652,6 +652,11 @@ def valid_commons_metadata_label(label):
             and all(unicodedata.category(char) not in {"Cc", "Cs"} for char in label))
 
 
+def commons_title_key(title):
+    """Normalize equivalent spacing in Commons file names."""
+    return " ".join(title.replace("_", " ").split())
+
+
 def search_images(job):
     """Discover candidate files without downloading image contents."""
     try:
@@ -699,14 +704,15 @@ def search_images(job):
                 if not valid_commons_metadata_label(license_name):
                     continue
                 title = page["title"].removeprefix("File:").strip()
-                if not valid_commons_metadata_label(title) or title in seen_titles:
+                title_key = commons_title_key(title)
+                if not valid_commons_metadata_label(title) or not title_key or title_key in seen_titles:
                     continue
                 try:
                     source.encode("utf-8")
                 except UnicodeEncodeError:
                     continue
                 seen_sources.add(source)
-                seen_titles.add(title)
+                seen_titles.add(title_key)
                 candidates.append({"title": title,
                                    "url": source, "license": license_name,
                                    "approved_query": query})
@@ -1362,7 +1368,7 @@ class Handler(BaseHTTPRequestHandler):
                             ))
                             store_job(job)
                             return self.respond({"id": job["id"]})
-                        if len({candidate["title"].strip() for candidate in candidates}) != len(candidates):
+                        if len({commons_title_key(candidate["title"]) for candidate in candidates}) != len(candidates):
                             job.update(status="approval", image_candidates=[], error=(
                                 "Some selected images share a file title. Search again or choose a local dataset."
                             ))
