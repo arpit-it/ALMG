@@ -658,7 +658,9 @@ def search_images(job):
                 license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120]
                 if not license_name:
                     continue
-                title = page["title"].removeprefix("File:")
+                title = page["title"].removeprefix("File:").strip()
+                if not title:
+                    continue
                 try:
                     title.encode("utf-8")
                     license_name.encode("utf-8")
