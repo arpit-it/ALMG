@@ -349,6 +349,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   displayed the provider, status code, and recovery options in the Mac app.
   The Mac app logged the download host and count after approving six
   Commons fixture images. The resulting dataset preview showed six examples.
+  Approving three Wikipedia fixture excerpts in the Mac app recorded
+  the selection count in Activity history and previewed three examples.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches

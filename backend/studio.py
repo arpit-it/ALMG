@@ -805,6 +805,8 @@ def prepare_dataset(job, imported_rows=None):
             activity(job, "Rendering a local dataset of prompt and image pairs.")
             rows = image_recipe.dataset()
         else:
+            if job["mode"] == "web":
+                activity(job, f"Approved {len(job['text_candidates'])} Wikipedia excerpts for the dataset.")
             rows = collect(job) if job["mode"] == "web" else synthesize(job)
             if job["mode"] == "web" and not rows:
                 raise ValueError("No usable examples found. Edit the web queries or choose a local dataset.")
