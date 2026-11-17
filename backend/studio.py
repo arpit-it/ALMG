@@ -701,8 +701,8 @@ def search_images(job):
                 raw_license = license_field.get("value") if isinstance(license_field, dict) else None
                 if not isinstance(raw_license, str):
                     continue
-                license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120]
-                if not valid_commons_metadata_label(license_name):
+                license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()
+                if len(license_name) > 120 or not valid_commons_metadata_label(license_name):
                     continue
                 title = page["title"].removeprefix("File:").strip()
                 title_key = commons_title_key(title)
@@ -1347,7 +1347,7 @@ class Handler(BaseHTTPRequestHandler):
                                 or len(set(approved)) != len(approved)):
                             raise ValueError("Approve the exact candidate URLs before downloading.")
                         candidates = [candidate for candidate in candidates if candidate["url"] in approved]
-                        if any(not valid_commons_metadata_label(candidate.get("license"))
+                        if any(not valid_commons_metadata_label(candidate.get("license")) or len(candidate["license"].strip()) > 120
                                for candidate in candidates):
                             job.update(
                                 status="approval",
