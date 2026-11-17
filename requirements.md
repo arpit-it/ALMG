@@ -257,6 +257,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   After approving search and download for a local Commons fixture with
   unreadable image data, the Mac app returned to dataset approval with
   options to revise the search or use a local dataset.
+  A Commons search fixture returning HTTP 429 displayed a rate limit
+  message and restored the dataset approval controls in the Mac app.
   A local fixture in the Mac app returned a malformed Unicode excerpt and
   a usable excerpt with a malformed title. After query and excerpt approval,
   the dataset preview showed three usable examples, retained the source with
