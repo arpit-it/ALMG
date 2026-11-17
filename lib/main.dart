@@ -1460,6 +1460,10 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'catalog_candidates') ...[
           const Text('Catalog preview only. Reuse rights are unverified and no records will enter the dataset.'),
+          if ((job?['catalog_candidates'] as List?)?.firstOrNull
+              case final Map record)
+            if (record['approved_query'] case final String query)
+              SelectableText('Approved catalog query: $query'),
           for (final record in job?['catalog_candidates'] as List? ?? const [])
             ListTile(
               title: Text(record['title'] as String),
