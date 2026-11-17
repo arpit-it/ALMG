@@ -1150,6 +1150,12 @@ class _StudioPageState extends State<StudioPage> {
     final status = job?['status'];
     final plan = job?['plan'] as Map?;
     final metrics = job?['metrics'] as Map?;
+    final textCandidates = job?['text_candidates'] as List? ?? const [];
+    final selectedTextUrls = {
+      for (final candidate in textCandidates)
+        if (!_excludedTextSources.contains(candidate['source']))
+          candidate['source'] as String,
+    };
     final states = {
       'planning': 'Qwen is drafting the plan',
       'approval': 'Dataset approval required',
@@ -1353,7 +1359,7 @@ class _StudioPageState extends State<StudioPage> {
                 : () => _editPlanItems(id as String, plan!['queries'] as List),
             child: const Text('Edit web queries'),
           ),
-          for (final candidate in job!['text_candidates'] as List)
+          for (final candidate in textCandidates)
             ListTile(
               title: SelectableText(
                 (candidate['title'] as String?)?.isNotEmpty == true
@@ -1380,20 +1386,12 @@ class _StudioPageState extends State<StudioPage> {
               ),
             ),
           FilledButton(
-            onPressed: _busy ||
-                    (job['text_candidates'] as List).every(
-                      (candidate) =>
-                          _excludedTextSources.contains(candidate['source']),
-                    )
+            onPressed: _busy || selectedTextUrls.isEmpty
                 ? null
                 : () => _submit('/jobs/$id/use-text-excerpts', {
-                    'approved_urls': [
-                      for (final candidate in job['text_candidates'] as List)
-                        if (!_excludedTextSources.contains(candidate['source']))
-                          candidate['source'],
-                    ].toSet().toList(),
+                    'approved_urls': selectedTextUrls.toList(),
                   }),
-            child: const Text('Approve excerpts from selected sources'),
+            child: Text('Approve excerpts (${selectedTextUrls.length} selected)'),
           ),
         ],
         if (status == 'image_candidates') ...[

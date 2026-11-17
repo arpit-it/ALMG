@@ -229,6 +229,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   After excerpt approval, the rebuilt Mac app showed the three fixture
   examples with their source URLs and queries, plus the two available
   article titles, in the dataset preview.
+  In the rebuilt Mac app, deselecting one of three fixture sources
+  changed the approval count to two. Approving produced a dataset preview
+  containing exactly the two selected sources.
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
