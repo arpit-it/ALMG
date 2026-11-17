@@ -581,6 +581,13 @@ def restore_jobs():
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
                 job["candidate_directory"] = str(work)
+            elif job["status"] in ("searching_text", "searching_images"):
+                job.pop("text_candidates", None)
+                job.pop("image_candidates", None)
+                job.update(status="approval", error=(
+                    "Web search was interrupted. Review and approve the queries to retry."
+                ))
+                store_job(job)
             elif job["status"] == "creating_dataset" and job.get("mode") == "web":
                 job.update(status="approval", mode=None,
                            error="Web collection was interrupted. Review and approve the queries to retry.")

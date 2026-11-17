@@ -351,6 +351,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Commons fixture images. The resulting dataset preview showed six examples.
   Approving three Wikipedia fixture excerpts in the Mac app recorded
   the selection count in Activity history and previewed three examples.
+  The Mac app reopened saved interrupted Wikipedia and Commons searches
+  at approval. Fresh consent reached review with three excerpts and six images.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
