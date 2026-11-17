@@ -671,7 +671,7 @@ def search_images(job):
             "action": "query", "format": "json", "generator": "search",
             "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": IMAGE_SEARCH_LIMIT,
             "prop": "imageinfo", "iiprop": "url|mime|extmetadata",
-            "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist",
+            "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist|Credit",
         })
         response = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
@@ -727,12 +727,13 @@ def search_images(job):
                         and re.fullmatch(r"https://[A-Za-z0-9.-]+/[^\s]*", license_url)
                         and valid_commons_metadata_label(license_url)):
                     candidate["license_url"] = license_url
-                artist_field = metadata.get("Artist")
-                artist_value = artist_field.get("value") if isinstance(artist_field, dict) else None
-                if isinstance(artist_value, str):
-                    artist = " ".join(unescape(re.sub(r"<[^>]+>", "", artist_value)).split())
-                    if len(artist) <= 255 and valid_commons_metadata_label(artist):
-                        candidate["artist"] = artist
+                for field in ("Artist", "Credit"):
+                    entry = metadata.get(field)
+                    value = entry.get("value") if isinstance(entry, dict) else None
+                    if isinstance(value, str):
+                        label = " ".join(unescape(re.sub(r"<[^>]+>", "", value)).split())
+                        if len(label) <= 255 and valid_commons_metadata_label(label):
+                            candidate[field.lower()] = label
                 candidates.append(candidate)
 
         if not candidates:
@@ -931,7 +932,7 @@ def prepare_dataset(job, imported_rows=None):
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),
-                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "csv_end_line", "approved_query", "title") if key in row}}
+                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "csv_end_line", "approved_query", "title") if key in row}}
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:
