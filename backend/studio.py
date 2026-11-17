@@ -211,7 +211,7 @@ def search_text(job):
         activity(job, "Approved text search on en.wikipedia.org.")
         candidates = discover_text(job)
         if not candidates:
-            raise ValueError("No usable excerpts found. Edit the web queries or choose a local dataset.")
+            raise ValueError("Wikipedia found no usable excerpts. Try broader queries or choose a local dataset.")
         activity(job, f"Found {len(candidates)} Wikipedia excerpts for review.")
         update(job, status="text_candidates", text_candidates=candidates)
     except (json.JSONDecodeError, UnicodeDecodeError):
