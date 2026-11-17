@@ -622,6 +622,11 @@ def valid_commons_image_url(url):
     return location.scheme == "https" and location.netloc == "upload.wikimedia.org"
 
 
+def valid_commons_license_label(label):
+    return (isinstance(label, str) and bool(label.strip())
+            and all(unicodedata.category(char) not in {"Cc", "Cs"} for char in label))
+
+
 def search_images(job):
     """Discover candidate files without downloading image contents."""
     try:
@@ -663,14 +668,13 @@ def search_images(job):
                 if not isinstance(raw_license, str):
                     continue
                 license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120]
-                if not license_name or any(unicodedata.category(char) == "Cc" for char in license_name):
+                if not valid_commons_license_label(license_name):
                     continue
                 title = page["title"].removeprefix("File:").strip()
                 if not title:
                     continue
                 try:
                     title.encode("utf-8")
-                    license_name.encode("utf-8")
                     source.encode("utf-8")
                 except UnicodeEncodeError:
                     continue
@@ -1291,12 +1295,12 @@ class Handler(BaseHTTPRequestHandler):
                                 or len(set(approved)) != len(approved)):
                             raise ValueError("Approve the exact candidate URLs before downloading.")
                         candidates = [candidate for candidate in candidates if candidate["url"] in approved]
-                        if any(not isinstance(candidate.get("license"), str)
-                               or not candidate["license"].strip() for candidate in candidates):
+                        if any(not valid_commons_license_label(candidate.get("license"))
+                               for candidate in candidates):
                             job.update(
                                 status="approval",
                                 image_candidates=[],
-                                error="Some saved images lack license information. Search again or choose a local dataset.",
+                                error="Some saved images lack usable license information. Search again or choose a local dataset.",
                             )
                             store_job(job)
                             return self.respond({"id": job["id"]})

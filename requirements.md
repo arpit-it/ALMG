@@ -323,6 +323,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   omitting its title with an embedded NUL. The Astronomía title appeared.
   After Commons search approval, the Mac app kept six licensed fixture
   images and excluded the result whose license label contained a NUL.
+  The Mac app cleared a saved Commons review with a NUL in a license
+  label and returned to search approval before any downloads started.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
