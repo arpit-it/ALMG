@@ -1106,6 +1106,14 @@ class _StudioPageState extends State<StudioPage> {
                   trailing: hasQueries && _imageRecipe ? const Text('Current plan') : null,
                   subtitle: const Text('commons.wikimedia.org · Images and captions'),
                 ),
+                for (final project in _projects)
+                  if (project['id'] == _project)
+                    if (project['source_website'] case final String website
+                        when website.isNotEmpty)
+                      ListTile(
+                        title: const Text('Saved project website'),
+                        subtitle: SelectableText('$website\nDiscovery unavailable'),
+                      ),
                 const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
                 const ListTile(
                   title: Text('Library of Congress'),

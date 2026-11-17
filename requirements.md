@@ -388,6 +388,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Project settings in the rebuilt Mac app saved an HTTPS discovery website
   and displayed it when reopened. This saves one URL per project. Website
   discovery, access and reuse checks, and page collection remain open.
+  The discovery catalog in the rebuilt Mac app displayed the saved fixture
+  website with discovery unavailable. Closing the catalog left Wikipedia
+  search awaiting approval. Website crawling remains open.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
