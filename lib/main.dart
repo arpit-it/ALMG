@@ -1355,7 +1355,11 @@ class _StudioPageState extends State<StudioPage> {
           ),
           for (final candidate in job!['text_candidates'] as List)
             ListTile(
-              title: SelectableText(candidate['text'] as String),
+              title: SelectableText(
+                (candidate['title'] as String?)?.isNotEmpty == true
+                    ? "${candidate['title']}\n${candidate['text']}"
+                    : candidate['text'] as String,
+              ),
               subtitle: SelectableText(
                 "Approved query: ${candidate['approved_query']}\n"
                 "${candidate['source']}",

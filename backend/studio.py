@@ -176,7 +176,9 @@ def discover_text(job):
             if len(snippet) >= 40 and snippet_key not in seen_snippets and source not in seen_sources:
                 seen_snippets.add(snippet_key)
                 seen_sources.add(source)
-                candidates.append({"text": snippet, "source": source,
+                title = result.get("title")
+                title = title.strip()[:255] if isinstance(title, str) else ""
+                candidates.append({"text": snippet, "source": source, "title": title,
                                    "approved_query": query, "group": source})
     return candidates
 
