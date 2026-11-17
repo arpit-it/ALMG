@@ -33,3 +33,27 @@ def catalog_candidates(payload, query, *, limit):
             "reuse_status": "unverified",
         })
     return candidates
+
+
+def item_advisories(payload):
+    """Preserve item-level advisories as evidence for human reuse review."""
+    item = payload.get("item") if isinstance(payload, dict) else None
+    if not isinstance(item, dict):
+        raise ValueError("The catalog item response has no usable item metadata.")
+    advisories = {}
+    for field in ("rights_advisory", "rights", "access_advisory"):
+        values = item.get(field)
+        if values is None:
+            continue
+        if not isinstance(values, list) or any(not isinstance(value, str) for value in values):
+            raise ValueError("The catalog item has unreadable rights metadata.")
+        cleaned = []
+        for value in values:
+            value = value.strip()
+            if len(value) > 8000 or any(unicodedata.category(c) == "Cs" for c in value):
+                raise ValueError("The catalog item has unreadable rights metadata.")
+            if value:
+                cleaned.append(value)
+        if cleaned:
+            advisories[field] = cleaned
+    return {"advisories": advisories, "reuse_status": "unverified"}

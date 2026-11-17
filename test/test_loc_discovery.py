@@ -54,3 +54,18 @@ class CatalogCandidatesTest(unittest.TestCase):
         request.assert_called_once()
         self.assertEqual(job["status"], "approval")
         self.assertIn("Try again later", job["error"])
+
+    def test_item_advisories_preserve_rights_without_granting_reuse(self):
+        from backend.loc_discovery import item_advisories
+        self.assertEqual(item_advisories({"item": {
+            "rights_advisory": ["Permission required."],
+            "rights": ["Contact the rights holder."],
+        }}), {
+            "advisories": {
+                "rights_advisory": ["Permission required."],
+                "rights": ["Contact the rights holder."],
+            },
+            "reuse_status": "unverified",
+        })
+        with self.assertRaises(ValueError):
+            item_advisories({"item": {"rights": "unreadable"}})

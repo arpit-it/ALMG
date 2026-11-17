@@ -247,6 +247,25 @@ def search_catalog(job):
         ))
 
 
+def review_catalog_item(job, source):
+    try:
+        result = request_json(source + "?fo=json", headers={
+            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+        }, opener=DISCOVERY)
+        review = loc_discovery.item_advisories(result)
+        with LOCK:
+            for record in job["catalog_candidates"]:
+                if record["source"] == source:
+                    record.update(review, metadata_reviewed=True)
+            job.update(status="catalog_candidates", error=None)
+            append_activity(job, "Item advisories loaded. Review the rights and access statements.")
+            store_job(job)
+    except (OSError, ValueError, IncompleteRead):
+        update(job, status="catalog_candidates", error=(
+            "Catalog item advisories could not be loaded. Review the URL and approve another attempt."
+        ))
+
+
 def search_text(job):
     try:
         activity(job, "Approved text search on en.wikipedia.org.")
@@ -625,7 +644,7 @@ def restore_jobs():
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
                 job["candidate_directory"] = str(work)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.update(status="approval", error=(
@@ -1486,6 +1505,13 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the Library of Congress query and result limit first.")
                         job.update(status="searching_catalog", error=None)
                         worker = (search_catalog, (job,))
+                    elif action == "review-catalog-item" and status == "catalog_candidates":
+                        source = data.get("approved_url")
+                        if (not isinstance(source, str)
+                                or not any(record["source"] == source for record in job["catalog_candidates"])):
+                            raise ValueError("Approve a listed catalog item URL first.")
+                        job.update(status="reviewing_catalog_item", error=None)
+                        worker = (review_catalog_item, (job, source))
                     elif action == "close-catalog" and status == "catalog_candidates":
                         job.pop("catalog_candidates", None)
                         job.update(status="approval", error=None)

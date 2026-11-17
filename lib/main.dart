@@ -687,6 +687,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_images',
         'searching_text',
         'searching_catalog',
+        'reviewing_catalog_item',
         'creating_dataset',
         'training',
         'exporting',
@@ -1245,6 +1246,7 @@ class _StudioPageState extends State<StudioPage> {
       'searching_text': 'Searching Wikipedia',
       'searching_catalog': 'Searching the Library of Congress',
       'catalog_candidates': 'Review Library of Congress records',
+      'reviewing_catalog_item': 'Loading catalog item advisories',
       'text_candidates': 'Review Wikipedia sources',
       'image_candidates': 'Image search results',
       'creating_dataset': 'Preparing dataset',
@@ -1465,9 +1467,32 @@ class _StudioPageState extends State<StudioPage> {
             if (record['approved_query'] case final String query)
               SelectableText('Approved catalog query: $query'),
           for (final record in job?['catalog_candidates'] as List? ?? const [])
-            ListTile(
-              title: Text(record['title'] as String),
-              subtitle: SelectableText(record['source'] as String),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  title: Text(record['title'] as String),
+                  subtitle: SelectableText(record['source'] as String),
+                ),
+                if (record['metadata_reviewed'] == true) ...[
+                  if ((record['advisories'] as Map).isEmpty)
+                    const Text('No rights or access advisories were supplied for this item.'),
+                  for (final entry in (record['advisories'] as Map).entries)
+                    SelectableText(
+                      "${entry.key}: ${(entry.value as List).join('\n')}",
+                    ),
+                  const Text('Reuse permission requires review of the item advisories.'),
+                ],
+                Text(
+                  'Loads item metadata from ${record['source']}?fo=json.',
+                ),
+                OutlinedButton(
+                  onPressed: _busy ? null : () => _submit('/jobs/$id/review-catalog-item', {
+                    'approved_url': record['source'],
+                  }),
+                  child: const Text('Approve loading item advisories'),
+                ),
+              ],
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-catalog', {}),
