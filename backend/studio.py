@@ -650,6 +650,10 @@ def search_images(job):
         if not candidates:
             raise ValueError("No supported images with license information found. Edit the search or choose a local dataset.")
         update(job, status="image_candidates", image_candidates=candidates)
+    except (json.JSONDecodeError, UnicodeDecodeError):
+        update(job, status="approval", image_candidates=[], error=(
+            "Wikimedia Commons returned an invalid search response. Try again or choose a local dataset."
+        ))
     except HTTPError as error:
         message = str(error)
         if error.code in {301, 302, 303, 307, 308}:
