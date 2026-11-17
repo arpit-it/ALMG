@@ -1512,7 +1512,13 @@ class _StudioPageState extends State<StudioPage> {
                           'Source: ${row['source']}',
                         ],
                       ].join('\n')
-                    : "${row['text']}\n${row['source']}\n${row['license'] ?? 'License unavailable'}",
+                    : [
+                        row['text'],
+                        row['source'],
+                        row['license'] ?? 'License unavailable',
+                        if (row['approved_query'] case final String query)
+                          'Approved query: $query',
+                      ].join('\n'),
               ),
               leading: row['image'] == null
                   ? null
