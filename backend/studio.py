@@ -1302,6 +1302,13 @@ class Handler(BaseHTTPRequestHandler):
                             ))
                             store_job(job)
                             return self.respond({"id": job["id"]})
+                        if any(not isinstance(candidate.get("title"), str)
+                               or not candidate["title"].strip() for candidate in candidates):
+                            job.update(status="approval", image_candidates=[], error=(
+                                "Some saved images lack file titles. Search again or choose a local dataset."
+                            ))
+                            store_job(job)
+                            return self.respond({"id": job["id"]})
                         if len(approved) < 5:
                             raise ValueError("Select at least five images before downloading.")
                         job.update(status="creating_dataset", error=None, mode="web_images",
