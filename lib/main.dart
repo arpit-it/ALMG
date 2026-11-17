@@ -1190,6 +1190,7 @@ class _StudioPageState extends State<StudioPage> {
             if (item['id'] == projectId) updated else item,
         ];
       });
+      if (_project == projectId) await _showDiscoveryProviders(hasQueries);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     }

@@ -411,6 +411,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   displayed the equivalent ASCII hostname and preserved the path.
   On the rebuilt Mac app, an instructions-only save preserved a legacy website
   URL in a local fixture project while persisting the new instructions.
+  After saving a replacement fixture website, the rebuilt Mac app returned
+  directly to the discovery catalog and displayed the saved URL.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
