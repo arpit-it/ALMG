@@ -613,11 +613,15 @@ def search_images(job):
         response = request_json(url, headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
         }, opener=DISCOVERY)
-        if "error" in response:
+        if isinstance(response, dict) and "error" in response:
             raise ValueError("Wikimedia Commons rejected the image search.")
+        query_result = response.get("query", {}) if isinstance(response, dict) else None
+        pages = query_result.get("pages", {}) if isinstance(query_result, dict) else None
+        if not isinstance(pages, dict):
+            raise ValueError("Wikimedia Commons returned an invalid search response. Try again or choose a local dataset.")
         candidates = []
         seen_sources = set()
-        for index, page in enumerate(response.get("query", {}).get("pages", {}).values()):
+        for index, page in enumerate(pages.values()):
             if index >= IMAGE_SEARCH_LIMIT:
                 break
             if not isinstance(page, dict) or not isinstance(page.get("title"), str):
