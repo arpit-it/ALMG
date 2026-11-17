@@ -342,8 +342,11 @@ def update_project(project_id, instructions, source_website=None):
             try:
                 site = urlsplit(source_website)
                 path = quote(site.path, safe="/%:@!$&'()*+,;=")
-                normalized_website = f"https://{site.hostname}{path}"
                 hostname = (site.hostname or "").encode("idna").decode("ascii")
+                normalized_website = f"https://{hostname}{path}"
+                if site.hostname and not site.hostname.isascii():
+                    if hostname.encode("ascii").decode("idna") != site.hostname:
+                        raise ValueError("Hostname changes when encoded.")
                 dns_name = re.fullmatch(
                     r"(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z](?:[a-z0-9-]{0,61}[a-z0-9])?\.?",
                     hostname, re.IGNORECASE,

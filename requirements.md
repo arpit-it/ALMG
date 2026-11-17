@@ -407,6 +407,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   escape and displayed the corrected escaped path in the discovery catalog.
   The rebuilt Mac app encoded brackets in a saved website path and kept
   an existing space escape intact. A backend fixture verified UTF-8 encoding.
+  Resaving a fixture with an internationalized domain in the Mac app
+  displayed the equivalent ASCII hostname and preserved the path.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
