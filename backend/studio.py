@@ -686,7 +686,7 @@ def read_approved_image(url):
     if location.scheme != "https" or location.netloc != "upload.wikimedia.org":
         raise ValueError("Image is outside the approved Commons host.")
     request = Request(url, headers={"User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)"})
-    with build_opener(NoRedirects(), HTTPSHandler(context=TLS)).open(request, timeout=15) as response:
+    with DISCOVERY.open(request, timeout=15) as response:
         limit = 8 * 1024 * 1024
         payload = response.read(limit + 1)
         if len(payload) > limit:
