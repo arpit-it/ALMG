@@ -639,7 +639,9 @@ def search_images(job):
                 continue
             info = images[0]
             source = info.get("url", "")
-            if not isinstance(source, str):
+            if (not isinstance(source, str) or any(
+                    char.isspace() or unicodedata.category(char) == "Cc" for char in source
+            )):
                 continue
             try:
                 location = urlsplit(source)

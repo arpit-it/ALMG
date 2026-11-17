@@ -305,6 +305,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   download review with the remaining five images in the Mac app.
   The Mac app showed three valid Wikipedia fixture URLs after query
   approval and omitted the page with a newline in its key.
+  After Commons search approval in the Mac app, download review retained
+  all six valid fixture URLs and omitted a seventh URL containing a newline.
   The rebuilt Mac app sent the approved provider with the queries.
   Local fixtures for Wikipedia and Commons both reached source review.
   In the Mac app, approving local Wikipedia and Commons fixture searches
