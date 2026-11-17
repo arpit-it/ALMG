@@ -653,8 +653,15 @@ def search_images(job):
                 license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120]
                 if not license_name:
                     continue
+                title = page["title"].removeprefix("File:")
+                try:
+                    title.encode("utf-8")
+                    license_name.encode("utf-8")
+                    source.encode("utf-8")
+                except UnicodeEncodeError:
+                    continue
                 seen_sources.add(source)
-                candidates.append({"title": page["title"].removeprefix("File:"),
+                candidates.append({"title": title,
                                    "url": source, "license": license_name,
                                    "approved_query": query})
         if not candidates:

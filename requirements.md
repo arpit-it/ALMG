@@ -301,6 +301,8 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   8 MiB, the Mac app reported the limit and previewed the other five.
   A Commons search fixture declared a response over the JSON size limit.
   The Mac app reported the limit and restored dataset approval.
+  A Commons fixture with one malformed Unicode image title reached
+  download review with the remaining five images in the Mac app.
   A local fixture in the Mac app returned a malformed Unicode excerpt and
   a usable excerpt with a malformed title. After query and excerpt approval,
   the dataset preview showed three usable examples, retained the source with
