@@ -636,8 +636,12 @@ def search_images(job):
             if (source not in seen_sources
                     and location.scheme == "https" and location.netloc == "upload.wikimedia.org"
                     and info.get("mime") in ("image/jpeg", "image/png", "image/webp")):
-                raw_license = info.get("extmetadata", {}).get("LicenseShortName", {}).get("value", "")
-                license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120] if isinstance(raw_license, str) else ""
+                metadata = info.get("extmetadata")
+                license_field = metadata.get("LicenseShortName") if isinstance(metadata, dict) else None
+                raw_license = license_field.get("value") if isinstance(license_field, dict) else None
+                if not isinstance(raw_license, str):
+                    continue
+                license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120]
                 if not license_name:
                     continue
                 seen_sources.add(source)
