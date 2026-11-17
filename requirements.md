@@ -462,6 +462,9 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   `orchard__fruit` title with different excerpt text was excluded;
   `orchard_fruit` and both unrelated articles remained. Broader provider
   and page collection verification remains open.
+  After offline Wikipedia search approval in the macOS app, source review
+  showed all three valid fixture articles and omitted an excerpt with a
+  control character beyond the 450-character preview limit.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

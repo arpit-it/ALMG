@@ -190,13 +190,14 @@ def discover_text(job):
             if not page_key or page_key in {".", ".."}:
                 continue
             snippet = " ".join(unescape(re.sub(r"<[^>]+>", "", description)).split())
-            snippet = unicodedata.normalize("NFC", snippet)[:450].rstrip()
+            snippet = unicodedata.normalize("NFC", snippet)
             try:
                 snippet.encode("utf-8")
             except UnicodeEncodeError:
                 continue
             if any(unicodedata.category(char) == "Cc" for char in snippet):
                 continue
+            snippet = snippet[:450].rstrip()
             snippet_key = unicodedata.normalize("NFC", snippet.casefold())
             if len(snippet) >= 40 and snippet_key not in seen_snippets and page_key not in seen_sources:
                 seen_snippets.add(snippet_key)

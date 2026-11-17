@@ -261,7 +261,9 @@ class WikipediaCollectionTest(unittest.TestCase):
                      "This otherwise usable article has a control character in its key."}
         alias = {"key": "Invoice__/_Receipt", "excerpt":
                  "A receipt records what was paid and when the payment happened."}
-        with patch.object(studio, "request_json", return_value={"pages": [malformed, page, alias]}) as request, \
+        malformed_tail = {"key": "Bad tail", "excerpt": "Usable text. " * 40 + chr(0)}
+        pages = [malformed_tail, malformed, page, alias]
+        with patch.object(studio, "request_json", return_value={"pages": pages}) as request, \
              patch.object(studio, "activity"), patch.object(studio.time, "sleep"), \
              patch.object(studio, "ask", return_value={"rows": [{"index": 0, "label": "billing"}]}):
             job["text_candidates"] = studio.discover_text(job)
