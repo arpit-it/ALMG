@@ -1318,6 +1318,12 @@ class Handler(BaseHTTPRequestHandler):
                             ))
                             store_job(job)
                             return self.respond({"id": job["id"]})
+                        if len({candidate["title"].strip() for candidate in candidates}) != len(candidates):
+                            job.update(status="approval", image_candidates=[], error=(
+                                "Some selected images share a file title. Search again or choose a local dataset."
+                            ))
+                            store_job(job)
+                            return self.respond({"id": job["id"]})
                         if len(approved) < 5:
                             raise ValueError("Select at least five images before downloading.")
                         job.update(status="creating_dataset", error=None, mode="web_images",
