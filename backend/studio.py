@@ -624,9 +624,11 @@ def search_images(job):
                 license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()[:120]
                 candidates.append({"title": page["title"].removeprefix("File:"),
                                    "url": source, "license": license_name or None})
+        if not candidates:
+            raise ValueError("No supported image files found. Edit the search or choose a local dataset.")
         update(job, status="image_candidates", image_candidates=candidates)
     except Exception as error:
-        update(job, status="failed", error=str(error))
+        update(job, status="approval", error=str(error), image_candidates=[])
 
 
 def read_approved_image(url):
