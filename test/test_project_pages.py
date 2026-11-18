@@ -68,3 +68,36 @@ class ProjectPagesTest(unittest.TestCase):
             self.assertEqual(exported['pages'][0]['text'], row['text'])
             self.assertEqual(exported['pages'][0]['metadata']['reuse_approval'], row['reuse_approval'])
             self.assertNotIn('id', exported['project'])
+
+    def test_restore_round_trip_is_independent_and_reusable(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(history, 'DATABASE', Path(folder) / 'chat.sqlite3'):
+            original = history.create_project('Portable fixture')['id']
+            history.update_project(original, 'Saved instructions', 'https://example.org/', ['wikipedia'])
+            history.add_project_file(original, 'notes.txt', 'Reference text')
+            history.index_project_pages(original, [{'source': 'https://example.org/fruit', 'text': 'Fruit grows on trees.',
+                'reuse_approval': {'source': 'https://example.org/fruit', 'permission_basis': 'Fixture owner permission.'}}])
+            snapshot = history.export_project_data(original)
+            restored = history.restore_project_data(snapshot)
+            self.assertNotEqual(restored['id'], original)
+            self.assertEqual(history.export_project_data(restored['id']), snapshot)
+            page = history.search_project_pages(restored['id'], 'Fruit')[0]
+            rows = history.approved_project_pages(restored['id'], {'confirmed': True, 'approved_scope': 'saved_project_text',
+                'approved_pages': [{'source': page['source'], 'revision': page['revision']}]})
+            self.assertEqual(rows[0]['text'], 'Fruit grows on trees.')
+            history.remove_project_file(restored['id'], history.project_details(restored['id'])['files'][0]['id'])
+            self.assertEqual(len(history.project_details(original)['files']), 1)
+
+    def test_invalid_restore_leaves_no_partial_project(self):
+        import copy
+        with tempfile.TemporaryDirectory() as folder, patch.object(history, 'DATABASE', Path(folder) / 'chat.sqlite3'):
+            original = history.create_project('Existing')['id']
+            snapshot = history.export_project_data(original)
+            for change in [lambda x: x.update(version=2),
+                           lambda x: x['project'].update(enabled_providers=['unknown']),
+                           lambda x: x['reference_files'].append({'name': '../notes', 'content': ''}),
+                           lambda x: x['pages'].append({'source': 'http://example.org'})]:
+                broken = copy.deepcopy(snapshot)
+                change(broken)
+                with self.assertRaises(ValueError):
+                    history.restore_project_data(broken)
+                self.assertEqual(len(history.list_projects()), 1)

@@ -153,6 +153,39 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  Future<void> _restoreProject() async {
+    try {
+      final file = await openFile(acceptedTypeGroups: const [XTypeGroup(label: 'ALMG project JSON', extensions: ['json'])]);
+      if (file == null || !mounted) return;
+      if (await file.length() > 20 * 1024 * 1024) throw const FormatException('Choose a project export up to 20 MiB.');
+      final snapshot = jsonDecode(utf8.decode(await file.readAsBytes()));
+      if (snapshot is! Map || snapshot['format'] != 'almg-project' || snapshot['project'] is! Map) {
+        throw const FormatException('Choose an ALMG project export.');
+      }
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Restore project?'),
+        content: Text('Restore “${snapshot['project']['name']}” as a separate project with saved settings, reference files and indexed sources. Existing projects stay intact. No websites will be contacted.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Restore'))]));
+      if (confirmed != true || !mounted) return;
+      final request = await _client.postUrl(Uri.parse('http://127.0.0.1:$backendPort/projects/restore'));
+      request.headers.set('X-Model-Studio', 'desktop');
+      request.headers.contentType = ContentType.json;
+      final bytes = utf8.encode(jsonEncode(snapshot));
+      request.contentLength = bytes.length;
+      request.add(bytes);
+      final response = await request.close().timeout(const Duration(seconds: 15));
+      final data = jsonDecode(await response.transform(utf8.decoder).join()) as Map;
+      if (response.statusCode != 201) throw FormatException(data['error']?.toString() ?? 'Could not restore project.');
+      if (!mounted) return;
+      setState(() { _dashboard = _load(); });
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Restored ${data['name']} with ${data['page_count']} indexed sources.')));
+    } catch (error) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
+    }
+  }
+
   Future<void> _open(Widget page) async {
     await Navigator.of(context)
         .push(MaterialPageRoute<void>(builder: (_) => page));
@@ -180,6 +213,7 @@ class _DashboardPageState extends State<DashboardPage> {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text('Projects', style: Theme.of(context).textTheme.titleLarge),
+          TextButton.icon(onPressed: _restoreProject, icon: const Icon(Icons.restore), label: const Text('Restore project export')),
           const SizedBox(height: 8),
           if (projects.isEmpty) const Text('No projects yet.'),
           LayoutBuilder(

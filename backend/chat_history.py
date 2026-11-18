@@ -348,7 +348,7 @@ def project_details(project_id):
         return project
 
 
-def update_project(project_id, instructions, source_website=None, enabled_providers=None):
+def validate_project_settings(instructions, source_website=None, enabled_providers=None):
     """Replace the instructions used for chats in a project."""
     if not isinstance(instructions, str) or len(instructions) > 2000:
         raise ValueError("Project instructions must be at most 2,000 characters.")
@@ -387,6 +387,12 @@ def update_project(project_id, instructions, source_website=None, enabled_provid
             if not valid:
                 raise ValueError("Enter a valid HTTPS website URL with a domain name and no credentials, query, or fragment.")
             source_website = normalized_website
+    return instructions.strip(), source_website
+
+
+def update_project(project_id, instructions, source_website=None, enabled_providers=None):
+    """Replace saved settings after validation."""
+    instructions, source_website = validate_project_settings(instructions, source_website, enabled_providers)
     with closing(connect()) as db, db:
         require_project(db, project_id)
         db.execute("UPDATE projects SET instructions = ?, source_website = COALESCE(?, source_website) WHERE id = ?",
@@ -543,3 +549,57 @@ def export_project_data(project_id):
         if len(json.dumps(snapshot, ensure_ascii=False).encode("utf-8")) > 20 * 1024 * 1024:
             raise ValueError("Project export exceeds the 20 MiB JSON limit.")
         return snapshot
+
+
+def restore_project_data(snapshot):
+    """Validate a portable snapshot and atomically restore it as a new project."""
+    if (not isinstance(snapshot, dict) or snapshot.get("format") != "almg-project"
+            or type(snapshot.get("version")) is not int or snapshot["version"] != 1):
+        raise ValueError("Choose an ALMG project export with version 1.")
+    project, files, pages = (snapshot.get(key) for key in ("project", "reference_files", "pages"))
+    if not isinstance(project, dict) or not isinstance(files, list) or not isinstance(pages, list):
+        raise ValueError("Project export is missing settings, references or pages.")
+    name = project.get("name")
+    if not isinstance(name, str) or not 0 < len(name.strip()) <= 80:
+        raise ValueError("Invalid exported project name.")
+    providers = project.get("enabled_providers")
+    if not isinstance(providers, list) or not isinstance(project.get("source_website"), str):
+        raise ValueError("Exported provider settings or website are invalid.")
+    instructions, website = validate_project_settings(project.get("instructions"), project["source_website"], providers)
+    if len(files) > 20:
+        raise ValueError("Each project supports up to 20 reference files.")
+    references = []
+    for file in files:
+        if not isinstance(file, dict):
+            raise ValueError("Invalid exported reference.")
+        filename, content = file.get("name"), file.get("content")
+        if (not isinstance(filename, str) or not 0 < len(filename.strip()) <= 255
+                or not isinstance(content, str) or not content.strip() or len(content.encode()) > 30000):
+            raise ValueError("Invalid exported reference name or content.")
+        references.append((uuid.uuid4().hex, filename.strip(), content))
+    prepared, sources = [], set()
+    for page in pages:
+        if not isinstance(page, dict):
+            raise ValueError("Invalid exported page.")
+        source, text, title, metadata, updated = (page.get(key) for key in ("source", "text", "title", "metadata", "updated"))
+        try:
+            parsed = urlsplit(source) if isinstance(source, str) else None
+            valid = (parsed and parsed.scheme == "https" and parsed.hostname and parsed.username is None
+                     and source not in sources and isinstance(text, str) and 1 <= len(text) <= 50000
+                     and isinstance(title, str) and isinstance(metadata, dict)
+                     and type(updated) in (int, float) and 0 <= updated <= 1e12)
+        except ValueError:
+            valid = False
+        if not valid:
+            raise ValueError("Invalid or duplicate exported page source, text or metadata.")
+        sources.add(source)
+        prepared.append((source, text, title, json.dumps(metadata, ensure_ascii=False), updated))
+    project_id = uuid.uuid4().hex
+    with closing(connect()) as db, db:
+        db.execute("INSERT INTO projects (id, name, instructions, source_website, enabled_providers) VALUES (?, ?, ?, ?, ?)",
+                   (project_id, name.strip(), instructions, website, json.dumps(providers)))
+        db.executemany("INSERT INTO project_files VALUES (?, ?, ?, ?)",
+                       [(file_id, project_id, filename, content) for file_id, filename, content in references])
+        db.executemany("INSERT INTO project_pages VALUES (?, ?, ?, ?, ?, ?)",
+                       [(project_id, *page) for page in prepared])
+    return {"id": project_id, "name": name.strip(), "page_count": len(prepared)}

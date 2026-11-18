@@ -1737,7 +1737,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({"error": "Local desktop clients only."}, 403)
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            limit = 1_600_000 if self.path == "/chats/stream" else 200_000
+            limit = 20 * 1024 * 1024 if self.path == "/projects/restore" else (1_600_000 if self.path == "/chats/stream" else 200_000)
             if not 0 < length <= limit:
                 raise ValueError("Invalid request size.")
             data = json.loads(self.rfile.read(length))
@@ -1751,6 +1751,8 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/model/setup":
                 inference.start_setup(data.get("action", "resume"))
                 return self.respond(inference.status(), 202)
+            if self.path == "/projects/restore":
+                return self.respond(chat_history.restore_project_data(data), 201)
             if self.path == "/projects":
                 return self.respond(chat_history.create_project(data["name"], data.get("directory")), 201)
             if self.path == "/projects/rename":

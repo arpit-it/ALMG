@@ -1043,6 +1043,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   occurred. All 123 Python tests and Flutter analysis passed. Restore and
   installation-update storage verification remain open.
 
+  The dashboard now restores a selected version-1 export as a separate
+  project after confirmation, validating settings, references and pages
+  before one atomic database write. The final rebuilt Mac app restored
+  the native export, reported three indexed sources, reopened all three
+  saved pages and returned only the astronomy page for a local search.
+  Restored snapshots matched the exported settings, provider selections,
+  references, texts, URLs and permission evidence exactly; the existing
+  project was preserved. Logs showed no website requests. All 125 Python
+  tests and Flutter analysis passed, including round-trip reuse and invalid
+  restore rollback. Fresh-installation and app-update storage verification
+  remain open.
+
 
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
