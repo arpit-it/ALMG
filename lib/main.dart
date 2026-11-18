@@ -1487,6 +1487,24 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _validateLocalLora() async {
+    try {
+      final result = await _request('/runtime/lora-fixture', {'confirmed': true});
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Local LoRA fixture passed'),
+        content: Text('${result['scope']}\n\n'
+          'Device: ${result['device']} · rank ${result['rank']} · ${result['steps']} steps\n'
+          'Loss: ${(result['initial_loss'] as num).toStringAsFixed(6)} → ${(result['final_loss'] as num).toStringAsFixed(6)}\n'
+          'Base weights unchanged: ${result['base_weights_unchanged']}\n'
+          'Adapter reload error: ${result['reload_max_error']}'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   /// Shows the current proposal, dataset preview, evaluation, and release gate.
   Future<void> _showRecipeContract() async {
     try {
@@ -1520,6 +1538,12 @@ class _StudioPageState extends State<StudioPage> {
           for (final artifact in contract['exports'] as List) Text(artifact as String),
           const SizedBox(height: 12),
           Text('Resume: ${contract['resume']}'),
+          const SizedBox(height: 12),
+          const Text('Optional local LoRA check: trains a tiny generated projection fixture on this Mac. No downloads; language-model fine-tuning remains unavailable.'),
+          TextButton(onPressed: () {
+            Navigator.pop(context);
+            _validateLocalLora();
+          }, child: const Text('Run local LoRA fixture')),
         ])),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
       ));

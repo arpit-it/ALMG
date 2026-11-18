@@ -40,8 +40,9 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
+    import lora_validation
     import recipe_contracts
     import chat_history
     import inference
@@ -1908,6 +1909,10 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
                 os.kill(os.getpid(), signal.SIGTERM)
                 return
+            if self.path == "/runtime/lora-fixture":
+                if data.get("confirmed") is not True:
+                    raise ValueError("Confirm the local LoRA fixture before running it.")
+                return self.respond(inference.WORKER.submit(lora_validation.run).result())
             if self.path == "/model/setup":
                 inference.start_setup(data.get("action", "resume"))
                 return self.respond(inference.status(), 202)

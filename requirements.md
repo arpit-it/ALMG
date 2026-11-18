@@ -1519,6 +1519,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Existing-recipe execution integration is delivered; the required small LoRA
   run on Apple silicon remains unverified, so this item stays open. No external
   collection, downloads or new recipes were added.
+  Added an opt-in local LoRA runtime smoke test in Recipe details. It uses
+  generated tensors, a frozen tiny projection and rank-2 adapters on Metal;
+  verifies loss improvement and frozen base weights; then saves/reloads the
+  adapter in a temporary directory and checks matching outputs. It shares the
+  dedicated inference worker and downloads or modifies no existing weights.
+  The API requires explicit fixture confirmation and release packaging includes
+  the lazy-loaded module. All 169 Python tests, 13 Flutter tests and Flutter
+  analysis passed. In the rebuilt Mac app, Run local LoRA fixture displayed:
+  Metal GPU, rank 2, 100 steps, loss 0.341811 to 0.000198, unchanged base weights
+  and adapter reload error 0.0. This verifies the tiny projection runtime only;
+  a representative language-model LoRA run remains unverified, so the item
+  stays open and no additional recipe is enabled.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
