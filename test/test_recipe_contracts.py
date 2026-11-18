@@ -117,7 +117,7 @@ class RecipeContractsTest(unittest.TestCase):
         job = {'id': 'invalid-result', 'status': 'queued', 'idle': False,
                'recipe': 'classifier', 'target': 0.8, 'plan': {'labels': ['a', 'b']}}
         with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), \
-                patch.object(studio, 'TRAINING_DATA', {job['id']: []}), \
+                patch.object(studio, 'TRAINING_DATA', {job['id']: ([{'text': 'example', 'label': 'a', 'group': 'g'}] if job['recipe'] == 'classifier' else studio.image_recipe.dataset())}), \
                 patch.object(studio, 'CANDIDATES', {}), patch.object(studio, 'store_job'), \
                 patch.object(studio, 'train', return_value=(object(), [], {'passed': True})):
             studio.run(job)
@@ -151,7 +151,7 @@ class RecipeContractsTest(unittest.TestCase):
                'recipe': 'text_to_image', 'target': 0.8}
         metrics = {'held_out_pixel_accuracy': 0.9, 'target_pixel_accuracy': 0.8, 'passed': True}
         with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), \
-                patch.object(studio, 'TRAINING_DATA', {job['id']: []}), \
+                patch.object(studio, 'TRAINING_DATA', {job['id']: ([{'text': 'example', 'label': 'a', 'group': 'g'}] if job['recipe'] == 'classifier' else studio.image_recipe.dataset())}), \
                 patch.object(studio, 'CANDIDATES', {}), patch.object(studio, 'store_job'), \
                 patch.object(studio.image_recipe, 'train', return_value=({'format': 'unknown'}, [], metrics)):
             studio.run(job)
@@ -223,3 +223,27 @@ class RecipeContractsTest(unittest.TestCase):
                 metadata = json.loads((out / 'recipe-contract.json').read_text())
                 self.assertEqual(metadata['origin'], 'legacy_catalog_fallback' if legacy else 'approved_job_snapshot')
                 self.assertEqual(metadata['parameters'], {'target': 0.8, 'idle': False})
+
+    def test_dataset_contract_rejects_invalid_rows_and_missing_image_splits(self):
+        recipe_contracts.validate_dataset('classifier', 'local', [{'text': 'fruit', 'label': 'fruit', 'group': 'one'}], ['fruit'])
+        for rows in ([], {}, [None], [{'text': ' ', 'label': 'fruit', 'group': 'one'}],
+                     [{'text': 'fruit', 'label': 'unknown', 'group': 'one'}],
+                     [{'text': 'fruit', 'label': 'fruit', 'group': ''}]):
+            with self.subTest(rows=rows), self.assertRaises(ValueError):
+                recipe_contracts.validate_dataset('classifier', 'local', rows, ['fruit'])
+        rows = studio.image_recipe.dataset()
+        recipe_contracts.validate_dataset('text_to_image', 'local', rows)
+        with self.assertRaisesRegex(ValueError, 'both training and held-out'):
+            recipe_contracts.validate_dataset('text_to_image', 'local', [row for row in rows if row['split'] == 'train'])
+        with self.assertRaisesRegex(ValueError, 'encoded image'):
+            recipe_contracts.validate_dataset('text_to_image', 'web_images', [{'text': 'caption', 'split': 'train'}])
+
+    def test_invalid_dataset_does_not_invoke_trainer_and_retains_rows(self):
+        job = {'id': 'invalid-dataset', 'status': 'queued', 'idle': False, 'recipe': 'classifier', 'plan': {'labels': ['a']}}
+        rows = [{'text': 'example', 'label': 'a'}]
+        with patch.object(studio, 'TRAINING_DATA', {job['id']: rows}), patch.object(studio, 'store_job'), patch.object(studio, 'train') as trainer:
+            studio.run(job)
+            trainer.assert_not_called()
+            self.assertEqual(job['status'], 'failed')
+            self.assertIn('nonempty group', job['error'])
+            self.assertEqual(studio.TRAINING_DATA[job['id']], rows)

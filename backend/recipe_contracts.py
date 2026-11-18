@@ -156,3 +156,32 @@ def export_metadata(job):
             'origin': 'approved_job_snapshot' if snapshot is not None else 'legacy_catalog_fallback',
             'contract': contract,
             'parameters': {key: deepcopy(job[key]) for key in keys if key in job}}
+
+
+def validate_dataset(recipe_id, mode, rows, labels=()):
+    """Validate the existing recipe's row structure before invoking a trainer."""
+    recipe_contract(recipe_id)
+    if not isinstance(rows, list) or not rows:
+        raise ValueError('Recipe dataset must be a nonempty list of examples.')
+    for index, row in enumerate(rows):
+        prefix = 'Dataset example ' + str(index + 1) + ': '
+        if not isinstance(row, dict) or not isinstance(row.get('text'), str) or not row['text'].strip():
+            raise ValueError(prefix + 'a nonempty text field is required.')
+        if recipe_id == 'classifier':
+            if (not isinstance(row.get('label'), str) or row['label'] not in labels
+                    or not isinstance(row.get('group'), str) or not row['group'].strip()):
+                raise ValueError(prefix + 'an approved label and nonempty group are required.')
+        else:
+            if row.get('split') not in ('train', 'test'):
+                raise ValueError(prefix + 'split must be train or test.')
+            if mode == 'web_images':
+                if not isinstance(row.get('image'), str) or not row['image']:
+                    raise ValueError(prefix + 'an encoded image is required.')
+            elif (row.get('shape') not in ('circle', 'square', 'triangle')
+                    or row.get('color') not in ('red', 'green', 'blue', 'yellow', 'purple')
+                    or row.get('position') not in ('left', 'center', 'right')
+                    or not isinstance(row.get('mask'), list) or len(row['mask']) != 48 * 48
+                    or not isinstance(row.get('rgb'), list) or len(row['rgb']) != 3):
+                raise ValueError(prefix + 'valid shape, color, position, mask and RGB fields are required.')
+    if recipe_id == 'text_to_image' and {row['split'] for row in rows} != {'train', 'test'}:
+        raise ValueError('Image recipe requires both training and held-out examples.')

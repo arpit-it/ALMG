@@ -1470,6 +1470,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and the new sidecar; the exported contract exactly matched the saved job,
   with target 0.800 and idle=false. No external collection occurred. LoRA
   validation and remaining interface integration stay open.
+  Training now checks recipe dataset row structure before invoking a trainer:
+  nonempty text, approved classifier labels and groups, or image split and
+  required shape/caption fields. Image datasets require both train and test
+  rows. Invalid datasets fail with an example-specific error without calling
+  the trainer or consuming the prepared rows. All 160 Python tests passed.
+  In the rebuilt Mac app, fresh 48-row classifier and 45-example shape fixtures
+  passed approval and the structural checks, then reached inference preview
+  with held-out scores of 1.000. No external collection or downloads occurred.
+  LoRA validation and remaining recipe-interface integration are still open.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 

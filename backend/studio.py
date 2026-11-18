@@ -1641,7 +1641,10 @@ def run(job):
                 return
             job["status"] = "training"
             store_job(job)
-            rows = TRAINING_DATA.pop(job["id"])
+            rows = TRAINING_DATA[job["id"]]
+            recipe_contracts.validate_dataset(job.get("recipe", "classifier"), job.get("mode"),
+                                              rows, job.get("plan", {}).get("labels", ()))
+            TRAINING_DATA.pop(job["id"])
         def report(message):
             with LOCK:
                 if job["status"] == "cancelled":
