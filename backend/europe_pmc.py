@@ -59,3 +59,19 @@ def publication_abstract(payload, source):
     if any(unicodedata.category(c) in {"Cc", "Cs"} for c in text):
         raise ValueError("Europe PMC returned unreadable abstract metadata.")
     return {"abstract": text, "abstract_reviewed": True, "reuse_status": "unverified"}
+
+
+def abstract_reuse_evidence(record, decision):
+    """Record an explicit human permission decision tied to the reviewed abstract."""
+    import hashlib
+    import time
+    basis = decision.get("permission_basis")
+    text = record.get("abstract")
+    if (decision.get("approved_url") != record.get("source")
+            or decision.get("confirmed") is not True
+            or not isinstance(basis, str) or not 10 <= len(basis.strip()) <= 2000
+            or record.get("abstract_reviewed") is not True
+            or not isinstance(text, str) or not text):
+        raise ValueError("Review the abstract and record a reuse permission basis first.")
+    return {"source": record["source"], "permission_basis": basis.strip(),
+            "abstract_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(), "time": time.time()}

@@ -582,6 +582,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   after fresh approval. All 53 Python tests passed; the persistence test
   confirms restored state is saved without a network request. Rights
   review, dataset collection and remaining provider work stay open.
+  Europe PMC abstract review now records explicit user reuse permission
+  with the publication URL and reviewed abstract SHA-256. The rebuilt
+  Mac app accepted a local fixture permission basis and displayed its
+  evidence; approving an abstract refresh removed that permission and
+  required a new decision. All 55 Python tests and Flutter analysis
+  passed. Tests reject missing review, unmatched URL and unconfirmed or
+  short permission decisions. Dataset collection, full-text loading and
+  remaining provider implementation are still open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

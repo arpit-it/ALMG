@@ -102,3 +102,28 @@ class PublicationDiscoveryTest(unittest.TestCase):
                 self.assertEqual(candidate["reuse_status"], "unverified")
                 self.assertEqual(json.loads(saved.read_text())["status"], "publication_candidates")
                 request.assert_not_called()
+
+    def test_abstract_permission_requires_review_and_explicit_matching_decision(self):
+        import hashlib
+        from backend.europe_pmc import abstract_reuse_evidence
+        record = {"source": "https://europepmc.org/article/MED/12345", "abstract": "Fixture abstract", "abstract_reviewed": True}
+        decision = {"approved_url": record["source"], "confirmed": True, "permission_basis": "Fixture permission granted."}
+        evidence = abstract_reuse_evidence(record, decision)
+        self.assertEqual(evidence["abstract_sha256"], hashlib.sha256(b"Fixture abstract").hexdigest())
+        self.assertEqual(evidence["source"], record["source"])
+        for changes in ({"confirmed": False}, {"approved_url": "other"}, {"permission_basis": "short"}):
+            with self.assertRaises(ValueError):
+                abstract_reuse_evidence(record, {**decision, **changes})
+        with self.assertRaises(ValueError):
+            abstract_reuse_evidence({**record, "abstract_reviewed": False}, decision)
+
+    def test_successful_abstract_refresh_invalidates_previous_permission(self):
+        record = {"source": "https://europepmc.org/article/MED/12345", "reuse_status": "user_approved",
+                  "reuse_approval": {"permission_basis": "Earlier permission"}}
+        job = {"publication_candidates": [record]}
+        with patch.object(studio, "request_json", return_value={"resultList": {"result": [{
+            "source": "MED", "id": "12345", "abstractText": "Refreshed abstract",
+        }]}}), patch.object(studio, "store_job"):
+            studio.review_publication(job, record["source"])
+        self.assertNotIn("reuse_approval", record)
+        self.assertEqual(record["reuse_status"], "unverified")

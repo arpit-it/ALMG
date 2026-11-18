@@ -247,6 +247,7 @@ def review_publication(job, source):
             for record in job["publication_candidates"]:
                 if record["source"] == source:
                     record.update(review)
+                    record.pop("reuse_approval", None)
             job.update(status="publication_candidates", error=None)
             append_activity(job, "Publication abstract metadata loaded for review. Reuse remains unverified.")
             store_job(job)
@@ -256,6 +257,8 @@ def review_publication(job, source):
                 if record["source"] == source:
                     record.pop("abstract", None)
                     record.pop("abstract_reviewed", None)
+                    record.pop("reuse_approval", None)
+                    record["reuse_status"] = "unverified"
             job.update(status="publication_candidates", error="Abstract metadata could not be loaded. Review the publication URL and approve another attempt.")
             store_job(job)
 
@@ -711,6 +714,7 @@ def restore_jobs():
                 for candidate in job["publication_candidates"]:
                     candidate.pop("abstract", None)
                     candidate.pop("abstract_reviewed", None)
+                    candidate.pop("reuse_approval", None)
                     candidate["reuse_status"] = "unverified"
                 job.update(status="publication_candidates", error=(
                     "Abstract loading was interrupted. Review and approve the publication URL to retry."
@@ -1601,6 +1605,16 @@ class Handler(BaseHTTPRequestHandler):
                         europe_pmc.abstract_request_url(source)
                         job.update(status="reviewing_publication", error=None)
                         worker = (review_publication, (job, source))
+                    elif action == "approve-publication-reuse" and status == "publication_candidates":
+                        record = next((record for record in job["publication_candidates"]
+                                       if record["source"] == data.get("approved_url")), None)
+                        if record is None:
+                            raise ValueError("Approve a listed publication URL first.")
+                        record["reuse_approval"] = europe_pmc.abstract_reuse_evidence(record, data)
+                        record["reuse_status"] = "user_approved"
+                        append_activity(job, "User reuse permission recorded for the reviewed abstract.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "close-publications" and status == "publication_candidates":
                         job.pop("publication_candidates", None)
                         job.update(status="approval", error=None)

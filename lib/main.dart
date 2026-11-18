@@ -1091,7 +1091,7 @@ class _StudioPageState extends State<StudioPage> {
     });
   }
 
-  Future<void> _approveCatalogReuse(String id, Map record) async {
+  Future<void> _approveCatalogReuse(String id, Map record, {String action = 'approve-catalog-reuse'}) async {
     var basis = '';
     final approved = await showDialog<bool>(
       context: context,
@@ -1126,7 +1126,7 @@ class _StudioPageState extends State<StudioPage> {
       ),
     );
     if (approved == true && mounted) {
-      await _submit('/jobs/$id/approve-catalog-reuse', {
+      await _submit('/jobs/$id/$action', {
         'approved_url': record['source'],
         'permission_basis': basis,
         'confirmed': true,
@@ -1534,7 +1534,7 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'publication_candidates') ...[
-          const Text('Publication metadata only. Reuse rights are unverified. '
+          const Text('Review publication metadata and record permission for each abstract. '
               'Training collection and full-text loading are not available yet.'),
           for (final record in job?['publication_candidates'] as List? ?? const [])
             Column(
@@ -1548,7 +1548,15 @@ class _StudioPageState extends State<StudioPage> {
                   SelectableText((record['abstract'] as String).isEmpty
                       ? 'No abstract was supplied for this publication.'
                       : 'Abstract: ${record['abstract']}'),
-                const Text('Loads abstract metadata from www.ebi.ac.uk for this publication. Reuse remains unverified.'),
+                if (record['reuse_approval'] case final Map approval)
+                  SelectableText('User reuse approval: ${approval['permission_basis']}\nReviewed abstract SHA-256: ${approval['abstract_sha256']}')
+                else if (record['abstract_reviewed'] == true && (record['abstract'] as String).isNotEmpty)
+                  TextButton(
+                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                        action: 'approve-publication-reuse'),
+                    child: const Text('Record abstract reuse approval'),
+                  ),
+                const Text('Loads abstract metadata from www.ebi.ac.uk for this publication. Loading clears earlier reuse approval.'),
                 OutlinedButton(
                   onPressed: _busy ? null : () => _submit('/jobs/$id/review-publication', {
                     'approved_url': record['source'],
