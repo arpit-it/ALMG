@@ -3,6 +3,12 @@ import re
 import unicodedata
 
 
+def catalog_url(value):
+    """Canonicalize only supported catalog item URLs, including legacy HTTP IDs."""
+    match = re.fullmatch(r"https?://www\.loc\.gov/item/([A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)/?", value) if isinstance(value, str) else None
+    return f"https://www.loc.gov/item/{match[1]}/" if match else None
+
+
 def catalog_candidates(payload, query, *, limit):
     """Return catalog links for review without treating access as reuse permission."""
     results = payload.get("results") if isinstance(payload, dict) else None
@@ -17,11 +23,10 @@ def catalog_candidates(payload, query, *, limit):
         title = item.get("title")
         if not isinstance(source, str) or not isinstance(title, str):
             continue
-        item_id = re.fullmatch(r"https?://www\.loc\.gov/item/([A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)/?", source)
+        source = catalog_url(source)
         title = title.strip()
-        if not item_id or not title or any(unicodedata.category(c) in {"Cc", "Cs"} for c in title):
+        if not source or not title or any(unicodedata.category(c) in {"Cc", "Cs"} for c in title):
             continue
-        source = f"https://www.loc.gov/item/{item_id[1]}/"
         if source in seen:
             continue
         seen.add(source)
@@ -35,11 +40,15 @@ def catalog_candidates(payload, query, *, limit):
     return candidates
 
 
-def item_advisories(payload):
+def item_advisories(payload, *, expected_source=None):
     """Preserve item-level advisories as evidence for human reuse review."""
     item = payload.get("item") if isinstance(payload, dict) else None
     if not isinstance(item, dict):
         raise ValueError("The catalog item response has no usable item metadata.")
+    if expected_source is not None:
+        approved = catalog_url(expected_source)
+        if not approved or catalog_url(item.get("id")) != approved:
+            raise ValueError("The catalog metadata does not match the approved item URL.")
     advisories = {}
     for field in ("rights_advisory", "rights", "access_advisory"):
         values = item.get(field)

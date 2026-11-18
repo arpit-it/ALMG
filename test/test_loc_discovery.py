@@ -192,3 +192,29 @@ class CatalogCandidatesTest(unittest.TestCase):
             studio.search_catalog(job)
         self.assertEqual(request.call_count, 2)
         self.assertEqual(len(job["catalog_candidates"]), 40)
+
+    def test_item_metadata_identity_matches_approved_url(self):
+        from backend.loc_discovery import item_advisories
+        source = "https://www.loc.gov/item/sn85033000/1911-08-10/ed-1/"
+        item = {"id": source.replace("https:", "http:"), "rights": ["Fixture rights"]}
+        self.assertEqual(item_advisories({"item": item}, expected_source=source)["advisories"],
+                         {"rights": ["Fixture rights"]})
+        for identity in (None, "https://www.loc.gov/item/other/", source + "?redirect=1",
+                         "https://www.loc.gov.evil.example/item/sn85033000/1911-08-10/ed-1/"):
+            with self.subTest(identity=identity), self.assertRaisesRegex(ValueError, "does not match"):
+                item_advisories({"item": {**item, "id": identity}}, expected_source=source)
+
+    def test_wrong_item_identity_clears_previous_permission(self):
+        from unittest.mock import patch
+        from backend import studio
+        record = {"source": "https://www.loc.gov/item/12345/", "metadata_reviewed": True,
+                  "reuse_approval": {"permission_basis": "Old permission"}, "advisories": {"rights": ["Old"]}}
+        job = {"catalog_candidates": [record]}
+        with patch.object(studio, "request_json", return_value={"item": {
+            "id": "https://www.loc.gov/item/other/", "rights": ["Wrong item rights"],
+        }}), patch.object(studio, "store_job"):
+            studio.review_catalog_item(job, record["source"])
+        self.assertEqual(job["status"], "catalog_candidates")
+        self.assertNotIn("reuse_approval", record)
+        self.assertNotIn("advisories", record)
+        self.assertNotIn("metadata_reviewed", record)

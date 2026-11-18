@@ -546,6 +546,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   those two searches. Tests verify cross-query URL deduplication and
   stopping contacts at the total limit. All 42 Python tests passed and
   Flutter analysis passed. The overall provider requirement remains open.
+  Item advisory loading now checks the returned catalog ID against the
+  approved source URL, accepting the equivalent legacy HTTP identifier.
+  In the rebuilt Mac app, a different-item fixture showed retry guidance
+  without advisories or reuse approval; a separately approved matching-ID
+  retry displayed the advisories and reuse review. All 44 Python tests
+  passed, including missing, mismatched and deceptive-host identities
+  and clearing earlier permission on mismatch. Provider scope stays open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

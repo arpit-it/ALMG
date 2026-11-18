@@ -259,7 +259,7 @@ def review_catalog_item(job, source):
         result = request_json(source + "?fo=json", headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
         }, opener=DISCOVERY)
-        review = loc_discovery.item_advisories(result)
+        review = loc_discovery.item_advisories(result, expected_source=source)
         with LOCK:
             for record in job["catalog_candidates"]:
                 if record["source"] == source:
