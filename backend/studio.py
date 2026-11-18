@@ -1,5 +1,6 @@
 """Local job API for prompt-driven text classifiers."""
 import csv
+import hashlib
 import ctypes
 import io
 import json
@@ -28,6 +29,7 @@ from urllib.request import Request, build_opener, ProxyHandler, HTTPRedirectHand
 
 import certifi
 import joblib
+from sklearn import __version__ as sklearn_version
 from sklearn.base import clone
 from sklearn.dummy import DummyClassifier
 from sklearn.feature_extraction.text import TfidfVectorizer
@@ -839,7 +841,7 @@ def usable_classifier_indices(rows):
             and classifier_variant_key(row["text"]) not in conflicting_variants]
 
 
-def train(rows, labels, target, repair=None, report=None):
+def train(rows, labels, target, repair=None, report=None, checkpoint_path=None):
     """Compare classifiers, optionally repair the dataset, and evaluate on held-out data."""
     if report:
         report("Removing duplicates and conflicting examples before splitting the dataset.")
@@ -885,11 +887,32 @@ def train(rows, labels, target, repair=None, report=None):
     ]
     trials = []
     best = None
+    completed = 0
+    checkpoint_key = hashlib.sha256(json.dumps({
+        "format": "almg-classifier-candidates-v1", "sklearn": sklearn_version,
+        "rows": rows, "labels": labels, "target": target, "repair": repair is not None,
+    }, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    if checkpoint_path is not None and checkpoint_path.is_file():
+        try:
+            saved = joblib.load(checkpoint_path)
+            if (saved.get("key") == checkpoint_key and type(saved.get("completed")) is int
+                    and 1 <= saved["completed"] <= len(candidates)
+                    and len(saved.get("trials", [])) == saved["completed"] and saved.get("best") is not None):
+                completed, trials, best = saved["completed"], saved["trials"], saved["best"]
+                if report:
+                    report(f"Resuming {completed} completed classifier candidates from {checkpoint_path}.")
+            elif report:
+                report("Saved classifier checkpoint does not match this approved dataset and settings; starting candidate fits again.")
+        except (OSError, ValueError, TypeError, KeyError, EOFError, UnpicklingError):
+            if report:
+                report("Saved classifier checkpoint could not be read; starting candidate fits again.")
 
     def compare(training, round_number):
         """Evaluate candidate classifiers for the current repair round."""
         nonlocal best
         for index, (name, classifier, options) in enumerate(candidates, start=1):
+            if round_number == 1 and index <= completed:
+                continue
             if report:
                 report(f"Fitting and validating candidate {index} of {len(candidates)}. {name}.")
             model = make_pipeline(TfidfVectorizer(max_features=30_000, **options), clone(classifier))
@@ -899,6 +922,13 @@ def train(rows, labels, target, repair=None, report=None):
             trials.append({"algorithm": name, "macro_f1": score, "round": round_number})
             if best is None or score > best[0] or (score == best[0] and best[1] == candidates[0][0]):
                 best = score, name, model, training
+            if checkpoint_path is not None and round_number == 1:
+                checkpoint_path.parent.mkdir(parents=True, exist_ok=True)
+                pending = checkpoint_path.with_suffix('.tmp')
+                joblib.dump({"key": checkpoint_key, "completed": index, "trials": trials, "best": best}, pending)
+                pending.replace(checkpoint_path)
+                if report:
+                    report(f"Saved classifier candidate checkpoint {index} of {len(candidates)}: {checkpoint_path}.")
 
     compare(fit, 1)
     repaired = []
@@ -1028,7 +1058,7 @@ def restore_jobs():
                 )
                 if job["status"] != "dataset_ready":
                     message = (
-                        "Training was interrupted. Approve training to restart from the saved dataset."
+                        "Training was interrupted. Approve training from the saved dataset to reuse matching candidate checkpoints; an unfinished fit restarts."
                         if job["status"] == "training"
                         else "Local label review was interrupted. Review again from the saved dataset."
                         if job["status"] == "reviewing_labels"
@@ -1613,6 +1643,7 @@ def run(job):
             model, rows, metrics = train(
                 rows, job["plan"]["labels"], job["target"],
                 repair=repair if job.get("allow_repair") else None, report=report,
+                checkpoint_path=ROOT / "training-sessions" / job["id"] / "classifier-checkpoint.joblib",
             )
         with LOCK:
             if job["status"] == "cancelled":

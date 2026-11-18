@@ -1288,6 +1288,19 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   beginning. The rebuilt Mac app retained the saved idle preference and
   evaluated the recovered run against its original 0.92 target. Resuming from
   a training checkpoint remains open.
+  Classifier training now atomically saves completed candidate fits and
+  validation trials, bound to the dataset, labels, target, repair option and
+  scikit-learn version. Matching state skips completed candidates after a
+  backend restart; changed datasets restart candidate fitting. The rebuilt
+  Mac app approved a 48-row fixture, saved candidate one, then recovered
+  after the isolated backend was stopped before candidate two. Approval in
+  the relaunched app logged reuse of one completed candidate, fitted the
+  remaining three and reached inference preview with validation and held-out
+  macro F1 of 1.000. Activity history displayed checkpoint locations. All
+  138 Python tests and Flutter analysis passed; resumed metrics and split
+  assignments match uninterrupted training. An unfinished individual fit
+  still restarts, and a user action to resume a deliberately cancelled job
+  remains open.
 - [x] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
   The rebuilt Mac app ran one opt-in retry from validation errors using a local
   Qwen fixture and reported a separate held-out score. The saved dataset
