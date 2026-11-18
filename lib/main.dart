@@ -1794,6 +1794,8 @@ class _StudioPageState extends State<StudioPage> {
         if (status == 'website_access_review') ...[
           SelectableText('Website: ${job?['website_access']['website']}\nRobots URL: ${job?['website_access']['robots_url']}'),
           const Text('Review the robots guidance and the site’s access rules. Content reuse remains unverified. Crawling is not available yet.'),
+          SelectableText('Robots path check for ALMG: ${job?['website_access']['robots_decision'] ?? 'undetermined'}\n${job?['website_access']['robots_rule'] ?? 'Refresh the robots guidance to check this URL.'}'),
+          const Text('This checks only the saved website URL. Other pages need their own robots checks before any crawl.'),
           if (job?['website_access']['robots_status'] == 404)
             const Text('robots.txt was not found (HTTP 404). This does not establish access or reuse permission.')
           else

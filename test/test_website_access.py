@@ -64,3 +64,23 @@ class WebsiteAccessTest(unittest.TestCase):
             access.access_rule_evidence(malformed, decision, review['website'])
         refreshed = access.robots_review(review['website'], 200, b'User-agent: *\nDisallow: /\n')
         self.assertNotIn('access_approval', refreshed)
+
+    def test_robots_uses_specific_combined_groups_and_longest_match(self):
+        text = 'User-agent: *\nDisallow: /\nUser-agent: ALMG\nDisallow: /private/\nUser-agent: almg\nAllow: /private/public/\n'
+        check = lambda path: access.robots_path_decision('https://example.org' + path, text)['robots_decision']
+        self.assertEqual(check('/archive/'), 'allowed')
+        self.assertEqual(check('/private/data'), 'disallowed')
+        self.assertEqual(check('/private/public/data'), 'allowed')
+        tie = 'User-agent: *\nDisallow: /archive\nAllow: /archive\n'
+        self.assertEqual(access.robots_path_decision('https://example.org/archive', tie)['robots_decision'], 'allowed')
+
+    def test_robots_wildcards_anchors_and_percent_encoded_paths(self):
+        text = 'User-agent: *\nDisallow: /*.pdf$\nDisallow: /%7Eprivate/\nDisallow: /ツ/\nDisallow: /encoded%2Fslash\n'
+        check = lambda path: access.robots_path_decision('https://example.org' + path, text)['robots_decision']
+        for path in ('/a/b.pdf', '/~private/file', '/%E3%83%84/file', '/encoded%2fslash'):
+            self.assertEqual(check(path), 'disallowed', path)
+        for path in ('/a.pdf/more', '/encoded/slash', '/other'):
+            self.assertEqual(check(path), 'allowed', path)
+        self.assertEqual(access.robots_path_decision('https://example.org', '', 404)['robots_decision'], 'undetermined')
+        self.assertEqual(access.robots_path_decision('https://example.org', 'User-agent: *\nDisallow: broken')['robots_decision'], 'undetermined')
+        self.assertEqual(access.robots_review('https://example.org/private/', 200, b'User-agent: *\nDisallow: /private/')['robots_decision'], 'disallowed')

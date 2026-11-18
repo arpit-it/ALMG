@@ -41,7 +41,8 @@ def robots_review(website, status, data):
     if any(unicodedata.category(c) in {'Cc', 'Cs'} and c not in '\n\r\t' for c in text):
         raise ValueError('robots.txt contains unreadable text.')
     return {'website': website, 'robots_url': url, 'robots_status': status, 'robots_text': text,
-            'robots_sha256': hashlib.sha256(data).hexdigest(), 'access_status': 'unverified', 'reuse_status': 'unverified'}
+            'robots_sha256': hashlib.sha256(data).hexdigest(), 'access_status': 'unverified', 'reuse_status': 'unverified',
+            **robots_path_decision(website, text, status)}
 
 
 def fetch_robots(website):
@@ -91,3 +92,83 @@ def access_rule_evidence(review, decision, current_website):
         raise ValueError('Review the current website access rules and record the basis first.')
     return {'website': current_website, 'scope': 'website_access_rules', 'access_basis': basis.strip(),
             'guidance_sha256': guidance_checksum(review), 'time': time.time()}
+
+
+def _normalized_path(value):
+    """Normalize UTF-8 and percent-encoded unreserved octets for rule matching."""
+    result, index = [], 0
+    while index < len(value):
+        char = value[index]
+        if char == '%':
+            code = value[index + 1:index + 3]
+            if len(code) != 2 or not re.fullmatch(r'[0-9a-fA-F]{2}', code):
+                raise ValueError('Invalid percent encoding in robots guidance.')
+            decoded = chr(int(code, 16))
+            result.append(decoded if decoded in 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-._~' else '%' + code.upper())
+            index += 3
+        else:
+            result.append(char if ord(char) < 128 else ''.join(f'%{byte:02X}' for byte in char.encode('utf-8')))
+            index += 1
+    return ''.join(result)
+
+
+def _rule_matches(pattern, path):
+    anchored = pattern.endswith('$')
+    parts = (pattern[:-1] if anchored else pattern).split('*')
+    if not path.startswith(parts[0]):
+        return False
+    cursor = len(parts[0])
+    if len(parts) == 1:
+        return not anchored or cursor == len(path)
+    for part in parts[1:-1]:
+        found = path.find(part, cursor)
+        if found < 0:
+            return False
+        cursor = found + len(part)
+    last = parts[-1]
+    if anchored:
+        return path.endswith(last) and len(path) - len(last) >= cursor
+    return path.find(last, cursor) >= 0
+
+
+def robots_path_decision(website, text, status=200):
+    """Evaluate the saved URL for ALMG; this does not grant access or reuse."""
+    from urllib.parse import unquote_to_bytes
+    if status != 200:
+        return {'robots_decision': 'undetermined', 'robots_rule': 'No robots.txt guidance was supplied.'}
+    groups, agents, rules, has_rule = [], [], [], False
+    for line in text.splitlines():
+        line = line.split('#', 1)[0].strip()
+        if ':' not in line:
+            continue
+        key, value = (part.strip() for part in line.split(':', 1))
+        key = key.casefold()
+        if key == 'user-agent':
+            if has_rule:
+                groups.append((agents, rules))
+                agents, rules, has_rule = [], [], False
+            agents.append(value.casefold())
+        elif key in {'allow', 'disallow'} and agents:
+            has_rule = True
+            if value:
+                rules.append((key, value))
+    groups.append((agents, rules))
+    specific = [rules for agents, rules in groups if 'almg' in agents]
+    applicable = specific if specific else [rules for agents, rules in groups if '*' in agents]
+    try:
+        path = _normalized_path(urlsplit(website).path or '/')
+        matches = []
+        for group in applicable:
+            for key, value in group:
+                if not value.startswith('/') or len(value) > 2048:
+                    raise ValueError('Unsupported robots rule.')
+                pattern = _normalized_path(value)
+                if _rule_matches(pattern, path):
+                    literal = pattern.removesuffix('$').replace('*', '')
+                    matches.append((len(unquote_to_bytes(literal)), key == 'allow', key, value))
+        if not matches:
+            return {'robots_decision': 'allowed', 'robots_rule': 'No matching disallow rule for ALMG.'}
+        _, allowed, key, value = max(matches)
+        return {'robots_decision': 'allowed' if allowed else 'disallowed', 'robots_rule': f'{key.title()}: {value}'}
+    except ValueError:
+        return {'robots_decision': 'undetermined', 'robots_rule': 'A matching group contains unsupported rules; crawling must remain blocked.'}
