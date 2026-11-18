@@ -1450,6 +1450,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   checks to reach inference preview with held-out scores of 1.000. No external
   collection or downloads occurred. LoRA validation and remaining interface
   integration stay open; no recipe was added.
+  Image candidate validation now checks complete learned payload dimensions:
+  all shape/position masks, bounded RGB colors and background, and caption
+  vocabulary/coefficient compatibility. Missing, nonnumeric or incorrectly
+  shaped payloads are rejected before preview persistence. All 156 Python
+  tests passed, including malformed payload cases. In the rebuilt Mac app,
+  the fresh 45-example shape fixture trained to held-out accuracy 1.000;
+  submitting "a red circle and a blue square" rendered both requested shapes
+  in the inference preview. No external collection or downloads occurred.
+  LoRA validation and remaining recipe-interface integration stay open.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 

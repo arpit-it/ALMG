@@ -116,3 +116,32 @@ def validate_model(recipe_id, mode, model):
             json.dumps(model, allow_nan=False)
         except (ValueError, TypeError) as error:
             raise ValueError('Image recipe model must contain finite JSON values.') from error
+
+        import numpy as np
+
+        def numeric_array(value, shape, minimum=None, maximum=None):
+            try:
+                array = np.asarray(value)
+                return (array.shape == shape and array.dtype.kind in 'iuf'
+                        and bool(np.isfinite(array).all())
+                        and (minimum is None or bool((array >= minimum).all()))
+                        and (maximum is None or bool((array <= maximum).all())))
+            except (ValueError, TypeError):
+                return False
+
+        if mode == 'web_images':
+            vocabulary = model.get('vocabulary')
+            if (not isinstance(vocabulary, list) or len(vocabulary) > 256
+                    or not all(isinstance(word, str) and word for word in vocabulary)
+                    or len(set(vocabulary)) != len(vocabulary)
+                    or not numeric_array(model.get('weights'), (len(vocabulary) + 1, 48 * 48 * 3))):
+                raise ValueError('Caption image model has invalid vocabulary or coefficient dimensions.')
+        else:
+            masks, palette = model.get('masks'), model.get('palette')
+            if (type(model.get('background')) is not int or not 0 <= model['background'] <= 255
+                    or not isinstance(masks, dict) or not isinstance(palette, dict)
+                    or any(not numeric_array(masks.get(shape + ':' + position), (48 * 48,), 0, 1)
+                           for shape in ('circle', 'square', 'triangle') for position in ('left', 'center', 'right'))
+                    or any(not numeric_array(palette.get(color), (3,), 0, 255)
+                           for color in ('red', 'green', 'blue', 'yellow', 'purple'))):
+                raise ValueError('Shape image model has invalid masks, colors or background.')

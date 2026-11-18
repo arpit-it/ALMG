@@ -133,7 +133,11 @@ class RecipeContractsTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             recipe_contracts.validate_model('classifier', 'local', {'format': 'almg-shapes-v1'})
         for mode, expected in [('local', 'almg-shapes-v1'), ('web_images', 'almg-caption-ridge-v1')]:
-            recipe_contracts.validate_model('text_to_image', mode, {'format': expected, 'size': 48})
+            if mode == 'web_images':
+                recipe_contracts.validate_model('text_to_image', mode, {'format': expected, 'size': 48, 'vocabulary': [], 'weights': [[0.] * (48 * 48 * 3)]})
+            else:
+                model, _, _ = studio.image_recipe.train(studio.image_recipe.dataset(), 0.8, lambda message: None)
+                recipe_contracts.validate_model('text_to_image', mode, model)
             for model in ({'format': 'unknown', 'size': 48}, {'format': expected, 'size': True},
                           {'format': expected, 'size': 64}, {'format': expected, 'size': 48, 'weights': [float('nan')]},
                           {'format': expected, 'size': 48, 'weights': object()}):
@@ -155,3 +159,29 @@ class RecipeContractsTest(unittest.TestCase):
             self.assertIn('unsupported model format', job['error'])
             self.assertNotIn(job['id'], studio.CANDIDATES)
             self.assertEqual(list(Path(folder).rglob('candidate.*')), [])
+
+    def test_image_payloads_require_complete_inference_dimensions(self):
+        from copy import deepcopy
+        model, _, _ = studio.image_recipe.train(studio.image_recipe.dataset(), 0.8, lambda message: None)
+        invalid = []
+        for key in ('masks', 'palette', 'background'):
+            candidate = deepcopy(model)
+            candidate.pop(key)
+            invalid.append(candidate)
+        candidate = deepcopy(model)
+        candidate['masks']['circle:center'] = [0.5]
+        invalid.append(candidate)
+        candidate = deepcopy(model)
+        candidate['palette']['red'] = [256, 0, 0]
+        invalid.append(candidate)
+        candidate = deepcopy(model)
+        candidate['masks']['circle:center'][0] = '0.5'
+        invalid.append(candidate)
+        for candidate in invalid:
+            with self.assertRaisesRegex(ValueError, 'invalid masks'):
+                recipe_contracts.validate_model('text_to_image', 'local', candidate)
+        for vocabulary, weights in [(['red'], [[0.] * 6912]), (['red', 'red'], [[0.] * 6912] * 3),
+                                    ([3], [[0.] * 6912] * 2), ([], [['0'] * 6912])]:
+            with self.assertRaisesRegex(ValueError, 'invalid vocabulary'):
+                recipe_contracts.validate_model('text_to_image', 'web_images',
+                    {'format': 'almg-caption-ridge-v1', 'size': 48, 'vocabulary': vocabulary, 'weights': weights})
