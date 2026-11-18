@@ -2649,6 +2649,9 @@ class _StudioPageState extends State<StudioPage> {
           if ((job?['word_variant_groups'] as int? ?? 0) > 0)
             Text('Near-duplicate groups (one-word differences): ${job?['word_variant_groups']}. '
               'Review their labels. These phrases stay together in evaluation splits.'),
+          if ((job?['ambiguous_variant_groups'] as int? ?? 0) > 0)
+            Text('Potential label ambiguity: ${job?['ambiguous_variant_groups']} similar-text groups have different labels. '
+              'Check whether the changed word justifies the label. These examples remain usable.'),
           if ((job?['conflicting_texts'] as int? ?? 0) > 0)
             Text(
               'Groups with conflicting labels: ${job?['conflicting_texts']}. '
@@ -2682,6 +2685,7 @@ class _StudioPageState extends State<StudioPage> {
               subtitle: Text(
                 row['image'] == null
                     ? [
+                        if (row['possible_label_ambiguity'] == true) 'Potential label ambiguity · Review changed word',
                         if (row['word_variant'] == true) 'One-word variant · Review label',
                         row['text'] as String,
                         if (row['no_words'] == true)

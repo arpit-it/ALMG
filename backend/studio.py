@@ -1458,6 +1458,15 @@ def prepare_dataset(job, imported_rows=None):
 
         word_variants = classifier_word_variant_groups(rows) if job.get("recipe") == "classifier" else [None] * len(rows)
         word_variant_by_row = {id(row): variant for row, variant in zip(rows, word_variants)}
+        labels_by_variant = {}
+        for row, variant in zip(rows, word_variants):
+            if variant is not None:
+                labels_by_variant.setdefault(variant, set()).add(row["label"])
+        ambiguous_variants = {variant for variant, labels in labels_by_variant.items() if len(labels) > 1}
+
+        def possible_label_ambiguity(row):
+            return word_variant_by_row[id(row)] in ambiguous_variants
+
         preview_rows = rows[:5]
         usable_counts = {}
         if job.get("recipe") == "classifier":
@@ -1466,6 +1475,7 @@ def prepare_dataset(job, imported_rows=None):
                 usable_counts[rows[index]["label"]] += 1
             preview_rows = sorted(
                 rows, key=lambda row: (not has_label_conflict(row),
+                                       not possible_label_ambiguity(row),
                                        bool(classifier_variant_key(row["text"])),
                                        duplicate_kind(row) is None and word_variant_by_row[id(row)] is None)
             )[:5]
@@ -1477,6 +1487,7 @@ def prepare_dataset(job, imported_rows=None):
                        duplicate_rows=sum(len(labels) - 1 for labels in labels_by_text.values()),
                        near_duplicate_groups=sum(len(texts) > 1 for texts in texts_by_words.values()),
                        word_variant_groups=len({group for group in word_variants if group is not None}),
+                       ambiguous_variant_groups=len(ambiguous_variants),
                        conflicting_texts=conflicting_groups,
                        symbol_only_rows=symbol_only_rows,
                        preview=[{"text": row["text"][:500], "label": row["label"],
@@ -1485,6 +1496,7 @@ def prepare_dataset(job, imported_rows=None):
                                               and not classifier_variant_key(row["text"])),
                                  "duplicate_kind": duplicate_kind(row),
                                  "word_variant": word_variant_by_row[id(row)] is not None,
+                                 "possible_label_ambiguity": possible_label_ambiguity(row),
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),

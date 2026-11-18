@@ -1102,6 +1102,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and Flutter analysis passed, including insertion/deletion grouping and
   phrase-length boundaries. Broader semantic ambiguity and similarity
   detection remain open.
+  Similar-text groups with differing labels now receive a separate potential
+  label-ambiguity warning and are prioritized in the five-row preview.
+  These review candidates remain usable; exact/normalized conflicts keep
+  their existing exclusions. The rebuilt Mac app imported a local CSV,
+  displayed one potential-ambiguity group and marked both invoice variants,
+  left the unrelated telescope example unmarked, and retained one fruit and
+  two astronomy usable examples with training approval pending. All 133
+  Python tests and Flutter analysis passed, including late-row prioritization
+  and same-label negative cases. Broader semantic ambiguity remains open.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
   shipping class and left training approval pending. The backend also
