@@ -553,6 +553,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   retry displayed the advisories and reuse review. All 44 Python tests
   passed, including missing, mismatched and deceptive-host identities
   and clearing earlier permission on mismatch. Provider scope stays open.
+  Item review also requires metadata to explicitly report unrestricted
+  access. The rebuilt Mac app blocked a restricted offline item with
+  specific recovery guidance and no reuse approval; a separately approved
+  unrestricted retry restored advisory review. All 46 Python tests passed,
+  including unknown/malformed access values and removal of earlier
+  permission and description after a restricted refresh. Remaining
+  providers and full document collection are still open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

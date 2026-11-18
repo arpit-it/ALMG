@@ -58,6 +58,7 @@ class CatalogCandidatesTest(unittest.TestCase):
     def test_item_advisories_preserve_rights_without_granting_reuse(self):
         from backend.loc_discovery import item_advisories
         self.assertEqual(item_advisories({"item": {
+            "access_restricted": False,
             "rights_advisory": ["Permission required."],
             "rights": ["Contact the rights holder."],
         }}), {
@@ -69,7 +70,7 @@ class CatalogCandidatesTest(unittest.TestCase):
             "description": "",
         })
         with self.assertRaises(ValueError):
-            item_advisories({"item": {"rights": "unreadable"}})
+            item_advisories({"item": {"access_restricted": False, "rights": "unreadable"}})
 
     def test_failed_refresh_clears_previous_advisory_review(self):
         from unittest.mock import patch
@@ -196,7 +197,7 @@ class CatalogCandidatesTest(unittest.TestCase):
     def test_item_metadata_identity_matches_approved_url(self):
         from backend.loc_discovery import item_advisories
         source = "https://www.loc.gov/item/sn85033000/1911-08-10/ed-1/"
-        item = {"id": source.replace("https:", "http:"), "rights": ["Fixture rights"]}
+        item = {"id": source.replace("https:", "http:"), "access_restricted": False, "rights": ["Fixture rights"]}
         self.assertEqual(item_advisories({"item": item}, expected_source=source)["advisories"],
                          {"rights": ["Fixture rights"]})
         for identity in (None, "https://www.loc.gov/item/other/", source + "?redirect=1",
@@ -217,4 +218,27 @@ class CatalogCandidatesTest(unittest.TestCase):
         self.assertEqual(job["status"], "catalog_candidates")
         self.assertNotIn("reuse_approval", record)
         self.assertNotIn("advisories", record)
+        self.assertNotIn("metadata_reviewed", record)
+
+    def test_item_access_must_be_explicitly_unrestricted(self):
+        from backend.loc_discovery import item_advisories, CatalogAccessError
+        for access in (None, True, "false", 0):
+            with self.subTest(access=access), self.assertRaises(CatalogAccessError):
+                item_advisories({"item": {"access_restricted": access, "rights": ["Permission statement"]}})
+        self.assertEqual(item_advisories({"item": {"access_restricted": False}})["description"], "")
+
+    def test_restricted_refresh_clears_previous_collectable_description(self):
+        from unittest.mock import patch
+        from backend import studio
+        record = {"source": "https://www.loc.gov/item/12345/", "metadata_reviewed": True,
+                  "reuse_approval": {"permission_basis": "Old permission"},
+                  "description": "An earlier description that had already been approved for collection."}
+        job = {"catalog_candidates": [record]}
+        with patch.object(studio, "request_json", return_value={"item": {
+            "id": record["source"], "access_restricted": True,
+        }}), patch.object(studio, "store_job"):
+            studio.review_catalog_item(job, record["source"])
+        self.assertIn("restricted", job["error"])
+        self.assertNotIn("reuse_approval", record)
+        self.assertNotIn("description", record)
         self.assertNotIn("metadata_reviewed", record)

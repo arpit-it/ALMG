@@ -268,15 +268,18 @@ def review_catalog_item(job, source):
             job.update(status="catalog_candidates", error=None)
             append_activity(job, "Item advisories loaded. Review the rights and access statements.")
             store_job(job)
-    except (OSError, ValueError, IncompleteRead):
+    except (OSError, ValueError, IncompleteRead) as error:
         with LOCK:
             for record in job["catalog_candidates"]:
                 if record["source"] == source:
                     record.pop("advisories", None)
+                    record.pop("description", None)
                     record.pop("metadata_reviewed", None)
                     record.pop("reuse_approval", None)
                     record["reuse_status"] = "unverified"
             job.update(status="catalog_candidates", error=(
+                "This catalog item is restricted or its access status is unknown. Review another item or return to dataset approval."
+                if isinstance(error, loc_discovery.CatalogAccessError) else
                 "Catalog item advisories could not be loaded. Review the URL and approve another attempt."
             ))
             store_job(job)

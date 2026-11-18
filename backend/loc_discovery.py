@@ -3,6 +3,10 @@ import re
 import unicodedata
 
 
+class CatalogAccessError(ValueError):
+    """The item metadata does not establish unrestricted access."""
+
+
 def catalog_url(value):
     """Canonicalize only supported catalog item URLs, including legacy HTTP IDs."""
     match = re.fullmatch(r"https?://www\.loc\.gov/item/([A-Za-z0-9_-]+(?:/[A-Za-z0-9_-]+)*)/?", value) if isinstance(value, str) else None
@@ -49,6 +53,8 @@ def item_advisories(payload, *, expected_source=None):
         approved = catalog_url(expected_source)
         if not approved or catalog_url(item.get("id")) != approved:
             raise ValueError("The catalog metadata does not match the approved item URL.")
+    if item.get("access_restricted") is not False:
+        raise CatalogAccessError("The catalog item is restricted or its access status is unknown.")
     advisories = {}
     for field in ("rights_advisory", "rights", "access_advisory"):
         values = item.get(field)
