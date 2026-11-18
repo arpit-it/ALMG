@@ -53,3 +53,20 @@ def document_summary(payload, source):
     if any(unicodedata.category(c) in {"Cc", "Cs"} for c in text):
         raise ValueError("Federal Register returned unreadable summary metadata.")
     return {"title": candidates[0]["title"], "summary": text, "summary_reviewed": True, "reuse_status": "unverified"}
+
+
+def summary_reuse_evidence(record, decision):
+    """Bind an explicit human reuse decision to a reviewed document summary."""
+    import hashlib
+    import time
+    source = record.get("source")
+    summary_request_url(source)
+    title, summary, basis = record.get("title"), record.get("summary"), decision.get("permission_basis")
+    if (record.get("summary_reviewed") is not True or not isinstance(title, str)
+            or not isinstance(summary, str) or not summary
+            or decision.get("approved_url") != source or decision.get("confirmed") is not True
+            or decision.get("approved_scope") != "document_summary"
+            or not isinstance(basis, str) or not 10 <= len(basis.strip()) <= 2000):
+        raise ValueError("Review the summary and record permission for that summary scope first.")
+    return {"source": source, "scope": "document_summary", "permission_basis": basis.strip(),
+            "summary_sha256": hashlib.sha256((title + "\n" + summary).encode("utf-8")).hexdigest(), "time": time.time()}

@@ -1736,6 +1736,16 @@ class Handler(BaseHTTPRequestHandler):
                         federal_register.summary_request_url(source)
                         job.update(status="reviewing_notice", error=None)
                         worker = (review_notice, (job, source))
+                    elif action == "approve-notice-reuse" and status == "notice_candidates":
+                        record = next((record for record in job["notice_candidates"]
+                                       if record["source"] == data.get("approved_url")), None)
+                        if record is None:
+                            raise ValueError("Approve a listed document URL first.")
+                        record["reuse_approval"] = federal_register.summary_reuse_evidence(record, data)
+                        record["reuse_status"] = "user_approved"
+                        append_activity(job, "User reuse permission recorded for the reviewed document summary.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "close-notices" and status == "notice_candidates":
                         job.pop("notice_candidates", None)
                         job.update(status="approval", error=None)

@@ -1127,6 +1127,8 @@ class _StudioPageState extends State<StudioPage> {
               SelectableText(record['source'] as String),
               if (scope == 'catalog_description')
                 const Text('This decision covers the displayed catalog description only. Country/year observations need separate review.'),
+              if (scope == 'document_summary')
+                const Text('This decision covers the displayed document summary only. Full-text reuse needs separate review.'),
               const Text('Confirm you have permission to use this item for the project dataset. Record the license, permission, or other basis you reviewed.'),
               TextField(
                 autofocus: true,
@@ -1628,7 +1630,7 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'notice_candidates') ...[
-          const Text('Document metadata only. Reuse is unverified. Full-text and dataset collection are not available yet.'),
+          const Text('Review the document summary and record reuse permission. Full-text and dataset collection are not available yet.'),
           for (final record in job?['notice_candidates'] as List? ?? const [])
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1640,7 +1642,15 @@ class _StudioPageState extends State<StudioPage> {
                 if (record['summary_reviewed'] == true)
                   SelectableText((record['summary'] as String).isEmpty
                       ? 'No summary was supplied for this document.' : 'Summary: ${record['summary']}'),
-                const Text('Loads summary metadata from www.federalregister.gov for this document. Reuse stays unverified.'),
+                if (record['reuse_approval'] case final Map approval)
+                  SelectableText('Document summary reuse approval: ${approval['permission_basis']}')
+                else if (record['summary_reviewed'] == true && (record['summary'] as String).isNotEmpty)
+                  TextButton(
+                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                        action: 'approve-notice-reuse', scope: 'document_summary'),
+                    child: const Text('Record summary reuse approval'),
+                  ),
+                const Text('Loads summary metadata from www.federalregister.gov for this document. Loading clears earlier reuse approval.'),
                 OutlinedButton(
                   onPressed: _busy ? null : () => _submit('/jobs/$id/review-notice', {'approved_url': record['source']}),
                   child: const Text('Approve loading document summary'),

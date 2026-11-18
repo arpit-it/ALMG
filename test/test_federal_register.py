@@ -78,3 +78,28 @@ class FederalRegisterDiscoveryTest(unittest.TestCase):
         self.assertEqual(job["status"], "notice_candidates")
         self.assertNotIn("summary", record)
         self.assertNotIn("summary_reviewed", record)
+
+    def test_summary_permission_requires_review_and_matching_scope(self):
+        import hashlib
+        from backend.federal_register import summary_reuse_evidence
+        record = {"source": document("2026-12345")["html_url"], "title": "Orchard notice",
+                  "summary": "Fixture orchard cultivation summary.", "summary_reviewed": True}
+        decision = {"approved_url": record["source"], "confirmed": True, "approved_scope": "document_summary",
+                    "permission_basis": "Local fixture summary permission reviewed."}
+        evidence = summary_reuse_evidence(record, decision)
+        self.assertEqual(evidence["scope"], "document_summary")
+        self.assertEqual(evidence["summary_sha256"], hashlib.sha256((record["title"] + "\n" + record["summary"]).encode()).hexdigest())
+        for changes in ({"confirmed": False}, {"approved_url": "other"}, {"approved_scope": "full_text"}, {"permission_basis": "short"}):
+            with self.assertRaises(ValueError):
+                summary_reuse_evidence(record, {**decision, **changes})
+        with self.assertRaises(ValueError):
+            summary_reuse_evidence({**record, "summary_reviewed": False}, decision)
+
+    def test_successful_summary_refresh_clears_previous_permission(self):
+        record = {"source": document("2026-12345")["html_url"], "reuse_status": "user_approved",
+                  "reuse_approval": {"permission_basis": "Earlier permission"}}
+        job = {"notice_candidates": [record]}
+        with patch.object(studio, "request_json", return_value={**document("2026-12345"), "abstract": "Refreshed summary"}), patch.object(studio, "store_job"):
+            studio.review_notice(job, record["source"])
+        self.assertNotIn("reuse_approval", record)
+        self.assertEqual(record["reuse_status"], "unverified")

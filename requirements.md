@@ -682,6 +682,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Python tests and Flutter analysis passed, including response identity,
   summary size/text validation and stale-text removal after failure.
   Reuse review, dataset collection and full-text loading remain open.
+  Federal Register summaries now support explicit reuse permission tied
+  to the reviewed title and summary checksum. The rebuilt Mac app showed
+  summary-only scope in the decision dialog, recorded an offline
+  permission basis, and cleared it after an approved summary refresh.
+  All 79 Python tests and Flutter analysis passed, including scope,
+  confirmation and matching-URL checks. Dataset collection, full-text
+  loading and remaining provider work stay open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
