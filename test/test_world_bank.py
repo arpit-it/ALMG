@@ -67,3 +67,22 @@ class IndicatorCatalogTest(unittest.TestCase):
         for changes in ({"confirmed": False}, {"approved_scope": "observations"}, {"approved_url": "other"}, {"permission_basis": "short"}):
             with self.assertRaises(ValueError):
                 indicator_reuse_evidence(record, {**decision, **changes})
+
+    def test_description_collection_checks_scope_selection_and_current_source_context(self):
+        from backend.world_bank import indicator_reuse_evidence, approved_description_rows
+        record = indicator_candidates([{"page": 1}, [{"id": "NY.GDP.MKTP.CD", "name": "GDP",
+            "source": {"id": "2", "value": "Development indicators"},
+            "sourceNote": "Economic output in local fixture catalog descriptions.", "sourceOrganization": "Fixture source"}]])[0]
+        record["reuse_status"] = "user_approved"
+        record["reuse_approval"] = indicator_reuse_evidence(record, {"approved_url": record["source"],
+            "approved_scope": "catalog_description", "confirmed": True, "permission_basis": "Fixture metadata permission granted."})
+        row = approved_description_rows([record], [record["source"]])[0]
+        self.assertEqual(row["collection_scope"], "catalog_description")
+        self.assertEqual(row["organization"], "Fixture source")
+        self.assertEqual(row["reuse_approval"], record["reuse_approval"])
+        for urls in ([], ["other"], [record["source"], record["source"]]):
+            with self.assertRaises(ValueError):
+                approved_description_rows([record], urls)
+        for changes in ({"organization": "Changed source"}, {"reuse_approval": {**record["reuse_approval"], "scope": "observations"}}, {"reuse_status": "unverified"}):
+            with self.assertRaises(ValueError):
+                approved_description_rows([{**record, **changes}], [record["source"]])

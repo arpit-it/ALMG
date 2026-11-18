@@ -659,6 +659,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   description and source context. All 70 Python tests and Flutter analysis
   passed; observation-scope decisions are rejected. Dataset/observation
   collection and provider-side query discovery remain open.
+  Selected, reuse-approved World Bank catalog descriptions can now enter
+  classifier datasets after separate collection approval. In the rebuilt
+  Mac app, deselecting one of three offline descriptions prepared exactly
+  two examples. Preview and saved rows retained metadata-only scope,
+  source organization, source URL and permission checksum. All 71 Python
+  tests and Flutter analysis passed; changed source context and
+  observation-scoped permission are rejected. Country/year observations,
+  provider-side query discovery and the remaining providers stay open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

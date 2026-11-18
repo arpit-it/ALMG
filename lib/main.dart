@@ -529,6 +529,7 @@ class _StudioPageState extends State<StudioPage> {
   final Set<String> _excludedCatalogSources = {};
   final Set<String> _excludedPublications = {};
   final Set<String> _excludedEntities = {};
+  final Set<String> _excludedIndicators = {};
   final _indicatorFilter = TextEditingController();
   final Set<String> _excludedImageSources = {};
   String? _error;
@@ -696,6 +697,9 @@ class _StudioPageState extends State<StudioPage> {
           _excludedEntities.clear();
         }
         if (_job?['id'] != job['id']) _indicatorFilter.clear();
+        if (_job?['id'] != job['id'] || job['status'] != 'indicator_candidates') {
+          _excludedIndicators.clear();
+        }
         _job = job;
       });
       const active = {
@@ -1161,6 +1165,7 @@ class _StudioPageState extends State<StudioPage> {
     if (provider == 'loc') return 'Library of Congress: $source';
     if (provider == 'europe_pmc') return 'Europe PMC: $source';
     if (provider == 'wikidata') return 'Wikidata: $source';
+    if (provider == 'world_bank') return 'World Bank indicator catalog: $source';
     if (provider == 'commons' ||
         (provider == null && source.startsWith('https://upload.wikimedia.org/'))) {
       return 'Wikimedia Commons: $source';
@@ -1328,6 +1333,11 @@ class _StudioPageState extends State<StudioPage> {
     final indicatorPages = job?['indicator_pages'] as int? ?? indicatorPage;
     final indicatorRecords = job?['indicator_candidates'] as List? ?? const [];
     final visibleIndicators = filterIndicators(indicatorRecords, _indicatorFilter.text);
+    final selectedIndicatorUrls = [
+      for (final record in visibleIndicators)
+        if (collectableIndicator(record) && !_excludedIndicators.contains(record['source']))
+          record['source'] as String,
+    ];
     final states = {
       'planning': 'Qwen is drafting the plan',
       'approval': 'Dataset approval required',
@@ -1601,7 +1611,7 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'indicator_candidates') ...[
           Text('World Bank catalog page $indicatorPage of $indicatorPages · up to 20 indicators. '
-              'Review permission for catalog descriptions. Observation and dataset collection are not available yet.'),
+              'Approve collection of selected, reuse-approved catalog descriptions for text classification. Country/year observations are not loaded.'),
           const Text('The catalog supplies no per-indicator reuse license. Review the source organization and applicable terms. Permission recorded here covers catalog descriptions only.'),
           const SelectableText('Terms reference: https://www.worldbank.org/ext/en/legal/terms-conditions'),
           TextField(
@@ -1625,6 +1635,15 @@ class _StudioPageState extends State<StudioPage> {
                 ListTile(
                   title: Text('${record['title']} (${record['indicator_id']})'),
                   subtitle: SelectableText('${record['description']}\nSource ${record['source_id']}: ${record['source_name']}\n${record['organization']}\n${record['source']}'),
+                  trailing: collectableIndicator(record) ? Checkbox(
+                    value: !_excludedIndicators.contains(record['source']),
+                    semanticLabel: "Include indicator description: ${record['title']}",
+                    onChanged: _busy ? null : (checked) => setState(() {
+                      final source = record['source'] as String;
+                      if (checked == true) { _excludedIndicators.remove(source); }
+                      else { _excludedIndicators.add(source); }
+                    }),
+                  ) : null,
                 ),
                 if (record['reuse_approval'] case final Map approval)
                   SelectableText('Catalog description reuse approval: ${approval['permission_basis']}')
@@ -1636,6 +1655,14 @@ class _StudioPageState extends State<StudioPage> {
                   ),
               ],
             ),
+          if (visibleIndicators.any(collectableIndicator)) ...[
+            const Text('Collection includes only selected descriptions visible under this filter.'),
+            OutlinedButton(
+              onPressed: _busy || selectedIndicatorUrls.isEmpty ? null
+                  : () => _submit('/jobs/$id/use-indicator-descriptions', {'approved_urls': selectedIndicatorUrls}),
+              child: Text('Approve indicator description collection (${selectedIndicatorUrls.length} selected)'),
+            ),
+          ],
           if (indicatorPage < indicatorPages) ...[
             Text('Loads catalog page ${indicatorPage + 1} from api.worldbank.org, up to 20 indicators. Replaces this preview.'),
             OutlinedButton(
@@ -2085,9 +2112,16 @@ class _StudioPageState extends State<StudioPage> {
                                   ? 'Publication: $title'
                                   : row['provider'] == 'wikidata'
                                       ? 'Entity: $title'
-                                      : 'Article: $title',
-                        if ({'loc', 'europe_pmc', 'wikidata'}.contains(row['provider']) && row['reuse_approval'] is Map)
+                                      : row['provider'] == 'world_bank'
+                                          ? 'Indicator: $title'
+                                          : 'Article: $title',
+                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank'}.contains(row['provider']) && row['reuse_approval'] is Map)
                           'User reuse approval: ${row['reuse_approval']['permission_basis']}',
+                        if (row['provider'] == 'world_bank') ...[
+                          'Content scope: catalog description',
+                          'Source ${row['source_id']}: ${row['source_name']}',
+                          'Source organization: ${row['organization']}',
+                        ],
                         if (row['approved_query'] case final String query)
                           'Approved query: $query',
                         if (row['source'] case final String source

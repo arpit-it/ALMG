@@ -24,3 +24,9 @@ bool collectablePublication(Map record) =>
 bool collectableEntity(Map record) =>
     record['reuse_status'] == 'user_approved' && record['reuse_approval'] is Map &&
     "${record['title']}\n${record['description']}".length >= 40;
+
+/// Whether a catalog description has metadata-scoped permission and usable text.
+bool collectableIndicator(Map record) =>
+    record['reuse_status'] == 'user_approved' && record['reuse_approval'] is Map &&
+    record['reuse_approval']['scope'] == 'catalog_description' &&
+    "${record['title']}\n${record['description']}".length >= 40;

@@ -58,3 +58,27 @@ def indicator_reuse_evidence(record, decision):
     return {"source": record["source"], "permission_basis": basis.strip(), "scope": "catalog_description",
             "metadata_sha256": indicator_metadata_checksum(record),
             "terms_source": "https://www.worldbank.org/ext/en/legal/terms-conditions", "time": time.time()}
+
+
+def approved_description_rows(records, approved_urls):
+    """Collect only selected metadata descriptions with current, scoped permission."""
+    if (not isinstance(approved_urls, list) or not approved_urls
+            or any(not isinstance(url, str) for url in approved_urls)
+            or len(set(approved_urls)) != len(approved_urls)):
+        raise ValueError("Select indicator description URLs before approving collection.")
+    selected = [record for record in records if record.get("source") in approved_urls]
+    if len(selected) != len(approved_urls):
+        raise ValueError("Approve only listed indicator description URLs.")
+    rows = []
+    for record in selected:
+        title, description, approval = record.get("title"), record.get("description"), record.get("reuse_approval")
+        if not isinstance(title, str) or not isinstance(description, str):
+            raise ValueError("Review the indicator description first.")
+        text = title + "\n" + description
+        if (len(text) < 40 or record.get("reuse_status") != "user_approved" or not isinstance(approval, dict)
+                or approval.get("scope") != "catalog_description" or approval.get("source") != record.get("source")
+                or approval.get("metadata_sha256") != indicator_metadata_checksum(record)):
+            raise ValueError("Record current permission for each indicator catalog description before collection.")
+        rows.append({**record, "provider": "world_bank", "text": text, "group": record["source"],
+                     "collection_scope": "catalog_description"})
+    return rows
