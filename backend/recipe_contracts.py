@@ -79,3 +79,22 @@ def training_parameters(recipe_id, values, snapshot=None):
         result[parameter['id']] = value
     result.setdefault('allow_repair', False)
     return result
+
+
+def validate_metrics(recipe_id, mode, metrics, target):
+    """Reject invalid evaluation output before saving a preview candidate."""
+    import math
+    contract = recipe_contract(recipe_id)
+    variant = ('Commons captions' if mode == 'web_images' else 'local shapes') if recipe_id == 'text_to_image' else 'classifier'
+    if not isinstance(metrics, dict) or type(metrics.get('passed')) is not bool:
+        raise ValueError('Recipe evaluation must include a boolean passed result.')
+    keys = contract['metrics'][variant]
+    for key in keys:
+        value = metrics.get(key)
+        if type(value) not in (int, float) or not 0 <= value <= 1 or not math.isfinite(value):
+            raise ValueError('Recipe evaluation requires a finite score between 0 and 1: ' + key)
+    target_key = next(key for key in keys if key.startswith('target_'))
+    if metrics[target_key] != target:
+        raise ValueError('Recipe evaluation target does not match the approved target.')
+    if metrics['passed'] and any(metrics[key] < target for key in keys if key != target_key):
+        raise ValueError('Recipe evaluation passed despite a score below the approved target.')

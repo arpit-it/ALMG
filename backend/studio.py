@@ -1661,6 +1661,7 @@ def run(job):
                 repair=repair if job.get("allow_repair") else None, report=report,
                 checkpoint_path=ROOT / "training-sessions" / job["id"] / "classifier-checkpoint.joblib",
             )
+        recipe_contracts.validate_metrics(job.get("recipe", "classifier"), job.get("mode"), metrics, job["target"])
         with LOCK:
             if job["status"] == "cancelled":
                 return

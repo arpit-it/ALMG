@@ -95,3 +95,33 @@ class RecipeContractsTest(unittest.TestCase):
         self.assertEqual(job['status'], 'dataset_ready')
         self.assertEqual(handler.respond.call_args.args[1], 400)
         worker.assert_not_called()
+
+    def test_evaluation_metrics_enforce_required_scores_and_approved_target(self):
+        valid = {'validation_macro_f1': 0.9, 'test_macro_f1': 0.85,
+                 'target_macro_f1': 0.8, 'passed': True}
+        recipe_contracts.validate_metrics('classifier', 'local', valid, 0.8)
+        for changes in ({'test_macro_f1': None}, {'test_macro_f1': True},
+                        {'test_macro_f1': float('nan')}, {'test_macro_f1': float('inf')},
+                        {'test_macro_f1': 1.1}, {'test_macro_f1': 0.7},
+                        {'target_macro_f1': 0.9}, {'passed': 1}):
+            with self.subTest(changes=changes), self.assertRaises(ValueError):
+                recipe_contracts.validate_metrics('classifier', 'local', {**valid, **changes}, 0.8)
+        recipe_contracts.validate_metrics('classifier', 'local', {**valid, 'passed': False}, 0.8)
+        for mode, key in [('local', 'held_out_pixel_accuracy'), ('web_images', 'held_out_pixel_similarity')]:
+            recipe_contracts.validate_metrics('text_to_image', mode,
+                {key: 0.9, 'target_pixel_accuracy': 0.8, 'passed': True}, 0.8)
+
+    def test_invalid_evaluation_never_saves_preview_candidate(self):
+        import tempfile
+        from pathlib import Path
+        job = {'id': 'invalid-result', 'status': 'queued', 'idle': False,
+               'recipe': 'classifier', 'target': 0.8, 'plan': {'labels': ['a', 'b']}}
+        with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), \
+                patch.object(studio, 'TRAINING_DATA', {job['id']: []}), \
+                patch.object(studio, 'CANDIDATES', {}), patch.object(studio, 'store_job'), \
+                patch.object(studio, 'train', return_value=(object(), [], {'passed': True})):
+            studio.run(job)
+            self.assertEqual(job['status'], 'failed')
+            self.assertIn('validation_macro_f1', job['error'])
+            self.assertNotIn(job['id'], studio.CANDIDATES)
+            self.assertEqual(list(Path(folder).rglob('candidate.*')), [])

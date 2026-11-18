@@ -1431,6 +1431,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   invalid-target/type/version rejection and no-worker failure behavior.
   LoRA validation and remaining execution-interface integration stay open;
   no recipe was added.
+  Evaluation output now validates required metric keys, numeric finite score
+  bounds, the approved target and below-target pass claims before a candidate
+  is saved for preview. Invalid output fails the job without saving a preview
+  candidate. All 153 Python tests passed, including invalid-output persistence
+  protection and both local and Commons image metric variants. In the rebuilt
+  Mac app, approval of fresh local fixtures trained a 48-row classifier and
+  45-example shape model to inference preview, each showing a held-out score
+  of 1.000 against the approved 0.800 target. No external collection occurred.
+  LoRA validation and remaining interface integration are still open.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
