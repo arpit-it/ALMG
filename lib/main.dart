@@ -693,6 +693,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_images',
         'searching_text',
         'searching_catalog',
+        'searching_publications',
         'reviewing_catalog_item',
         'creating_dataset',
         'training',
@@ -1196,12 +1197,12 @@ class _StudioPageState extends State<StudioPage> {
                   title: Text('Library of Congress'),
                   subtitle: Text('www.loc.gov · Catalog preview for text classification'),
                 ),
-                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
-                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('Europe PMC'),
-                  subtitle: Text('europepmc.org · Research literature'),
+                  subtitle: Text('www.ebi.ac.uk · Publication preview for text classification'),
                 ),
+                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('Wikidata'),
                   subtitle: Text('wikidata.org · Entities and knowledge graphs'),
@@ -1297,6 +1298,8 @@ class _StudioPageState extends State<StudioPage> {
       'searching_images': 'Searching for images',
       'searching_text': 'Searching Wikipedia',
       'searching_catalog': 'Searching the Library of Congress',
+      'searching_publications': 'Searching Europe PMC',
+      'publication_candidates': 'Review Europe PMC publications',
       'catalog_candidates': 'Review Library of Congress records',
       'reviewing_catalog_item': 'Loading catalog item advisories',
       'text_candidates': 'Review Wikipedia sources',
@@ -1512,6 +1515,33 @@ class _StudioPageState extends State<StudioPage> {
               'approved_result_limit': searchLimit,
             }),
             child: const Text('Approve Library of Congress search'),
+          ),
+        ],
+        if (status == 'approval' && !_imageRecipe &&
+            plan != null && (plan['queries'] as List).isNotEmpty) ...[
+          const Text('Europe PMC publication preview · www.ebi.ac.uk. '
+              'Sends the first query for up to 20 publication records.'),
+          SelectableText((plan['queries'] as List).first as String),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/search-publications', {
+              'approved_provider': 'europe_pmc',
+              'approved_query': (plan['queries'] as List).first,
+              'approved_result_limit': 20,
+            }),
+            child: const Text('Approve Europe PMC search'),
+          ),
+        ],
+        if (status == 'publication_candidates') ...[
+          const Text('Publication metadata only. Reuse rights are unverified. '
+              'Abstract and full-text collection are not available yet.'),
+          for (final record in job?['publication_candidates'] as List? ?? const [])
+            ListTile(
+              title: Text(record['title'] as String),
+              subtitle: SelectableText('${record['source']}\nApproved query: ${record['approved_query']}'),
+            ),
+          TextButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/close-publications', {}),
+            child: const Text('Return to dataset approval'),
           ),
         ],
         if (status == 'catalog_candidates') ...[

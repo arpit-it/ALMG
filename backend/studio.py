@@ -38,12 +38,13 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import chat_history, image_recipe, inference, loc_discovery
+    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc
 else:
     import chat_history
     import inference
     import image_recipe
     import loc_discovery
+    import europe_pmc
 
 ROOT = Path(os.environ.get("STUDIO_DATA", Path(__file__).resolve().parent / "runs"))
 MODEL = inference.MODEL
@@ -214,6 +215,26 @@ def discover_text(job):
                 candidates.append({"text": snippet, "source": source, "title": title,
                                    "approved_query": query, "group": source, "provider": "wikipedia"})
     return candidates
+
+
+def search_publications(job):
+    """Search the explicitly approved first query, without following publication links."""
+    try:
+        query = job["plan"]["queries"][0]
+        url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + urlencode({
+            "query": query, "format": "json", "resultType": "lite", "pageSize": 20,
+        })
+        result = request_json(url, headers={
+            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+        }, opener=DISCOVERY)
+        candidates = europe_pmc.publication_candidates(result, query)
+        if not candidates:
+            update(job, status="approval", error="Europe PMC found no supported publications. Edit the query or choose another source.")
+            return
+        activity(job, f"Found {len(candidates)} Europe PMC publications for review.")
+        update(job, status="publication_candidates", publication_candidates=candidates)
+    except (OSError, ValueError, IncompleteRead):
+        update(job, status="approval", error="Europe PMC search failed. Review the query and approve another attempt or choose another source.")
 
 
 def search_catalog(job):
@@ -673,7 +694,7 @@ def restore_jobs():
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.update(status="approval", error=(
@@ -703,7 +724,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -1532,6 +1553,19 @@ class Handler(BaseHTTPRequestHandler):
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
                         job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))
+                    elif action == "search-publications" and status == "approval" and job.get("recipe") == "classifier":
+                        queries = job["plan"]["queries"]
+                        if (not queries or data.get("approved_query") != queries[0]
+                                or data.get("approved_provider") != "europe_pmc"
+                                or data.get("approved_result_limit") != 20):
+                            raise ValueError("Approve the Europe PMC query and result limit first.")
+                        job.update(status="searching_publications", error=None)
+                        worker = (search_publications, (job,))
+                    elif action == "close-publications" and status == "publication_candidates":
+                        job.pop("publication_candidates", None)
+                        job.update(status="approval", error=None)
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "search-catalog" and status == "approval" and job.get("recipe") == "classifier":
                         queries = job["plan"]["queries"]
                         if (not queries or data.get("approved_queries") != queries

@@ -560,6 +560,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   including unknown/malformed access values and removal of earlier
   permission and description after a restricted refresh. Remaining
   providers and full document collection are still open.
+  Europe PMC now offers a consent-gated publication metadata preview for
+  text classification. The rebuilt Mac app disclosed www.ebi.ac.uk, the
+  first query and 20-record limit before approval. An offline fixture then
+  displayed two supported publication titles, Europe PMC URLs and their
+  approved query, omitted a malformed ID, and returned to dataset approval.
+  Reuse stays unverified; abstract/full-text collection and other provider
+  work remain open. All 49 Python tests and Flutter analysis passed.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
