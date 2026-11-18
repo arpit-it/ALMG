@@ -127,3 +127,33 @@ class WebsiteAccessTest(unittest.TestCase):
         connection.request.assert_called_once()
         self.assertEqual(connection.request.call_args.args[:2], ('GET', '/archive/'))
         response.read.assert_called_once_with(access.SEED_LIMIT + 1)
+
+    def test_page_preview_requires_current_allowed_discovered_url(self):
+        review = self.discovery_review()
+        record = {'source': 'https://example.org/archive/fruit', 'discovered_from': review['website']}
+        self.assertEqual(access.require_page_access(review, review['website'], record), record['source'])
+        for changes in ({'source': 'https://other.org/fruit'}, {'source': 'https://example.org/private/fruit'},
+                        {'discovered_from': 'https://other.org'}, {'source': 'https://example.org/%2e%2e/fruit'}):
+            with self.assertRaises(ValueError):
+                access.require_page_access(review, review['website'], {**record, **changes})
+        with patch.object(access, '_fetch_html', return_value=b'<head>hidden title</head><p>Fruit harvest text</p><script>secret()</script><p>Revenue &amp; costs</p>') as fetch:
+            result = access.fetch_page_preview(review, review['website'], record)
+        fetch.assert_called_once_with(review, review['website'], record['source'])
+        self.assertEqual(result['page_text'], 'Fruit harvest text Revenue & costs')
+        self.assertEqual(result['reuse_status'], 'unverified')
+        self.assertEqual(result['access_guidance_sha256'], access.guidance_checksum(review))
+        self.assertEqual(len(access.page_preview(b'x' * 20001)['page_text']), 20000)
+        self.assertTrue(access.page_preview(b'x' * 20001)['page_text_truncated'])
+        with self.assertRaises(ValueError):
+            access.page_preview(b'x' * (access.SEED_LIMIT + 1))
+
+    def test_failed_page_refresh_removes_old_preview_and_permission(self):
+        record = {'source': 'https://example.org/archive/fruit', 'page_text': 'Old preview', 'page_reviewed': True,
+                  'reuse_approval': {'basis': 'Old permission'}}
+        job = {'website_candidates': [record], 'website_access': self.discovery_review()}
+        with patch.object(access, 'fetch_page_preview', side_effect=ValueError('blocked')), patch.object(studio, 'store_job'):
+            studio.review_website_page(job, job['website_access']['website'], record['source'])
+        self.assertEqual(job['status'], 'website_candidates')
+        self.assertNotIn('page_text', record)
+        self.assertNotIn('reuse_approval', record)
+        self.assertEqual(record['reuse_status'], 'unverified')

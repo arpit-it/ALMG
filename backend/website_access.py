@@ -242,15 +242,16 @@ def discovered_links(website, data, review):
     return rows
 
 
-def fetch_seed_links(review, current_website):
+def _fetch_html(review, current_website, source):
     global SEED_LAST_REQUEST
     delay = require_discovery_access(review, current_website)
-    parsed = urlsplit(current_website)
+    parsed = urlsplit(source)
     address = public_address(parsed.hostname)
     context = ssl.create_default_context(cafile=certifi.where())
     connection = HTTPSConnection(parsed.hostname, timeout=30, context=context)
     with SEED_LOCK:
         time.sleep(max(0, delay - (time.time() - max(SEED_LAST_REQUEST, review['reviewed_at']))))
+        require_discovery_access(review, current_website)
         raw = socket.create_connection((address, 443), timeout=30)
         try:
             connection.sock = context.wrap_socket(raw, server_hostname=parsed.hostname)
@@ -259,7 +260,60 @@ def fetch_seed_links(review, current_website):
             response = connection.getresponse()
             if response.status != 200 or response.getheader('Content-Type', '').split(';')[0].strip().lower() not in {'text/html', 'application/xhtml+xml'}:
                 raise ValueError('Discovery requires a successful HTML page; redirects are not followed.')
-            return discovered_links(current_website, response.read(SEED_LIMIT + 1), review)
+            data = response.read(SEED_LIMIT + 1)
+            if len(data) > SEED_LIMIT:
+                raise ValueError('Website page exceeds the approved 512 KiB limit.')
+            return data
         finally:
             connection.close()
             raw.close()
+
+
+def fetch_seed_links(review, current_website):
+    return discovered_links(current_website, _fetch_html(review, current_website, current_website), review)
+
+
+def require_page_access(review, current_website, record):
+    from urllib.parse import unquote_to_bytes
+    require_discovery_access(review, current_website)
+    source = record.get('source')
+    robots_url(source)
+    parsed, origin = urlsplit(source), urlsplit(current_website)
+    if (record.get('discovered_from') != current_website or parsed.hostname != origin.hostname or parsed.port != origin.port
+            or '\\' in parsed.path or any(part in (b'.', b'..') for part in unquote_to_bytes(parsed.path).split(b'/'))
+            or robots_path_decision(source, review['robots_text'], review['robots_status'])['robots_decision'] != 'allowed'):
+        raise ValueError('Approve a discovered same-site URL allowed by current robots guidance.')
+    return source
+
+
+def page_preview(data):
+    """Extract a text-only preview without executing HTML or loading resources."""
+    from html.parser import HTMLParser
+    if len(data) > SEED_LIMIT:
+        raise ValueError('Website page exceeds the approved 512 KiB limit.')
+    class Text(HTMLParser):
+        def __init__(self):
+            super().__init__(convert_charrefs=True)
+            self.hidden, self.chunks = [], []
+        def handle_starttag(self, tag, attrs):
+            if self.hidden or tag in {'head', 'script', 'style', 'iframe', 'object', 'noscript'}:
+                self.hidden.append(tag)
+        def handle_endtag(self, tag):
+            if self.hidden and tag in self.hidden:
+                self.hidden = self.hidden[:self.hidden.index(tag)]
+        def handle_data(self, data):
+            if not self.hidden:
+                self.chunks.append(data)
+    parser = Text()
+    parser.feed(data.decode('utf-8-sig'))
+    text = ' '.join(' '.join(parser.chunks).split())
+    if not text or any(unicodedata.category(c) in {'Cc', 'Cs'} for c in text):
+        raise ValueError('No readable page text was found.')
+    return {'page_text': text[:20000], 'page_text_truncated': len(text) > 20000,
+            'page_reviewed': True, 'reuse_status': 'unverified'}
+
+
+def fetch_page_preview(review, current_website, record):
+    source = require_page_access(review, current_website, record)
+    preview = page_preview(_fetch_html(review, current_website, source))
+    return {**preview, 'access_guidance_sha256': guidance_checksum(review)}

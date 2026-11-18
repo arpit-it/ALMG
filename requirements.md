@@ -829,6 +829,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   No linked pages or resources were loaded and reuse stayed unverified.
   All 108 Python tests and Flutter analysis passed. Per-page fetching,
   content reuse review and dataset collection remain open.
+
+  Discovered website URLs now require separate approval for a bounded HTML
+  text preview. Current site access and per-URL robots rules are checked
+  before the pinned request; previews retain at most 20,000 characters.
+  In the rebuilt Mac app, cancellation made no page request, while approval
+  loaded only the selected fixture, stripped head/script text and left the
+  other URL unloaded. Reuse stayed unverified. All 110 Python tests and
+  Flutter analysis passed, including stale-access/unsafe-URL rejection and
+  failed-refresh cleanup. Content reuse review and dataset collection
+  remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

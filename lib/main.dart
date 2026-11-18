@@ -735,6 +735,7 @@ class _StudioPageState extends State<StudioPage> {
         'reviewing_filing',
         'reviewing_website_access',
         'discovering_website',
+        'reviewing_website_page',
         'searching_companies',
         'reviewing_bibliography',
         'reviewing_notice',
@@ -1429,6 +1430,7 @@ class _StudioPageState extends State<StudioPage> {
       'searching_notices': 'Searching Federal Register',
       'searching_companies': 'Finding SEC companies',
       'company_candidates': 'Choose an SEC company',
+      'reviewing_website_page': 'Loading approved website page',
       'discovering_website': 'Discovering links from approved website page',
       'website_candidates': 'Review discovered website URLs',
       'reviewing_website_access': 'Loading approved robots.txt',
@@ -1825,11 +1827,29 @@ class _StudioPageState extends State<StudioPage> {
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-website-access', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'website_candidates') ...[
-          const Text('Discovered URLs only. Linked pages have not been fetched and reuse remains unverified. Page collection is not available yet.'),
+          const Text('Approve each discovered URL before loading its text preview. Reuse remains unverified; dataset collection is not available yet.'),
           if ((job?['website_candidates'] as List? ?? const []).isEmpty)
             const Text('No supported same-site links were found within the preview limits.'),
           for (final record in job?['website_candidates'] as List? ?? const [])
-            SelectableText(record['source'] as String),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              SelectableText(record['source'] as String),
+              if (record['page_reviewed'] == true) ...[
+                SelectableText('Page text preview: ${record['page_text']}'),
+                if (record['page_text_truncated'] == true) const Text('Preview truncated to 20,000 characters.'),
+                const Text('Loading a page does not establish reuse permission.'),
+              ],
+              OutlinedButton(onPressed: _busy ? null : () async {
+                final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+                  title: const Text('Approve website page preview'),
+                  content: SelectableText('${record['source']}\nOne HTML request, at most 512 KiB; display at most 20,000 characters. Current site access review and robots rules are rechecked. Redirects and linked resources are not loaded. Refreshing clears any earlier reuse approval.'),
+                  actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                    FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve page preview request'))],
+                ));
+                if (confirmed == true) {
+                  await _submit('/jobs/$id/review-website-page', {'approved_url': record['source'], 'approved_byte_limit': 524288});
+                }
+              }, child: const Text('Review page preview request')),
+            ]),
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-website-links', {}), child: const Text('Return to website access review')),
         ],
         if (status == 'company_candidates') ...[

@@ -227,6 +227,27 @@ SEC_REQUEST_LOCK = threading.Lock()
 SEC_LAST_REQUEST = 0.0
 
 
+def review_website_page(job, website, source):
+    try:
+        record = next(record for record in job["website_candidates"] if record["source"] == source)
+        result = website_access.fetch_page_preview(job["website_access"], website, record)
+        with LOCK:
+            record.update(result)
+            record.pop("reuse_approval", None)
+            job.update(status="website_candidates", error=None)
+            append_activity(job, "Loaded only the approved website page preview; content reuse remains unverified.")
+            store_job(job)
+    except (OSError, ValueError, IncompleteRead, UnicodeError) as error:
+        with LOCK:
+            for record in job["website_candidates"]:
+                if record["source"] == source:
+                    for key in ("page_text", "page_reviewed", "page_text_truncated", "access_guidance_sha256", "reuse_approval"):
+                        record.pop(key, None)
+                    record["reuse_status"] = "unverified"
+            job.update(status="website_candidates", error=f"Website page preview failed: {error}")
+            store_job(job)
+
+
 def discover_website_links(job, website):
     try:
         rows = website_access.fetch_seed_links(job["website_access"], website)
@@ -998,6 +1019,13 @@ def restore_jobs():
                 job.update(status="catalog_candidates", error=(
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
+                store_job(job)
+            elif job["status"] == "reviewing_website_page":
+                for record in job.get("website_candidates", []):
+                    for key in ("page_text", "page_reviewed", "page_text_truncated", "access_guidance_sha256", "reuse_approval"):
+                        record.pop(key, None)
+                    record["reuse_status"] = "unverified"
+                job.update(status="website_candidates", error="Page loading was interrupted. Review and approve the URL again.")
                 store_job(job)
             elif job["status"] == "reviewing_filing":
                 for record in job.get("filing_candidates", []):
@@ -1913,6 +1941,15 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the current website discovery URL, 512 KiB and 20-link limits first.")
                         job.update(status="discovering_website", error=None)
                         worker = (discover_website_links, (job, website))
+                    elif action == "review-website-page" and status == "website_candidates":
+                        website = chat_history.project_details(job.get("project_id"))["source_website"]
+                        source = data.get("approved_url")
+                        record = next((row for row in job["website_candidates"] if row["source"] == source), None)
+                        if record is None or data.get("approved_byte_limit") != website_access.SEED_LIMIT:
+                            raise ValueError("Approve a discovered website URL and the 512 KiB limit first.")
+                        website_access.require_page_access(job["website_access"], website, record)
+                        job.update(status="reviewing_website_page", error=None)
+                        worker = (review_website_page, (job, website, source))
                     elif action == "close-website-links" and status == "website_candidates":
                         job.update(status="website_access_review", error=None)
                         store_job(job)
