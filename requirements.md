@@ -1649,6 +1649,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   reapproval then reached preview at accuracy 1.000. No external collection
   occurred. Physical suspend/resume and actual busy/power transitions remain
   unverified, so this requirement stays open.
+  Native power-event delivery now retries transient socket/timeout/server
+  failures up to three times with a stable event ID; permanent HTTP rejections
+  are not retried. The backend deduplicates its most recent 256 event receipts
+  in memory, preventing an acknowledged retry from invalidating fresh approval
+  twice within the same backend lifetime. The 193-test Python suite passed
+  (192 executed; opt-in Metal test skipped), plus 16 Flutter tests and clean
+  analysis. In the rebuilt Mac app, a local server returned 503 on the first
+  sleep and wake deliveries. Each retried with its original ID and received
+  200; saved activity contained exactly one entry per event. The waiting job
+  returned to approval and explicit reapproval reached preview at accuracy
+  1.000. No external collection occurred. Physical suspend/resume and real
+  busy/power transitions remain unverified; this requirement stays open.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.

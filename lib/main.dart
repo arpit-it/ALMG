@@ -29,19 +29,42 @@ void main() {
   runApp(const ModelStudio());
 }
 
-/// Forwards local native power events using the desktop backend's HTTP framing.
-Future<void> forwardPowerEvent(String event, {int port = backendPort}) async {
+int _powerEventSequence = 0;
+
+/// Forwards local native power events using bounded, idempotent retries.
+Future<void> forwardPowerEvent(String event, {int port = backendPort, int attempts = 3,
+    Duration retryDelay = const Duration(milliseconds: 500), String? eventId}) async {
+  if (!{'sleep', 'wake'}.contains(event) || attempts < 1 || attempts > 5) {
+    throw ArgumentError('Invalid power event or retry count.');
+  }
+  final token = eventId ?? '${DateTime.now().microsecondsSinceEpoch}-${++_powerEventSequence}';
+  for (var attempt = 0; attempt < attempts; attempt++) {
+    try {
+      await _sendPowerEvent(event, token, port);
+      return;
+    } catch (error) {
+      if (attempt == attempts - 1 ||
+          !(error is SocketException || error is TimeoutException || error is HttpException)) {
+        rethrow;
+      }
+      await Future<void>.delayed(retryDelay);
+    }
+  }
+}
+
+Future<void> _sendPowerEvent(String event, String eventId, int port) async {
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
   try {
     final request = await client.postUrl(Uri.parse('http://127.0.0.1:$port/runtime/power-event'));
     request.headers.set('X-Model-Studio', 'desktop');
     request.headers.contentType = ContentType.json;
-    final bytes = utf8.encode(jsonEncode({'event': event}));
+    final bytes = utf8.encode(jsonEncode({'event': event, 'event_id': eventId}));
     request.contentLength = bytes.length;
     request.add(bytes);
     final response = await request.close().timeout(const Duration(seconds: 5));
-    await response.drain<void>();
-    if (response.statusCode >= 400) throw HttpException('Power event was rejected.');
+    await response.drain<void>().timeout(const Duration(seconds: 5));
+    if (response.statusCode >= 500) throw HttpException('Power event temporarily unavailable.');
+    if (response.statusCode >= 400) throw const FormatException('Power event was rejected.');
   } finally {
     client.close(force: true);
   }

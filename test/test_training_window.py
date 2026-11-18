@@ -220,3 +220,18 @@ class TrainingWindowTest(unittest.TestCase):
             self.assertIn('system-clock change', job['error'])
             self.assertIn(job['id'], studio.TRAINING_DATA)
             self.assertNotIn(job['id'], studio.CANDIDATES)
+
+    def test_duplicate_power_event_does_not_invalidate_renewed_approval(self):
+        job = {'id': 'deduplicated-power', 'status': 'training'}
+        with patch.object(studio, 'JOBS', {job['id']: job}), patch.object(studio, 'POWER_INTERRUPTED_JOBS', set()), patch.object(studio, 'POWER_EVENT_RECEIPTS', {}), patch.object(studio, 'store_job'):
+            first = studio.record_power_event('wake', 'event-fixture')
+            studio.POWER_INTERRUPTED_JOBS.clear()
+            job['status'] = 'queued'  # Fresh user approval after first delivery.
+            duplicate = studio.record_power_event('wake', 'event-fixture')
+            self.assertEqual(duplicate, first)
+            self.assertNotIn(job['id'], studio.POWER_INTERRUPTED_JOBS)
+            self.assertEqual(len(job['activity']), 1)
+            with self.assertRaisesRegex(ValueError, 'different event'):
+                studio.record_power_event('sleep', 'event-fixture')
+            with self.assertRaisesRegex(ValueError, 'event ID'):
+                studio.record_power_event('wake', [])

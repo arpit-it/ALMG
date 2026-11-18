@@ -77,6 +77,7 @@ CHAT_STREAMS = {}
 TRAINING_DATA = {}
 TRAINING_WORKERS = set()
 POWER_INTERRUPTED_JOBS = set()
+POWER_EVENT_RECEIPTS = {}
 CANDIDATES = {}
 
 
@@ -1646,17 +1647,29 @@ class TrainingWindowInterrupted(ValueError):
     """Require renewed approval after a sleep-like clock discontinuity."""
 
 
-def record_power_event(event):
+def record_power_event(event, event_id=None):
     """Invalidate active training windows on local native sleep/wake events."""
     if event not in ("sleep", "wake"):
         raise ValueError("Unknown system power event.")
+    if event_id is not None and (not isinstance(event_id, str) or not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", event_id)):
+        raise ValueError("Invalid system power event ID.")
     with LOCK:
+        if event_id is not None and event_id in POWER_EVENT_RECEIPTS:
+            receipt = POWER_EVENT_RECEIPTS[event_id]
+            if receipt["event"] != event:
+                raise ValueError("Power event ID was reused for a different event.")
+            return dict(receipt)
         affected = [job for job in JOBS.values() if job["status"] in ("queued", "waiting_idle", "training")]
         for job in affected:
             POWER_INTERRUPTED_JOBS.add(job["id"])
             append_activity(job, f"System {event} notification received. Training will require fresh approval at the next safe boundary.")
             store_job(job)
-    return {"event": event, "affected_jobs": len(affected)}
+        receipt = {"event": event, "affected_jobs": len(affected)}
+        if event_id is not None:
+            POWER_EVENT_RECEIPTS[event_id] = receipt
+            while len(POWER_EVENT_RECEIPTS) > 256:
+                POWER_EVENT_RECEIPTS.pop(next(iter(POWER_EVENT_RECEIPTS)))
+        return dict(receipt)
 
 
 def check_training_power(job):
@@ -2021,7 +2034,7 @@ class Handler(BaseHTTPRequestHandler):
                 os.kill(os.getpid(), signal.SIGTERM)
                 return
             if self.path == "/runtime/power-event":
-                return self.respond(record_power_event(data.get("event")))
+                return self.respond(record_power_event(data.get("event"), data.get("event_id")))
             if self.path == "/runtime/lora-fixture":
                 if data.get("confirmed") is not True:
                     raise ValueError("Confirm the local LoRA fixture before running it.")
