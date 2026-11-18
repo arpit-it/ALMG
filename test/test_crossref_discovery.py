@@ -84,3 +84,29 @@ class BibliographicDiscoveryTest(unittest.TestCase):
         self.assertNotIn("abstract", record)
         self.assertNotIn("license_statements", record)
         self.assertNotIn("abstract_reviewed", record)
+
+    def test_abstract_reuse_is_scoped_and_bound_to_license_evidence(self):
+        from backend.crossref_discovery import abstract_reuse_evidence, abstract_metadata_checksum
+        record = {"doi": "10.1234/orchard", "source": "https://doi.org/10.1234%2Forchard", "title": "Orchard publication",
+                  "publisher": "Fixture publisher", "abstract": "Local orchard abstract", "abstract_reviewed": True,
+                  "license_statements": [{"url": "https://example.invalid/license", "content_version": "vor"}]}
+        decision = {"approved_url": record["source"], "confirmed": True, "approved_scope": "crossref_abstract",
+                    "permission_basis": "Local fixture abstract permission reviewed."}
+        evidence = abstract_reuse_evidence(record, decision)
+        self.assertEqual(evidence["scope"], "crossref_abstract")
+        self.assertEqual(evidence["abstract_metadata_sha256"], abstract_metadata_checksum(record))
+        self.assertNotEqual(evidence["abstract_metadata_sha256"], abstract_metadata_checksum({**record, "license_statements": []}))
+        for changes in ({"confirmed": False}, {"approved_url": "other"}, {"approved_scope": "publisher_page"}, {"permission_basis": "short"}):
+            with self.assertRaises(ValueError):
+                abstract_reuse_evidence(record, {**decision, **changes})
+        with self.assertRaises(ValueError):
+            abstract_reuse_evidence({**record, "abstract_reviewed": False}, decision)
+
+    def test_abstract_refresh_clears_previous_permission(self):
+        record = {"doi": "10.1234/orchard", "source": "https://doi.org/10.1234%2Forchard", "reuse_status": "user_approved",
+                  "reuse_approval": {"permission_basis": "Old permission"}}
+        job = {"bibliographic_candidates": [record]}
+        with patch.object(studio, "request_json", return_value={"status": "ok", "message": {**item(record["doi"]), "abstract": "Refreshed abstract"}}), patch.object(studio, "store_job"):
+            studio.review_bibliography(job, record["source"])
+        self.assertNotIn("reuse_approval", record)
+        self.assertEqual(record["reuse_status"], "unverified")

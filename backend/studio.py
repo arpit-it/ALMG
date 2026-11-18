@@ -1799,6 +1799,16 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve a listed DOI URL first.")
                         job.update(status="reviewing_bibliography", error=None)
                         worker = (review_bibliography, (job, source))
+                    elif action == "approve-bibliography-reuse" and status == "bibliographic_candidates":
+                        record = next((record for record in job["bibliographic_candidates"]
+                                       if record["source"] == data.get("approved_url")), None)
+                        if record is None:
+                            raise ValueError("Approve a listed DOI URL first.")
+                        record["reuse_approval"] = crossref_discovery.abstract_reuse_evidence(record, data)
+                        record["reuse_status"] = "user_approved"
+                        append_activity(job, "User reuse permission recorded for the reviewed Crossref abstract.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "close-bibliography" and status == "bibliographic_candidates":
                         job.pop("bibliographic_candidates", None)
                         job.update(status="approval", error=None)

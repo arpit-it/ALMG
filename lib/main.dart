@@ -1136,6 +1136,8 @@ class _StudioPageState extends State<StudioPage> {
                 const Text('This decision covers the displayed catalog description only. Country/year observations need separate review.'),
               if (scope == 'document_summary')
                 const Text('This decision covers the displayed document summary only. Full-text reuse needs separate review.'),
+              if (scope == 'crossref_abstract')
+                const Text('This decision covers the displayed abstract only. Confirm that any supplied license statement applies to this abstract.'),
               const Text('Confirm you have permission to use this item for the project dataset. Record the license, permission, or other basis you reviewed.'),
               TextField(
                 autofocus: true,
@@ -1661,7 +1663,7 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'bibliographic_candidates') ...[
-          const Text('Review abstract and license metadata. Reuse remains unverified. Dataset and publisher-page collection are not available yet.'),
+          const Text('Review abstract and license metadata before recording reuse permission. Dataset and publisher-page collection are not available yet.'),
           for (final record in job?['bibliographic_candidates'] as List? ?? const [])
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1678,7 +1680,15 @@ class _StudioPageState extends State<StudioPage> {
                     SelectableText('Publisher license metadata: ${license['url']}\nContent version: ${license['content_version']}'),
                   const Text('License metadata does not establish permission for this abstract. Review its scope before reuse.'),
                 ],
-                const Text('Loads abstract and license metadata from api.crossref.org for this DOI. Publisher and license links are not fetched.'),
+                if (record['reuse_approval'] case final Map approval)
+                  SelectableText('Crossref abstract reuse approval: ${approval['permission_basis']}')
+                else if (record['abstract_reviewed'] == true && (record['abstract'] as String).isNotEmpty)
+                  TextButton(
+                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                        action: 'approve-bibliography-reuse', scope: 'crossref_abstract'),
+                    child: const Text('Record Crossref abstract reuse approval'),
+                  ),
+                const Text('Loads abstract and license metadata from api.crossref.org for this DOI. Loading clears earlier reuse approval. Publisher and license links are not fetched.'),
                 OutlinedButton(
                   onPressed: _busy ? null : () => _submit('/jobs/$id/review-bibliography', {'approved_url': record['source']}),
                   child: const Text('Approve loading Crossref abstract metadata'),

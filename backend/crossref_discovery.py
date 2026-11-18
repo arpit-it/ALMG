@@ -74,3 +74,29 @@ def abstract_metadata(payload, doi):
         cleaned.append({"url": url, "content_version": version})
     return {"title": rows[0]["title"], "publisher": rows[0]["publisher"], "work_type": rows[0]["work_type"],
             "abstract": text, "abstract_reviewed": True, "license_statements": cleaned, "reuse_status": "unverified"}
+
+
+def abstract_metadata_checksum(record):
+    """Bind reviewed text to its publisher and supplied license statements."""
+    import hashlib
+    import json
+    fields = {key: record.get(key) for key in ("doi", "title", "publisher", "abstract", "license_statements")}
+    if (any(not isinstance(fields[key], str) for key in ("doi", "title", "publisher", "abstract"))
+            or not isinstance(fields["license_statements"], list)):
+        raise ValueError("Review abstract and license metadata before recording permission.")
+    return hashlib.sha256(json.dumps(fields, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def abstract_reuse_evidence(record, decision):
+    """Record explicit abstract permission without inferring rights from license links."""
+    import time
+    doi, basis = record.get("doi"), decision.get("permission_basis")
+    if (not valid_doi(doi) or record.get("source") != "https://doi.org/" + quote(doi, safe="")
+            or record.get("abstract_reviewed") is not True or not record.get("abstract")
+            or decision.get("approved_url") != record["source"] or decision.get("confirmed") is not True
+            or decision.get("approved_scope") != "crossref_abstract"
+            or not isinstance(basis, str) or not 10 <= len(basis.strip()) <= 2000):
+        raise ValueError("Review the abstract and record permission for that abstract scope first.")
+    return {"source": record["source"], "scope": "crossref_abstract", "permission_basis": basis.strip(),
+            "abstract_metadata_sha256": abstract_metadata_checksum(record),
+            "license_statements": record["license_statements"], "time": time.time()}
