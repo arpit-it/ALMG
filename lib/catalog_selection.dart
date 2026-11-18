@@ -19,3 +19,8 @@ bool collectablePublication(Map record) =>
     record['reuse_status'] == 'user_approved' &&
     record['reuse_approval'] is Map &&
     (record['abstract'] as String? ?? '').length >= 40;
+
+/// Whether entity text has permission and enough content for classification.
+bool collectableEntity(Map record) =>
+    record['reuse_status'] == 'user_approved' && record['reuse_approval'] is Map &&
+    "${record['title']}\n${record['description']}".length >= 40;

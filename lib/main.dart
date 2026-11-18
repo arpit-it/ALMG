@@ -527,6 +527,7 @@ class _StudioPageState extends State<StudioPage> {
   final Set<String> _excludedTextSources = {};
   final Set<String> _excludedCatalogSources = {};
   final Set<String> _excludedPublications = {};
+  final Set<String> _excludedEntities = {};
   final Set<String> _excludedImageSources = {};
   String? _error;
   bool _busy = false;
@@ -688,6 +689,9 @@ class _StudioPageState extends State<StudioPage> {
         if (_job?['id'] != job['id'] ||
             !{'publication_candidates', 'reviewing_publication'}.contains(job['status'])) {
           _excludedPublications.clear();
+        }
+        if (_job?['id'] != job['id'] || job['status'] != 'entity_candidates') {
+          _excludedEntities.clear();
         }
         _job = job;
       });
@@ -1148,6 +1152,7 @@ class _StudioPageState extends State<StudioPage> {
     }
     if (provider == 'loc') return 'Library of Congress: $source';
     if (provider == 'europe_pmc') return 'Europe PMC: $source';
+    if (provider == 'wikidata') return 'Wikidata: $source';
     if (provider == 'commons' ||
         (provider == null && source.startsWith('https://upload.wikimedia.org/'))) {
       return 'Wikimedia Commons: $source';
@@ -1303,6 +1308,12 @@ class _StudioPageState extends State<StudioPage> {
     final selectedPublicationUrls = [
       for (final record in publicationRecords)
         if (collectablePublication(record as Map) && !_excludedPublications.contains(record['source']))
+          record['source'] as String,
+    ];
+    final entityRecords = job?['entity_candidates'] as List? ?? const [];
+    final selectedEntityUrls = [
+      for (final record in entityRecords)
+        if (collectableEntity(record as Map) && !_excludedEntities.contains(record['source']))
           record['source'] as String,
     ];
     final states = {
@@ -1564,7 +1575,7 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'entity_candidates') ...[
-          const Text('Review entity labels, descriptions and source URLs. Entity dataset collection is not available yet.'),
+          const Text('Review entity labels, descriptions and source URLs. Approve reuse before collecting selected descriptions for text classification.'),
           const Text('Wikidata structured entity data is supplied under CC0. Review the source and project use before recording permission.'),
           const SelectableText('Terms source: https://www.wikidata.org/wiki/Wikidata:Copyright'),
           for (final record in job?['entity_candidates'] as List? ?? const [])
@@ -1574,16 +1585,31 @@ class _StudioPageState extends State<StudioPage> {
                 ListTile(
                   title: Text('${record['title']} (${record['entity_id']})'),
                   subtitle: SelectableText('${record['description']}\n${record['source']}\nApproved query: ${record['approved_query']}'),
+                  trailing: collectableEntity(record as Map) ? Checkbox(
+                    value: !_excludedEntities.contains(record['source']),
+                    semanticLabel: "Include entity description: ${record['title']}",
+                    onChanged: _busy ? null : (checked) => setState(() {
+                      final source = record['source'] as String;
+                      if (checked == true) { _excludedEntities.remove(source); }
+                      else { _excludedEntities.add(source); }
+                    }),
+                  ) : null,
                 ),
                 if (record['reuse_approval'] case final Map approval)
                   SelectableText('User reuse approval: ${approval['permission_basis']}')
                 else
                   TextButton(
-                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record,
                         action: 'approve-entity-reuse'),
                     child: const Text('Record entity reuse approval'),
                   ),
               ],
+            ),
+          if (entityRecords.any((record) => collectableEntity(record as Map)))
+            OutlinedButton(
+              onPressed: _busy || selectedEntityUrls.isEmpty ? null
+                  : () => _submit('/jobs/$id/use-entity-descriptions', {'approved_urls': selectedEntityUrls}),
+              child: Text('Approve entity description collection (${selectedEntityUrls.length} selected)'),
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-entities', {}),
@@ -1980,8 +2006,10 @@ class _StudioPageState extends State<StudioPage> {
                               ? 'Catalog record: $title'
                               : row['provider'] == 'europe_pmc'
                                   ? 'Publication: $title'
-                                  : 'Article: $title',
-                        if ({'loc', 'europe_pmc'}.contains(row['provider']) && row['reuse_approval'] is Map)
+                                  : row['provider'] == 'wikidata'
+                                      ? 'Entity: $title'
+                                      : 'Article: $title',
+                        if ({'loc', 'europe_pmc', 'wikidata'}.contains(row['provider']) && row['reuse_approval'] is Map)
                           'User reuse approval: ${row['reuse_approval']['permission_basis']}',
                         if (row['approved_query'] case final String query)
                           'Approved query: $query',

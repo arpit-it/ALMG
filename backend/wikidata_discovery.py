@@ -43,3 +43,27 @@ def entity_reuse_evidence(record, decision):
     return {"source": record["source"], "permission_basis": basis.strip(),
             "entity_text_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(),
             "terms_source": "https://www.wikidata.org/wiki/Wikidata:Copyright", "time": time.time()}
+
+
+def approved_entity_rows(records, approved_urls):
+    """Collect only selected entity text with matching permission evidence."""
+    import hashlib
+    if (not isinstance(approved_urls, list) or not approved_urls
+            or any(not isinstance(url, str) for url in approved_urls)
+            or len(set(approved_urls)) != len(approved_urls)):
+        raise ValueError("Select entity URLs before approving collection.")
+    selected = [record for record in records if record.get("source") in approved_urls]
+    if len(selected) != len(approved_urls):
+        raise ValueError("Approve only listed entity URLs.")
+    rows = []
+    for record in selected:
+        title, description, approval = record.get("title"), record.get("description"), record.get("reuse_approval")
+        if not isinstance(title, str) or not isinstance(description, str):
+            raise ValueError("Review the entity text before collection.")
+        text = title + "\n" + description
+        if (len(text) < 40 or record.get("reuse_status") != "user_approved" or not isinstance(approval, dict)
+                or approval.get("source") != record.get("source")
+                or approval.get("entity_text_sha256") != hashlib.sha256(text.encode("utf-8")).hexdigest()):
+            raise ValueError("Review the entity and record current reuse permission before collection.")
+        rows.append({**record, "provider": "wikidata", "text": text, "group": record["source"]})
+    return rows

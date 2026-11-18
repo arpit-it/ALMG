@@ -65,3 +65,21 @@ class EntityDiscoveryTest(unittest.TestCase):
                 entity_reuse_evidence(record, {**decision, **changes})
         with self.assertRaises(ValueError):
             entity_reuse_evidence({**record, "source": "https://evil.example/Q42"}, decision)
+
+    def test_collection_checks_selection_and_permission_text_checksum(self):
+        from backend.wikidata_discovery import entity_reuse_evidence, approved_entity_rows
+        record = {"entity_id": "Q42", "title": "Orchard", "description": "Cultivated fruit trees grown for seasonal harvests.",
+                  "source": "https://www.wikidata.org/wiki/Q42", "reuse_status": "user_approved"}
+        record["reuse_approval"] = entity_reuse_evidence(record, {
+            "approved_url": record["source"], "confirmed": True, "permission_basis": "Local fixture permission reviewed.",
+        })
+        row = approved_entity_rows([record], [record["source"]])[0]
+        self.assertEqual(row["text"], record["title"] + "\n" + record["description"])
+        self.assertEqual(row["reuse_approval"], record["reuse_approval"])
+        self.assertEqual(row["provider"], "wikidata")
+        for urls in ([], ["other"], [record["source"], record["source"]]):
+            with self.assertRaises(ValueError):
+                approved_entity_rows([record], urls)
+        for changes in ({"description": "Changed description that is long enough for classifier collection."}, {"reuse_status": "unverified"}, {"reuse_approval": {}}):
+            with self.assertRaises(ValueError):
+                approved_entity_rows([{**record, **changes}], [record["source"]])

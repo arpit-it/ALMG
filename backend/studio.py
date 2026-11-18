@@ -784,6 +784,8 @@ def restore_jobs():
                              and all(row.get("provider") == "loc" for row in job["text_candidates"])
                              else "publication_candidates" if job.get("text_candidates")
                              and all(row.get("provider") == "europe_pmc" for row in job["text_candidates"])
+                             else "entity_candidates" if job.get("text_candidates")
+                             and all(row.get("provider") == "wikidata" for row in job["text_candidates"])
                              else "text_candidates")
                     job.update(status=stage, mode=None, error=(
                         "Excerpt preparation was interrupted. Review and approve the excerpts to retry."
@@ -1143,6 +1145,8 @@ def prepare_dataset(job, imported_rows=None):
                      and all(row.get("provider") == "loc" for row in job["text_candidates"])
                      else "publication_candidates" if job.get("text_candidates")
                              and all(row.get("provider") == "europe_pmc" for row in job["text_candidates"])
+                             else "entity_candidates" if job.get("text_candidates")
+                             and all(row.get("provider") == "wikidata" for row in job["text_candidates"])
                              else "text_candidates")
             update(job, status=stage, mode=None, error=str(error))
         else:
@@ -1646,6 +1650,10 @@ class Handler(BaseHTTPRequestHandler):
                         append_activity(job, "User reuse permission recorded for the reviewed entity text.")
                         store_job(job)
                         return self.respond({"id": job["id"]})
+                    elif action == "use-entity-descriptions" and status == "entity_candidates":
+                        rows = wikidata_discovery.approved_entity_rows(job["entity_candidates"], data.get("approved_urls"))
+                        job.update(status="creating_dataset", error=None, mode="web", text_candidates=rows)
+                        worker = (prepare_dataset, (job,))
                     elif action == "close-entities" and status == "entity_candidates":
                         job.pop("entity_candidates", None)
                         job.update(status="approval", error=None)

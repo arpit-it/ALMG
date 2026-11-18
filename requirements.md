@@ -620,6 +620,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and description SHA-256 and retained the terms source. All 63 Python
   tests and Flutter analysis passed. Entity dataset collection and
   remaining provider work are still open.
+  Selected, reuse-approved Wikidata labels and descriptions can now form
+  classifier examples after collection approval. The rebuilt Mac app
+  deselected one of three offline entities and prepared exactly the two
+  selected URLs. Preview and saved rows retained query and permission
+  evidence, including terms source and reviewed-text checksum. All 64
+  Python tests and Flutter analysis passed; changed text and invalid URL
+  selections are rejected. Entity tagging, graph training and remaining
+  providers stay open; the overall requirement is not complete.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
