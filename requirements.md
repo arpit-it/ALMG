@@ -1081,7 +1081,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   warnings treated as errors, and Flutter analysis passed.
 
 
-- [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
+- [x] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   One-word differences in phrases of 8–80 words now form review groups,
   including across explicit source groups, and stay together in evaluation
   splits. Similarity alone does not exclude examples or assert a label
@@ -1122,6 +1122,19 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Flutter analysis passed, including malformed later-batch preservation and
   interrupted-review recovery. Real-model semantic review quality remains
   unverified, so this requirement remains open.
+  Final acceptance: the rebuilt Mac app ran label review with the existing
+  verified mlx-community/Qwen3.8-27B-4bit checkpoint, with model loading
+  offline and external collection blocked. For three imported local examples,
+  Qwen flagged the mixed orchard-fruit/star-chart sentence and left both
+  clear fruit and astronomy examples unflagged. All labels, class balance
+  and usable counts remained unchanged, with training approval pending.
+  Review results now save and display the model identifier; a regression
+  assertion covers that provenance. Existing weights remained verified.
+  All 136 Python tests and Flutter analysis passed. Combined with the
+  recorded import validation, duplicate/near-duplicate warnings, ambiguous
+  example review and source/variant split verification, the stated acceptance
+  criteria are complete. Model suggestions remain advisory and can be wrong;
+  this three-example check is not a general accuracy benchmark.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
   shipping class and left training approval pending. The backend also

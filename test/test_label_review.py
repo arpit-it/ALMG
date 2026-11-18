@@ -20,6 +20,7 @@ class LabelReviewTest(unittest.TestCase):
         self.assertEqual((job['label_reviewed_rows'], job['label_review_flags']), (6, 1))
         self.assertEqual(job['preview'][0]['text'], 'Independent example 5')
         self.assertEqual(job['preview'][0]['label_review']['reason'], 'Insufficient context.')
+        self.assertEqual(job['preview'][0]['label_review']['model'], studio.MODEL)
         self.assertEqual(job['usable_counts']['fruit'], 6)
         self.assertEqual([row['label'] for row in studio.TRAINING_DATA.pop(job['id'])], ['fruit'] * 6)
         self.assertTrue(all('label_review' not in row for row in rows))

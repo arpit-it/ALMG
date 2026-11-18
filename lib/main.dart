@@ -2696,7 +2696,8 @@ class _StudioPageState extends State<StudioPage> {
                 row['image'] == null
                     ? [
                         if (row['label_review'] is Map && row['label_review']['ambiguous'] == true)
-                          'Local model review: ${row['label_review']['reason']}',
+                          'Local model review: ${row['label_review']['reason']}'
+                            '${row['label_review']['model'] == null ? '' : '\nReview model: ${row['label_review']['model']}'}',
                         if (row['possible_label_ambiguity'] == true) 'Potential label ambiguity · Review changed word',
                         if (row['word_variant'] == true) 'One-word variant · Review label',
                         row['text'] as String,

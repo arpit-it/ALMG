@@ -1415,7 +1415,7 @@ def review_dataset_labels(job):
                         or not isinstance(review.get("reason"), str) or len(review["reason"]) > 160
                         or (review["ambiguous"] and not review["reason"].strip())):
                     raise ValueError("Local label review returned an invalid suggestion. Try again.")
-                by_index[review["index"]] = {"ambiguous": review["ambiguous"], "reason": review["reason"].strip()}
+                by_index[review["index"]] = {"ambiguous": review["ambiguous"], "reason": review["reason"].strip(), "model": MODEL}
             reviewed.extend({**row, "label_review": by_index[index]} for index, row in enumerate(batch))
         prepare_dataset(job, reviewed)
     except Exception as error:
