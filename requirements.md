@@ -1547,6 +1547,22 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   a deliberately tiny offline validation fixture, not a production fine-tuning
   recipe; no additional recipe, downloads or external collection were enabled.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
+  Partial delivery: training approval checks available memory and free disk
+  against a minimum reserve scaled by prepared dataset size; a second check
+  runs immediately before training after idle waiting. Successful measurements
+  are saved with the job. Low resources leave/return the prepared dataset to
+  fresh approval, with an actionable message and no trainer invocation.
+  macOS memory uses vm_stat page size plus free/inactive/speculative pages;
+  disk is checked on the existing ancestor of the training storage directory.
+  The 175-test Python suite passed with the unrelated opt-in Metal test skipped
+  (174 executed). Tests cover memory parsing, dataset-scaled estimates, low
+  memory/disk, no queued worker, and resource loss after queuing. In the rebuilt
+  Mac app, a local low-memory fixture displayed 0 MiB available versus a
+  258 MiB reserve and retained training approval. Retrying with real system
+  resources trained the same 45-example dataset to preview at accuracy 1.000;
+  saved resource measurements exceeded both estimates. No external collection
+  occurred. Idle/power, sleep/wake and busy-machine resume verification remain
+  open; estimates are admission checks rather than memory-usage guarantees.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.

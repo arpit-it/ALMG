@@ -40,8 +40,9 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
+    import training_resources
     import lora_validation
     import recipe_contracts
     import chat_history
@@ -1640,9 +1641,10 @@ def run(job):
         with LOCK:
             if job["status"] not in ("queued", "waiting_idle"):
                 return
+            rows = TRAINING_DATA[job["id"]]
+            job["resource_check"] = training_resources.check(rows, ROOT)
             job["status"] = "training"
             store_job(job)
-            rows = TRAINING_DATA[job["id"]]
         def report(message):
             with LOCK:
                 if job["status"] == "cancelled":
@@ -1678,6 +1680,11 @@ def run(job):
         activity(job, "Evaluation complete. Waiting for inference preview and release approval.")
     except TrainingCancelled:
         return
+    except training_resources.ResourceUnavailable as error:
+        with LOCK:
+            if job["status"] != "cancelled":
+                job.update(status="dataset_ready", error=str(error))
+                store_job(job)
     except Exception as error:
         with LOCK:
             if job["status"] != "cancelled":
@@ -2532,7 +2539,8 @@ class Handler(BaseHTTPRequestHandler):
                         parameters = recipe_contracts.training_parameters(
                             job.get("recipe", "classifier"), data, job.get("recipe_contract"))
                         recipe_contracts.execution_variant(job.get("recipe", "classifier"), job.get("mode"))
-                        job.update(status="queued", **parameters, error=None)
+                        resources = training_resources.check(TRAINING_DATA.get(job["id"], []), ROOT)
+                        job.update(status="queued", **parameters, resource_check=resources, error=None)
                         TRAINING_WORKERS.add(job["id"])
                         worker = (run, (job,))
                     elif action == "preview" and status in ("preview_ready", "passed"):
