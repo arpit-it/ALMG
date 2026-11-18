@@ -848,6 +848,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Python tests and Flutter analysis passed, including stale-guidance and
   invalid-scope rejection. Dataset collection and remaining broad
   discovery criteria stay open.
+
+  Selected website page previews can now enter text classification datasets
+  only while site access and per-preview reuse evidence remain current.
+  In the rebuilt Mac app with local fixtures, deselecting one of three
+  approved previews produced exactly the two selected examples with source
+  URLs, discovery page, access-review basis and reuse basis. Class-count
+  warnings remained visible; training was not started. All 112 Python
+  tests, three Dart selection tests and Flutter analysis passed. The broad
+  discovery requirement remains open pending verification of all criteria
+  together, including provider settings and project website workflows.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

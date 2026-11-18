@@ -342,3 +342,27 @@ def page_reuse_evidence(record, decision, review, current_website):
         raise ValueError('Review the current page preview and record permission for that preview scope first.')
     return {'source': record['source'], 'scope': 'website_page_preview', 'permission_basis': basis.strip(),
             'page_preview_sha256': page_preview_checksum(record), 'time': time.time()}
+
+
+def approved_page_rows(records, approved_urls, review, current_website):
+    """Collect selected reviewed excerpts while access and reuse evidence are current."""
+    if (not isinstance(approved_urls, list) or not approved_urls
+            or any(not isinstance(url, str) for url in approved_urls)
+            or len(set(approved_urls)) != len(approved_urls)):
+        raise ValueError('Select website page preview URLs before approving collection.')
+    selected = [record for record in records if record.get('source') in approved_urls]
+    if len(selected) != len(approved_urls):
+        raise ValueError('Approve only listed website page preview URLs.')
+    rows = []
+    for record in selected:
+        require_page_access(review, current_website, record)
+        text, approval = record.get('page_text'), record.get('reuse_approval')
+        if (not isinstance(text, str) or len(text) < 40 or record.get('reuse_status') != 'user_approved'
+                or not isinstance(approval, dict) or approval.get('source') != record.get('source')
+                or approval.get('scope') != 'website_page_preview'
+                or record.get('access_guidance_sha256') != guidance_checksum(review)
+                or approval.get('page_preview_sha256') != page_preview_checksum(record)):
+            raise ValueError('Record current page preview reuse permission before collection.')
+        rows.append({**record, 'provider': 'project_website', 'text': text, 'group': record['source'],
+                     'collection_scope': 'website_page_preview', 'site_access_approval': dict(review['access_approval'])})
+    return rows

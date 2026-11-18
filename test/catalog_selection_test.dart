@@ -2,6 +2,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/catalog_selection.dart';
 
 void main() {
+  test('website page eligibility requires preview scope and enough text', () {
+    final record = {'page_reviewed': true, 'reuse_status': 'user_approved',
+      'reuse_approval': {'scope': 'website_page_preview'}, 'page_text': 'a' * 40};
+    expect(collectableWebsitePage(record), isTrue);
+    expect(collectableWebsitePage({...record, 'page_text': 'a' * 39}), isFalse);
+    expect(collectableWebsitePage({...record, 'page_reviewed': false}), isFalse);
+    expect(collectableWebsitePage({...record, 'reuse_approval': {'scope': 'whole_site'}}), isFalse);
+  });
   test('Crossref collection requires reviewed scoped permission and 40 characters', () {
     final record = {
       'abstract_reviewed': true, 'reuse_status': 'user_approved',

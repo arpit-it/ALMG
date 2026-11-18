@@ -48,3 +48,9 @@ bool collectableFiling(Map record) =>
     record['filing_reviewed'] == true && record['reuse_status'] == 'user_approved' &&
     record['reuse_approval'] is Map && record['reuse_approval']['scope'] == 'sec_filing_preview' &&
     (record['filing_text'] as String? ?? '').length >= 40;
+
+/// Whether the website page preview has reuse permission and usable text.
+bool collectableWebsitePage(Map record) =>
+    record['page_reviewed'] == true && record['reuse_status'] == 'user_approved' &&
+    record['reuse_approval'] is Map && record['reuse_approval']['scope'] == 'website_page_preview' &&
+    (record['page_text'] as String? ?? '').length >= 40;

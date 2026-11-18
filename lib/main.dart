@@ -533,6 +533,7 @@ class _StudioPageState extends State<StudioPage> {
   final Set<String> _excludedNotices = {};
   final Set<String> _excludedBibliography = {};
   final Set<String> _excludedFilings = {};
+  final Set<String> _excludedWebsitePages = {};
   final _secQuery = TextEditingController();
   final _secCik = TextEditingController();
   final _secContact = TextEditingController();
@@ -717,6 +718,10 @@ class _StudioPageState extends State<StudioPage> {
         if (_job?['id'] != job['id'] ||
             !{'filing_candidates', 'reviewing_filing'}.contains(job['status'])) {
           _excludedFilings.clear();
+        }
+        if (_job?['id'] != job['id'] ||
+            !{'website_candidates', 'reviewing_website_page'}.contains(job['status'])) {
+          _excludedWebsitePages.clear();
         }
         _job = job;
       });
@@ -1226,6 +1231,7 @@ class _StudioPageState extends State<StudioPage> {
     if (provider == 'europe_pmc') return 'Europe PMC: $source';
     if (provider == 'wikidata') return 'Wikidata: $source';
     if (provider == 'world_bank') return 'World Bank indicator catalog: $source';
+    if (provider == 'project_website') return 'Project website: $source';
     if (provider == 'sec_edgar') return 'SEC EDGAR: $source';
     if (provider == 'crossref') return 'Crossref: $source';
     if (provider == 'federal_register') return 'Federal Register: $source';
@@ -1402,6 +1408,12 @@ class _StudioPageState extends State<StudioPage> {
     ];
     final projectWebsite = _projects.where((project) => project['id'] == _project)
         .firstOrNull?['source_website'] as String? ?? '';
+    final websiteRecords = job?['website_candidates'] as List? ?? const [];
+    final selectedWebsiteUrls = [
+      for (final record in websiteRecords)
+        if (collectableWebsitePage(record as Map) && !_excludedWebsitePages.contains(record['source']))
+          record['source'] as String,
+    ];
     final filingRecords = job?['filing_candidates'] as List? ?? const [];
     final selectedFilingUrls = [
       for (final record in filingRecords)
@@ -1829,12 +1841,22 @@ class _StudioPageState extends State<StudioPage> {
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-website-access', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'website_candidates') ...[
-          const Text('Approve each discovered URL before loading its text preview, then review content reuse separately. Dataset collection is not available yet.'),
+          const Text('Approve collection of selected, reuse-approved website page previews for text classification. Only displayed text is collected, including any truncation.'),
           if ((job?['website_candidates'] as List? ?? const []).isEmpty)
             const Text('No supported same-site links were found within the preview limits.'),
-          for (final record in job?['website_candidates'] as List? ?? const [])
+          for (final record in websiteRecords)
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               SelectableText(record['source'] as String),
+              if (collectableWebsitePage(record as Map))
+                CheckboxListTile(title: Text("Include page preview: ${record['source']}"),
+                  value: !_excludedWebsitePages.contains(record['source']),
+                  onChanged: _busy ? null : (checked) => setState(() {
+                    final source = record['source'] as String;
+                    if (checked == true) { _excludedWebsitePages.remove(source); }
+                    else { _excludedWebsitePages.add(source); }
+                  })),
+              if (record['page_reviewed'] == true && (record['page_text'] as String).length < 40)
+                const Text('This page preview is too short for collection. At least 40 characters are required.'),
               if (record['page_reviewed'] == true) ...[
                 SelectableText('Page text preview: ${record['page_text']}'),
                 if (record['page_text_truncated'] == true) const Text('Preview truncated to 20,000 characters.'),
@@ -1843,7 +1865,7 @@ class _StudioPageState extends State<StudioPage> {
               if (record['reuse_approval'] case final Map approval)
                 SelectableText('Website page preview reuse approval: ${approval['permission_basis']}')
               else if (record['page_reviewed'] == true)
-                TextButton(onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                TextButton(onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record,
                     action: 'approve-website-page-reuse', scope: 'website_page_preview'),
                   child: const Text('Record page preview reuse approval')),
               OutlinedButton(onPressed: _busy ? null : () async {
@@ -1858,6 +1880,10 @@ class _StudioPageState extends State<StudioPage> {
                 }
               }, child: const Text('Review page preview request')),
             ]),
+          if (websiteRecords.any((record) => collectableWebsitePage(record as Map)))
+            OutlinedButton(onPressed: _busy || selectedWebsiteUrls.isEmpty ? null
+                : () => _submit('/jobs/$id/use-website-page-previews', {'approved_urls': selectedWebsiteUrls}),
+              child: Text('Approve website page preview collection (${selectedWebsiteUrls.length} selected)')),
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-website-links', {}), child: const Text('Return to website access review')),
         ],
         if (status == 'company_candidates') ...[
@@ -2535,9 +2561,15 @@ class _StudioPageState extends State<StudioPage> {
                                           : row['provider'] == 'federal_register'
                                               ? 'Document: $title'
                                               : 'Article: $title',
-                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'crossref', 'sec_edgar'}.contains(row['provider']) && row['reuse_approval'] is Map)
+                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'crossref', 'sec_edgar', 'project_website'}.contains(row['provider']) && row['reuse_approval'] is Map)
                           'User reuse approval: ${row['reuse_approval']['permission_basis']}',
                         if (row['provider'] == 'crossref') 'Content scope: abstract',
+                        if (row['provider'] == 'project_website') ...[
+                          'Content scope: website page preview',
+                          'Discovered from: ${row['discovered_from']}',
+                          if (row['site_access_approval'] is Map) 'Site access review: ${row['site_access_approval']['access_basis']}',
+                          if (row['page_text_truncated'] == true) 'Text truncated to the reviewed preview.',
+                        ],
                         if (row['provider'] == 'sec_edgar') ...[
                           'Content scope: filing preview',
                           'CIK ${row['cik']} · ${row['form']} · ${row['filing_date']}',

@@ -180,3 +180,25 @@ class WebsiteAccessTest(unittest.TestCase):
             studio.review_website_page(job, review['website'], record['source'])
         self.assertNotIn('reuse_approval', job['website_candidates'][0])
         self.assertEqual(job['website_candidates'][0]['reuse_status'], 'unverified')
+
+    def test_collection_requires_selected_current_page_access_and_reuse(self):
+        review = self.discovery_review()
+        record = {'source': 'https://example.org/archive/fruit', 'discovered_from': review['website'],
+                  **access.page_preview(b'Fruit cultivation practices and seasonal harvest revenue in this local page preview.'),
+                  'access_guidance_sha256': access.guidance_checksum(review)}
+        record['reuse_approval'] = access.page_reuse_evidence(record, {'approved_url': record['source'], 'confirmed': True,
+            'approved_scope': 'website_page_preview', 'permission_basis': 'Local fixture content permission reviewed.'}, review, review['website'])
+        record['reuse_status'] = 'user_approved'
+        rows = access.approved_page_rows([record, {'source': 'unselected'}], [record['source']], review, review['website'])
+        self.assertEqual(rows[0]['text'], record['page_text'])
+        self.assertEqual(rows[0]['collection_scope'], 'website_page_preview')
+        self.assertEqual(rows[0]['site_access_approval'], review['access_approval'])
+        for urls in ([], ['unknown'], [record['source'], record['source']]):
+            with self.assertRaises(ValueError):
+                access.approved_page_rows([record], urls, review, review['website'])
+        for change in ({'page_text': 'Changed page preview that must invalidate the current permission.'}, {'page_text_truncated': True},
+                       {'reuse_status': 'unverified'}, {'reuse_approval': {**record['reuse_approval'], 'scope': 'whole_site'}}):
+            with self.assertRaises(ValueError):
+                access.approved_page_rows([{**record, **change}], [record['source']], review, review['website'])
+        with self.assertRaises(ValueError):
+            access.approved_page_rows([record], [record['source']], review, 'https://other.org')
