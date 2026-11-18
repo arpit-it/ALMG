@@ -1,5 +1,6 @@
 """SQLite persistence and context selection for local conversations."""
 import base64
+import json
 import os
 import re
 import sqlite3
@@ -11,6 +12,7 @@ from threading import Lock
 from urllib.parse import quote, unquote_to_bytes, urlsplit
 
 DATABASE = Path(os.environ.get("STUDIO_CHAT_DB", Path(__file__).parent / "runs" / "chat.sqlite3"))
+DISCOVERY_PROVIDERS = ('wikipedia', 'commons', 'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'sec_edgar', 'crossref', 'project_website')
 SEND_LOCK = Lock()
 SCHEMA_LOCK = Lock()
 
@@ -50,6 +52,8 @@ def connect():
             db.execute("ALTER TABLE projects ADD COLUMN directory TEXT")
         if "source_website" not in {row["name"] for row in db.execute("PRAGMA table_info(projects)")}:
             db.execute("ALTER TABLE projects ADD COLUMN source_website TEXT NOT NULL DEFAULT ''")
+        if "enabled_providers" not in {row["name"] for row in db.execute("PRAGMA table_info(projects)")}:
+            db.execute("ALTER TABLE projects ADD COLUMN enabled_providers TEXT")
         columns = {row["name"] for row in db.execute("PRAGMA table_info(messages)")}
         if "file_name" not in columns:
             db.execute("ALTER TABLE messages ADD COLUMN file_name TEXT")
@@ -84,10 +88,17 @@ def recent_chats():
         """)]
 
 
+def project_record(row):
+    project = dict(row)
+    saved = project.get("enabled_providers")
+    project["enabled_providers"] = list(DISCOVERY_PROVIDERS) if saved is None else json.loads(saved)
+    return project
+
+
 def list_projects():
     """List projects in alphabetical order."""
     with closing(connect()) as db:
-        return [dict(row) for row in db.execute("SELECT * FROM projects ORDER BY name COLLATE NOCASE")]
+        return [project_record(row) for row in db.execute("SELECT * FROM projects ORDER BY name COLLATE NOCASE")]
 
 
 def create_project(name, directory=None):
@@ -323,17 +334,21 @@ def project_details(project_id):
     """Return project instructions and the list of reference files."""
     with closing(connect()) as db:
         require_project(db, project_id)
-        project = dict(db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone())
+        project = project_record(db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone())
         project["files"] = [dict(row) for row in db.execute(
             "SELECT id, name FROM project_files WHERE project_id = ? ORDER BY rowid", (project_id,)
         )]
         return project
 
 
-def update_project(project_id, instructions, source_website=None):
+def update_project(project_id, instructions, source_website=None, enabled_providers=None):
     """Replace the instructions used for chats in a project."""
     if not isinstance(instructions, str) or len(instructions) > 2000:
         raise ValueError("Project instructions must be at most 2,000 characters.")
+    if enabled_providers is not None and (not isinstance(enabled_providers, list)
+            or any(not isinstance(value, str) or value not in DISCOVERY_PROVIDERS for value in enabled_providers)
+            or len(set(enabled_providers)) != len(enabled_providers)):
+        raise ValueError("Select known discovery providers without duplicates.")
     if source_website is not None:
         if not isinstance(source_website, str):
             raise ValueError("Enter a public HTTPS website URL.")
@@ -369,6 +384,8 @@ def update_project(project_id, instructions, source_website=None):
         require_project(db, project_id)
         db.execute("UPDATE projects SET instructions = ?, source_website = COALESCE(?, source_website) WHERE id = ?",
                    (instructions.strip(), source_website, project_id))
+        if enabled_providers is not None:
+            db.execute("UPDATE projects SET enabled_providers = ? WHERE id = ?", (json.dumps(enabled_providers), project_id))
 
 
 def add_project_file(project_id, name, content):

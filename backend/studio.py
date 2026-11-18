@@ -227,6 +227,24 @@ SEC_REQUEST_LOCK = threading.Lock()
 SEC_LAST_REQUEST = 0.0
 
 
+EXTERNAL_PROVIDER_ACTIONS = {
+    "search-images": "commons", "search-catalog": "loc", "review-catalog-item": "loc",
+    "search-publications": "europe_pmc", "review-publication": "europe_pmc", "search-entities": "wikidata",
+    "load-indicators": "world_bank", "next-indicators": "world_bank", "search-notices": "federal_register",
+    "review-notice": "federal_register", "search-companies": "sec_edgar", "search-filings": "sec_edgar",
+    "review-filing": "sec_edgar", "search-bibliography": "crossref", "review-bibliography": "crossref",
+    "review-website-access": "project_website", "discover-website-links": "project_website", "review-website-page": "project_website",
+}
+
+
+def require_enabled_provider(job, action, data):
+    provider = "wikipedia" if action == "prepare" and data.get("mode") == "web" else EXTERNAL_PROVIDER_ACTIONS.get(action)
+    if provider and job.get("project_id"):
+        enabled = chat_history.project_details(job["project_id"])["enabled_providers"]
+        if provider not in enabled:
+            raise ValueError("This discovery provider is disabled for the project. Enable it in project settings first.")
+
+
 def review_website_page(job, website, source):
     try:
         record = next(record for record in job["website_candidates"] if record["source"] == source)
@@ -1722,7 +1740,7 @@ class Handler(BaseHTTPRequestHandler):
                 chat_history.delete_chat(data["id"])
                 return self.respond({"ok": True})
             if self.path == "/projects/instructions":
-                chat_history.update_project(data["id"], data["instructions"], data.get("source_website"))
+                chat_history.update_project(data["id"], data["instructions"], data.get("source_website"), data.get("enabled_providers"))
                 return self.respond({"ok": True})
             if self.path == "/projects/files/add":
                 chat_history.add_project_file(data["id"], data["name"], data["content"])
@@ -1804,6 +1822,7 @@ class Handler(BaseHTTPRequestHandler):
                     job = JOBS.get(parts[1])
                     if job is None:
                         raise ValueError("Training task not found.")
+                    require_enabled_provider(job, action, data)
                     status = job["status"]
                     if action == "edit-dataset-size" and status == "approval" and job.get("recipe") == "classifier":
                         count = data.get("examples_per_label")

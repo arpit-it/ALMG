@@ -3,6 +3,13 @@ import 'dart:convert';
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
 
+const discoveryProviderNames = <String, String>{
+  'wikipedia': 'English Wikipedia', 'commons': 'Wikimedia Commons', 'loc': 'Library of Congress',
+  'europe_pmc': 'Europe PMC', 'wikidata': 'Wikidata', 'world_bank': 'World Bank Open Data',
+  'federal_register': 'Federal Register', 'sec_edgar': 'SEC EDGAR', 'crossref': 'Crossref',
+  'project_website': 'Project website',
+};
+
 /// Edits a project’s instructions and local reference files.
 class ProjectSettings extends StatefulWidget {
   /// Creates an editor for an existing project.
@@ -33,6 +40,8 @@ class _ProjectSettingsState extends State<ProjectSettings> {
   late final _sourceWebsite = TextEditingController(
     text: widget.project['source_website'] as String?,
   );
+  late final Set<String> _enabledProviders =
+      (widget.project['enabled_providers'] as List? ?? discoveryProviderNames.keys.toList()).cast<String>().toSet();
   bool _busy = false;
   String? _error;
 
@@ -82,6 +91,7 @@ class _ProjectSettingsState extends State<ProjectSettings> {
       body: {
         'id': _project['id'],
         'instructions': _instructions.text,
+        'enabled_providers': _enabledProviders.toList(),
         if (_sourceWebsite.text != (widget.project['source_website'] ?? ''))
           'source_website': _sourceWebsite.text,
       },
@@ -146,6 +156,15 @@ class _ProjectSettingsState extends State<ProjectSettings> {
               border: OutlineInputBorder(),
             ),
           ),
+          const SizedBox(height: 12),
+          const Text('Enabled discovery providers'),
+          const Text('Enabling a provider does not contact it. Each discovery request still needs approval.'),
+          for (final provider in discoveryProviderNames.entries)
+            CheckboxListTile(title: Text(provider.value), value: _enabledProviders.contains(provider.key),
+              onChanged: _busy ? null : (checked) => setState(() {
+                if (checked == true) { _enabledProviders.add(provider.key); }
+                else { _enabledProviders.remove(provider.key); }
+              })),
           const SizedBox(height: 12),
           TextField(
             controller: _sourceWebsite,

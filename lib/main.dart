@@ -884,6 +884,16 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _submit(String path, Map<String, dynamic> body) async {
+    const providers = {'search-images': 'commons', 'search-catalog': 'loc', 'search-publications': 'europe_pmc',
+      'search-entities': 'wikidata', 'load-indicators': 'world_bank', 'search-notices': 'federal_register',
+      'search-companies': 'sec_edgar', 'search-filings': 'sec_edgar', 'search-bibliography': 'crossref',
+      'review-website-access': 'project_website'};
+    final action = path.split('/').last;
+    final provider = action == 'prepare' && body['mode'] == 'web' ? 'wikipedia' : providers[action];
+    if (provider != null && !_providerEnabled(provider)) {
+      setState(() => _error = 'This discovery provider is disabled for the project. Enable it in project settings first.');
+      return;
+    }
     setState(() {
       _error = null;
       _busy = true;
@@ -1245,6 +1255,11 @@ class _StudioPageState extends State<StudioPage> {
   String _commonsFilePage(String title) =>
       'File page: https://commons.wikimedia.org/wiki/File:${Uri.encodeComponent(title)}';
 
+  bool _providerEnabled(String provider) {
+    final project = _projects.where((item) => item['id'] == _project).firstOrNull;
+    return (project?['enabled_providers'] as List? ?? discoveryProviderNames.keys.toList()).contains(provider);
+  }
+
   Future<void> _showDiscoveryProviders(bool hasQueries) async {
     final projectId = _project;
     final website = _projects
@@ -1267,12 +1282,12 @@ class _StudioPageState extends State<StudioPage> {
                 ),
                 ListTile(
                   title: const Text('English Wikipedia'),
-                  trailing: hasQueries && !_imageRecipe ? const Text('Current plan') : null,
+                  trailing: !_providerEnabled('wikipedia') ? const Text('Disabled') : hasQueries && !_imageRecipe ? const Text('Current plan') : null,
                   subtitle: const Text('en.wikipedia.org · Text classification'),
                 ),
                 ListTile(
                   title: const Text('Wikimedia Commons'),
-                  trailing: hasQueries && _imageRecipe ? const Text('Current plan') : null,
+                  trailing: !_providerEnabled('commons') ? const Text('Disabled') : hasQueries && _imageRecipe ? const Text('Current plan') : null,
                   subtitle: const Text('commons.wikimedia.org · Images and captions'),
                 ),
                 if (projectId != null) ...[
@@ -1288,32 +1303,39 @@ class _StudioPageState extends State<StudioPage> {
                       subtitle: const Text('Robots review available; crawling unavailable'),
                     ),
                 ],
-                const ListTile(
-                  title: Text('Library of Congress'),
+                ListTile(
+                  trailing: _providerEnabled('loc') ? null : const Text('Disabled'),
+                  title: const Text('Library of Congress'),
                   subtitle: Text('www.loc.gov · Catalog preview for text classification'),
                 ),
-                const ListTile(
-                  title: Text('Europe PMC'),
+                ListTile(
+                  trailing: _providerEnabled('europe_pmc') ? null : const Text('Disabled'),
+                  title: const Text('Europe PMC'),
                   subtitle: Text('www.ebi.ac.uk · Publication preview for text classification'),
                 ),
-                const ListTile(
-                  title: Text('Wikidata'),
+                ListTile(
+                  trailing: _providerEnabled('wikidata') ? null : const Text('Disabled'),
+                  title: const Text('Wikidata'),
                   subtitle: Text('www.wikidata.org · Entity preview for text classification'),
                 ),
-                const ListTile(
-                  title: Text('World Bank Open Data'),
+                ListTile(
+                  trailing: _providerEnabled('world_bank') ? null : const Text('Disabled'),
+                  title: const Text('World Bank Open Data'),
                   subtitle: Text('api.worldbank.org · Indicator catalog preview'),
                 ),
-                const ListTile(
-                  title: Text('Federal Register'),
+                ListTile(
+                  trailing: _providerEnabled('federal_register') ? null : const Text('Disabled'),
+                  title: const Text('Federal Register'),
                   subtitle: Text('www.federalregister.gov · Document preview for text classification'),
                 ),
-                const ListTile(
-                  title: Text('Crossref'),
+                ListTile(
+                  trailing: _providerEnabled('crossref') ? null : const Text('Disabled'),
+                  title: const Text('Crossref'),
                   subtitle: Text('api.crossref.org · Bibliographic preview for text classification'),
                 ),
-                const ListTile(
-                  title: Text('SEC EDGAR'),
+                ListTile(
+                  trailing: _providerEnabled('sec_edgar') ? null : const Text('Disabled'),
+                  title: const Text('SEC EDGAR'),
                   subtitle: Text('www.sec.gov · Company name/ticker lookup\ndata.sec.gov · Recent filings by CIK\nSeparate approval for filing text and reuse; declared contact required.'),
                 ),
 
@@ -1325,7 +1347,7 @@ class _StudioPageState extends State<StudioPage> {
           if (projectId != null)
             TextButton(
               onPressed: () => Navigator.of(context).pop(true),
-              child: Text(website.isEmpty ? 'Add project website' : 'Edit project website'),
+              child: const Text('Project discovery settings'),
             ),
           TextButton(
             onPressed: () => Navigator.of(context).pop(),

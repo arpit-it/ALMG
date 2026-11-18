@@ -858,6 +858,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   tests, three Dart selection tests and Flutter analysis passed. The broad
   discovery requirement remains open pending verification of all criteria
   together, including provider settings and project website workflows.
+
+  Projects now persist enabled discovery providers, with existing projects
+  defaulting to the available set. The app labels disabled providers and
+  blocks their searches; backend checks reject disabled discovery actions
+  before workers start. In the rebuilt Mac app, disabling Crossref survived
+  saving/reopening settings, showed Disabled in the provider list, and a
+  search attempt showed the disabled message without a fixture request.
+  All 113 Python tests and Flutter analysis passed, including project
+  isolation, persistence, invalid-selection and disabled-request checks.
+  Full cross-provider acceptance verification remains open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
