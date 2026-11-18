@@ -1650,9 +1650,10 @@ def run(job):
                 if job["status"] == "cancelled":
                     raise TrainingCancelled()
             activity(job, message)
-        if job.get("mode") == "web_images":
+        variant = recipe_contracts.execution_variant(job.get("recipe", "classifier"), job.get("mode"))
+        if variant == "Commons captions":
             model, rows, metrics = image_recipe.train_web(rows, job["target"], report)
-        elif job.get("recipe") == "text_to_image":
+        elif variant == "local shapes":
             model, rows, metrics = image_recipe.train(rows, job["target"], report)
         else:
             def repair(mistakes):
@@ -2531,6 +2532,7 @@ class Handler(BaseHTTPRequestHandler):
                             )
                         parameters = recipe_contracts.training_parameters(
                             job.get("recipe", "classifier"), data, job.get("recipe_contract"))
+                        recipe_contracts.execution_variant(job.get("recipe", "classifier"), job.get("mode"))
                         job.update(status="queued", **parameters, error=None)
                         TRAINING_WORKERS.add(job["id"])
                         worker = (run, (job,))

@@ -81,11 +81,24 @@ def training_parameters(recipe_id, values, snapshot=None):
     return result
 
 
+def execution_variant(recipe_id, mode):
+    """Resolve only the existing recipe/source combinations, including legacy local jobs."""
+    recipe_contract(recipe_id)
+    if recipe_id == 'classifier' and mode in (None, 'local', 'synthetic', 'local_csv', 'web'):
+        return 'classifier'
+    if recipe_id == 'text_to_image':
+        if mode in (None, 'local', 'synthetic'):
+            return 'local shapes'
+        if mode == 'web_images':
+            return 'Commons captions'
+    raise ValueError('Dataset mode is not supported by this training recipe.')
+
+
 def validate_metrics(recipe_id, mode, metrics, target):
     """Reject invalid evaluation output before saving a preview candidate."""
     import math
     contract = recipe_contract(recipe_id)
-    variant = ('Commons captions' if mode == 'web_images' else 'local shapes') if recipe_id == 'text_to_image' else 'classifier'
+    variant = execution_variant(recipe_id, mode)
     if not isinstance(metrics, dict) or type(metrics.get('passed')) is not bool:
         raise ValueError('Recipe evaluation must include a boolean passed result.')
     keys = contract['metrics'][variant]
@@ -102,7 +115,7 @@ def validate_metrics(recipe_id, mode, metrics, target):
 
 def validate_model(recipe_id, mode, model):
     """Check the existing runtime/export format before candidate persistence."""
-    recipe_contract(recipe_id)
+    execution_variant(recipe_id, mode)
     if recipe_id == 'classifier':
         from sklearn.pipeline import Pipeline
         if not isinstance(model, Pipeline) or not callable(getattr(model, 'predict', None)):
@@ -160,7 +173,7 @@ def export_metadata(job):
 
 def validate_dataset(recipe_id, mode, rows, labels=()):
     """Validate the existing recipe's row structure before invoking a trainer."""
-    recipe_contract(recipe_id)
+    execution_variant(recipe_id, mode)
     if not isinstance(rows, list) or not rows:
         raise ValueError('Recipe dataset must be a nonempty list of examples.')
     for index, row in enumerate(rows):

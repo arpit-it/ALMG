@@ -247,3 +247,25 @@ class RecipeContractsTest(unittest.TestCase):
             self.assertEqual(job['status'], 'failed')
             self.assertIn('nonempty group', job['error'])
             self.assertEqual(studio.TRAINING_DATA[job['id']], rows)
+
+    def test_execution_variants_reject_recipe_source_mismatches(self):
+        for mode in (None, 'local', 'synthetic', 'local_csv', 'web'):
+            self.assertEqual(recipe_contracts.execution_variant('classifier', mode), 'classifier')
+        for mode in (None, 'local', 'synthetic'):
+            self.assertEqual(recipe_contracts.execution_variant('text_to_image', mode), 'local shapes')
+        self.assertEqual(recipe_contracts.execution_variant('text_to_image', 'web_images'), 'Commons captions')
+        for recipe, mode in [('classifier', 'web_images'), ('text_to_image', 'web'), ('text_to_image', 'local_csv'), ('classifier', 'unknown')]:
+            with self.subTest(recipe=recipe, mode=mode), self.assertRaisesRegex(ValueError, 'not supported'):
+                recipe_contracts.execution_variant(recipe, mode)
+
+    def test_invalid_execution_mode_leaves_approval_pending_without_worker(self):
+        import io
+        from unittest.mock import Mock
+        job = {'id': 'mode-fixture', 'recipe': 'text_to_image', 'mode': 'local_csv', 'status': 'dataset_ready'}
+        body = json.dumps({'target': 0.8, 'idle': False}).encode()
+        handler = Mock(path='/jobs/mode-fixture/start', headers={'Content-Length': str(len(body))}, rfile=io.BytesIO(body))
+        with patch.object(studio, 'JOBS', {job['id']: job}), patch.object(studio, 'store_job'), patch.object(studio.threading, 'Thread') as worker:
+            studio.Handler.do_POST(handler)
+        self.assertEqual(job['status'], 'dataset_ready')
+        self.assertEqual(handler.respond.call_args.args[1], 400)
+        worker.assert_not_called()
