@@ -839,6 +839,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Flutter analysis passed, including stale-access/unsafe-URL rejection and
   failed-refresh cleanup. Content reuse review and dataset collection
   remain open.
+
+  Website page previews now support explicit preview-only reuse permission
+  with a recorded basis, bound to source, text, truncation and current
+  access guidance. In the rebuilt Mac app using local fixtures, the scope
+  dialog recorded the basis; an approved page refresh removed the decision
+  and restored reuse review while the other URL stayed unloaded. All 111
+  Python tests and Flutter analysis passed, including stale-guidance and
+  invalid-scope rejection. Dataset collection and remaining broad
+  discovery criteria stay open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

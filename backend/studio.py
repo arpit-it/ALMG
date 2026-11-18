@@ -1950,6 +1950,16 @@ class Handler(BaseHTTPRequestHandler):
                         website_access.require_page_access(job["website_access"], website, record)
                         job.update(status="reviewing_website_page", error=None)
                         worker = (review_website_page, (job, website, source))
+                    elif action == "approve-website-page-reuse" and status == "website_candidates":
+                        website = chat_history.project_details(job.get("project_id"))["source_website"]
+                        record = next((row for row in job["website_candidates"] if row["source"] == data.get("approved_url")), None)
+                        if record is None:
+                            raise ValueError("Approve a discovered page URL first.")
+                        record["reuse_approval"] = website_access.page_reuse_evidence(record, data, job["website_access"], website)
+                        record["reuse_status"] = "user_approved"
+                        append_activity(job, "User reuse permission recorded for the displayed website page preview.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "close-website-links" and status == "website_candidates":
                         job.update(status="website_access_review", error=None)
                         store_job(job)

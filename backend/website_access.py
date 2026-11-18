@@ -317,3 +317,28 @@ def fetch_page_preview(review, current_website, record):
     source = require_page_access(review, current_website, record)
     preview = page_preview(_fetch_html(review, current_website, source))
     return {**preview, 'access_guidance_sha256': guidance_checksum(review)}
+
+
+def page_preview_checksum(record):
+    import json
+    text = record.get('page_text')
+    if (record.get('page_reviewed') is not True or not isinstance(text, str) or not 1 <= len(text) <= 20000
+            or type(record.get('page_text_truncated')) is not bool
+            or not isinstance(record.get('access_guidance_sha256'), str)
+            or not re.fullmatch(r'[0-9a-f]{64}', record['access_guidance_sha256'])):
+        raise ValueError('Review the website page preview first.')
+    fields = {key: record.get(key) for key in ('source', 'discovered_from', 'page_text', 'page_text_truncated', 'access_guidance_sha256')}
+    return hashlib.sha256(json.dumps(fields, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
+
+
+def page_reuse_evidence(record, decision, review, current_website):
+    """Record permission for the displayed page excerpt, separately from access."""
+    require_page_access(review, current_website, record)
+    basis = decision.get('permission_basis')
+    if (record.get('access_guidance_sha256') != guidance_checksum(review)
+            or decision.get('approved_url') != record.get('source') or decision.get('confirmed') is not True
+            or decision.get('approved_scope') != 'website_page_preview'
+            or not isinstance(basis, str) or not 10 <= len(basis.strip()) <= 2000):
+        raise ValueError('Review the current page preview and record permission for that preview scope first.')
+    return {'source': record['source'], 'scope': 'website_page_preview', 'permission_basis': basis.strip(),
+            'page_preview_sha256': page_preview_checksum(record), 'time': time.time()}

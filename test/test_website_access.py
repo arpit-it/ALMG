@@ -157,3 +157,26 @@ class WebsiteAccessTest(unittest.TestCase):
         self.assertNotIn('page_text', record)
         self.assertNotIn('reuse_approval', record)
         self.assertEqual(record['reuse_status'], 'unverified')
+
+    def test_page_reuse_is_bound_to_preview_and_access_guidance(self):
+        review = self.discovery_review()
+        record = {'source': 'https://example.org/archive/fruit', 'discovered_from': review['website'],
+                  **access.page_preview(b'<p>Local fruit harvest page preview.</p>'),
+                  'access_guidance_sha256': access.guidance_checksum(review)}
+        decision = {'approved_url': record['source'], 'confirmed': True, 'approved_scope': 'website_page_preview',
+                    'permission_basis': 'Local fixture content reuse permission reviewed.'}
+        evidence = access.page_reuse_evidence(record, decision, review, review['website'])
+        self.assertEqual(evidence['scope'], 'website_page_preview')
+        self.assertEqual(evidence['page_preview_sha256'], access.page_preview_checksum(record))
+        for change in ({'page_text': 'Changed preview'}, {'page_text_truncated': True}):
+            self.assertNotEqual(evidence['page_preview_sha256'], access.page_preview_checksum({**record, **change}))
+        for change in ({'approved_scope': 'site_access'}, {'confirmed': False}, {'approved_url': 'other'}, {'permission_basis': 'short'}):
+            with self.assertRaises(ValueError):
+                access.page_reuse_evidence(record, {**decision, **change}, review, review['website'])
+        with self.assertRaises(ValueError):
+            access.page_reuse_evidence({**record, 'access_guidance_sha256': '0' * 64}, decision, review, review['website'])
+        job = {'website_candidates': [{**record, 'reuse_approval': evidence, 'reuse_status': 'user_approved'}], 'website_access': review}
+        with patch.object(access, 'fetch_page_preview', return_value={**access.page_preview(b'Refreshed local page preview'), 'access_guidance_sha256': access.guidance_checksum(review)}), patch.object(studio, 'store_job'):
+            studio.review_website_page(job, review['website'], record['source'])
+        self.assertNotIn('reuse_approval', job['website_candidates'][0])
+        self.assertEqual(job['website_candidates'][0]['reuse_status'], 'unverified')

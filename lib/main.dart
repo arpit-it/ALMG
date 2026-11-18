@@ -1179,6 +1179,8 @@ class _StudioPageState extends State<StudioPage> {
                 const Text('This decision covers the displayed catalog description only. Country/year observations need separate review.'),
               if (scope == 'document_summary')
                 const Text('This decision covers the displayed document summary only. Full-text reuse needs separate review.'),
+              if (scope == 'website_page_preview')
+                const Text('This decision covers only the displayed page text preview, including any truncation. Website access permission and robots allowance do not establish permission to reuse content.'),
               if (scope == 'sec_filing_preview')
                 const Text('This decision covers only the displayed filing text preview, including any truncation. Review the applicable permission; public access does not establish reuse rights.'),
               if (scope == 'crossref_abstract')
@@ -1827,7 +1829,7 @@ class _StudioPageState extends State<StudioPage> {
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-website-access', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'website_candidates') ...[
-          const Text('Approve each discovered URL before loading its text preview. Reuse remains unverified; dataset collection is not available yet.'),
+          const Text('Approve each discovered URL before loading its text preview, then review content reuse separately. Dataset collection is not available yet.'),
           if ((job?['website_candidates'] as List? ?? const []).isEmpty)
             const Text('No supported same-site links were found within the preview limits.'),
           for (final record in job?['website_candidates'] as List? ?? const [])
@@ -1838,6 +1840,12 @@ class _StudioPageState extends State<StudioPage> {
                 if (record['page_text_truncated'] == true) const Text('Preview truncated to 20,000 characters.'),
                 const Text('Loading a page does not establish reuse permission.'),
               ],
+              if (record['reuse_approval'] case final Map approval)
+                SelectableText('Website page preview reuse approval: ${approval['permission_basis']}')
+              else if (record['page_reviewed'] == true)
+                TextButton(onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                    action: 'approve-website-page-reuse', scope: 'website_page_preview'),
+                  child: const Text('Record page preview reuse approval')),
               OutlinedButton(onPressed: _busy ? null : () async {
                 final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
                   title: const Text('Approve website page preview'),
