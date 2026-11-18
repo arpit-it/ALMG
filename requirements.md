@@ -1507,6 +1507,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   preview candidate. A separate valid 45-example fixture passed the same gate
   and trained to inference preview with held-out accuracy 1.000. No external
   collection occurred. LoRA validation and remaining integration stay open.
+  Existing trainers now run through one recipe execution interface that
+  resolves the catalog variant, validates settings and input/output datasets,
+  invokes the registered local trainer, and validates metrics and model before
+  returning a preview candidate. Orchestration retains scheduling, cancellation,
+  repair callbacks, checkpoint paths and persistence. Prepared rows are consumed
+  only after successful execution. All 167 Python tests passed, including
+  callback/checkpoint forwarding, malformed returns and real shape execution.
+  In the rebuilt Mac app, fresh 48-row classifier and 45-example shape fixtures
+  both trained through this interface to preview with held-out scores of 1.000.
+  Existing-recipe execution integration is delivered; the required small LoRA
+  run on Apple silicon remains unverified, so this item stays open. No external
+  collection, downloads or new recipes were added.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 

@@ -1642,34 +1642,28 @@ def run(job):
             job["status"] = "training"
             store_job(job)
             rows = TRAINING_DATA[job["id"]]
-            recipe_contracts.validate_dataset(job.get("recipe", "classifier"), job.get("mode"),
-                                              rows, job.get("plan", {}).get("labels", ()))
-            TRAINING_DATA.pop(job["id"])
         def report(message):
             with LOCK:
                 if job["status"] == "cancelled":
                     raise TrainingCancelled()
             activity(job, message)
-        variant = recipe_contracts.execution_variant(job.get("recipe", "classifier"), job.get("mode"))
-        if variant == "Commons captions":
-            model, rows, metrics = image_recipe.train_web(rows, job["target"], report)
-        elif variant == "local shapes":
-            model, rows, metrics = image_recipe.train(rows, job["target"], report)
-        else:
-            def repair(mistakes):
-                report("Generating one additional batch from validation mistakes.")
-                return repair_synthetic(job, mistakes)
+        def repair(mistakes):
+            report("Generating one additional batch from validation mistakes.")
+            return repair_synthetic(job, mistakes)
 
-            model, rows, metrics = train(
-                rows, job["plan"]["labels"], job["target"],
-                repair=repair if job.get("allow_repair") else None, report=report,
-                checkpoint_path=ROOT / "training-sessions" / job["id"] / "classifier-checkpoint.joblib",
-            )
-        recipe_contracts.validate_metrics(job.get("recipe", "classifier"), job.get("mode"), metrics, job["target"])
-        recipe_contracts.validate_model(job.get("recipe", "classifier"), job.get("mode"), model)
+        model, rows, metrics = recipe_contracts.execute(
+            job.get("recipe", "classifier"), job.get("mode"), rows,
+            {key: job[key] for key in ("target", "idle", "allow_repair") if key in job},
+            trainers={"classifier": train, "local shapes": image_recipe.train,
+                      "Commons captions": image_recipe.train_web},
+            labels=job.get("plan", {}).get("labels", ()), report=report, repair=repair,
+            checkpoint_path=ROOT / "training-sessions" / job["id"] / "classifier-checkpoint.joblib",
+            snapshot=job.get("recipe_contract"),
+        )
         with LOCK:
             if job["status"] == "cancelled":
                 return
+            TRAINING_DATA.pop(job["id"], None)
             work = ROOT / "training-sessions" / job["id"]
             (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
             if job.get("recipe") == "text_to_image":

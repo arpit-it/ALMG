@@ -226,3 +226,31 @@ def validate_dataset(recipe_id, mode, rows, labels=()):
                 for position in ('left', 'center', 'right'))
                 or not {'red', 'green', 'blue', 'yellow', 'purple'} <= colors):
             raise ValueError('Shape training requires every shape/position combination and every color.')
+
+
+def execute(recipe_id, mode, rows, parameters, *, trainers, labels=(), report,
+            repair=None, checkpoint_path=None, snapshot=None):
+    """Run an existing recipe through one validated input/output boundary.
+
+    Trainers are supplied by orchestration so this contract module does not
+    own job state, scheduling, cancellation, model loading or network access.
+    """
+    settings = training_parameters(recipe_id, parameters, snapshot)
+    variant = execution_variant(recipe_id, mode)
+    validate_dataset(recipe_id, mode, rows, labels)
+    trainer = trainers.get(variant)
+    if not callable(trainer):
+        raise ValueError('No local trainer is registered for this recipe variant.')
+    if variant == 'classifier':
+        result = trainer(rows, labels, settings['target'], report=report,
+                         repair=repair if settings['allow_repair'] else None,
+                         checkpoint_path=checkpoint_path)
+    else:
+        result = trainer(rows, settings['target'], report)
+    if not isinstance(result, tuple) or len(result) != 3:
+        raise ValueError('Recipe trainer must return model, dataset and metrics.')
+    model, evaluated_rows, metrics = result
+    validate_dataset(recipe_id, mode, evaluated_rows, labels)
+    validate_metrics(recipe_id, mode, metrics, settings['target'])
+    validate_model(recipe_id, mode, model)
+    return model, evaluated_rows, metrics

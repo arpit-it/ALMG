@@ -119,7 +119,7 @@ class RecipeContractsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), \
                 patch.object(studio, 'TRAINING_DATA', {job['id']: ([{'text': 'example', 'label': 'a', 'group': 'g'}] if job['recipe'] == 'classifier' else studio.image_recipe.dataset())}), \
                 patch.object(studio, 'CANDIDATES', {}), patch.object(studio, 'store_job'), \
-                patch.object(studio, 'train', return_value=(object(), [], {'passed': True})):
+                patch.object(studio, 'train', return_value=(object(), [{'text': 'example', 'label': 'a', 'group': 'g'}], {'passed': True})):
             studio.run(job)
             self.assertEqual(job['status'], 'failed')
             self.assertIn('validation_macro_f1', job['error'])
@@ -153,7 +153,7 @@ class RecipeContractsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), \
                 patch.object(studio, 'TRAINING_DATA', {job['id']: ([{'text': 'example', 'label': 'a', 'group': 'g'}] if job['recipe'] == 'classifier' else studio.image_recipe.dataset())}), \
                 patch.object(studio, 'CANDIDATES', {}), patch.object(studio, 'store_job'), \
-                patch.object(studio.image_recipe, 'train', return_value=({'format': 'unknown'}, [], metrics)):
+                patch.object(studio.image_recipe, 'train', return_value=({'format': 'unknown'}, studio.image_recipe.dataset(), metrics)):
             studio.run(job)
             self.assertEqual(job['status'], 'failed')
             self.assertIn('unsupported model format', job['error'])
@@ -239,7 +239,7 @@ class RecipeContractsTest(unittest.TestCase):
             recipe_contracts.validate_dataset('text_to_image', 'web_images', [{'text': 'caption', 'split': 'train'}])
 
     def test_invalid_dataset_does_not_invoke_trainer_and_retains_rows(self):
-        job = {'id': 'invalid-dataset', 'status': 'queued', 'idle': False, 'recipe': 'classifier', 'plan': {'labels': ['a']}}
+        job = {'id': 'invalid-dataset', 'status': 'queued', 'idle': False, 'recipe': 'classifier', 'target': 0.8, 'plan': {'labels': ['a']}}
         rows = [{'text': 'example', 'label': 'a'}]
         with patch.object(studio, 'TRAINING_DATA', {job['id']: rows}), patch.object(studio, 'store_job'), patch.object(studio, 'train') as trainer:
             studio.run(job)
@@ -311,3 +311,33 @@ class RecipeContractsTest(unittest.TestCase):
                         encoded((48, 48), 'RGB', 'JPEG'), 'A' * 100001):
             with self.assertRaisesRegex(ValueError, 'valid prepared'):
                 recipe_contracts.validate_dataset('text_to_image', 'web_images', [{**rows[0], 'image': content}, rows[1]])
+
+    def test_execution_interface_passes_classifier_callbacks_and_checks_outputs(self):
+        from unittest.mock import Mock
+        from sklearn.pipeline import Pipeline
+        from sklearn.dummy import DummyClassifier
+        rows = [{'text': 'fruit', 'label': 'fruit', 'group': 'one'}]
+        model = Pipeline([('classifier', DummyClassifier())])
+        metrics = {'validation_macro_f1': 0.9, 'test_macro_f1': 0.9, 'target_macro_f1': 0.8, 'passed': True}
+        trainer = Mock(return_value=(model, rows, metrics))
+        report, repair = Mock(), Mock()
+        result = recipe_contracts.execute('classifier', 'synthetic', rows,
+            {'target': 0.8, 'allow_repair': True}, trainers={'classifier': trainer}, labels=['fruit'],
+            report=report, repair=repair, checkpoint_path='fixture-checkpoint')
+        self.assertEqual(result, (model, rows, metrics))
+        trainer.assert_called_once_with(rows, ['fruit'], 0.8, report=report, repair=repair, checkpoint_path='fixture-checkpoint')
+        for output in (None, (model, rows), (model, [], metrics), (model, rows, {'passed': True})):
+            trainer.return_value = output
+            with self.assertRaises(ValueError):
+                recipe_contracts.execute('classifier', 'synthetic', rows, {'target': 0.8},
+                    trainers={'classifier': trainer}, labels=['fruit'], report=report)
+
+    def test_execution_interface_runs_real_shape_recipe_and_requires_adapter(self):
+        rows = studio.image_recipe.dataset()
+        model, evaluated, metrics = recipe_contracts.execute('text_to_image', 'synthetic', rows,
+            {'target': 0.8}, trainers={'local shapes': studio.image_recipe.train}, report=lambda message: None)
+        self.assertEqual(model['format'], 'almg-shapes-v1')
+        self.assertEqual(evaluated, rows)
+        self.assertTrue(metrics['passed'])
+        with self.assertRaisesRegex(ValueError, 'No local trainer'):
+            recipe_contracts.execute('text_to_image', 'synthetic', rows, {'target': 0.8}, trainers={}, report=lambda message: None)
