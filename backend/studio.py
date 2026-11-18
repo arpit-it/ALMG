@@ -873,6 +873,8 @@ def restore_jobs():
                              and all(row.get("provider") == "wikidata" for row in job["text_candidates"])
                              else "indicator_candidates" if job.get("text_candidates")
                              and all(row.get("provider") == "world_bank" for row in job["text_candidates"])
+                             else "notice_candidates" if job.get("text_candidates")
+                             and all(row.get("provider") == "federal_register" for row in job["text_candidates"])
                              else "text_candidates")
                     job.update(status=stage, mode=None, error=(
                         "Excerpt preparation was interrupted. Review and approve the excerpts to retry."
@@ -1221,7 +1223,7 @@ def prepare_dataset(job, imported_rows=None):
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),
-                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "restrictions", "csv_end_line", "approved_query", "title", "provider", "reuse_approval", "source_name", "organization", "source_id", "collection_scope") if key in row}}
+                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "restrictions", "csv_end_line", "approved_query", "title", "provider", "reuse_approval", "source_name", "organization", "source_id", "collection_scope", "document_number") if key in row}}
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:
@@ -1236,6 +1238,8 @@ def prepare_dataset(job, imported_rows=None):
                              and all(row.get("provider") == "wikidata" for row in job["text_candidates"])
                              else "indicator_candidates" if job.get("text_candidates")
                              and all(row.get("provider") == "world_bank" for row in job["text_candidates"])
+                             else "notice_candidates" if job.get("text_candidates")
+                             and all(row.get("provider") == "federal_register" for row in job["text_candidates"])
                              else "text_candidates")
             update(job, status=stage, mode=None, error=str(error))
         else:
@@ -1746,6 +1750,10 @@ class Handler(BaseHTTPRequestHandler):
                         append_activity(job, "User reuse permission recorded for the reviewed document summary.")
                         store_job(job)
                         return self.respond({"id": job["id"]})
+                    elif action == "use-notice-summaries" and status == "notice_candidates":
+                        rows = federal_register.approved_summary_rows(job["notice_candidates"], data.get("approved_urls"))
+                        job.update(status="creating_dataset", error=None, mode="web", text_candidates=rows)
+                        worker = (prepare_dataset, (job,))
                     elif action == "close-notices" and status == "notice_candidates":
                         job.pop("notice_candidates", None)
                         job.update(status="approval", error=None)

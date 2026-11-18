@@ -103,3 +103,22 @@ class FederalRegisterDiscoveryTest(unittest.TestCase):
             studio.review_notice(job, record["source"])
         self.assertNotIn("reuse_approval", record)
         self.assertEqual(record["reuse_status"], "unverified")
+
+    def test_summary_collection_checks_selection_scope_and_current_text(self):
+        from backend.federal_register import summary_reuse_evidence, approved_summary_rows
+        record = {"source": document("2026-12345")["html_url"], "title": "Orchard notice", "document_number": "2026-12345",
+                  "summary": "Fruit cultivation practices described in a local fixture document summary.",
+                  "summary_reviewed": True, "reuse_status": "user_approved", "approved_query": "orchard"}
+        record["reuse_approval"] = summary_reuse_evidence(record, {"approved_url": record["source"],
+            "confirmed": True, "approved_scope": "document_summary", "permission_basis": "Local fixture summary permission reviewed."})
+        row = approved_summary_rows([record], [record["source"]])[0]
+        self.assertEqual(row["collection_scope"], "document_summary")
+        self.assertEqual(row["document_number"], "2026-12345")
+        self.assertEqual(row["reuse_approval"], record["reuse_approval"])
+        for urls in ([], ["other"], [record["source"], record["source"]]):
+            with self.assertRaises(ValueError):
+                approved_summary_rows([record], urls)
+        for changes in ({"summary": record["summary"] + " Changed."}, {"summary_reviewed": False},
+                        {"reuse_approval": {**record["reuse_approval"], "scope": "full_text"}}):
+            with self.assertRaises(ValueError):
+                approved_summary_rows([{**record, **changes}], [record["source"]])

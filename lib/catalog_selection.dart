@@ -30,3 +30,9 @@ bool collectableIndicator(Map record) =>
     record['reuse_status'] == 'user_approved' && record['reuse_approval'] is Map &&
     record['reuse_approval']['scope'] == 'catalog_description' &&
     "${record['title']}\n${record['description']}".length >= 40;
+
+/// Whether a reviewed document summary can be offered for collection.
+bool collectableNotice(Map record) =>
+    record['summary_reviewed'] == true && record['reuse_status'] == 'user_approved' &&
+    record['reuse_approval'] is Map && record['reuse_approval']['scope'] == 'document_summary' &&
+    "${record['title']}\n${record['summary']}".length >= 40;

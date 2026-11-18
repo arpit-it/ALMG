@@ -530,6 +530,7 @@ class _StudioPageState extends State<StudioPage> {
   final Set<String> _excludedPublications = {};
   final Set<String> _excludedEntities = {};
   final Set<String> _excludedIndicators = {};
+  final Set<String> _excludedNotices = {};
   final _indicatorFilter = TextEditingController();
   final Set<String> _excludedImageSources = {};
   String? _error;
@@ -699,6 +700,10 @@ class _StudioPageState extends State<StudioPage> {
         if (_job?['id'] != job['id']) _indicatorFilter.clear();
         if (_job?['id'] != job['id'] || job['status'] != 'indicator_candidates') {
           _excludedIndicators.clear();
+        }
+        if (_job?['id'] != job['id'] ||
+            !{'notice_candidates', 'reviewing_notice'}.contains(job['status'])) {
+          _excludedNotices.clear();
         }
         _job = job;
       });
@@ -1170,6 +1175,7 @@ class _StudioPageState extends State<StudioPage> {
     if (provider == 'europe_pmc') return 'Europe PMC: $source';
     if (provider == 'wikidata') return 'Wikidata: $source';
     if (provider == 'world_bank') return 'World Bank indicator catalog: $source';
+    if (provider == 'federal_register') return 'Federal Register: $source';
     if (provider == 'commons' ||
         (provider == null && source.startsWith('https://upload.wikimedia.org/'))) {
       return 'Wikimedia Commons: $source';
@@ -1340,6 +1346,12 @@ class _StudioPageState extends State<StudioPage> {
     final selectedIndicatorUrls = [
       for (final record in visibleIndicators)
         if (collectableIndicator(record) && !_excludedIndicators.contains(record['source']))
+          record['source'] as String,
+    ];
+    final noticeRecords = job?['notice_candidates'] as List? ?? const [];
+    final selectedNoticeUrls = [
+      for (final record in noticeRecords)
+        if (collectableNotice(record as Map) && !_excludedNotices.contains(record['source']))
           record['source'] as String,
     ];
     final states = {
@@ -1630,7 +1642,7 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'notice_candidates') ...[
-          const Text('Review the document summary and record reuse permission. Full-text and dataset collection are not available yet.'),
+          const Text('Review summaries and reuse permission before approving selected summaries for the dataset. Full-text loading is not available yet.'),
           for (final record in job?['notice_candidates'] as List? ?? const [])
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1638,6 +1650,15 @@ class _StudioPageState extends State<StudioPage> {
                 ListTile(
                   title: Text('${record['title']} (${record['document_number']})'),
                   subtitle: SelectableText('${record['source']}\nApproved query: ${record['approved_query']}'),
+                  trailing: collectableNotice(record as Map) ? Checkbox(
+                    value: !_excludedNotices.contains(record['source']),
+                    semanticLabel: "Include document summary: ${record['title']}",
+                    onChanged: _busy ? null : (checked) => setState(() {
+                      final source = record['source'] as String;
+                      if (checked == true) { _excludedNotices.remove(source); }
+                      else { _excludedNotices.add(source); }
+                    }),
+                  ) : null,
                 ),
                 if (record['summary_reviewed'] == true)
                   SelectableText((record['summary'] as String).isEmpty
@@ -1646,7 +1667,7 @@ class _StudioPageState extends State<StudioPage> {
                   SelectableText('Document summary reuse approval: ${approval['permission_basis']}')
                 else if (record['summary_reviewed'] == true && (record['summary'] as String).isNotEmpty)
                   TextButton(
-                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record,
                         action: 'approve-notice-reuse', scope: 'document_summary'),
                     child: const Text('Record summary reuse approval'),
                   ),
@@ -1656,6 +1677,12 @@ class _StudioPageState extends State<StudioPage> {
                   child: const Text('Approve loading document summary'),
                 ),
               ],
+            ),
+          if (noticeRecords.any((record) => collectableNotice(record as Map)))
+            OutlinedButton(
+              onPressed: _busy || selectedNoticeUrls.isEmpty ? null
+                  : () => _submit('/jobs/$id/use-notice-summaries', {'approved_urls': selectedNoticeUrls}),
+              child: Text('Approve document summary collection (${selectedNoticeUrls.length} selected)'),
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-notices', {}),
@@ -2167,9 +2194,15 @@ class _StudioPageState extends State<StudioPage> {
                                       ? 'Entity: $title'
                                       : row['provider'] == 'world_bank'
                                           ? 'Indicator: $title'
-                                          : 'Article: $title',
-                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank'}.contains(row['provider']) && row['reuse_approval'] is Map)
+                                          : row['provider'] == 'federal_register'
+                                              ? 'Document: $title'
+                                              : 'Article: $title',
+                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register'}.contains(row['provider']) && row['reuse_approval'] is Map)
                           'User reuse approval: ${row['reuse_approval']['permission_basis']}',
+                        if (row['provider'] == 'federal_register') ...[
+                          'Content scope: document summary',
+                          'Document number: ${row['document_number']}',
+                        ],
                         if (row['provider'] == 'world_bank') ...[
                           'Content scope: catalog description',
                           'Source ${row['source_id']}: ${row['source_name']}',

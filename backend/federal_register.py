@@ -70,3 +70,29 @@ def summary_reuse_evidence(record, decision):
         raise ValueError("Review the summary and record permission for that summary scope first.")
     return {"source": source, "scope": "document_summary", "permission_basis": basis.strip(),
             "summary_sha256": hashlib.sha256((title + "\n" + summary).encode("utf-8")).hexdigest(), "time": time.time()}
+
+
+def approved_summary_rows(records, approved_urls):
+    """Collect only selected summaries with current summary-scoped permission."""
+    import hashlib
+    if (not isinstance(approved_urls, list) or not approved_urls
+            or any(not isinstance(url, str) for url in approved_urls)
+            or len(set(approved_urls)) != len(approved_urls)):
+        raise ValueError("Select document summary URLs before approving collection.")
+    selected = [record for record in records if record.get("source") in approved_urls]
+    if len(selected) != len(approved_urls):
+        raise ValueError("Approve only listed document summary URLs.")
+    rows = []
+    for record in selected:
+        title, summary, approval = record.get("title"), record.get("summary"), record.get("reuse_approval")
+        if not isinstance(title, str) or not isinstance(summary, str):
+            raise ValueError("Review the document summary first.")
+        text = title + "\n" + summary
+        if (len(text) < 40 or record.get("summary_reviewed") is not True
+                or record.get("reuse_status") != "user_approved" or not isinstance(approval, dict)
+                or approval.get("scope") != "document_summary" or approval.get("source") != record.get("source")
+                or approval.get("summary_sha256") != hashlib.sha256(text.encode("utf-8")).hexdigest()):
+            raise ValueError("Record current summary reuse permission before collection.")
+        rows.append({**record, "provider": "federal_register", "text": text,
+                     "group": record["source"], "collection_scope": "document_summary"})
+    return rows
