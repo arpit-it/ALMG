@@ -957,6 +957,54 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   three valid articles and omitted the result with a dot-segment page key.
   A second Mac fixture search included an invalid Unicode page key.
   Source review still showed all three valid articles for approval.
+
+- [x] Provide web discovery and collection without a search API key. Show a
+  built-in list of public data providers and let users add websites to a
+  project. Discover candidate pages from the enabled providers without
+  requiring page URLs from the user. Require approval before discovery
+  contacts those providers, and show discovered URLs for approval before
+  fetching pages for the dataset.
+  Start with these providers. Use their public discovery endpoints without
+  credentials and review reuse rights for each result before adding its
+  content to a training dataset.
+
+  | Workflow | Starter provider | Discover |
+  | --- | --- | --- |
+  | General knowledge and topic classification | English Wikipedia | [MediaWiki page search](https://www.mediawiki.org/wiki/API:REST_API/Reference/en#Search_pages) |
+  | Images and captions | Wikimedia Commons | [MediaWiki search](https://commons.wikimedia.org/w/rest.php/v1/search/page?q=landscape) and file license metadata |
+  | History, documents, and public collections | Library of Congress | [Catalog search](https://www.loc.gov/apis/json-and-yaml/requests/parameters/) |
+  | Research literature | Europe PMC | [Publication search](https://europepmc.org/RestfulWebService) and available open-access records |
+  | Entity tagging and knowledge graphs | Wikidata | [Public APIs and dumps](https://www.wikidata.org/wiki/Wikidata:Data_access) |
+  | Economics and development indicators | World Bank Open Data | [Key-free Indicators API](https://datahelpdesk.worldbank.org/knowledgebase/articles/889392) |
+  | Public notices and regulatory text | Federal Register | [Document search API](https://www.federalregister.gov/developers/documentation/api/v1) |
+  | Company filings and financial text | SEC EDGAR | [Published indexes and data endpoints](https://www.sec.gov/search-filings/edgar-search-assistance/accessing-edgar-data); use a declared user agent and follow fair-access limits |
+  | Bibliographic metadata | Crossref | [Public REST API](https://www.crossref.org/documentation/retrieve-metadata/rest-api/); prefer identified requests and check reuse rights for abstracts |
+
+  Use each provider's documented API, feed, or dump where available.
+  For added websites, check the site's access rules and robots.txt before
+  crawling. Treat automated access and permission to reuse content as
+  separate checks.
+
+  Match providers to the workflow and show the selected destinations before
+  running discovery. Projects can add a public website as a source when
+  the starter providers do not cover the topic.
+
+  Acceptance verified locally on 2026-11-18. The provider-specific Mac app
+  checks recorded above cover discovery previews, URL approval and reuse
+  review for Wikipedia, Commons, Library of Congress, Europe PMC, Wikidata,
+  World Bank, Federal Register and Crossref, plus SEC company lookup,
+  submissions and filing previews. Provider selections persist per project,
+  match the text/image workflows and block disabled-provider requests.
+  The final rebuilt Mac app completed the website workflow from adding a
+  source in project settings through robots/access review, approved link
+  discovery, separate page requests and separate reuse decisions to a
+  two-example dataset with both kinds of permission evidence. Fixture logs
+  showed only the approved robots, starting-page and individual-page
+  requests. No external collection, linked-resource fetching or training
+  was performed. All 120 Python tests and Flutter analysis passed. New
+  acceptance tests exercise every provider's missing-consent, valid-consent
+  and disabled-provider dispatch boundary without API credentials.
+
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
