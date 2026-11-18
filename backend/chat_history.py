@@ -31,6 +31,12 @@ def connect():
             name TEXT NOT NULL, content TEXT NOT NULL
         );
         CREATE INDEX IF NOT EXISTS project_files_by_project ON project_files(project_id);
+        CREATE TABLE IF NOT EXISTS project_pages (
+            project_id TEXT NOT NULL REFERENCES projects(id), source TEXT NOT NULL,
+            text TEXT NOT NULL, title TEXT NOT NULL, metadata TEXT NOT NULL, updated REAL NOT NULL,
+            PRIMARY KEY(project_id, source)
+        );
+
         CREATE TABLE IF NOT EXISTS chats (
             id TEXT PRIMARY KEY, title TEXT NOT NULL, updated REAL NOT NULL
         );
@@ -432,6 +438,7 @@ def delete_project(project_id):
     with SEND_LOCK, closing(connect()) as db, db:
         db.execute("UPDATE chats SET project_id = NULL WHERE project_id = ?", (project_id,))
         db.execute("DELETE FROM project_files WHERE project_id = ?", (project_id,))
+        db.execute("DELETE FROM project_pages WHERE project_id = ?", (project_id,))
         db.execute("DELETE FROM projects WHERE id = ?", (project_id,))
 
 
@@ -440,3 +447,41 @@ def delete_chat(chat_id):
     with SEND_LOCK, closing(connect()) as db, db:
         db.execute("DELETE FROM messages WHERE chat_id = ?", (chat_id,))
         db.execute("DELETE FROM chats WHERE id = ?", (chat_id,))
+
+
+def index_project_pages(project_id, rows):
+    """Save the latest collected text and permission evidence for each project URL."""
+    prepared = []
+    for row in rows:
+        source, text = row.get("source"), row.get("text")
+        if not isinstance(source, str) or not source.startswith("https://"):
+            continue
+        parsed = urlsplit(source)
+        if (not parsed.hostname or parsed.username is not None or not isinstance(text, str)
+                or not 1 <= len(text) <= 50000):
+            raise ValueError("Collected page text or source is invalid for local indexing.")
+        metadata = {key: row[key] for key in ("provider", "collection_scope", "reuse_approval", "site_access_approval",
+                    "discovered_from", "page_text_truncated", "filing_text_truncated", "license", "license_url") if key in row}
+        prepared.append((project_id, source, text, row.get("title", ""), json.dumps(metadata, ensure_ascii=False), time.time()))
+    with closing(connect()) as db, db:
+        require_project(db, project_id)
+        db.executemany("""INSERT INTO project_pages(project_id, source, text, title, metadata, updated) VALUES(?, ?, ?, ?, ?, ?)
+            ON CONFLICT(project_id, source) DO UPDATE SET text=excluded.text, title=excluded.title,
+                metadata=excluded.metadata, updated=excluded.updated""", prepared)
+    return len(prepared)
+
+
+def search_project_pages(project_id, query=""):
+    """Search only this project's stored text and URLs, without network access."""
+    if not isinstance(query, str) or len(query) > 160:
+        raise ValueError("Enter a local page search of up to 160 characters.")
+    terms = query.strip().split()[:10]
+    where, values = ["project_id = ?"], [project_id]
+    for term in terms:
+        where.append("(instr(lower(text), lower(?)) > 0 OR instr(lower(title), lower(?)) > 0 OR instr(lower(source), lower(?)) > 0)")
+        values.extend([term] * 3)
+    with closing(connect()) as db:
+        require_project(db, project_id)
+        rows = db.execute("SELECT source, title, text, metadata, updated FROM project_pages WHERE " +
+                          " AND ".join(where) + " ORDER BY updated DESC, source LIMIT 20", values)
+        return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]

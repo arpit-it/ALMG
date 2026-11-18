@@ -1370,6 +1370,9 @@ def prepare_dataset(job, imported_rows=None):
         work = ROOT / "training-sessions" / job["id"]
         work.mkdir(parents=True, exist_ok=True)
         (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
+        if job.get("mode") == "web" and job.get("project_id"):
+            saved = chat_history.index_project_pages(job["project_id"], rows)
+            activity(job, f"Saved {saved} collected sources in the project's local page index.")
         label_counts = {}
         labels_by_text = {}
         texts_by_words = {}
@@ -1609,6 +1612,13 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as error:
                 return self.respond({"error": str(error)}, 404)
         route = urlsplit(self.path)
+        if route.path == "/project-pages":
+            params = parse_qs(route.query)
+            try:
+                rows = chat_history.search_project_pages(params.get("project_id", [None])[0], params.get("q", [""])[0])
+                return self.respond({"pages": rows})
+            except ValueError as error:
+                return self.respond({"error": str(error)}, 400)
         if route.path == "/dashboard":
             projects = chat_history.list_projects()
             with LOCK:

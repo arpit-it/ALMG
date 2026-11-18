@@ -1257,6 +1257,37 @@ class _StudioPageState extends State<StudioPage> {
   String _commonsFilePage(String title) =>
       'File page: https://commons.wikimedia.org/wiki/File:${Uri.encodeComponent(title)}';
 
+  Future<void> _showSavedPages() async {
+    final project = _project;
+    if (project == null) return;
+    var query = '';
+    try {
+      var pages = (await _request('/project-pages?project_id=${Uri.encodeQueryComponent(project)}'))['pages'] as List;
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => StatefulBuilder(builder: (context, update) => AlertDialog(
+        title: const Text('Saved project pages'),
+        content: SizedBox(width: 600, height: 480, child: Column(children: [
+          const Text('Searches this project’s collected text locally. No websites are contacted. Shows up to 20 saved sources.'),
+          TextField(maxLength: 160, decoration: const InputDecoration(labelText: 'Search saved text or source URL'),
+            onChanged: (value) => query = value),
+          TextButton(onPressed: () async {
+            final result = await _request('/project-pages?project_id=${Uri.encodeQueryComponent(project)}&q=${Uri.encodeQueryComponent(query)}');
+            if (context.mounted) update(() => pages = result['pages'] as List);
+          }, child: const Text('Search local pages')),
+          Expanded(child: ListView(children: [
+            if (pages.isEmpty) const Text('No saved pages match this search.'),
+            for (final page in pages) ListTile(title: SelectableText(page['source'] as String),
+              subtitle: SelectableText((page['text'] as String).length > 1000
+                  ? '${(page['text'] as String).substring(0, 1000)}…' : page['text'] as String)),
+          ])),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      )));
+    } catch (error) {
+      if (mounted) setState(() => _error = 'Saved page search failed: $error');
+    }
+  }
+
   bool _providerEnabled(String provider) {
     final project = _projects.where((item) => item['id'] == _project).firstOrNull;
     return (project?['enabled_providers'] as List? ?? discoveryProviderNames.keys.toList()).contains(provider);
@@ -1517,6 +1548,9 @@ class _StudioPageState extends State<StudioPage> {
     return ListView(
       padding: const EdgeInsets.all(24),
       children: [
+        if (_project != null)
+          TextButton(onPressed: _busy ? null : _showSavedPages, child: const Text('Search saved project pages')),
+
         Text('Model creation', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         Text(states[status] ?? 'Waiting for a model goal'),
