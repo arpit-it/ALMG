@@ -699,6 +699,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_text',
         'searching_catalog',
         'searching_publications',
+        'searching_entities',
         'reviewing_publication',
         'reviewing_catalog_item',
         'creating_dataset',
@@ -1208,12 +1209,12 @@ class _StudioPageState extends State<StudioPage> {
                   title: Text('Europe PMC'),
                   subtitle: Text('www.ebi.ac.uk · Publication preview for text classification'),
                 ),
-                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
-                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('Wikidata'),
-                  subtitle: Text('wikidata.org · Entities and knowledge graphs'),
+                  subtitle: Text('www.wikidata.org · Entity preview for text classification'),
                 ),
+                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('World Bank Open Data'),
                   subtitle: Text('data.worldbank.org · Development indicators'),
@@ -1312,6 +1313,8 @@ class _StudioPageState extends State<StudioPage> {
       'searching_text': 'Searching Wikipedia',
       'searching_catalog': 'Searching the Library of Congress',
       'searching_publications': 'Searching Europe PMC',
+      'searching_entities': 'Searching Wikidata',
+      'entity_candidates': 'Review Wikidata entities',
       'publication_candidates': 'Review Europe PMC publications',
       'reviewing_publication': 'Loading publication abstract metadata',
       'catalog_candidates': 'Review Library of Congress records',
@@ -1545,6 +1548,31 @@ class _StudioPageState extends State<StudioPage> {
               'approved_result_limit': 20,
             }),
             child: const Text('Approve Europe PMC search'),
+          ),
+        ],
+        if (status == 'approval' && !_imageRecipe &&
+            plan != null && (plan['queries'] as List).isNotEmpty) ...[
+          const Text('Wikidata entity preview · www.wikidata.org. '
+              'Sends the listed queries in English for up to 20 items per query and 40 total.'),
+          for (final query in plan['queries'] as List) SelectableText('• $query'),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/search-entities', {
+              'approved_provider': 'wikidata', 'approved_queries': plan['queries'],
+              'approved_result_limit': 20, 'approved_total_limit': 40,
+            }),
+            child: const Text('Approve Wikidata search'),
+          ),
+        ],
+        if (status == 'entity_candidates') ...[
+          const Text('Review entity labels, descriptions and source URLs. Entity dataset collection is not available yet.'),
+          for (final record in job?['entity_candidates'] as List? ?? const [])
+            ListTile(
+              title: Text('${record['title']} (${record['entity_id']})'),
+              subtitle: SelectableText('${record['description']}\n${record['source']}\nApproved query: ${record['approved_query']}'),
+            ),
+          TextButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/close-entities', {}),
+            child: const Text('Return to dataset approval'),
           ),
         ],
         if (status == 'publication_candidates') ...[

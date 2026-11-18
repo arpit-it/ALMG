@@ -605,6 +605,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   All 58 Python tests and Flutter analysis passed. Tests verify URL
   deduplication and no further provider contacts after the total limit.
   Full-text loading and other starter providers remain open.
+  Wikidata now provides a consent-gated English item search preview.
+  In the rebuilt Mac app, approval disclosed www.wikidata.org, both
+  queries, 20 items per query and 40 total. Offline source review showed
+  two entity labels, Q IDs, descriptions, validated URLs and matching
+  queries; a malformed ID was omitted and return navigation worked.
+  All 62 Python tests and Flutter analysis passed, including API scope,
+  deduplication and contact-limit checks. Entity dataset collection and
+  the remaining providers stay open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

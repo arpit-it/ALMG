@@ -1,0 +1,52 @@
+import unittest
+from unittest.mock import patch
+from backend.wikidata_discovery import entity_candidates
+from backend import studio
+
+
+class EntityDiscoveryTest(unittest.TestCase):
+    def test_only_supported_items_and_clean_text_enter_source_review(self):
+        good = {"id": "Q42", "label": "Orchard", "description": "Cultivated fruit trees", "url": "https://evil.example/"}
+        rows = entity_candidates({"search": [good, good,
+            {**good, "id": "P42"}, {**good, "id": "Q42/../other"},
+            {**good, "id": "Q43", "label": "Bad\nlabel"},
+            {**good, "id": "Q44", "description": "bad\ud800"},
+        ]}, "orchard")
+        self.assertEqual(len(rows), 1)
+        self.assertEqual(rows[0]["source"], "https://www.wikidata.org/wiki/Q42")
+        self.assertEqual(rows[0]["approved_query"], "orchard")
+        self.assertEqual(rows[0]["reuse_status"], "unverified")
+
+    def test_query_list_uses_only_search_endpoint_and_deduplicates_entities(self):
+        from urllib.parse import parse_qs, urlsplit
+        job = {"plan": {"queries": ["orchard", "astronomy"]}}
+        def response(url, **kwargs):
+            parts = urlsplit(url)
+            self.assertEqual((parts.hostname, parts.path), ("www.wikidata.org", "/w/api.php"))
+            params = parse_qs(parts.query)
+            self.assertEqual(params["action"], ["wbsearchentities"])
+            self.assertEqual(params["language"], ["en"])
+            self.assertEqual(params["maxlag"], ["5"])
+            return {"search": [{"id": "Q42", "label": "Shared"},
+                {"id": "Q43" if params["search"] == ["orchard"] else "Q44", "label": "Topic"}]}
+        with patch.object(studio, "request_json", side_effect=response) as request, patch.object(studio, "activity"), patch.object(studio, "store_job"):
+            studio.search_entities(job)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(job["status"], "entity_candidates")
+        self.assertEqual([row["approved_query"] for row in job["entity_candidates"]], ["orchard", "orchard", "astronomy"])
+
+    def test_error_and_empty_responses_return_to_approval(self):
+        for payload in ({"search": []}, {"error": {"code": "maxlag"}}, {"search": "bad"}):
+            job = {"plan": {"queries": ["orchard"]}}
+            with patch.object(studio, "request_json", return_value=payload), patch.object(studio, "store_job"):
+                studio.search_entities(job)
+            self.assertEqual(job["status"], "approval")
+            self.assertIn("Wikidata", job["error"])
+
+    def test_entity_limit_stops_further_contacts(self):
+        job = {"plan": {"queries": ["one", "two", "unused"]}}
+        responses = [{"search": [{"id": f"Q{batch * 100 + index + 1}", "label": "Entity"} for index in range(25)]} for batch in range(2)]
+        with patch.object(studio, "request_json", side_effect=responses) as request, patch.object(studio, "activity"), patch.object(studio, "store_job"):
+            studio.search_entities(job)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(len(job["entity_candidates"]), 40)
