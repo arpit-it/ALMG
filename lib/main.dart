@@ -11,6 +11,7 @@ import 'app_name.dart';
 import 'backend_address.dart';
 
 import 'chat.dart';
+import 'catalog_selection.dart';
 import 'project_settings.dart';
 
 /// Starts the Flutter desktop application.
@@ -524,6 +525,7 @@ class _StudioPageState extends State<StudioPage> {
   bool get _imageRecipe => _job?['recipe'] == 'text_to_image';
   Map<String, dynamic>? _job;
   final Set<String> _excludedTextSources = {};
+  final Set<String> _excludedCatalogSources = {};
   final Set<String> _excludedImageSources = {};
   String? _error;
   bool _busy = false;
@@ -677,6 +679,10 @@ class _StudioPageState extends State<StudioPage> {
         }
         if (_job?['id'] != job['id'] || job['status'] != 'image_candidates') {
           _excludedImageSources.clear();
+        }
+        if (_job?['id'] != job['id'] ||
+            !{'catalog_candidates', 'reviewing_catalog_item'}.contains(job['status'])) {
+          _excludedCatalogSources.clear();
         }
         _job = job;
       });
@@ -1282,6 +1288,8 @@ class _StudioPageState extends State<StudioPage> {
         if (!_excludedTextSources.contains(candidate['source']))
           candidate['source'] as String,
     };
+    final catalogRecords = job?['catalog_candidates'] as List? ?? const [];
+    final selectedCatalogUrls = selectedCatalogSources(catalogRecords, _excludedCatalogSources);
     final states = {
       'planning': 'Qwen is drafting the plan',
       'approval': 'Dataset approval required',
@@ -1517,6 +1525,20 @@ class _StudioPageState extends State<StudioPage> {
                 ListTile(
                   title: Text(record['title'] as String),
                   subtitle: SelectableText(record['source'] as String),
+                  trailing: collectableCatalogRecord(record as Map)
+                      ? Checkbox(
+                          value: !_excludedCatalogSources.contains(record['source']),
+                          semanticLabel: "Include catalog description: ${record['title']}",
+                          onChanged: _busy ? null : (checked) => setState(() {
+                            final source = record['source'] as String;
+                            if (checked == true) {
+                              _excludedCatalogSources.remove(source);
+                            } else {
+                              _excludedCatalogSources.add(source);
+                            }
+                          }),
+                        )
+                      : null,
                 ),
                 if (record['metadata_reviewed'] == true) ...[
                   if (record['description'] case final String text when text.isNotEmpty)
@@ -1537,7 +1559,7 @@ class _StudioPageState extends State<StudioPage> {
                     SelectableText('User reuse approval: ${approval['permission_basis']}')
                   else
                     TextButton(
-                      onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map),
+                      onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record),
                       child: const Text('Record reuse approval'),
                     ),
                 ],
@@ -1552,19 +1574,13 @@ class _StudioPageState extends State<StudioPage> {
                 ),
               ],
             ),
-          if ((job?['catalog_candidates'] as List? ?? const []).any(
-              (record) => record['reuse_status'] == 'user_approved' &&
-                  (record['description'] as String? ?? '').length >= 40))
+          if (catalogRecords.any((record) => collectableCatalogRecord(record as Map)))
             OutlinedButton(
-              onPressed: _busy ? null : () => _submit('/jobs/$id/use-catalog-descriptions', {
-                'approved_urls': [
-                  for (final record in job?['catalog_candidates'] as List? ?? const [])
-                    if (record['reuse_status'] == 'user_approved' &&
-                        (record['description'] as String? ?? '').length >= 40)
-                      record['source'],
-                ],
-              }),
-              child: const Text('Approve collection of reuse-approved descriptions'),
+              onPressed: _busy || selectedCatalogUrls.isEmpty ? null
+                  : () => _submit('/jobs/$id/use-catalog-descriptions', {
+                      'approved_urls': selectedCatalogUrls,
+                    }),
+              child: Text('Approve catalog descriptions (${selectedCatalogUrls.length} selected)'),
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-catalog', {}),
