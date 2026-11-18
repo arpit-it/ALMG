@@ -749,6 +749,17 @@ def classifier_word_variant_groups(rows):
             signature = (len(words), position, words[:position] + words[position + 1:])
             previous = signatures.setdefault(signature, index)
             parents[root(index)] = root(previous)
+    # Compare each deletion with complete shorter phrases, independently of
+    # input order. Equal-length substitution signatures above remain scoped
+    # to the same token position so reordered words do not become matches.
+    complete = {words: index for index, words in enumerate(words_by_row) if 8 <= len(words) <= 80}
+    for index, words in enumerate(words_by_row):
+        if not 9 <= len(words) <= 80:
+            continue
+        for position in range(len(words)):
+            shorter = complete.get(words[:position] + words[position + 1:])
+            if shorter is not None:
+                parents[root(index)] = root(shorter)
     members = {}
     for index, words in enumerate(words_by_row):
         members.setdefault(root(index), set()).add(words)

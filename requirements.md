@@ -1093,6 +1093,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   split grouping, source-group connections, exact matches, short phrases,
   two-word differences and unchanged exclusions. Broader semantic ambiguity
   and near-duplicate detection beyond this bounded rule remain open.
+  The same bounded phrase review now includes a single inserted or omitted
+  word, regardless of input order, and keeps those rows in the same split.
+  In the rebuilt Mac app, a native CSV import of an invoice sentence and
+  its added “only” variant showed one group and marked both rows for label
+  review. The unrelated telescope row remained unmarked, all three examples
+  stayed usable and training still required approval. All 132 Python tests
+  and Flutter analysis passed, including insertion/deletion grouping and
+  phrase-length boundaries. Broader semantic ambiguity and similarity
+  detection remain open.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
   shipping class and left training approval pending. The backend also

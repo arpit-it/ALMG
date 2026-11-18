@@ -26,3 +26,22 @@ class WordVariantsTest(unittest.TestCase):
         text = 'Please send the latest orchard fruit invoice before Monday morning'
         self.assertEqual(studio.classifier_word_variant_groups([row(text), row(text.upper())]), [None, None])
         self.assertEqual(studio.classifier_word_variant_groups([row(text), row(text.replace('Monday morning', 'Tuesday evening'))]), [None, None])
+
+    def test_inserted_or_omitted_word_groups_in_either_input_order(self):
+        text = 'Please send the latest orchard fruit invoice before Monday morning'
+        longer = text.replace('send the', 'send only the')
+        for texts in [(text, longer), (longer, text)]:
+            rows = [{'text': value, 'group': str(index), 'label': 'billing'} for index, value in enumerate(texts)]
+            groups = studio.classifier_word_variant_groups(rows)
+            self.assertIsNotNone(groups[0])
+            self.assertEqual(groups[0], groups[1])
+            self.assertEqual(len(set(studio.classifier_split_groups(rows))), 1)
+            self.assertEqual(studio.usable_classifier_indices(rows), [0, 1])
+        self.assertEqual(studio.classifier_word_variant_groups([
+            {'text': text}, {'text': text.replace('send the', 'send only this the')}]), [None, None])
+
+    def test_word_insertions_respect_phrase_length_bounds(self):
+        for length in (7, 80):
+            short = ' '.join('word' + str(index) for index in range(length))
+            self.assertEqual(studio.classifier_word_variant_groups([
+                {'text': short}, {'text': short + ' extra'}]), [None, None])
