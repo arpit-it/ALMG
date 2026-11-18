@@ -93,6 +93,34 @@ class ChatHistoryTest(unittest.TestCase):
         chat_history.send(branch, "Orchid care instructions", reply)
         self.assertEqual(len(chat_history.messages(source)), 2)
 
+    def test_branch_keeps_project_instructions_references_and_original_unchanged(self):
+        project = chat_history.create_project("Branch fixture project")["id"]
+        other = chat_history.create_project("Other project")["id"]
+        chat_history.update_project(project, "Use ORCHARD_APPROVED and cite project references.")
+        chat_history.add_project_file(project, "orchard-notes.txt", "Pear trees need water on Tuesday.")
+        chat_history.add_project_file(other, "private.txt", "OTHER_PROJECT_NOLEAK")
+        attachment = {"name": "guide.pdf", "data": "/w==", "extracted": "Page 2\nPear trees grow in orchards."}
+        source = chat_history.send(None, "Pear watering question", lambda _: "Original answer", project_id=project, attachment=attachment)["id"]
+        before = chat_history.messages(source)
+        branch = chat_history.branch(source, 2)
+        self.assertEqual(branch['project_id'], project)
+        self.assertEqual(branch['project_name'], 'Branch fixture project')
+        self.assertEqual(branch['source_id'], source)
+        self.assertEqual(branch['message_count'], 2)
+        def generate(messages):
+            text = str(messages)
+            self.assertIn('ORCHARD_APPROVED', text)
+            self.assertIn('orchard-notes.txt', text)
+            self.assertIn('Tuesday', text)
+            self.assertIn('Page 2', text)
+            self.assertIn('guide.pdf', text)
+            self.assertNotIn('OTHER_PROJECT_NOLEAK', text)
+            return 'ORCHARD_APPROVED: Tuesday (orchard-notes.txt).'
+        chat_history.send(branch['id'], 'When should pear trees receive water?', generate, project_id=project, recall=False)
+        self.assertEqual(chat_history.messages(source), before)
+        self.assertEqual(len(chat_history.messages(branch['id'])), 4)
+        self.assertEqual({chat['id'] for chat in chat_history.list_chats(project)}, {source, branch['id']})
+
     def test_failed_generation_does_not_save_a_turn(self):
         """Keep the chat list empty if inference returns an empty reply."""
         with self.assertRaises(ValueError):

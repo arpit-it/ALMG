@@ -645,6 +645,7 @@ class _ChatPageState extends State<ChatPage> {
     final source = _chatId;
     if (source == null || _openingChat || _sending || _deleting) return;
     final draft = _input.text;
+    late final String branchNotice;
     setState(() {
       _openingChat = true;
       _error = null;
@@ -655,7 +656,10 @@ class _ChatPageState extends State<ChatPage> {
         body: {'id': source, 'message_count': messageCount},
       );
       if (!mounted) return;
+      branchNotice = 'Created branch in ${branch['project_name'] ?? 'the same project'}. '
+          'Original conversation preserved: ${branch['source_title'] ?? 'source chat'}.';
       setState(() {
+        if (branch.containsKey('project_id')) _projectId = branch['project_id'] as String?;
         _chatId = branch['id'] as String;
         if (prompt != null) _attachment = null;
         _messages.removeRange(messageCount, _messages.length);
@@ -671,6 +675,7 @@ class _ChatPageState extends State<ChatPage> {
       if (mounted) setState(() => _openingChat = false);
     }
     if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(branchNotice)));
     if (send) {
       await _send();
     } else {

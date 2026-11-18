@@ -146,7 +146,8 @@ def branch(chat_id, message_count):
         # Reserve the write lock before reading the source conversation.
         db.execute("BEGIN IMMEDIATE")
         source = db.execute(
-            "SELECT title, project_id FROM chats WHERE id = ?", (chat_id,)
+            """SELECT chats.title, chats.project_id, projects.name AS project_name
+               FROM chats LEFT JOIN projects ON chats.project_id = projects.id WHERE chats.id = ?""", (chat_id,)
         ).fetchone()
         if source is None:
             raise ValueError("Conversation not found.")
@@ -166,7 +167,9 @@ def branch(chat_id, message_count):
                WHERE chat_id = ? ORDER BY id LIMIT ?""",
             (branch_id, chat_id, message_count),
         )
-    return {"id": branch_id}
+    return {"id": branch_id, "project_id": source["project_id"], "source_id": chat_id,
+            "source_title": source["title"], "message_count": message_count,
+            "project_name": source["project_name"] or "Personal chats"}
 
 
 def context(db, chat_id, prompt, project_id=None, *, recall=True):

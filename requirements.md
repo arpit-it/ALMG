@@ -1390,7 +1390,19 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   both remained off. All 142 Python tests, 13 Flutter tests and Flutter
   analysis passed. Together with the verified message-body search and native
   Markdown export above, all stated acceptance criteria are complete.
-- [ ] Test project instructions, reference files, and chat branches together. Verify that a branch preserves its source conversation and stays in the same project.
+- [x] Test project instructions, reference files, and chat branches together. Verify that a branch preserves its source conversation and stays in the same project.
+  Branch responses now identify their source and project, and the Mac app
+  confirms both after creating a branch. An integrated local regression
+  covers project instructions, reference snippets, inherited PDF page text,
+  other-project exclusion and source preservation together. In the rebuilt
+  isolated Mac app, project settings displayed the instruction and reference
+  file; branching the saved answer confirmed Branch fixture project and its
+  source conversation. A follow-up with recall disabled received the expected
+  fixture response only after asserting all inherited context. Reopening the
+  original showed its unchanged two messages; SQLite confirmed the branch
+  remained in the same project with four messages. All 143 Python tests,
+  13 Flutter tests and Flutter analysis passed. No external collection or
+  model download was performed.
 
 ## P3 · Extend the dynamic workbench and platform support
 
