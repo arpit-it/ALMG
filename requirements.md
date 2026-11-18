@@ -877,6 +877,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Python tests and Flutter analysis passed, including disabled Commons
   search/download rejection. Cross-provider acceptance verification stays
   open.
+
+  Wikipedia excerpt collection now requires a recorded reuse basis for
+  every selected result, bound to its displayed source, title and text.
+  In the rebuilt Mac app with local fixtures, unreviewed excerpts were
+  unavailable for selection; separate excerpt-only decisions enabled them,
+  and collection showed two examples with sources, permission bases and
+  search-excerpt scope. No full articles were fetched. All 115 Python tests
+  and Flutter analysis passed, including stale-text, invalid-source and
+  wrong-scope rejection. Cross-provider acceptance verification remains
+  open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

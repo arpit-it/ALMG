@@ -54,3 +54,8 @@ bool collectableWebsitePage(Map record) =>
     record['page_reviewed'] == true && record['reuse_status'] == 'user_approved' &&
     record['reuse_approval'] is Map && record['reuse_approval']['scope'] == 'website_page_preview' &&
     (record['page_text'] as String? ?? '').length >= 40;
+
+/// Whether a Wikipedia excerpt has explicit excerpt-scoped reuse permission.
+bool collectableWikipediaExcerpt(Map record) =>
+    record['reuse_status'] == 'user_approved' && record['reuse_approval'] is Map &&
+    record['reuse_approval']['scope'] == 'wikipedia_excerpt';

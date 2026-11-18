@@ -38,7 +38,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access
+    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import chat_history
     import inference
@@ -51,6 +51,7 @@ else:
     import crossref_discovery
     import sec_discovery
     import website_access
+    import wikipedia_reuse
 
 ROOT = Path(os.environ.get("STUDIO_DATA", Path(__file__).resolve().parent / "runs"))
 MODEL = inference.MODEL
@@ -2269,16 +2270,18 @@ class Handler(BaseHTTPRequestHandler):
                         append_activity(job, "Catalog review closed. Choose a dataset source.")
                         store_job(job)
                         return self.respond({"id": job["id"]})
+                    elif action == "approve-wikipedia-reuse" and status == "text_candidates":
+                        record = next((row for row in job["text_candidates"] if row["source"] == data.get("approved_url")), None)
+                        if record is None:
+                            raise ValueError("Approve a listed Wikipedia excerpt URL first.")
+                        record["reuse_approval"] = wikipedia_reuse.excerpt_reuse_evidence(record, data)
+                        record["reuse_status"] = "user_approved"
+                        append_activity(job, "User reuse permission recorded for the displayed Wikipedia excerpt.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "use-text-excerpts" and status == "text_candidates":
-                        urls = [candidate["source"] for candidate in job["text_candidates"]]
-                        approved = data.get("approved_urls")
-                        if (not isinstance(approved, list) or not approved
-                            or any(not isinstance(url, str) or url not in urls for url in approved)
-                            or len(set(approved)) != len(approved)):
-                            raise ValueError("Select one or more listed candidate URLs first.")
-                        job.update(status="creating_dataset", error=None, mode="web",
-                                   text_candidates=[candidate for candidate in job["text_candidates"]
-                                                    if candidate["source"] in approved])
+                        rows = wikipedia_reuse.approved_excerpt_rows(job["text_candidates"], data.get("approved_urls"))
+                        job.update(status="creating_dataset", error=None, mode="web", text_candidates=rows)
                         worker = (prepare_dataset, (job,))
                     elif action == "prepare" and status == "approval":
                         mode = data.get("mode")

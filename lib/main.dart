@@ -1194,6 +1194,8 @@ class _StudioPageState extends State<StudioPage> {
                 const Text('This decision covers the displayed catalog description only. Country/year observations need separate review.'),
               if (scope == 'document_summary')
                 const Text('This decision covers the displayed document summary only. Full-text reuse needs separate review.'),
+              if (scope == 'wikipedia_excerpt')
+                const Text('This decision covers only the displayed search excerpt. Review applicable licensing and attribution requirements for this source; full-article reuse needs separate review.'),
               if (scope == 'website_page_preview')
                 const Text('This decision covers only the displayed page text preview, including any truncation. Website access permission and robots allowance do not establish permission to reuse content.'),
               if (scope == 'sec_filing_preview')
@@ -1403,7 +1405,7 @@ class _StudioPageState extends State<StudioPage> {
     final textCandidates = job?['text_candidates'] as List? ?? const [];
     final selectedTextUrls = {
       for (final candidate in textCandidates)
-        if (!_excludedTextSources.contains(candidate['source']))
+        if (collectableWikipediaExcerpt(candidate as Map) && !_excludedTextSources.contains(candidate['source']))
           candidate['source'] as String,
     };
     final catalogRecords = job?['catalog_candidates'] as List? ?? const [];
@@ -2326,6 +2328,9 @@ class _StudioPageState extends State<StudioPage> {
             child: const Text('Browse discovery providers'),
           ),
         if (status == 'text_candidates') ...[
+          const Text('Review reuse rights for each excerpt before collection. Permission recorded here covers the displayed excerpt only.'),
+          const SelectableText('Licensing reference: https://foundation.wikimedia.org/wiki/Policy:Terms_of_Use#7._Licensing_of_Content'),
+
           TextButton(
             onPressed: _busy
                 ? null
@@ -2352,6 +2357,7 @@ class _StudioPageState extends State<StudioPage> {
               ),
             ),
           for (final candidate in textCandidates)
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             ListTile(
               title: SelectableText(
                 (candidate['title'] as String?)?.isNotEmpty == true
@@ -2366,8 +2372,8 @@ class _StudioPageState extends State<StudioPage> {
                 ].join('\n'),
               ),
               trailing: Checkbox(
-                value: !_excludedTextSources.contains(candidate['source']),
-                onChanged: _busy
+                value: collectableWikipediaExcerpt(candidate as Map) && !_excludedTextSources.contains(candidate['source']),
+                onChanged: _busy || !collectableWikipediaExcerpt(candidate)
                     ? null
                     : (checked) => setState(() {
                         final source = candidate['source'] as String;
@@ -2386,8 +2392,15 @@ class _StudioPageState extends State<StudioPage> {
                 ].join('. '),
               ),
             ),
+            if (candidate['reuse_approval'] case final Map approval)
+              SelectableText('Wikipedia excerpt reuse approval: ${approval['permission_basis']}')
+            else
+              TextButton(onPressed: _busy ? null : () => _approveCatalogReuse(id as String, candidate,
+                  action: 'approve-wikipedia-reuse', scope: 'wikipedia_excerpt'),
+                child: const Text('Record excerpt reuse approval')),
+            ]),
           const Text(
-            'ALMG labels the selected search excerpts locally. '
+            'ALMG labels only selected, reuse-approved search excerpts locally. '
             'Approving excerpts does not fetch full articles.',
           ),
           FilledButton(
@@ -2586,8 +2599,9 @@ class _StudioPageState extends State<StudioPage> {
                                           : row['provider'] == 'federal_register'
                                               ? 'Document: $title'
                                               : 'Article: $title',
-                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'crossref', 'sec_edgar', 'project_website'}.contains(row['provider']) && row['reuse_approval'] is Map)
+                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'crossref', 'sec_edgar', 'project_website', 'wikipedia'}.contains(row['provider']) && row['reuse_approval'] is Map)
                           'User reuse approval: ${row['reuse_approval']['permission_basis']}',
+                        if (row['provider'] == 'wikipedia' && row['reuse_approval'] is Map) 'Content scope: search excerpt',
                         if (row['provider'] == 'crossref') 'Content scope: abstract',
                         if (row['provider'] == 'project_website') ...[
                           'Content scope: website page preview',
