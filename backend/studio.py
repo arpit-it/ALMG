@@ -1085,6 +1085,8 @@ def restore_jobs():
                              and all(row.get("provider") == "sec_edgar" for row in job["text_candidates"])
                              else "website_candidates" if job.get("text_candidates")
                              and all(row.get("provider") == "project_website" for row in job["text_candidates"])
+                             else "approval" if job.get("text_candidates")
+                             and all(row.get("provider") == "local_index" for row in job["text_candidates"])
                              else "text_candidates")
                     job.update(status=stage, mode=None, error=(
                         "Excerpt preparation was interrupted. Review and approve the excerpts to retry."
@@ -1370,7 +1372,8 @@ def prepare_dataset(job, imported_rows=None):
         work = ROOT / "training-sessions" / job["id"]
         work.mkdir(parents=True, exist_ok=True)
         (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
-        if job.get("mode") == "web" and job.get("project_id"):
+        if (job.get("mode") == "web" and job.get("project_id")
+                and not all(row.get("collection_origin") == "project_index" for row in rows)):
             saved = chat_history.index_project_pages(job["project_id"], rows)
             activity(job, f"Saved {saved} collected sources in the project's local page index.")
         label_counts = {}
@@ -1437,7 +1440,7 @@ def prepare_dataset(job, imported_rows=None):
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),
-                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "restrictions", "csv_end_line", "approved_query", "title", "provider", "reuse_approval", "source_name", "organization", "source_id", "collection_scope", "document_number", "cik", "accession", "filing_date", "form", "filing_text_truncated", "page_text_truncated", "discovered_from", "site_access_approval") if key in row}}
+                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "restrictions", "csv_end_line", "approved_query", "title", "provider", "reuse_approval", "source_name", "organization", "source_id", "collection_scope", "document_number", "cik", "accession", "filing_date", "form", "filing_text_truncated", "page_text_truncated", "discovered_from", "site_access_approval", "collection_origin", "source_provider") if key in row}}
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:
@@ -1460,6 +1463,8 @@ def prepare_dataset(job, imported_rows=None):
                              and all(row.get("provider") == "sec_edgar" for row in job["text_candidates"])
                              else "website_candidates" if job.get("text_candidates")
                              and all(row.get("provider") == "project_website" for row in job["text_candidates"])
+                             else "approval" if job.get("text_candidates")
+                             and all(row.get("provider") == "local_index" for row in job["text_candidates"])
                              else "text_candidates")
             update(job, status=stage, mode=None, error=str(error))
         else:
@@ -2010,6 +2015,10 @@ class Handler(BaseHTTPRequestHandler):
                         job.update(status="approval", error=None)
                         store_job(job)
                         return self.respond({"id": job["id"]})
+                    elif action == "use-saved-pages" and status == "approval" and job.get("recipe") == "classifier":
+                        rows = chat_history.approved_project_pages(job["project_id"], data)
+                        job.update(status="creating_dataset", error=None, mode="web", text_candidates=rows)
+                        worker = (prepare_dataset, (job,))
                     elif action == "search-companies" and status == "approval" and job.get("recipe") == "classifier":
                         query, contact = sec_discovery.company_query(data.get("query")), data.get("contact")
                         sec_discovery.submissions_request("1", contact)

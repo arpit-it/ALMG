@@ -1022,6 +1022,17 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Reuse in later datasets, project export/restore with provider settings,
   and installation-update storage verification remain open.
 
+  Saved sources can now be selected for a later classifier dataset with
+  explicit confirmation that their recorded content permission still
+  applies. Revision checks reject changed text/evidence and sources from
+  other projects. In the rebuilt Mac app, selecting two of three saved
+  fixture sources produced exactly two locally labeled examples, retaining
+  source URLs and reuse bases and identifying the local index as the origin.
+  Logs showed no website requests. The final build exposed descriptive
+  accessible source labels. All 122 Python tests and Flutter analysis
+  passed. Export/restore with provider settings and installation-update
+  storage verification remain open.
+
 
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples

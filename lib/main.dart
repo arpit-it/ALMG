@@ -1235,6 +1235,7 @@ class _StudioPageState extends State<StudioPage> {
 
   String _datasetSourceLabel(Map row, String source) {
     final provider = row['provider'];
+    if (provider == 'local_index') return 'Saved project source: $source';
     if (provider == 'wikipedia' ||
         (provider == null && source.startsWith('https://en.wikipedia.org/wiki/'))) {
       return 'English Wikipedia: $source';
@@ -1259,30 +1260,57 @@ class _StudioPageState extends State<StudioPage> {
 
   Future<void> _showSavedPages() async {
     final project = _project;
+    final jobId = _activeJob;
+    final canUse = _job?['status'] == 'approval' && _job?['recipe'] == 'classifier' && jobId != null;
     if (project == null) return;
     var query = '';
+    var searchError = '';
+    final selected = <String>{};
     try {
       var pages = (await _request('/project-pages?project_id=${Uri.encodeQueryComponent(project)}'))['pages'] as List;
       if (!mounted) return;
-      await showDialog<void>(context: context, builder: (context) => StatefulBuilder(builder: (context, update) => AlertDialog(
+      final choices = await showDialog<List<dynamic>>(context: context, builder: (context) => StatefulBuilder(builder: (context, update) => AlertDialog(
         title: const Text('Saved project pages'),
         content: SizedBox(width: 600, height: 480, child: Column(children: [
           const Text('Searches this project’s collected text locally. No websites are contacted. Shows up to 20 saved sources.'),
           TextField(maxLength: 160, decoration: const InputDecoration(labelText: 'Search saved text or source URL'),
             onChanged: (value) => query = value),
           TextButton(onPressed: () async {
-            final result = await _request('/project-pages?project_id=${Uri.encodeQueryComponent(project)}&q=${Uri.encodeQueryComponent(query)}');
-            if (context.mounted) update(() => pages = result['pages'] as List);
+            try {
+              final result = await _request('/project-pages?project_id=${Uri.encodeQueryComponent(project)}&q=${Uri.encodeQueryComponent(query)}');
+              if (context.mounted) update(() { pages = result['pages'] as List; selected.clear(); searchError = ''; });
+            } catch (error) {
+              if (context.mounted) update(() => searchError = 'Local search failed: $error');
+            }
           }, child: const Text('Search local pages')),
+          if (searchError.isNotEmpty) Text(searchError),
           Expanded(child: ListView(children: [
             if (pages.isEmpty) const Text('No saved pages match this search.'),
-            for (final page in pages) ListTile(title: SelectableText(page['source'] as String),
-              subtitle: SelectableText((page['text'] as String).length > 1000
-                  ? '${(page['text'] as String).substring(0, 1000)}…' : page['text'] as String)),
+            for (final page in pages) CheckboxListTile(
+              title: Text(page['source'] as String),
+              subtitle: Text('${(page['text'] as String).length > 1000 ? '${(page['text'] as String).substring(0, 1000)}…' : page['text']}\nReuse basis: ${page['metadata']['reuse_approval']?['permission_basis'] ?? 'No recorded reuse permission'}'),
+              value: selected.contains(page['source']),
+              onChanged: !canUse || page['metadata']['reuse_approval'] is! Map ? null : (checked) => update(() {
+                if (checked == true) { selected.add(page['source'] as String); }
+                else { selected.remove(page['source']); }
+              })),
           ])),
         ])),
-        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+          if (canUse) FilledButton(onPressed: selected.isEmpty ? null : () => Navigator.pop(context,
+            [for (final page in pages) if (selected.contains(page['source'])) {'source': page['source'], 'revision': page['revision']}]),
+            child: Text('Use saved sources (${selected.length} selected)'))],
       )));
+      if (choices == null || !mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Approve saved text for this dataset'),
+        content: Text('Use the stored text of ${choices.length} selected sources, up to 50,000 characters each, with their recorded reuse evidence. Confirm that the recorded permission still applies. Text will be labeled locally for this plan. No websites will be contacted.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve saved-text reuse'))],
+      ));
+      if (confirmed == true) {
+        await _submit('/jobs/$jobId/use-saved-pages', {'approved_pages': choices, 'confirmed': true, 'approved_scope': 'saved_project_text'});
+      }
     } catch (error) {
       if (mounted) setState(() => _error = 'Saved page search failed: $error');
     }
@@ -2634,9 +2662,14 @@ class _StudioPageState extends State<StudioPage> {
                                           : row['provider'] == 'federal_register'
                                               ? 'Document: $title'
                                               : 'Article: $title',
-                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'crossref', 'sec_edgar', 'project_website', 'wikipedia'}.contains(row['provider']) && row['reuse_approval'] is Map)
+                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'crossref', 'sec_edgar', 'project_website', 'wikipedia', 'local_index'}.contains(row['provider']) && row['reuse_approval'] is Map)
                           'User reuse approval: ${row['reuse_approval']['permission_basis']}',
                         if (row['provider'] == 'wikipedia' && row['reuse_approval'] is Map) 'Content scope: search excerpt',
+                        if (row['collection_origin'] == 'project_index') ...[
+                          'Loaded from this project’s local page index.',
+                          'Original provider: ${row['source_provider']}',
+                          'Stored content scope: ${row['collection_scope'] ?? 'collected text'}',
+                        ],
                         if (row['provider'] == 'crossref') 'Content scope: abstract',
                         if (row['provider'] == 'project_website') ...[
                           'Content scope: website page preview',

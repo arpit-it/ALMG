@@ -1,5 +1,6 @@
 """SQLite persistence and context selection for local conversations."""
 import base64
+import hashlib
 import json
 import os
 import re
@@ -484,4 +485,39 @@ def search_project_pages(project_id, query=""):
         require_project(db, project_id)
         rows = db.execute("SELECT source, title, text, metadata, updated FROM project_pages WHERE " +
                           " AND ".join(where) + " ORDER BY updated DESC, source LIMIT 20", values)
-        return [{**dict(row), "metadata": json.loads(row["metadata"])} for row in rows]
+        return [indexed_page_record(row) for row in rows]
+
+
+def indexed_page_record(row):
+    page = {**dict(row), "metadata": json.loads(row["metadata"])}
+    fields = {key: page[key] for key in ("source", "title", "text", "metadata")}
+    page["revision"] = hashlib.sha256(json.dumps(fields, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    return page
+
+
+def approved_project_pages(project_id, decision):
+    approved = decision.get("approved_pages")
+    if (decision.get("confirmed") is not True or decision.get("approved_scope") != "saved_project_text"
+            or not isinstance(approved, list) or not 1 <= len(approved) <= 20
+            or any(not isinstance(page, dict) or not isinstance(page.get("source"), str)
+                   or not isinstance(page.get("revision"), str) for page in approved)
+            or len({page["source"] for page in approved}) != len(approved)):
+        raise ValueError("Select saved sources and confirm reuse of their stored text first.")
+    rows = []
+    with closing(connect()) as db:
+        require_project(db, project_id)
+        for choice in approved:
+            stored = db.execute("SELECT source, title, text, metadata, updated FROM project_pages WHERE project_id = ? AND source = ?",
+                                (project_id, choice["source"])).fetchone()
+            if stored is None:
+                raise ValueError("Select only sources saved in this project.")
+            page = indexed_page_record(stored)
+            evidence = page["metadata"].get("reuse_approval")
+            if (page["revision"] != choice["revision"] or not isinstance(evidence, dict)
+                    or evidence.get("source") != page["source"]
+                    or not isinstance(evidence.get("permission_basis"), str) or len(evidence["permission_basis"].strip()) < 10):
+                raise ValueError("Saved text or reuse evidence changed. Search and review the current saved source again.")
+            rows.append({**page["metadata"], "source": page["source"], "text": page["text"], "title": page["title"],
+                         "source_provider": page["metadata"].get("provider"), "provider": "local_index",
+                         "group": page["source"], "collection_origin": "project_index", "index_revision": page["revision"]})
+    return rows
