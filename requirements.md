@@ -1369,7 +1369,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   complete for the text/OCR context path. All 141 Python tests, 11 Flutter
   tests and Flutter analysis passed. Direct visual interpretation and PDF
   layout analysis are not provided by this path and are labeled accordingly.
-- [ ] Add full-text conversation search, Markdown export, and controls for whether the model can draw on other conversations.
+- [x] Add full-text conversation search, Markdown export, and controls for whether the model can draw on other conversations.
   Partial delivery: conversation menus now save Markdown through the native
   file dialog as well as copying it. Both actions use a shared formatter
   that preserves message formatting, order, Unicode and attachment filenames
@@ -1380,6 +1380,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   with its title, user/assistant sections and attachment filename. All 141
   Python tests, 13 Flutter tests and Flutter analysis passed. App-level
   verification of cross-conversation recall controls remains open.
+  Final acceptance: the conversation view now exposes Use other conversations
+  before sending, sharing its persisted preference with Settings. In the
+  rebuilt Mac app, enabled recall sent true and included a related message
+  from the selected fixture project; disabled recall sent false and omitted
+  that message while retaining current-thread history. Captured request and
+  context fixtures verified that the other project's matching message was
+  excluded in both cases. After app restart, the chat switch and Settings
+  both remained off. All 142 Python tests, 13 Flutter tests and Flutter
+  analysis passed. Together with the verified message-body search and native
+  Markdown export above, all stated acceptance criteria are complete.
 - [ ] Test project instructions, reference files, and chat branches together. Verify that a branch preserves its source conversation and stays in the same project.
 
 ## P3 · Extend the dynamic workbench and platform support

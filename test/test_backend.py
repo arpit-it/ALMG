@@ -49,6 +49,26 @@ class ChatHistoryTest(unittest.TestCase):
 
         chat_history.send(None, "Garden orchid question", reply, project_id=project, recall=False)
 
+    def test_recall_switch_only_controls_related_chats_in_current_project(self):
+        project = chat_history.create_project("Work")["id"]
+        other = chat_history.create_project("Other")["id"]
+        chat_history.send(None, "Violet lantern SAME_PROJECT_CONTEXT", lambda _: "Source reply", project_id=project)
+        chat_history.send(None, "Violet lantern OTHER_PROJECT_CONTEXT", lambda _: "Private reply", project_id=other)
+        observed = []
+        def reply(messages):
+            observed.append(messages)
+            return "Current reply"
+        current = chat_history.send(None, "Violet lantern location", reply, project_id=project, recall=True)["id"]
+        enabled = str(observed[-1])
+        self.assertIn("SAME_PROJECT_CONTEXT", enabled)
+        self.assertNotIn("OTHER_PROJECT_CONTEXT", enabled)
+        chat_history.send(current, "Violet lantern followup", reply, project_id=project, recall=False)
+        disabled = str(observed[-1])
+        self.assertNotIn("SAME_PROJECT_CONTEXT", disabled)
+        self.assertNotIn("OTHER_PROJECT_CONTEXT", disabled)
+        self.assertIn("Current reply", disabled)
+        self.assertIn("Violet lantern location", disabled)
+
     def test_retried_message_returns_committed_turn_once(self):
         token = "a" * 32
         first = chat_history.send(None, "Hello", lambda _: "Hi", token=token)

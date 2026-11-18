@@ -145,6 +145,11 @@ class _ChatPageState extends State<ChatPage> {
     }
   }
 
+  void _setRecall(bool value) {
+    setState(() => _recall = value);
+    _saveChatPreferences();
+  }
+
   void _rememberDraft() {
     if (!_draftsLoaded || _sending) return;
     if (_input.text == (_drafts[_draftKey] ?? '')) return;
@@ -1422,6 +1427,14 @@ class _ChatPageState extends State<ChatPage> {
                   ),
                 ],
               ),
+              SwitchListTile.adaptive(
+                dense: true,
+                contentPadding: EdgeInsets.zero,
+                title: const Text('Use other conversations'),
+                subtitle: const Text('Use related messages from other chats in this project.'),
+                value: _recall,
+                onChanged: _sending || _openingChat ? null : _setRecall,
+              ),
               const SizedBox(height: 12),
               if (_backendOffline) _backendRecovery(),
               if (_sending || _openingChat) const LinearProgressIndicator(),
@@ -1891,10 +1904,7 @@ class _ChatPageState extends State<ChatPage> {
                     'Use related messages from other chats in the same project.',
                   ),
                   value: _recall,
-                  onChanged: (value) {
-                    setState(() => _recall = value);
-                    _saveChatPreferences();
-                  },
+                  onChanged: _sending ? null : _setRecall,
                 ),
               ]),
             ],
