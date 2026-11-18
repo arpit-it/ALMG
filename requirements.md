@@ -802,6 +802,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   rejection was added. Network tests cover public-address pinning, TLS
   hostname preservation and bounded reads. Site access-rule approval,
   robots enforcement, crawling and per-page reuse review remain open.
+
+  Project website access-rule review now records an explicit basis scoped
+  to the saved website and displayed robots guidance checksum. In the
+  rebuilt Mac app with local fixtures, the access-only dialog recorded the
+  basis while reuse stayed unverified; a newly approved robots refresh
+  removed the earlier decision and restored the review control. No crawl
+  started. All 103 Python tests and Flutter analysis passed, including
+  changed-site and scope rejection. Robots enforcement, crawling and
+  per-page reuse approval remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

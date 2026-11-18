@@ -44,3 +44,23 @@ class WebsiteAccessTest(unittest.TestCase):
             studio.review_website_access({}, 'https://example.org')
         fetch.assert_called_once_with('https://example.org')
         self.assertEqual(update.call_args.kwargs['status'], 'website_access_review')
+
+    def test_access_rule_decision_is_scoped_to_current_guidance(self):
+        review = access.robots_review('https://example.org/archive/', 200, b'User-agent: *\nDisallow: /private/\n')
+        decision = {'approved_website': review['website'], 'confirmed': True, 'approved_scope': 'website_access_rules',
+                    'access_basis': 'Local fixture site access policy reviewed.'}
+        evidence = access.access_rule_evidence(review, decision, review['website'])
+        self.assertEqual(evidence['scope'], 'website_access_rules')
+        self.assertEqual(evidence['guidance_sha256'], access.guidance_checksum(review))
+        self.assertNotEqual(evidence['guidance_sha256'], access.guidance_checksum({**review, 'robots_text': 'User-agent: *\nDisallow: /\n'}))
+        self.assertEqual(review['reuse_status'], 'unverified')
+        for changes in ({'confirmed': False}, {'approved_scope': 'content_reuse'}, {'approved_website': 'https://other.org'}, {'access_basis': 'short'}):
+            with self.assertRaises(ValueError):
+                access.access_rule_evidence(review, {**decision, **changes}, review['website'])
+        with self.assertRaises(ValueError):
+            access.access_rule_evidence(review, decision, 'https://other.org')
+        malformed = {**review, 'robots_url': 'https://other.org/robots.txt'}
+        with self.assertRaises(ValueError):
+            access.access_rule_evidence(malformed, decision, review['website'])
+        refreshed = access.robots_review(review['website'], 200, b'User-agent: *\nDisallow: /\n')
+        self.assertNotIn('access_approval', refreshed)

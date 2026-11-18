@@ -64,3 +64,30 @@ def fetch_robots(website):
     finally:
         connection.close()
         raw.close()
+
+
+def guidance_checksum(review):
+    """Bind access-rule review to the exact website and displayed robots guidance."""
+    import json
+    if (review.get('robots_url') != robots_url(review.get('website'))
+            or review.get('robots_status') not in (200, 404)
+            or not isinstance(review.get('robots_text'), str)
+            or len(review['robots_text'].encode('utf-8')) > ROBOTS_LIMIT
+            or (review['robots_status'] == 404 and review['robots_text'])
+            or not isinstance(review.get('robots_sha256'), str)
+            or not re.fullmatch(r'[0-9a-f]{64}', review['robots_sha256'])):
+        raise ValueError('Review the website robots guidance first.')
+    fields = {key: review[key] for key in ('website', 'robots_url', 'robots_status', 'robots_text', 'robots_sha256')}
+    return hashlib.sha256(json.dumps(fields, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
+
+
+def access_rule_evidence(review, decision, current_website):
+    """Record a user's site access-rule review without approving content reuse."""
+    import time
+    basis = decision.get('access_basis')
+    if (current_website != review.get('website') or decision.get('approved_website') != current_website
+            or decision.get('confirmed') is not True or decision.get('approved_scope') != 'website_access_rules'
+            or not isinstance(basis, str) or not 10 <= len(basis.strip()) <= 2000):
+        raise ValueError('Review the current website access rules and record the basis first.')
+    return {'website': current_website, 'scope': 'website_access_rules', 'access_basis': basis.strip(),
+            'guidance_sha256': guidance_checksum(review), 'time': time.time()}

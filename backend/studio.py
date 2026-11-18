@@ -1888,6 +1888,14 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the saved website, robots.txt destination and 64 KiB limit first.")
                         job.update(status="reviewing_website_access", website_access=None, error=None)
                         worker = (review_website_access, (job, website))
+                    elif action == "approve-website-access-rules" and status == "website_access_review":
+                        website = chat_history.project_details(job.get("project_id"))["source_website"]
+                        review = job["website_access"]
+                        review["access_approval"] = website_access.access_rule_evidence(review, data, website)
+                        review["access_status"] = "user_reviewed"
+                        append_activity(job, "User site access-rule review recorded; content reuse remains unverified.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "close-website-access" and status == "website_access_review":
                         job.update(status="approval", error=None)
                         store_job(job)

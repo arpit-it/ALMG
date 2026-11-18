@@ -1139,6 +1139,27 @@ class _StudioPageState extends State<StudioPage> {
     });
   }
 
+  Future<void> _approveWebsiteRules(String id, Map review) async {
+    var basis = '';
+    final approved = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Record website access-rule review'),
+      content: SizedBox(width: 460, child: Column(mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start, children: [
+          SelectableText(review['website'] as String),
+          const Text('Confirm you reviewed the site’s rules for automated access and the displayed robots guidance. Record the policy URL, owner permission, or other basis. This records access-rule review only; it does not approve content reuse or start crawling.'),
+          TextField(autofocus: true, minLines: 2, maxLines: 4, maxLength: 2000,
+            decoration: const InputDecoration(labelText: 'Basis for automated access'),
+            onChanged: (value) => basis = value),
+        ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm access-rule review'))],
+    ));
+    if (approved == true && mounted) {
+      await _submit('/jobs/$id/approve-website-access-rules', {'approved_website': review['website'],
+        'approved_scope': 'website_access_rules', 'access_basis': basis, 'confirmed': true});
+    }
+  }
+
   Future<void> _approveCatalogReuse(String id, Map record, {String action = 'approve-catalog-reuse', String? scope}) async {
     var basis = '';
     final approved = await showDialog<bool>(
@@ -1772,11 +1793,16 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'website_access_review') ...[
           SelectableText('Website: ${job?['website_access']['website']}\nRobots URL: ${job?['website_access']['robots_url']}'),
-          const Text('Access and reuse remain unverified. Review the robots guidance and the site’s access rules before crawling. No pages have been crawled.'),
+          const Text('Review the robots guidance and the site’s access rules. Content reuse remains unverified. Crawling is not available yet.'),
           if (job?['website_access']['robots_status'] == 404)
             const Text('robots.txt was not found (HTTP 404). This does not establish access or reuse permission.')
           else
             SelectableText('robots.txt:\n${job?['website_access']['robots_text']}'),
+          if (job?['website_access']['access_approval'] case final Map approval)
+            SelectableText('Access-rule review recorded: ${approval['access_basis']}')
+          else
+            TextButton(onPressed: _busy ? null : () => _approveWebsiteRules(id as String, job!['website_access'] as Map),
+              child: const Text('Record website access-rule review')),
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-website-access', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'company_candidates') ...[
