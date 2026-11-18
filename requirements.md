@@ -1111,6 +1111,17 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   two astronomy usable examples with training approval pending. All 133
   Python tests and Flutter analysis passed, including late-row prioritization
   and same-label negative cases. Broader semantic ambiguity remains open.
+  An explicit local-model review now checks every classifier example in
+  batches of four, validates indexed suggestions, stores short review
+  reasons and prioritizes flagged rows. Labels and usable counts stay
+  unchanged, with training approval still required. The rebuilt Mac app
+  imported three unrelated fixture rows, ran Review label ambiguity locally,
+  reported all three reviewed and one flagged, and displayed the mixed-topic
+  example's reason while preserving class balance. This used deterministic
+  local-model responses and no external requests. All 136 Python tests and
+  Flutter analysis passed, including malformed later-batch preservation and
+  interrupted-review recovery. Real-model semantic review quality remains
+  unverified, so this requirement remains open.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
   shipping class and left training approval pending. The backend also

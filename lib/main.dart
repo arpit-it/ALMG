@@ -786,6 +786,7 @@ class _StudioPageState extends State<StudioPage> {
         'reviewing_publication',
         'reviewing_catalog_item',
         'creating_dataset',
+        'reviewing_labels',
         'training',
         'exporting',
       };
@@ -1589,6 +1590,7 @@ class _StudioPageState extends State<StudioPage> {
       'text_candidates': 'Review Wikipedia sources',
       'image_candidates': 'Image search results',
       'creating_dataset': 'Preparing dataset',
+      'reviewing_labels': 'Reviewing labels with the local model',
       'cancelled': 'Training cancelled',
       'dataset_ready': 'Training approval required',
       'queued': 'Training queued',
@@ -1606,6 +1608,7 @@ class _StudioPageState extends State<StudioPage> {
     final working = {
       'planning',
       'creating_dataset',
+      'reviewing_labels',
       'queued',
       'waiting_idle',
       'training',
@@ -2629,6 +2632,13 @@ class _StudioPageState extends State<StudioPage> {
               onPressed: _busy ? null : () => _importDataset(id as String),
               child: const Text('Replace dataset with CSV'),
             ),
+          if (!_imageRecipe) ...[
+            OutlinedButton(onPressed: _busy ? null : () => _submit('/jobs/$id/review-labels', {'confirmed': true}),
+              child: const Text('Review label ambiguity locally')),
+            const Text('Uses the local model to flag uncertain labels. Suggestions may be wrong; labels stay unchanged and training still needs approval.'),
+            if ((job?['label_reviewed_rows'] as int? ?? 0) > 0)
+              Text('Local label review: ${job?['label_reviewed_rows']} examples reviewed, ${job?['label_review_flags']} flagged.'),
+          ],
           if (job?['usable_counts'] case final Map counts)
             for (final entry in counts.entries)
               if ((entry.value as int) < 8)
@@ -2685,6 +2695,8 @@ class _StudioPageState extends State<StudioPage> {
               subtitle: Text(
                 row['image'] == null
                     ? [
+                        if (row['label_review'] is Map && row['label_review']['ambiguous'] == true)
+                          'Local model review: ${row['label_review']['reason']}',
                         if (row['possible_label_ambiguity'] == true) 'Potential label ambiguity · Review changed word',
                         if (row['word_variant'] == true) 'One-word variant · Review label',
                         row['text'] as String,
