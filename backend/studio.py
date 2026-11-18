@@ -218,16 +218,23 @@ def discover_text(job):
 
 
 def search_publications(job):
-    """Search the explicitly approved first query, without following publication links."""
+    """Search the approved query list, without following publication links."""
     try:
-        query = job["plan"]["queries"][0]
-        url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + urlencode({
-            "query": query, "format": "json", "resultType": "lite", "pageSize": 20,
-        })
-        result = request_json(url, headers={
-            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
-        }, opener=DISCOVERY)
-        candidates = europe_pmc.publication_candidates(result, query)
+        candidates = []
+        seen = set()
+        for query in job["plan"]["queries"]:
+            if len(candidates) >= 40:
+                break
+            url = "https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + urlencode({
+                "query": query, "format": "json", "resultType": "lite", "pageSize": 20,
+            })
+            result = request_json(url, headers={
+                "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+            }, opener=DISCOVERY)
+            for record in europe_pmc.publication_candidates(result, query):
+                if record["source"] not in seen and len(candidates) < 40:
+                    seen.add(record["source"])
+                    candidates.append(record)
         if not candidates:
             update(job, status="approval", error="Europe PMC found no supported publications. Edit the query or choose another source.")
             return
@@ -1596,9 +1603,10 @@ class Handler(BaseHTTPRequestHandler):
                         worker = (prepare_dataset, (job, rows))
                     elif action == "search-publications" and status == "approval" and job.get("recipe") == "classifier":
                         queries = job["plan"]["queries"]
-                        if (not queries or data.get("approved_query") != queries[0]
+                        if (not queries or data.get("approved_queries") != queries
                                 or data.get("approved_provider") != "europe_pmc"
-                                or data.get("approved_result_limit") != 20):
+                                or data.get("approved_result_limit") != 20
+                                or data.get("approved_total_limit") != 40):
                             raise ValueError("Approve the Europe PMC query and result limit first.")
                         job.update(status="searching_publications", error=None)
                         worker = (search_publications, (job,))

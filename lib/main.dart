@@ -1534,12 +1534,14 @@ class _StudioPageState extends State<StudioPage> {
         if (status == 'approval' && !_imageRecipe &&
             plan != null && (plan['queries'] as List).isNotEmpty) ...[
           const Text('Europe PMC publication preview · www.ebi.ac.uk. '
-              'Sends the first query for up to 20 publication records.'),
-          SelectableText((plan['queries'] as List).first as String),
+              'Sends the listed queries for up to 20 records per query and 40 total.'),
+          for (final query in plan['queries'] as List)
+            SelectableText('• $query'),
           OutlinedButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/search-publications', {
               'approved_provider': 'europe_pmc',
-              'approved_query': (plan['queries'] as List).first,
+              'approved_queries': plan['queries'],
+              'approved_total_limit': 40,
               'approved_result_limit': 20,
             }),
             child: const Text('Approve Europe PMC search'),

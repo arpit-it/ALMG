@@ -18,7 +18,7 @@ class PublicationDiscoveryTest(unittest.TestCase):
         self.assertTrue(all(row["approved_query"] == "orchard" for row in records))
 
     def test_search_contacts_only_discovery_endpoint_and_limits_records(self):
-        job = {"plan": {"queries": ["orchard fruit", "unused"]}}
+        job = {"plan": {"queries": ["orchard fruit"]}}
         payload = {"resultList": {"result": [
             {"source": "MED", "id": str(index), "title": "Research"} for index in range(30)]}}
         with patch.object(studio, "request_json", return_value=payload) as request, \
@@ -146,3 +146,27 @@ class PublicationDiscoveryTest(unittest.TestCase):
         for change in ({"abstract": record["abstract"] + " Changed."}, {"abstract_reviewed": False}, {"reuse_status": "unverified"}):
             with self.assertRaises(ValueError):
                 approved_abstract_rows([{**record, **change}], [record["source"]])
+
+    def test_query_list_deduplicates_publications_and_preserves_matching_query(self):
+        from urllib.parse import parse_qs, urlsplit
+        job = {"plan": {"queries": ["orchard", "astronomy"]}}
+        def response(url, **kwargs):
+            query = parse_qs(urlsplit(url).query)["query"][0]
+            return {"resultList": {"result": [
+                {"source": "MED", "id": "1", "title": "Shared paper"},
+                {"source": "MED", "id": "2" if query == "orchard" else "3", "title": query},
+            ]}}
+        with patch.object(studio, "request_json", side_effect=response) as request, patch.object(studio, "activity"), patch.object(studio, "store_job"):
+            studio.search_publications(job)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual([row["approved_query"] for row in job["publication_candidates"]], ["orchard", "orchard", "astronomy"])
+
+    def test_publication_search_stops_contacts_at_total_limit(self):
+        job = {"plan": {"queries": ["orchard", "astronomy", "unused"]}}
+        responses = [{"resultList": {"result": [
+            {"source": "MED", "id": str(batch * 100 + index), "title": "Research"} for index in range(25)
+        ]}} for batch in range(2)]
+        with patch.object(studio, "request_json", side_effect=responses) as request, patch.object(studio, "activity"), patch.object(studio, "store_job"):
+            studio.search_publications(job)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(len(job["publication_candidates"]), 40)

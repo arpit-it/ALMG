@@ -598,6 +598,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   abstract checksum against its permission record. All 56 Python tests
   and Flutter analysis passed. Full-text loading and other starter
   providers remain open, so the overall requirement stays incomplete.
+  Europe PMC discovery now requires approval of all displayed queries,
+  20 results per query and 40 total. The rebuilt Mac app disclosed both
+  offline queries and returned orchard and astronomy publications with
+  matching query provenance; a shared publication appeared only once.
+  All 58 Python tests and Flutter analysis passed. Tests verify URL
+  deduplication and no further provider contacts after the total limit.
+  Full-text loading and other starter providers remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
