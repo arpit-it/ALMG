@@ -48,3 +48,41 @@ def filing_candidates(payload, cik, limit=20):
         if len(rows) >= limit:
             break
     return rows
+
+
+COMPANY_CATALOG_URL = 'https://www.sec.gov/files/company_tickers_exchange.json'
+
+
+def company_query(value):
+    if (not isinstance(value, str) or not 1 <= len(value.strip()) <= 160
+            or any(unicodedata.category(c) in {'Cc', 'Cs'} for c in value)):
+        raise ValueError('Enter a company name or ticker, up to 160 characters.')
+    return value.strip()
+
+
+def company_candidates(payload, query, limit=20):
+    """Match the bounded SEC association catalog locally; no filing requests."""
+    terms = company_query(query).casefold().split()
+    if (not isinstance(payload, dict) or payload.get('fields') != ['cik', 'name', 'ticker', 'exchange']
+            or not isinstance(payload.get('data'), list) or len(payload['data']) > 50000):
+        raise ValueError('SEC returned an unsupported company catalog.')
+    rows, seen = [], set()
+    for row in payload['data']:
+        if not isinstance(row, list) or len(row) != 4:
+            continue
+        cik, name, ticker, exchange = row
+        if (type(cik) is not int or not 1 <= cik <= 9999999999
+                or any(not isinstance(v, str) or not 1 <= len(v) <= bound
+                       or any(unicodedata.category(c) in {'Cc', 'Cs'} for c in v)
+                       for v, bound in ((name, 1000), (ticker, 40)))
+                or (exchange is not None and (not isinstance(exchange, str) or len(exchange) > 100
+                    or any(unicodedata.category(c) in {'Cc', 'Cs'} for c in exchange)))):
+            continue
+        if cik in seen or not all(term in f'{name} {ticker}'.casefold() for term in terms):
+            continue
+        rows.append({'cik': str(cik), 'company': name, 'ticker': ticker, 'exchange': exchange or '',
+                     'source': COMPANY_CATALOG_URL, 'provider': 'sec_edgar'})
+        seen.add(cik)
+        if len(rows) >= limit:
+            break
+    return rows

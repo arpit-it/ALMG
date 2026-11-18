@@ -40,3 +40,22 @@ class SecDiscoveryTest(unittest.TestCase):
             headers={'User-Agent': 'ALMG/1.0 fixture@example.invalid'}, opener=studio.DISCOVERY)
         self.assertEqual(update.call_args.kwargs['status'], 'filing_candidates')
         self.assertEqual(len(update.call_args.kwargs['filing_candidates']), 1)
+
+    def test_company_matching_is_bounded_local_and_validated(self):
+        catalog = {'fields': ['cik', 'name', 'ticker', 'exchange'], 'data': [
+            [1234, 'Orchard Fixture Corp', 'ORCH', 'Nasdaq'],
+            [1234, 'Orchard Duplicate', 'ORCH.B', 'Nasdaq'],
+            [4321, 'Astronomy Fixture', 'STAR', None],
+            [0, 'Orchard bad CIK', 'BAD', 'X'], [999, 'Orchard\nInvalid', 'BAD', 'X']]}
+        rows = sec.company_candidates(catalog, 'oRcH')
+        self.assertEqual([row['cik'] for row in rows], ['1234'])
+        self.assertEqual(sec.company_candidates(catalog, 'orchard fixture')[0]['ticker'], 'ORCH')
+        self.assertEqual(sec.company_candidates(catalog, 'missing'), [])
+        with self.assertRaises(ValueError):
+            sec.company_candidates({'fields': [], 'data': []}, 'orchard')
+        with patch.object(studio, 'request_json', return_value=catalog) as request, patch.object(studio, 'activity'), patch.object(studio, 'update') as update, patch.object(studio.time, 'sleep'):
+            studio.search_companies({}, 'orchard', 'fixture@example.invalid')
+        request.assert_called_once_with(sec.COMPANY_CATALOG_URL, headers={'User-Agent': 'ALMG/1.0 fixture@example.invalid'}, opener=studio.DISCOVERY)
+        self.assertEqual(update.call_args.kwargs['status'], 'company_candidates')
+        many = {**catalog, 'data': [[i, f'Orchard {i}', 'O', 'X'] for i in range(1, 30)]}
+        self.assertEqual(len(sec.company_candidates(many, 'orchard')), 20)

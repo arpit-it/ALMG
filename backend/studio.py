@@ -226,6 +226,21 @@ SEC_REQUEST_LOCK = threading.Lock()
 SEC_LAST_REQUEST = 0.0
 
 
+def search_companies(job, query, contact):
+    global SEC_LAST_REQUEST
+    try:
+        _, agent = sec_discovery.submissions_request("1", contact)
+        with SEC_REQUEST_LOCK:
+            time.sleep(max(0, 1 - (time.monotonic() - SEC_LAST_REQUEST)))
+            SEC_LAST_REQUEST = time.monotonic()
+            result = request_json(sec_discovery.COMPANY_CATALOG_URL, headers={"User-Agent": agent}, opener=DISCOVERY)
+        rows = sec_discovery.company_candidates(result, query)
+        activity(job, f"Found {len(rows)} SEC company matches in the approved catalog; no submissions loaded.")
+        update(job, status="company_candidates", company_candidates=rows, company_query=query)
+    except (OSError, ValueError, IncompleteRead):
+        update(job, status="approval", error="SEC company lookup failed. Review the name or ticker and contact, then approve another attempt.")
+
+
 def search_filings(job, cik, contact):
     global SEC_LAST_REQUEST
     try:
@@ -929,7 +944,7 @@ def restore_jobs():
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "searching_filings", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "searching_filings", "searching_companies", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.pop("publication_candidates", None)
@@ -970,7 +985,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "filing_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "filing_candidates", "company_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -1809,6 +1824,19 @@ class Handler(BaseHTTPRequestHandler):
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
                         job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))
+                    elif action == "search-companies" and status == "approval" and job.get("recipe") == "classifier":
+                        query, contact = sec_discovery.company_query(data.get("query")), data.get("contact")
+                        sec_discovery.submissions_request("1", contact)
+                        if (data.get("approved_provider") != "sec_edgar" or data.get("approved_url") != sec_discovery.COMPANY_CATALOG_URL
+                                or data.get("approved_result_limit") != 20):
+                            raise ValueError("Approve the SEC company catalog, contact and match limit first.")
+                        job.update(status="searching_companies", error=None)
+                        worker = (search_companies, (job, query, contact))
+                    elif action == "close-companies" and status == "company_candidates":
+                        job.pop("company_candidates", None)
+                        job.update(status="approval", error=None)
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "search-filings" and status == "approval" and job.get("recipe") == "classifier":
                         cik, contact = data.get("cik"), data.get("contact")
                         url, _ = sec_discovery.submissions_request(cik, contact)

@@ -532,6 +532,7 @@ class _StudioPageState extends State<StudioPage> {
   final Set<String> _excludedIndicators = {};
   final Set<String> _excludedNotices = {};
   final Set<String> _excludedBibliography = {};
+  final _secQuery = TextEditingController();
   final _secCik = TextEditingController();
   final _secContact = TextEditingController();
   final _indicatorFilter = TextEditingController();
@@ -726,6 +727,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_notices',
         'searching_bibliography',
         'searching_filings',
+        'searching_companies',
         'reviewing_bibliography',
         'reviewing_notice',
         'loading_indicators',
@@ -901,6 +903,7 @@ class _StudioPageState extends State<StudioPage> {
     _prompt.dispose();
     _target.dispose();
     _previewInput.dispose();
+    _secQuery.dispose();
     _secCik.dispose();
     _secContact.dispose();
     _indicatorFilter.dispose();
@@ -1386,6 +1389,8 @@ class _StudioPageState extends State<StudioPage> {
       'searching_publications': 'Searching Europe PMC',
       'searching_entities': 'Searching Wikidata',
       'searching_notices': 'Searching Federal Register',
+      'searching_companies': 'Finding SEC companies',
+      'company_candidates': 'Choose an SEC company',
       'searching_filings': 'Loading SEC company filings',
       'filing_candidates': 'Review SEC filing URLs',
       'searching_bibliography': 'Searching Crossref',
@@ -1671,6 +1676,29 @@ class _StudioPageState extends State<StudioPage> {
         if (status == 'approval' && !_imageRecipe &&
             plan != null && (plan['queries'] as List).isNotEmpty) ...[
           const Text('SEC EDGAR company filing preview · data.sec.gov. Enter a CIK and contact email. One submissions request returns up to 20 recent filing records; model queries are not sent. Filing content is not loaded.'),
+          TextField(controller: _secQuery, maxLength: 160, decoration: const InputDecoration(labelText: 'SEC company name or ticker')),
+          OutlinedButton(
+            onPressed: _busy ? null : () async {
+              final query = _secQuery.text.trim();
+              final contact = _secContact.text.trim();
+              if (query.isEmpty) {
+                setState(() => _error = 'Enter a company name or ticker.');
+                return;
+              }
+              const destination = 'https://www.sec.gov/files/company_tickers_exchange.json';
+              final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+                title: const Text('Approve SEC company lookup'),
+                content: SelectableText('$destination\nUser-Agent: ALMG/1.0 $contact\nYour contact email will be sent to www.sec.gov in this header. One catalog request. Match "$query" locally and show up to 20 companies. No company submissions or filing contents are loaded.'),
+                actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                  FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve company catalog request'))],
+              ));
+              if (confirmed == true) {
+                await _submit('/jobs/$id/search-companies', {'approved_provider': 'sec_edgar', 'query': query,
+                  'contact': contact, 'approved_url': destination, 'approved_result_limit': 20});
+              }
+            },
+            child: const Text('Review SEC company lookup'),
+          ),
           TextField(controller: _secCik, maxLength: 10, decoration: const InputDecoration(labelText: 'SEC company CIK')),
           TextField(controller: _secContact, maxLength: 200, decoration: const InputDecoration(labelText: 'SEC user agent contact email')),
           OutlinedButton(
@@ -1705,6 +1733,19 @@ class _StudioPageState extends State<StudioPage> {
             }),
             child: const Text('Approve Crossref search'),
           ),
+        ],
+        if (status == 'company_candidates') ...[
+          Text('Matches for "${job?['company_query']}" in the SEC association catalog. This catalog may be incomplete or inaccurate. Choosing a CIK does not load filings.'),
+          if ((job?['company_candidates'] as List? ?? const []).isEmpty)
+            const Text('No company matches found. Return to change the name or ticker, or enter a known CIK.'),
+          for (final record in job?['company_candidates'] as List? ?? const [])
+            ListTile(title: Text('${record['company']} · ${record['ticker']}'),
+              subtitle: Text('CIK ${record['cik']} · ${record['exchange']}'),
+              trailing: TextButton(onPressed: _busy ? null : () async {
+                _secCik.text = record['cik'] as String;
+                await _submit('/jobs/$id/close-companies', {});
+              }, child: const Text('Use this CIK'))),
+          TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-companies', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'filing_candidates') ...[
           const Text('SEC filing metadata only. Reuse is unverified; filing content collection is not available yet.'),

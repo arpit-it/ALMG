@@ -748,6 +748,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   were loaded, and reuse stayed unverified. All 93 Python tests and Flutter
   analysis passed. Company lookup, filing reuse and content collection,
   project websites and other broad discovery criteria remain open.
+
+  SEC company lookup now matches an entered name or ticker locally against
+  the separately approved company association catalog, returning at most
+  20 companies. In the rebuilt Mac app, a fixture lookup showed the matching
+  company and omitted an invalid CIK; choosing it filled CIK 1234 and opened
+  a separate submissions approval dialog. Logs confirmed one catalog
+  request and no submissions request. All 94 Python tests and Flutter
+  analysis passed. Filing reuse, content collection, project websites and
+  the remaining broad discovery criteria stay open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
