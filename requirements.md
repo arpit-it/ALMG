@@ -1563,6 +1563,19 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   saved resource measurements exceeded both estimates. No external collection
   occurred. Idle/power, sleep/wake and busy-machine resume verification remain
   open; estimates are admission checks rather than memory-usage guarantees.
+  Idle-gated training now rechecks idle/AC eligibility at reported training
+  boundaries. If the device becomes busy or loses AC, it pauses between steps,
+  retains the worker/dataset and cancellation controls, then rechecks resources
+  before resuming. Individual fits are not interrupted. The 179-test Python
+  suite passed (178 executed; unrelated opt-in Metal test skipped), covering
+  pause/resume, cancellation, immediate-training bypass, macOS 600-second idle
+  threshold, AC/battery distinction and probe timeout failure. In the rebuilt
+  Mac app, a local fixture became busy after initial admission: the UI showed
+  Training paused between steps, then automatically resumed after the fixture's
+  20-second busy period and reached preview at accuracy 1.000. The saved job
+  retained idle=true and both pause/resume activity entries. No external
+  collection occurred. Physical sleep/wake recovery and real-device busy/power
+  transition verification remain open; the native transition used local fixtures.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.

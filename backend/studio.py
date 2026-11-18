@@ -1622,6 +1622,37 @@ def cancelled_classifier_rows(job, confirmed):
     return rows
 
 
+def wait_for_training_window(job):
+    """Pause at a reported training boundary, never in the middle of a fit."""
+    if not job.get("idle"):
+        return
+    paused = False
+    while True:
+        with LOCK:
+            if job["status"] == "cancelled":
+                raise TrainingCancelled()
+        if idle_ready():
+            if paused:
+                # Recheck resources after waiting before allowing another step.
+                resources = training_resources.check(TRAINING_DATA[job["id"]], ROOT)
+                with LOCK:
+                    if job["status"] == "cancelled":
+                        raise TrainingCancelled()
+                    job.update(status="training", resource_check=resources)
+                    store_job(job)
+                activity(job, "Resuming training at the next step: device is idle and on AC power.")
+            return
+        if not paused:
+            with LOCK:
+                if job["status"] == "cancelled":
+                    raise TrainingCancelled()
+                job["status"] = "waiting_idle"
+                store_job(job)
+            activity(job, "Training paused between steps: waiting for idle time and AC power.")
+            paused = True
+        time.sleep(2)
+
+
 def run(job):
     """Train and evaluate an approved dataset, then wait for inference preview."""
     try:
@@ -1649,6 +1680,7 @@ def run(job):
             with LOCK:
                 if job["status"] == "cancelled":
                     raise TrainingCancelled()
+            wait_for_training_window(job)
             activity(job, message)
         def repair(mistakes):
             report("Generating one additional batch from validation mistakes.")
