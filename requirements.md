@@ -1346,6 +1346,17 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   isolated fixture state file. All 141 Python tests, 8 Flutter tests and
   Flutter analysis passed, including lost-acknowledgement idempotency.
 - [ ] Expand support for PDF and image attachments. Show which text or image content the model can use, and cite filenames and page numbers when available.
+  Partial delivery: the composer now previews the exact bounded text made
+  available to Qwen, including PDF page markers, with an explicit explanation
+  that image visuals and PDF layout are not provided as context. UTF-8 text
+  files also receive previews; binary content is rejected as text. The
+  12,000-code-point bound matches the backend without splitting Unicode
+  surrogate pairs. In the rebuilt Mac app, a two-page local PDF selected
+  through the native Open panel showed both pages in the expandable preview.
+  Actual local Qwen answered from page 2 and cited the filename and page;
+  captured model context matched the displayed text and page markers. All
+  141 Python tests, 10 Flutter tests and Flutter analysis passed. Image OCR
+  and unreadable-attachment app verification remain open.
 - [ ] Add full-text conversation search, Markdown export, and controls for whether the model can draw on other conversations.
 - [ ] Test project instructions, reference files, and chat branches together. Verify that a branch preserves its source conversation and stays in the same project.
 

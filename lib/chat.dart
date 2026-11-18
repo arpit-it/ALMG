@@ -9,6 +9,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'project_settings.dart';
+import 'attachment_preview.dart';
 import 'backend_address.dart';
 
 /// Refreshes immediately, then retries while the local backend is unavailable.
@@ -693,22 +694,16 @@ class _ChatPageState extends State<ChatPage> {
       }
       final extension = file.name.split('.').last.toLowerCase();
       String? extracted;
-      if (Platform.isMacOS &&
-          {
-            'pdf',
-            'png',
-            'jpg',
-            'jpeg',
-            'heic',
-            'tiff',
-            'webp',
-          }.contains(extension)) {
+      if (Platform.isMacOS && visualAttachmentExtensions.contains(extension)) {
         const channel = MethodChannel('almg/attachments');
         extracted = await channel.invokeMethod<String>('extract', {
           'format': extension,
           'bytes': bytes,
         });
+      } else {
+        extracted = visualAttachmentExtensions.contains(extension) ? '' : readableAttachmentText(bytes);
       }
+      extracted = boundedAttachmentText(extracted ?? '');
       if (!mounted || chat != _chatId || project != _projectId || _sending) {
         return;
       }
@@ -1598,11 +1593,18 @@ class _ChatPageState extends State<ChatPage> {
                 ),
               if (_attachment?['extracted'] case final String text
                   when !_sending)
-                Text(
-                  text.isEmpty
-                      ? 'No readable text found. Describe the attachment in your message.'
-                      : 'Extracted ${text.characters.length} characters for Qwen.',
-                ),
+                if (text.isEmpty)
+                  const Text('No readable text found. Qwen cannot inspect this attachment’s visuals. Describe it in your message.')
+                else
+                  ExpansionTile(
+                    title: const Text('Text available to Qwen'),
+                    subtitle: Text('${_attachment!['name']} · ${text.runes.length} characters'),
+                    children: [
+                      const Text('Only this text is provided as attachment context. Image visuals and PDF layout are not included. Page markers can be used for citations.'),
+                      ConstrainedBox(constraints: const BoxConstraints(maxHeight: 180),
+                        child: SingleChildScrollView(child: SelectableText(text))),
+                    ],
+                  ),
               TextField(
                 focusNode: _composerFocus,
                 controller: _input,
