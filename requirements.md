@@ -738,6 +738,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   exposed no collection control. Both Dart selection tests, all 10
   Crossref Python tests and Flutter analysis passed. The broader provider
   and project website discovery requirement remains open.
+
+  SEC EDGAR now offers a CIK-based recent-filing metadata preview. The
+  consent dialog shows the exact submissions endpoint and declared contact
+  header; requests are serialized at at most one per second with no
+  automatic retry. In the rebuilt Mac app, cancelling sent no fixture
+  request; approval sent one and displayed the valid filing URL while
+  omitting a malformed path. No filing contents or older submission files
+  were loaded, and reuse stayed unverified. All 93 Python tests and Flutter
+  analysis passed. Company lookup, filing reuse and content collection,
+  project websites and other broad discovery criteria remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

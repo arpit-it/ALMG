@@ -38,7 +38,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery
+    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery
 else:
     import chat_history
     import inference
@@ -49,6 +49,7 @@ else:
     import world_bank
     import federal_register
     import crossref_discovery
+    import sec_discovery
 
 ROOT = Path(os.environ.get("STUDIO_DATA", Path(__file__).resolve().parent / "runs"))
 MODEL = inference.MODEL
@@ -219,6 +220,25 @@ def discover_text(job):
                 candidates.append({"text": snippet, "source": source, "title": title,
                                    "approved_query": query, "group": source, "provider": "wikipedia"})
     return candidates
+
+
+SEC_REQUEST_LOCK = threading.Lock()
+SEC_LAST_REQUEST = 0.0
+
+
+def search_filings(job, cik, contact):
+    global SEC_LAST_REQUEST
+    try:
+        url, agent = sec_discovery.submissions_request(cik, contact)
+        with SEC_REQUEST_LOCK:
+            time.sleep(max(0, 1 - (time.monotonic() - SEC_LAST_REQUEST)))
+            SEC_LAST_REQUEST = time.monotonic()
+            result = request_json(url, headers={"User-Agent": agent}, opener=DISCOVERY)
+        rows = sec_discovery.filing_candidates(result, cik)
+        activity(job, f"Found {len(rows)} SEC filing records for CIK {int(cik)}; no filing contents loaded.")
+        update(job, status="filing_candidates", filing_candidates=rows, filing_cik=str(int(cik)))
+    except (OSError, ValueError, IncompleteRead, AttributeError):
+        update(job, status="approval", error="SEC preview failed. Review the CIK and contact, then approve another attempt. No automatic retry was made.")
 
 
 def search_bibliography(job):
@@ -909,7 +929,7 @@ def restore_jobs():
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "searching_filings", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.pop("publication_candidates", None)
@@ -950,7 +970,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "filing_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -1789,6 +1809,19 @@ class Handler(BaseHTTPRequestHandler):
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
                         job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))
+                    elif action == "search-filings" and status == "approval" and job.get("recipe") == "classifier":
+                        cik, contact = data.get("cik"), data.get("contact")
+                        url, _ = sec_discovery.submissions_request(cik, contact)
+                        if (data.get("approved_provider") != "sec_edgar" or data.get("approved_url") != url
+                                or data.get("approved_result_limit") != 20):
+                            raise ValueError("Approve the SEC destination, contact and preview limit first.")
+                        job.update(status="searching_filings", error=None)
+                        worker = (search_filings, (job, cik, contact))
+                    elif action == "close-filings" and status == "filing_candidates":
+                        job.pop("filing_candidates", None)
+                        job.update(status="approval", error=None)
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "search-bibliography" and status == "approval" and job.get("recipe") == "classifier":
                         queries = job["plan"]["queries"]
                         if (not queries or data.get("approved_queries") != queries

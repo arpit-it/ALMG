@@ -532,6 +532,8 @@ class _StudioPageState extends State<StudioPage> {
   final Set<String> _excludedIndicators = {};
   final Set<String> _excludedNotices = {};
   final Set<String> _excludedBibliography = {};
+  final _secCik = TextEditingController();
+  final _secContact = TextEditingController();
   final _indicatorFilter = TextEditingController();
   final Set<String> _excludedImageSources = {};
   String? _error;
@@ -723,6 +725,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_entities',
         'searching_notices',
         'searching_bibliography',
+        'searching_filings',
         'reviewing_bibliography',
         'reviewing_notice',
         'loading_indicators',
@@ -898,6 +901,8 @@ class _StudioPageState extends State<StudioPage> {
     _prompt.dispose();
     _target.dispose();
     _previewInput.dispose();
+    _secCik.dispose();
+    _secContact.dispose();
     _indicatorFilter.dispose();
     super.dispose();
   }
@@ -1381,6 +1386,8 @@ class _StudioPageState extends State<StudioPage> {
       'searching_publications': 'Searching Europe PMC',
       'searching_entities': 'Searching Wikidata',
       'searching_notices': 'Searching Federal Register',
+      'searching_filings': 'Loading SEC company filings',
+      'filing_candidates': 'Review SEC filing URLs',
       'searching_bibliography': 'Searching Crossref',
       'bibliographic_candidates': 'Review Crossref bibliographic records',
       'reviewing_bibliography': 'Loading Crossref abstract metadata',
@@ -1663,6 +1670,31 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'approval' && !_imageRecipe &&
             plan != null && (plan['queries'] as List).isNotEmpty) ...[
+          const Text('SEC EDGAR company filing preview · data.sec.gov. Enter a CIK and contact email. One submissions request returns up to 20 recent filing records; model queries are not sent. Filing content is not loaded.'),
+          TextField(controller: _secCik, maxLength: 10, decoration: const InputDecoration(labelText: 'SEC company CIK')),
+          TextField(controller: _secContact, maxLength: 200, decoration: const InputDecoration(labelText: 'SEC user agent contact email')),
+          OutlinedButton(
+            onPressed: _busy ? null : () async {
+              final cik = _secCik.text.trim();
+              final contact = _secContact.text.trim();
+              if (!RegExp(r'^[0-9]{1,10}$').hasMatch(cik) || int.parse(cik) == 0) {
+                setState(() => _error = 'Enter a company CIK containing one to ten digits.');
+                return;
+              }
+              final destination = 'https://data.sec.gov/submissions/CIK${cik.padLeft(10, '0')}.json';
+              final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+                title: const Text('Approve SEC company preview'),
+                content: SelectableText('$destination\nUser-Agent: ALMG/1.0 $contact\nYour contact email will be sent to data.sec.gov in this header. One request, up to 20 records. No filing contents or older submission files are fetched.'),
+                actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                  FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve SEC request'))],
+              ));
+              if (confirmed == true) {
+                await _submit('/jobs/$id/search-filings', {'approved_provider': 'sec_edgar', 'cik': cik,
+                  'contact': contact, 'approved_url': destination, 'approved_result_limit': 20});
+              }
+            },
+            child: const Text('Review SEC preview request'),
+          ),
           const Text('Crossref bibliographic preview · api.crossref.org. '
               'Sends the listed queries for up to 20 records per query and 40 total.'),
           for (final query in plan['queries'] as List) SelectableText('• $query'),
@@ -1673,6 +1705,15 @@ class _StudioPageState extends State<StudioPage> {
             }),
             child: const Text('Approve Crossref search'),
           ),
+        ],
+        if (status == 'filing_candidates') ...[
+          const Text('SEC filing metadata only. Reuse is unverified; filing content collection is not available yet.'),
+          if ((job?['filing_candidates'] as List? ?? const []).isEmpty)
+            const Text('No supported recent filings were found for this company.'),
+          for (final record in job?['filing_candidates'] as List? ?? const [])
+            ListTile(title: Text('${record['company']} · ${record['form']}'),
+              subtitle: SelectableText('CIK ${record['cik']} · ${record['filing_date']}\nAccession ${record['accession']}\n${record['source']}')),
+          TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-filings', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'bibliographic_candidates') ...[
           const Text('Approve collection of selected, reuse-approved abstracts for text classification. Publisher pages are not loaded.'),
