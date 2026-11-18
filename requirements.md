@@ -1082,6 +1082,17 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
 
 
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
+  One-word differences in phrases of 8–80 words now form review groups,
+  including across explicit source groups, and stay together in evaluation
+  splits. Similarity alone does not exclude examples or assert a label
+  conflict. In the rebuilt Mac app, importing a three-row local CSV through
+  the native Open panel showed one group, marked both Monday/Tuesday invoice
+  variants for label review, left the unrelated telescope row unmarked and
+  retained all three usable examples while training awaited approval.
+  All 130 Python tests and Flutter analysis passed; regression checks cover
+  split grouping, source-group connections, exact matches, short phrases,
+  two-word differences and unchanged exclusions. Broader semantic ambiguity
+  and near-duplicate detection beyond this bounded rule remain open.
   The isolated Mac app showed one billing example and zero shipping examples
   in the class balance preview. The rebuilt app warned about the missing
   shipping class and left training approval pending. The backend also

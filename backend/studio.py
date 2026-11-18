@@ -730,10 +730,37 @@ def comparable_classifier_words(words):
     return len(words) >= 2 or (len(words) == 1 and len(words[0]) >= 5)
 
 
+def classifier_word_variant_groups(rows):
+    """Find bounded phrases differing by one word; flag for review, not exclusion."""
+    parents = list(range(len(rows)))
+    signatures = {}
+    words_by_row = [classifier_variant_key(row["text"]) for row in rows]
+
+    def root(index):
+        while parents[index] != index:
+            parents[index] = parents[parents[index]]
+            index = parents[index]
+        return index
+
+    for index, words in enumerate(words_by_row):
+        if not 8 <= len(words) <= 80:
+            continue
+        for position in range(len(words)):
+            signature = (len(words), position, words[:position] + words[position + 1:])
+            previous = signatures.setdefault(signature, index)
+            parents[root(index)] = root(previous)
+    members = {}
+    for index, words in enumerate(words_by_row):
+        members.setdefault(root(index), set()).add(words)
+    return [root(index) if len(members[root(index)]) > 1 else None for index in range(len(rows))]
+
+
 def classifier_split_groups(rows):
     """Keep source groups and normalized text variants in the same split."""
     parents = {}
     groups_by_words = {}
+    word_variants = classifier_word_variant_groups(rows)
+    groups_by_variant = {}
 
     def root(group):
         while group in parents:
@@ -747,6 +774,12 @@ def classifier_split_groups(rows):
         related = root(groups_by_words.setdefault(key, group))
         if group != related:
             parents[group] = related
+    for row, variant in zip(rows, word_variants):
+        if variant is not None:
+            group = root(row["group"])
+            related = root(groups_by_variant.setdefault(variant, group))
+            if group != related:
+                parents[group] = related
     return [root(row["group"]) for row in rows]
 
 
@@ -1412,6 +1445,8 @@ def prepare_dataset(job, imported_rows=None):
                 return "near"
             return None
 
+        word_variants = classifier_word_variant_groups(rows) if job.get("recipe") == "classifier" else [None] * len(rows)
+        word_variant_by_row = {id(row): variant for row, variant in zip(rows, word_variants)}
         preview_rows = rows[:5]
         usable_counts = {}
         if job.get("recipe") == "classifier":
@@ -1421,7 +1456,7 @@ def prepare_dataset(job, imported_rows=None):
             preview_rows = sorted(
                 rows, key=lambda row: (not has_label_conflict(row),
                                        bool(classifier_variant_key(row["text"])),
-                                       duplicate_kind(row) is None)
+                                       duplicate_kind(row) is None and word_variant_by_row[id(row)] is None)
             )[:5]
         activity(job, f"Prepared {len(rows)} examples. Waiting for training approval.")
         with LOCK:
@@ -1430,6 +1465,7 @@ def prepare_dataset(job, imported_rows=None):
                        usable_counts=usable_counts,
                        duplicate_rows=sum(len(labels) - 1 for labels in labels_by_text.values()),
                        near_duplicate_groups=sum(len(texts) > 1 for texts in texts_by_words.values()),
+                       word_variant_groups=len({group for group in word_variants if group is not None}),
                        conflicting_texts=conflicting_groups,
                        symbol_only_rows=symbol_only_rows,
                        preview=[{"text": row["text"][:500], "label": row["label"],
@@ -1437,6 +1473,7 @@ def prepare_dataset(job, imported_rows=None):
                                  "no_words": (job.get("recipe") == "classifier"
                                               and not classifier_variant_key(row["text"])),
                                  "duplicate_kind": duplicate_kind(row),
+                                 "word_variant": word_variant_by_row[id(row)] is not None,
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),

@@ -2646,6 +2646,9 @@ class _StudioPageState extends State<StudioPage> {
             Text(
               'Near-duplicate groups (Unicode and punctuation variants): ${job?['near_duplicate_groups']}',
             ),
+          if ((job?['word_variant_groups'] as int? ?? 0) > 0)
+            Text('Near-duplicate groups (one-word differences): ${job?['word_variant_groups']}. '
+              'Review their labels. These phrases stay together in evaluation splits.'),
           if ((job?['conflicting_texts'] as int? ?? 0) > 0)
             Text(
               'Groups with conflicting labels: ${job?['conflicting_texts']}. '
@@ -2679,6 +2682,7 @@ class _StudioPageState extends State<StudioPage> {
               subtitle: Text(
                 row['image'] == null
                     ? [
+                        if (row['word_variant'] == true) 'One-word variant · Review label',
                         row['text'] as String,
                         if (row['no_words'] == true)
                           'No letters or numbers. Check the label.',
