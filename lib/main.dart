@@ -704,6 +704,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_catalog',
         'searching_publications',
         'searching_entities',
+        'loading_indicators',
         'reviewing_publication',
         'reviewing_catalog_item',
         'creating_dataset',
@@ -1218,12 +1219,12 @@ class _StudioPageState extends State<StudioPage> {
                   title: Text('Wikidata'),
                   subtitle: Text('www.wikidata.org · Entity preview for text classification'),
                 ),
-                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
-                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('World Bank Open Data'),
-                  subtitle: Text('data.worldbank.org · Development indicators'),
+                  subtitle: Text('api.worldbank.org · Indicator catalog preview'),
                 ),
+                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('Federal Register'),
                   subtitle: Text('federalregister.gov · Public notices and regulations'),
@@ -1325,6 +1326,8 @@ class _StudioPageState extends State<StudioPage> {
       'searching_catalog': 'Searching the Library of Congress',
       'searching_publications': 'Searching Europe PMC',
       'searching_entities': 'Searching Wikidata',
+      'loading_indicators': 'Loading World Bank indicator catalog',
+      'indicator_candidates': 'Review World Bank indicators',
       'entity_candidates': 'Review Wikidata entities',
       'publication_candidates': 'Review Europe PMC publications',
       'reviewing_publication': 'Loading publication abstract metadata',
@@ -1572,6 +1575,30 @@ class _StudioPageState extends State<StudioPage> {
               'approved_result_limit': 20, 'approved_total_limit': 40,
             }),
             child: const Text('Approve Wikidata search'),
+          ),
+        ],
+        if (status == 'approval' && !_imageRecipe) ...[
+          const Text('World Bank indicator catalog preview · api.worldbank.org. '
+              'Loads the first catalog page, up to 20 indicators, unfiltered by model queries. Country/year observations are not loaded.'),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/load-indicators', {
+              'approved_provider': 'world_bank', 'approved_scope': 'indicator_catalog',
+              'approved_page': 1, 'approved_result_limit': 20,
+            }),
+            child: const Text('Approve World Bank catalog preview'),
+          ),
+        ],
+        if (status == 'indicator_candidates') ...[
+          const Text('World Bank catalog page 1 · up to 20 indicators. '
+              'Reuse rights are unverified. Observation and dataset collection are not available yet.'),
+          for (final record in job?['indicator_candidates'] as List? ?? const [])
+            ListTile(
+              title: Text('${record['title']} (${record['indicator_id']})'),
+              subtitle: SelectableText('${record['description']}\nSource ${record['source_id']}: ${record['source_name']}\n${record['organization']}\n${record['source']}'),
+            ),
+          TextButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/close-indicators', {}),
+            child: const Text('Return to dataset approval'),
           ),
         ],
         if (status == 'entity_candidates') ...[

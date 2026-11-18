@@ -38,7 +38,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery
+    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank
 else:
     import chat_history
     import inference
@@ -46,6 +46,7 @@ else:
     import loc_discovery
     import europe_pmc
     import wikidata_discovery
+    import world_bank
 
 ROOT = Path(os.environ.get("STUDIO_DATA", Path(__file__).resolve().parent / "runs"))
 MODEL = inference.MODEL
@@ -216,6 +217,21 @@ def discover_text(job):
                 candidates.append({"text": snippet, "source": source, "title": title,
                                    "approved_query": query, "group": source, "provider": "wikipedia"})
     return candidates
+
+
+def load_indicators(job):
+    try:
+        result = request_json("https://api.worldbank.org/v2/indicator?format=json&per_page=20&page=1", headers={
+            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+        }, opener=DISCOVERY)
+        candidates = world_bank.indicator_candidates(result)
+        if not candidates:
+            update(job, status="approval", error="No supported World Bank indicators were available. Approve another attempt or choose another source.")
+            return
+        activity(job, f"Loaded {len(candidates)} World Bank indicator catalog records for review.")
+        update(job, status="indicator_candidates", indicator_candidates=candidates)
+    except (OSError, ValueError, IncompleteRead):
+        update(job, status="approval", error="World Bank catalog loading failed. Approve another attempt or choose another source.")
 
 
 def search_entities(job):
@@ -764,7 +780,7 @@ def restore_jobs():
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "reviewing_publication", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "loading_indicators", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.pop("publication_candidates", None)
@@ -799,7 +815,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -1632,6 +1648,18 @@ class Handler(BaseHTTPRequestHandler):
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
                         job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))
+                    elif action == "load-indicators" and status == "approval" and job.get("recipe") == "classifier":
+                        if (data.get("approved_provider") != "world_bank"
+                                or data.get("approved_scope") != "indicator_catalog"
+                                or data.get("approved_page") != 1 or data.get("approved_result_limit") != 20):
+                            raise ValueError("Approve the World Bank catalog page and limit first.")
+                        job.update(status="loading_indicators", error=None)
+                        worker = (load_indicators, (job,))
+                    elif action == "close-indicators" and status == "indicator_candidates":
+                        job.pop("indicator_candidates", None)
+                        job.update(status="approval", error=None)
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "search-entities" and status == "approval" and job.get("recipe") == "classifier":
                         queries = job["plan"]["queries"]
                         if (not queries or data.get("approved_queries") != queries

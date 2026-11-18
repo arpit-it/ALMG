@@ -628,6 +628,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   Python tests and Flutter analysis passed; changed text and invalid URL
   selections are rejected. Entity tagging, graph training and remaining
   providers stay open; the overall requirement is not complete.
+  World Bank now offers an approval-gated first-page indicator catalog
+  preview. The rebuilt Mac app disclosed api.worldbank.org, the 20-record
+  limit and unfiltered catalog scope before loading an offline fixture.
+  Review showed two valid indicators with notes, organizations, source
+  IDs and source-specific metadata URLs; malformed codes were omitted
+  and return navigation worked. All 67 Python tests and Flutter analysis
+  passed. Query-based indicator discovery, reuse review, observations
+  and dataset collection remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
