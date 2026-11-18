@@ -1702,6 +1702,9 @@ class _StudioPageState extends State<StudioPage> {
                     SelectableText('Publisher license metadata: ${license['url']}\nContent version: ${license['content_version']}'),
                   const Text('License metadata does not establish permission for this abstract. Review its scope before reuse.'),
                 ],
+                if (record['abstract_reviewed'] == true &&
+                    (record['abstract'] as String).isNotEmpty && (record['abstract'] as String).length < 40)
+                  const Text('This abstract is too short for collection. At least 40 characters are required, even with reuse permission.'),
                 if (record['reuse_approval'] case final Map approval)
                   SelectableText('Crossref abstract reuse approval: ${approval['permission_basis']}')
                 else if (record['abstract_reviewed'] == true && (record['abstract'] as String).isNotEmpty)

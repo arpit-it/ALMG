@@ -730,6 +730,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   All 90 Python tests and Flutter analysis passed, including stale-license,
   changed-text and invalid-selection rejection. Publisher-page collection,
   SEC EDGAR and project website discovery remain open.
+
+  Crossref review now explains why a nonempty abstract below the
+  40-character collection minimum is unavailable, including after reuse
+  permission is recorded. In the rebuilt Mac app, a short local fixture
+  displayed the explanation before and after permission approval and
+  exposed no collection control. Both Dart selection tests, all 10
+  Crossref Python tests and Flutter analysis passed. The broader provider
+  and project website discovery requirement remains open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

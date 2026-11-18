@@ -2,6 +2,17 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/catalog_selection.dart';
 
 void main() {
+  test('Crossref collection requires reviewed scoped permission and 40 characters', () {
+    final record = {
+      'abstract_reviewed': true, 'reuse_status': 'user_approved',
+      'reuse_approval': {'scope': 'crossref_abstract'}, 'abstract': 'a' * 40,
+    };
+    expect(collectableBibliography(record), isTrue);
+    expect(collectableBibliography({...record, 'abstract': 'a' * 39}), isFalse);
+    expect(collectableBibliography({...record, 'abstract_reviewed': false}), isFalse);
+    expect(collectableBibliography({...record, 'reuse_status': 'unverified'}), isFalse);
+    expect(collectableBibliography({...record, 'reuse_approval': {'scope': 'publisher_page'}}), isFalse);
+  });
   test('collection contains only selected records with reviewed permission', () {
     final record = {
       'source': 'https://www.loc.gov/item/12345/',
