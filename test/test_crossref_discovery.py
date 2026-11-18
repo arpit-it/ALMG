@@ -50,3 +50,37 @@ class BibliographicDiscoveryTest(unittest.TestCase):
                 studio.search_bibliography(job)
             self.assertEqual(job["status"], "approval")
             self.assertIn("Crossref", job["error"])
+
+    def test_abstract_and_license_metadata_preserve_identity_without_granting_reuse(self):
+        from backend.crossref_discovery import abstract_request_url, abstract_metadata
+        doi = "10.1234/orchard"
+        self.assertEqual(abstract_request_url(doi), "https://api.crossref.org/works/10.1234%2Forchard")
+        work = {**item(doi), "abstract": "<jats:p>Orchards &amp; fruit.</jats:p>",
+                "license": [{"URL": "https://example.invalid/fixture-license", "content-version": "vor"}]}
+        result = abstract_metadata({"status": "ok", "message": work}, doi)
+        self.assertEqual(result["abstract"], "Orchards & fruit.")
+        self.assertEqual(result["license_statements"], [{"url": "https://example.invalid/fixture-license", "content_version": "vor"}])
+        self.assertEqual(result["reuse_status"], "unverified")
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            abstract_metadata({"status": "ok", "message": {**work, "DOI": "10.1234/other"}}, doi)
+
+    def test_invalid_abstract_and_license_metadata_are_rejected(self):
+        from backend.crossref_discovery import abstract_metadata
+        base = item("10.1234/orchard")
+        self.assertEqual(abstract_metadata({"status": "ok", "message": base}, base["DOI"])["abstract"], "")
+        for changes in ({"abstract": "x" * 50001}, {"abstract": "bad\ud800"}, {"license": "bad"},
+                        {"license": [{"URL": "javascript:alert(1)"}]}, {"license": [{"URL": "https://user@example.invalid/license"}]}):
+            with self.assertRaises(ValueError):
+                abstract_metadata({"status": "ok", "message": {**base, **changes}}, base["DOI"])
+
+    def test_failed_abstract_refresh_removes_previous_abstract_and_license_review(self):
+        record = {"doi": "10.1234/orchard", "source": "https://doi.org/10.1234%2Forchard",
+                  "abstract": "Old text", "abstract_reviewed": True, "license_statements": [{"url": "old"}]}
+        job = {"bibliographic_candidates": [record]}
+        with patch.object(studio, "request_json", side_effect=ValueError("unavailable")) as request, patch.object(studio, "store_job"):
+            studio.review_bibliography(job, record["source"])
+        request.assert_called_once()
+        self.assertEqual(job["status"], "bibliographic_candidates")
+        self.assertNotIn("abstract", record)
+        self.assertNotIn("license_statements", record)
+        self.assertNotIn("abstract_reviewed", record)

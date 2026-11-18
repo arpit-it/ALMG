@@ -718,6 +718,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_entities',
         'searching_notices',
         'searching_bibliography',
+        'reviewing_bibliography',
         'reviewing_notice',
         'loading_indicators',
         'reviewing_publication',
@@ -1368,6 +1369,7 @@ class _StudioPageState extends State<StudioPage> {
       'searching_notices': 'Searching Federal Register',
       'searching_bibliography': 'Searching Crossref',
       'bibliographic_candidates': 'Review Crossref bibliographic records',
+      'reviewing_bibliography': 'Loading Crossref abstract metadata',
       'notice_candidates': 'Review Federal Register documents',
       'reviewing_notice': 'Loading document summary metadata',
       'loading_indicators': 'Loading World Bank indicator catalog',
@@ -1659,11 +1661,29 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'bibliographic_candidates') ...[
-          const Text('Bibliographic metadata only. Reuse is unverified. Abstract and publisher-page collection are not available yet.'),
+          const Text('Review abstract and license metadata. Reuse remains unverified. Dataset and publisher-page collection are not available yet.'),
           for (final record in job?['bibliographic_candidates'] as List? ?? const [])
-            ListTile(
-              title: Text(record['title'] as String),
-              subtitle: SelectableText('DOI: ${record['doi']}\n${record['publisher']} · ${record['work_type']}\n${record['source']}\nApproved query: ${record['approved_query']}'),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  title: Text(record['title'] as String),
+                  subtitle: SelectableText('DOI: ${record['doi']}\n${record['publisher']} · ${record['work_type']}\n${record['source']}\nApproved query: ${record['approved_query']}'),
+                ),
+                if (record['abstract_reviewed'] == true) ...[
+                  SelectableText((record['abstract'] as String).isEmpty ? 'No abstract was supplied for this DOI.' : 'Abstract: ${record['abstract']}'),
+                  if ((record['license_statements'] as List).isEmpty)
+                    const Text('No license links were supplied. Reuse remains unverified.'),
+                  for (final license in record['license_statements'] as List)
+                    SelectableText('Publisher license metadata: ${license['url']}\nContent version: ${license['content_version']}'),
+                  const Text('License metadata does not establish permission for this abstract. Review its scope before reuse.'),
+                ],
+                const Text('Loads abstract and license metadata from api.crossref.org for this DOI. Publisher and license links are not fetched.'),
+                OutlinedButton(
+                  onPressed: _busy ? null : () => _submit('/jobs/$id/review-bibliography', {'approved_url': record['source']}),
+                  child: const Text('Approve loading Crossref abstract metadata'),
+                ),
+              ],
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-bibliography', {}),

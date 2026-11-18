@@ -247,6 +247,32 @@ def search_bibliography(job):
         update(job, status="approval", error="Crossref search failed. Review the queries and approve another attempt or choose another source.")
 
 
+def review_bibliography(job, source):
+    try:
+        record = next((record for record in job["bibliographic_candidates"] if record["source"] == source), None)
+        if record is None:
+            raise ValueError("Approve a listed bibliographic record first.")
+        result = request_json(crossref_discovery.abstract_request_url(record["doi"]), headers={
+            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+        }, opener=DISCOVERY)
+        review = crossref_discovery.abstract_metadata(result, record["doi"])
+        with LOCK:
+            record.update(review)
+            record.pop("reuse_approval", None)
+            job.update(status="bibliographic_candidates", error=None)
+            append_activity(job, "Crossref abstract and license metadata loaded. Reuse remains unverified.")
+            store_job(job)
+    except (OSError, ValueError, IncompleteRead):
+        with LOCK:
+            for record in job["bibliographic_candidates"]:
+                if record["source"] == source:
+                    for field in ("abstract", "abstract_reviewed", "license_statements", "reuse_approval"):
+                        record.pop(field, None)
+                    record["reuse_status"] = "unverified"
+            job.update(status="bibliographic_candidates", error="Crossref abstract metadata could not be loaded. Review the DOI and approve another attempt.")
+            store_job(job)
+
+
 def search_notices(job):
     try:
         candidates, seen = [], set()
@@ -843,6 +869,13 @@ def restore_jobs():
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
                 job["candidate_directory"] = str(work)
+            elif job["status"] == "reviewing_bibliography" and job.get("bibliographic_candidates"):
+                for candidate in job["bibliographic_candidates"]:
+                    for field in ("abstract", "abstract_reviewed", "license_statements", "reuse_approval"):
+                        candidate.pop(field, None)
+                    candidate["reuse_status"] = "unverified"
+                job.update(status="bibliographic_candidates", error="Abstract loading was interrupted. Review and approve the DOI to retry.")
+                store_job(job)
             elif job["status"] == "reviewing_notice" and job.get("notice_candidates"):
                 for candidate in job["notice_candidates"]:
                     candidate.pop("summary", None)
@@ -876,7 +909,7 @@ def restore_jobs():
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "loading_indicators", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.pop("publication_candidates", None)
@@ -1760,6 +1793,12 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the Crossref queries and result limits first.")
                         job.update(status="searching_bibliography", error=None)
                         worker = (search_bibliography, (job,))
+                    elif action == "review-bibliography" and status == "bibliographic_candidates":
+                        source = data.get("approved_url")
+                        if not isinstance(source, str) or not any(record["source"] == source for record in job["bibliographic_candidates"]):
+                            raise ValueError("Approve a listed DOI URL first.")
+                        job.update(status="reviewing_bibliography", error=None)
+                        worker = (review_bibliography, (job, source))
                     elif action == "close-bibliography" and status == "bibliographic_candidates":
                         job.pop("bibliographic_candidates", None)
                         job.update(status="approval", error=None)
