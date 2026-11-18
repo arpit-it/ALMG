@@ -1597,9 +1597,11 @@ class _ChatPageState extends State<ChatPage> {
                   const Text('No readable text found. Qwen cannot inspect this attachment’s visuals. Describe it in your message.')
                 else
                   ExpansionTile(
-                    title: const Text('Text available to Qwen'),
+                    title: Text(attachmentPreviewTitle(_attachment!['name']!)),
                     subtitle: Text('${_attachment!['name']} · ${text.runes.length} characters'),
                     children: [
+                      if (isImageAttachment(_attachment!['name']!))
+                        const Text('OCR can omit or misread text. Review the recognized text before sending.'),
                       const Text('Only this text is provided as attachment context. Image visuals and PDF layout are not included. Page markers can be used for citations.'),
                       ConstrainedBox(constraints: const BoxConstraints(maxHeight: 180),
                         child: SingleChildScrollView(child: SelectableText(text))),

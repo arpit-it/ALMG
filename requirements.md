@@ -1345,7 +1345,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   one user/assistant pair. Existing preferences were preserved by using an
   isolated fixture state file. All 141 Python tests, 8 Flutter tests and
   Flutter analysis passed, including lost-acknowledgement idempotency.
-- [ ] Expand support for PDF and image attachments. Show which text or image content the model can use, and cite filenames and page numbers when available.
+- [x] Expand support for PDF and image attachments. Show which text or image content the model can use, and cite filenames and page numbers when available.
   Partial delivery: the composer now previews the exact bounded text made
   available to Qwen, including PDF page markers, with an explicit explanation
   that image visuals and PDF layout are not provided as context. UTF-8 text
@@ -1357,6 +1357,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   captured model context matched the displayed text and page markers. All
   141 Python tests, 10 Flutter tests and Flutter analysis passed. Image OCR
   and unreadable-attachment app verification remain open.
+  Final acceptance: image previews now identify recognized OCR text and
+  advise reviewing recognition errors; .tif and .heif aliases use the native
+  image path. In the rebuilt Mac app, selecting a local .tif through the
+  native Open panel produced the expected recognized text with its filename
+  and OCR limitation note. Actual local Qwen answered from that text and
+  cited the image filename; captured context matched the preview. A blank
+  PNG displayed the no-readable-text message and explicitly said its visuals
+  were unavailable, with a request to describe it. Combined with the verified
+  PDF page preview and page citation, the stated attachment criteria are
+  complete for the text/OCR context path. All 141 Python tests, 11 Flutter
+  tests and Flutter analysis passed. Direct visual interpretation and PDF
+  layout analysis are not provided by this path and are labeled accordingly.
 - [ ] Add full-text conversation search, Markdown export, and controls for whether the model can draw on other conversations.
 - [ ] Test project instructions, reference files, and chat branches together. Verify that a branch preserves its source conversation and stays in the same project.
 
