@@ -1713,6 +1713,9 @@ def export_candidate(job, candidate):
                     json.dumps(provenance, indent=2, ensure_ascii=False), encoding="utf-8",
                 )
             (files / "report.json").write_text(json.dumps(metrics, indent=2), encoding="utf-8")
+            (files / "recipe-contract.json").write_text(
+                json.dumps(recipe_contracts.export_metadata(job), indent=2), encoding="utf-8",
+            )
             activity(job, "Saving the trained model.")
             if job.get("recipe") == "text_to_image":
                 (files / "model.json").write_text(json.dumps(model), encoding="utf-8")

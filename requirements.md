@@ -1459,6 +1459,17 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   submitting "a red circle and a blue square" rendered both requested shapes
   in the inference preview. No external collection or downloads occurred.
   LoRA validation and remaining recipe-interface integration stay open.
+  Released bundles now include recipe-contract.json with the saved approval
+  contract snapshot and actual recipe-specific execution settings. Legacy
+  jobs use an explicitly labeled catalog fallback without rewriting the job.
+  The catalog lists this sidecar. All 158 Python tests passed, covering both
+  provenance paths, independent snapshots and release bundle contents. In the
+  rebuilt Mac app, a fresh 45-example shape model trained to accuracy 1.000,
+  rendered a red circle and blue square, and completed the explicit release
+  action. Its four-file bundle contained model.json, dataset.jsonl, report.json
+  and the new sidecar; the exported contract exactly matched the saved job,
+  with target 0.800 and idle=false. No external collection occurred. LoRA
+  validation and remaining interface integration stay open.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 

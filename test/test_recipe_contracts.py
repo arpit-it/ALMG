@@ -185,3 +185,41 @@ class RecipeContractsTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'invalid vocabulary'):
                 recipe_contracts.validate_model('text_to_image', 'web_images',
                     {'format': 'almg-caption-ridge-v1', 'size': 48, 'vocabulary': vocabulary, 'weights': weights})
+
+    def test_release_contract_preserves_snapshot_and_labels_legacy_fallback(self):
+        from copy import deepcopy
+        snapshot = recipe_contracts.recipe_contract('classifier')
+        snapshot['description'] = 'Description at approval time'
+        job = {'recipe': 'classifier', 'recipe_contract': snapshot, 'target': 0.9,
+               'idle': False, 'allow_repair': True}
+        before = deepcopy(job)
+        metadata = recipe_contracts.export_metadata(job)
+        self.assertEqual(metadata['origin'], 'approved_job_snapshot')
+        self.assertEqual(metadata['contract'], snapshot)
+        self.assertEqual(metadata['parameters'], {'target': 0.9, 'idle': False, 'allow_repair': True})
+        metadata['contract']['description'] = 'changed copy'
+        self.assertEqual(job, before)
+        legacy = {'recipe': 'text_to_image', 'target': 0.8, 'allow_repair': False}
+        fallback = recipe_contracts.export_metadata(legacy)
+        self.assertEqual(fallback['origin'], 'legacy_catalog_fallback')
+        self.assertEqual(fallback['contract']['id'], 'text_to_image')
+        self.assertEqual(fallback['parameters'], {'target': 0.8})
+        self.assertNotIn('recipe_contract', legacy)
+
+    def test_release_bundle_contains_recipe_contract_alongside_model_and_metrics(self):
+        import tempfile
+        from pathlib import Path
+        for legacy in (False, True):
+            job = {'id': 'release-contract', 'recipe': 'text_to_image', 'status': 'exporting',
+                   'target': 0.8, 'idle': False}
+            if not legacy:
+                job['recipe_contract'] = recipe_contracts.recipe_contract('text_to_image')
+            with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), \
+                    patch.object(studio, 'store_job'), patch.object(studio, 'activity'), patch.object(studio, 'CANDIDATES', {}):
+                studio.export_candidate(job, ({'format': 'almg-shapes-v1'}, [], {'passed': True}))
+                out = Path(folder) / job['id']
+                self.assertEqual(job['status'], 'passed')
+                self.assertTrue(all((out / name).is_file() for name in ['model.json', 'dataset.jsonl', 'report.json', 'recipe-contract.json']))
+                metadata = json.loads((out / 'recipe-contract.json').read_text())
+                self.assertEqual(metadata['origin'], 'legacy_catalog_fallback' if legacy else 'approved_job_snapshot')
+                self.assertEqual(metadata['parameters'], {'target': 0.8, 'idle': False})

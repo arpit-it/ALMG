@@ -14,7 +14,7 @@ _CONTRACTS = {
         "hardware": {"training": "CPU; no accelerator required", "planning": "Local Qwen on Apple silicon"},
         "parameters": [*_COMMON_PARAMETERS, {"id": "allow_repair", "label": "One local-example retry", "type": "boolean", "default": False}],
         "metrics": {"classifier": ["validation_macro_f1", "test_macro_f1", "target_macro_f1"]},
-        "exports": ["model.joblib: scikit-learn pipeline", "dataset.jsonl: labeled examples and splits", "report.json: evaluation report"],
+        "exports": ["model.joblib: scikit-learn pipeline", "dataset.jsonl: labeled examples and splits", "report.json: evaluation report", "recipe-contract.json: recipe snapshot and execution settings"],
         "resume": "Reuse completed candidate checkpoints; an unfinished fit restarts.",
         "status": "available",
     },
@@ -26,7 +26,7 @@ _CONTRACTS = {
         "parameters": _COMMON_PARAMETERS,
         "metrics": {"local shapes": ["held_out_pixel_accuracy", "target_pixel_accuracy"],
                     "Commons captions": ["held_out_pixel_similarity", "target_pixel_accuracy"]},
-        "exports": ["model.json: local image model", "dataset.jsonl: image examples and splits", "report.json: evaluation report"],
+        "exports": ["model.json: local image model", "dataset.jsonl: image examples and splits", "report.json: evaluation report", "recipe-contract.json: recipe snapshot and execution settings"],
         "resume": "No partial-fit checkpoint; fitting restarts. Commons models require further runtime and semantic evaluation before release.",
         "status": "experimental",
     },
@@ -145,3 +145,14 @@ def validate_model(recipe_id, mode, model):
                     or any(not numeric_array(palette.get(color), (3,), 0, 255)
                            for color in ('red', 'green', 'blue', 'yellow', 'purple'))):
                 raise ValueError('Shape image model has invalid masks, colors or background.')
+
+
+def export_metadata(job):
+    """Preserve approval provenance; identify catalog fallback for legacy jobs."""
+    snapshot = job.get('recipe_contract')
+    contract = deepcopy(snapshot) if snapshot is not None else recipe_contract(job.get('recipe', 'classifier'))
+    keys = [parameter['id'] for parameter in contract['parameters']]
+    return {'schema_version': 1,
+            'origin': 'approved_job_snapshot' if snapshot is not None else 'legacy_catalog_fallback',
+            'contract': contract,
+            'parameters': {key: deepcopy(job[key]) for key in keys if key in job}}
