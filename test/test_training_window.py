@@ -194,3 +194,29 @@ class TrainingWindowTest(unittest.TestCase):
             self.assertEqual(job['status'], 'dataset_ready')
             self.assertIn('approve training again', job['error'])
             execute.assert_not_called()
+
+    def test_power_event_during_final_evaluation_prevents_preview_persistence(self):
+        import tempfile
+        from pathlib import Path
+        job = {'id': 'late-power', 'status': 'queued', 'idle': False, 'recipe': 'text_to_image', 'target': 0.8}
+        rows = studio.image_recipe.dataset()
+        def finish(*args, **kwargs):
+            studio.record_power_event('wake')
+            return {'format': 'fixture'}, rows, {'passed': True}
+        with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), patch.object(studio, 'JOBS', {job['id']: job}), patch.object(studio, 'TRAINING_DATA', {job['id']: rows}), patch.object(studio, 'CANDIDATES', {}), patch.object(studio, 'POWER_INTERRUPTED_JOBS', set()), patch.object(studio, 'store_job'), patch.object(studio.training_resources, 'check', return_value={}), patch.object(studio.recipe_contracts, 'execute', side_effect=finish):
+            studio.run(job)
+            self.assertEqual(job['status'], 'dataset_ready')
+            self.assertIn('sleep/wake was reported', job['error'])
+            self.assertIn(job['id'], studio.TRAINING_DATA)
+            self.assertNotIn(job['id'], studio.CANDIDATES)
+            self.assertFalse(list(Path(folder).rglob('candidate.*')))
+
+    def test_clock_gap_during_final_evaluation_prevents_preview_persistence(self):
+        job = {'id': 'late-clock', 'status': 'queued', 'idle': False, 'recipe': 'text_to_image', 'target': 0.8}
+        rows = studio.image_recipe.dataset()
+        with patch.object(studio, 'TRAINING_DATA', {job['id']: rows}), patch.object(studio, 'CANDIDATES', {}), patch.object(studio, 'store_job'), patch.object(studio.training_resources, 'check', return_value={}), patch.object(studio, 'training_clock', side_effect=[(100., 10.), (160., 11.)]), patch.object(studio.recipe_contracts, 'execute', return_value=({}, rows, {})):
+            studio.run(job)
+            self.assertEqual(job['status'], 'dataset_ready')
+            self.assertIn('system-clock change', job['error'])
+            self.assertIn(job['id'], studio.TRAINING_DATA)
+            self.assertNotIn(job['id'], studio.CANDIDATES)

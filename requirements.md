@@ -1638,6 +1638,17 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   reapproval reached preview at accuracy 1.000. Saved activity confirms both
   events. No external collection or power-setting changes occurred. Actual
   physical suspend/resume and real busy/power transitions remain unverified.
+  The final transition into preview now rechecks native power-event and
+  clock-discontinuity guards inside the candidate persistence lock. Events
+  arriving during the final evaluation, after its last progress callback,
+  cannot bypass renewed approval or consume the retained dataset. The 192-test
+  Python suite passed (191 executed; opt-in Metal test skipped), including
+  final-evaluation power and clock gaps with no candidate persistence. In the
+  rebuilt Mac app, a local fixture injected wake after real image evaluation:
+  the job returned to approval and candidate.json did not exist. Explicit
+  reapproval then reached preview at accuracy 1.000. No external collection
+  occurred. Physical suspend/resume and actual busy/power transitions remain
+  unverified, so this requirement stays open.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.

@@ -1763,6 +1763,9 @@ def run(job):
         with LOCK:
             if job["status"] == "cancelled":
                 return
+            if job["id"] in POWER_INTERRUPTED_JOBS:
+                raise TrainingWindowInterrupted("System sleep/wake was reported. Dataset and existing checkpoints are retained; approve training again to continue safely.")
+            check_training_clock(clock_sample[0], training_clock())
             TRAINING_DATA.pop(job["id"], None)
             work = ROOT / "training-sessions" / job["id"]
             (work / "dataset.json").write_text(json.dumps(rows), encoding="utf-8")
