@@ -721,6 +721,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   metadata removed the approval and restored the permission control. All
   89 Python tests and Flutter analysis passed. Dataset collection,
   publisher pages and SEC EDGAR remain open.
+
+  Selected Crossref abstracts with current abstract-scoped permission can
+  now enter text classification datasets. Local Mac app fixtures reached
+  a two-example preview with DOI URLs, permission bases and abstract scope;
+  deselection changed the approval count to zero. The final rebuilt app
+  reopened that preview and displayed the insufficient-class-count warning.
+  All 90 Python tests and Flutter analysis passed, including stale-license,
+  changed-text and invalid-selection rejection. Publisher-page collection,
+  SEC EDGAR and project website discovery remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

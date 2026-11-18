@@ -935,6 +935,8 @@ def restore_jobs():
                              and all(row.get("provider") == "world_bank" for row in job["text_candidates"])
                              else "notice_candidates" if job.get("text_candidates")
                              and all(row.get("provider") == "federal_register" for row in job["text_candidates"])
+                             else "bibliographic_candidates" if job.get("text_candidates")
+                             and all(row.get("provider") == "crossref" for row in job["text_candidates"])
                              else "text_candidates")
                     job.update(status=stage, mode=None, error=(
                         "Excerpt preparation was interrupted. Review and approve the excerpts to retry."
@@ -1300,6 +1302,8 @@ def prepare_dataset(job, imported_rows=None):
                              and all(row.get("provider") == "world_bank" for row in job["text_candidates"])
                              else "notice_candidates" if job.get("text_candidates")
                              and all(row.get("provider") == "federal_register" for row in job["text_candidates"])
+                             else "bibliographic_candidates" if job.get("text_candidates")
+                             and all(row.get("provider") == "crossref" for row in job["text_candidates"])
                              else "text_candidates")
             update(job, status=stage, mode=None, error=str(error))
         else:
@@ -1809,6 +1813,10 @@ class Handler(BaseHTTPRequestHandler):
                         append_activity(job, "User reuse permission recorded for the reviewed Crossref abstract.")
                         store_job(job)
                         return self.respond({"id": job["id"]})
+                    elif action == "use-bibliographic-abstracts" and status == "bibliographic_candidates":
+                        rows = crossref_discovery.approved_abstract_rows(job["bibliographic_candidates"], data.get("approved_urls"))
+                        job.update(status="creating_dataset", error=None, mode="web", text_candidates=rows)
+                        worker = (prepare_dataset, (job,))
                     elif action == "close-bibliography" and status == "bibliographic_candidates":
                         job.pop("bibliographic_candidates", None)
                         job.update(status="approval", error=None)

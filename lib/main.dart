@@ -531,6 +531,7 @@ class _StudioPageState extends State<StudioPage> {
   final Set<String> _excludedEntities = {};
   final Set<String> _excludedIndicators = {};
   final Set<String> _excludedNotices = {};
+  final Set<String> _excludedBibliography = {};
   final _indicatorFilter = TextEditingController();
   final Set<String> _excludedImageSources = {};
   String? _error;
@@ -704,6 +705,10 @@ class _StudioPageState extends State<StudioPage> {
         if (_job?['id'] != job['id'] ||
             !{'notice_candidates', 'reviewing_notice'}.contains(job['status'])) {
           _excludedNotices.clear();
+        }
+        if (_job?['id'] != job['id'] ||
+            !{'bibliographic_candidates', 'reviewing_bibliography'}.contains(job['status'])) {
+          _excludedBibliography.clear();
         }
         _job = job;
       });
@@ -1179,6 +1184,7 @@ class _StudioPageState extends State<StudioPage> {
     if (provider == 'europe_pmc') return 'Europe PMC: $source';
     if (provider == 'wikidata') return 'Wikidata: $source';
     if (provider == 'world_bank') return 'World Bank indicator catalog: $source';
+    if (provider == 'crossref') return 'Crossref: $source';
     if (provider == 'federal_register') return 'Federal Register: $source';
     if (provider == 'commons' ||
         (provider == null && source.startsWith('https://upload.wikimedia.org/'))) {
@@ -1351,6 +1357,12 @@ class _StudioPageState extends State<StudioPage> {
     final selectedIndicatorUrls = [
       for (final record in visibleIndicators)
         if (collectableIndicator(record) && !_excludedIndicators.contains(record['source']))
+          record['source'] as String,
+    ];
+    final bibliographyRecords = job?['bibliographic_candidates'] as List? ?? const [];
+    final selectedBibliographyUrls = [
+      for (final record in bibliographyRecords)
+        if (collectableBibliography(record as Map) && !_excludedBibliography.contains(record['source']))
           record['source'] as String,
     ];
     final noticeRecords = job?['notice_candidates'] as List? ?? const [];
@@ -1663,8 +1675,8 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'bibliographic_candidates') ...[
-          const Text('Review abstract and license metadata before recording reuse permission. Dataset and publisher-page collection are not available yet.'),
-          for (final record in job?['bibliographic_candidates'] as List? ?? const [])
+          const Text('Approve collection of selected, reuse-approved abstracts for text classification. Publisher pages are not loaded.'),
+          for (final record in bibliographyRecords)
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1672,6 +1684,16 @@ class _StudioPageState extends State<StudioPage> {
                   title: Text(record['title'] as String),
                   subtitle: SelectableText('DOI: ${record['doi']}\n${record['publisher']} · ${record['work_type']}\n${record['source']}\nApproved query: ${record['approved_query']}'),
                 ),
+                if (collectableBibliography(record as Map))
+                  CheckboxListTile(
+                    title: Text("Include abstract: ${record['title']}"),
+                    value: !_excludedBibliography.contains(record['source']),
+                    onChanged: _busy ? null : (checked) => setState(() {
+                      final source = record['source'] as String;
+                      if (checked == true) { _excludedBibliography.remove(source); }
+                      else { _excludedBibliography.add(source); }
+                    }),
+                  ),
                 if (record['abstract_reviewed'] == true) ...[
                   SelectableText((record['abstract'] as String).isEmpty ? 'No abstract was supplied for this DOI.' : 'Abstract: ${record['abstract']}'),
                   if ((record['license_statements'] as List).isEmpty)
@@ -1684,7 +1706,7 @@ class _StudioPageState extends State<StudioPage> {
                   SelectableText('Crossref abstract reuse approval: ${approval['permission_basis']}')
                 else if (record['abstract_reviewed'] == true && (record['abstract'] as String).isNotEmpty)
                   TextButton(
-                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record,
                         action: 'approve-bibliography-reuse', scope: 'crossref_abstract'),
                     child: const Text('Record Crossref abstract reuse approval'),
                   ),
@@ -1694,6 +1716,12 @@ class _StudioPageState extends State<StudioPage> {
                   child: const Text('Approve loading Crossref abstract metadata'),
                 ),
               ],
+            ),
+          if (bibliographyRecords.any((record) => collectableBibliography(record as Map)))
+            OutlinedButton(
+              onPressed: _busy || selectedBibliographyUrls.isEmpty ? null
+                  : () => _submit('/jobs/$id/use-bibliographic-abstracts', {'approved_urls': selectedBibliographyUrls}),
+              child: Text('Approve abstract collection (${selectedBibliographyUrls.length} selected)'),
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-bibliography', {}),
@@ -2256,8 +2284,9 @@ class _StudioPageState extends State<StudioPage> {
                                           : row['provider'] == 'federal_register'
                                               ? 'Document: $title'
                                               : 'Article: $title',
-                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register'}.contains(row['provider']) && row['reuse_approval'] is Map)
+                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'crossref'}.contains(row['provider']) && row['reuse_approval'] is Map)
                           'User reuse approval: ${row['reuse_approval']['permission_basis']}',
+                        if (row['provider'] == 'crossref') 'Content scope: abstract',
                         if (row['provider'] == 'federal_register') ...[
                           'Content scope: document summary',
                           'Document number: ${row['document_number']}',

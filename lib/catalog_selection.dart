@@ -36,3 +36,9 @@ bool collectableNotice(Map record) =>
     record['summary_reviewed'] == true && record['reuse_status'] == 'user_approved' &&
     record['reuse_approval'] is Map && record['reuse_approval']['scope'] == 'document_summary' &&
     "${record['title']}\n${record['summary']}".length >= 40;
+
+/// Whether the displayed abstract has scoped permission and usable text.
+bool collectableBibliography(Map record) =>
+    record['abstract_reviewed'] == true && record['reuse_status'] == 'user_approved' &&
+    record['reuse_approval'] is Map && record['reuse_approval']['scope'] == 'crossref_abstract' &&
+    (record['abstract'] as String? ?? '').length >= 40;

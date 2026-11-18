@@ -110,3 +110,23 @@ class BibliographicDiscoveryTest(unittest.TestCase):
             studio.review_bibliography(job, record["source"])
         self.assertNotIn("reuse_approval", record)
         self.assertEqual(record["reuse_status"], "unverified")
+
+    def test_collection_requires_selected_current_scoped_permission(self):
+        from backend.crossref_discovery import abstract_reuse_evidence, approved_abstract_rows
+        record = {"doi": "10.1234/orchard", "source": "https://doi.org/10.1234%2Forchard", "title": "Orchard publication",
+                  "publisher": "Fixture publisher", "abstract": "Fruit cultivation practices are described in this local abstract fixture.",
+                  "abstract_reviewed": True, "license_statements": [], "reuse_status": "user_approved"}
+        record['reuse_approval'] = abstract_reuse_evidence(record, {"approved_url": record['source'], "confirmed": True,
+            "approved_scope": "crossref_abstract", "permission_basis": "Local fixture permission reviewed."})
+        rows = approved_abstract_rows([record, {"source": "unselected"}], [record['source']])
+        self.assertEqual([row['source'] for row in rows], [record['source']])
+        self.assertEqual(rows[0]['text'], record['abstract'])
+        self.assertEqual(rows[0]['collection_scope'], 'crossref_abstract')
+        for urls in ([], ['unknown'], [record['source'], record['source']]):
+            with self.assertRaises(ValueError):
+                approved_abstract_rows([record], urls)
+        for changes in ({"abstract": "Changed abstract that must invalidate the prior permission evidence."},
+                        {"license_statements": [{"url": "https://example.invalid/new"}]}, {"reuse_status": "unverified"},
+                        {"reuse_approval": {**record['reuse_approval'], "scope": "publisher_page"}}):
+            with self.assertRaises(ValueError):
+                approved_abstract_rows([{**record, **changes}], [record['source']])

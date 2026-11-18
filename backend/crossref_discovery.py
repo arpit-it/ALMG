@@ -100,3 +100,26 @@ def abstract_reuse_evidence(record, decision):
     return {"source": record["source"], "scope": "crossref_abstract", "permission_basis": basis.strip(),
             "abstract_metadata_sha256": abstract_metadata_checksum(record),
             "license_statements": record["license_statements"], "time": time.time()}
+
+
+def approved_abstract_rows(records, approved_urls):
+    """Collect selected abstracts only while their reviewed permission is current."""
+    if (not isinstance(approved_urls, list) or not approved_urls
+            or any(not isinstance(url, str) for url in approved_urls)
+            or len(set(approved_urls)) != len(approved_urls)):
+        raise ValueError("Select abstract URLs before approving collection.")
+    selected = [record for record in records if record.get("source") in approved_urls]
+    if len(selected) != len(approved_urls):
+        raise ValueError("Approve only listed DOI URLs.")
+    rows = []
+    for record in selected:
+        approval = record.get("reuse_approval")
+        text = record.get("abstract")
+        if (not isinstance(text, str) or len(text) < 40 or record.get("abstract_reviewed") is not True
+                or record.get("reuse_status") != "user_approved" or not isinstance(approval, dict)
+                or approval.get("scope") != "crossref_abstract" or approval.get("source") != record.get("source")
+                or approval.get("abstract_metadata_sha256") != abstract_metadata_checksum(record)):
+            raise ValueError("Record current abstract reuse permission before collection.")
+        rows.append({**record, "provider": "crossref", "text": text,
+                     "group": record["source"], "collection_scope": "crossref_abstract"})
+    return rows
