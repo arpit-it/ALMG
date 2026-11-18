@@ -1896,6 +1896,16 @@ class Handler(BaseHTTPRequestHandler):
                         sec_discovery.submissions_request(record["cik"], contact)
                         job.update(status="reviewing_filing", error=None)
                         worker = (review_filing, (job, source, contact))
+                    elif action == "approve-filing-reuse" and status == "filing_candidates":
+                        record = next((record for record in job["filing_candidates"]
+                                       if record["source"] == data.get("approved_url")), None)
+                        if record is None:
+                            raise ValueError("Approve a listed filing URL first.")
+                        record["reuse_approval"] = sec_discovery.filing_reuse_evidence(record, data)
+                        record["reuse_status"] = "user_approved"
+                        append_activity(job, "User reuse permission recorded for the displayed SEC filing preview.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "close-filings" and status == "filing_candidates":
                         job.pop("filing_candidates", None)
                         job.update(status="approval", error=None)

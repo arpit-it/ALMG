@@ -86,3 +86,23 @@ class SecDiscoveryTest(unittest.TestCase):
         self.assertEqual(job['status'], 'filing_candidates')
         self.assertNotIn('filing_text', record)
         self.assertNotIn('reuse_approval', record)
+
+    def test_preview_permission_is_explicit_scoped_and_bound_to_truncation(self):
+        record = {**sec.filing_candidates(payload(), '1234')[0], **sec.document_preview(b'Orchard filing text reviewed locally.', 'text/plain')}
+        decision = {'approved_url': record['source'], 'confirmed': True, 'approved_scope': 'sec_filing_preview',
+                    'permission_basis': 'Local fixture preview permission reviewed.'}
+        evidence = sec.filing_reuse_evidence(record, decision)
+        self.assertEqual(evidence['scope'], 'sec_filing_preview')
+        self.assertEqual(evidence['filing_preview_sha256'], sec.filing_preview_checksum(record))
+        for changes in ({'filing_text': 'Changed filing text'}, {'filing_text_truncated': True}, {'form': '8-K'}):
+            self.assertNotEqual(evidence['filing_preview_sha256'], sec.filing_preview_checksum({**record, **changes}))
+        for changes in ({'confirmed': False}, {'approved_scope': 'whole_filing'}, {'approved_url': 'other'}, {'permission_basis': 'short'}):
+            with self.assertRaises(ValueError):
+                sec.filing_reuse_evidence(record, {**decision, **changes})
+        with self.assertRaises(ValueError):
+            sec.filing_reuse_evidence({**record, 'filing_reviewed': False}, decision)
+        job = {'filing_candidates': [{**record, 'reuse_approval': evidence, 'reuse_status': 'user_approved'}]}
+        with patch.object(studio, 'load_sec_document', return_value=sec.document_preview(b'Refreshed filing text', 'text/plain')), patch.object(studio, 'store_job'), patch.object(studio.time, 'sleep'):
+            studio.review_filing(job, record['source'], 'fixture@example.invalid')
+        self.assertNotIn('reuse_approval', job['filing_candidates'][0])
+        self.assertEqual(job['filing_candidates'][0]['reuse_status'], 'unverified')

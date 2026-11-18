@@ -140,3 +140,29 @@ def document_preview(data, content_type):
         raise ValueError('No readable filing text was found.')
     return {'filing_text': text[:PREVIEW_LIMIT], 'filing_text_truncated': len(text) > PREVIEW_LIMIT,
             'filing_reviewed': True, 'reuse_status': 'unverified'}
+
+
+def filing_preview_checksum(record):
+    """Bind the reviewed excerpt to filing identity and truncation status."""
+    import hashlib
+    import json
+    filing_source(record)
+    fields = {key: record.get(key) for key in ('source', 'company', 'cik', 'accession', 'filing_date', 'form',
+                                               'filing_text', 'filing_text_truncated')}
+    if (not isinstance(fields['filing_text'], str) or not fields['filing_text']
+            or len(fields['filing_text']) > PREVIEW_LIMIT or type(fields['filing_text_truncated']) is not bool):
+        raise ValueError('Review the filing text preview first.')
+    return hashlib.sha256(json.dumps(fields, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
+
+
+def filing_reuse_evidence(record, decision):
+    """Record a human permission decision for the displayed preview only."""
+    import time
+    basis = decision.get('permission_basis')
+    if (record.get('filing_reviewed') is not True or decision.get('confirmed') is not True
+            or decision.get('approved_url') != record.get('source')
+            or decision.get('approved_scope') != 'sec_filing_preview'
+            or not isinstance(basis, str) or not 10 <= len(basis.strip()) <= 2000):
+        raise ValueError('Review the filing preview and record permission for that preview scope first.')
+    return {'source': record['source'], 'scope': 'sec_filing_preview', 'permission_basis': basis.strip(),
+            'filing_preview_sha256': filing_preview_checksum(record), 'time': time.time()}

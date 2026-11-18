@@ -1150,6 +1150,8 @@ class _StudioPageState extends State<StudioPage> {
                 const Text('This decision covers the displayed catalog description only. Country/year observations need separate review.'),
               if (scope == 'document_summary')
                 const Text('This decision covers the displayed document summary only. Full-text reuse needs separate review.'),
+              if (scope == 'sec_filing_preview')
+                const Text('This decision covers only the displayed filing text preview, including any truncation. Review the applicable permission; public access does not establish reuse rights.'),
               if (scope == 'crossref_abstract')
                 const Text('This decision covers the displayed abstract only. Confirm that any supplied license statement applies to this abstract.'),
               const Text('Confirm you have permission to use this item for the project dataset. Record the license, permission, or other basis you reviewed.'),
@@ -1750,7 +1752,7 @@ class _StudioPageState extends State<StudioPage> {
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-companies', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'filing_candidates') ...[
-          const Text('Review each filing URL before loading its text. Reuse remains unverified; dataset collection is not available yet.'),
+          const Text('Review each filing URL before loading its text, then record permission for the displayed preview. Dataset collection is not available yet.'),
           if ((job?['filing_candidates'] as List? ?? const []).isEmpty)
             const Text('No supported recent filings were found for this company.'),
           for (final record in job?['filing_candidates'] as List? ?? const [])
@@ -1762,6 +1764,12 @@ class _StudioPageState extends State<StudioPage> {
                 if (record['filing_text_truncated'] == true) const Text('Preview truncated to 50,000 characters.'),
                 const Text('Loading a filing does not establish permission to reuse its content.'),
               ],
+              if (record['reuse_approval'] case final Map approval)
+                SelectableText('SEC filing preview reuse approval: ${approval['permission_basis']}')
+              else if (record['filing_reviewed'] == true)
+                TextButton(onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                    action: 'approve-filing-reuse', scope: 'sec_filing_preview'),
+                  child: const Text('Record filing preview reuse approval')),
               OutlinedButton(onPressed: _busy ? null : () async {
                 final contact = _secContact.text.trim();
                 final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(

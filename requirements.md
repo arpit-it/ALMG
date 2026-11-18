@@ -767,6 +767,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   tests and Flutter analysis passed, including format/size limits, source
   validation and stale-preview removal. Filing reuse, dataset collection
   and project website discovery remain open.
+
+  SEC filing previews now support an explicit preview-only reuse decision
+  and permission basis, bound to filing identity, text and truncation status.
+  In the rebuilt Mac app using local fixtures, the scope dialog and recorded
+  basis appeared; an approved refresh removed the decision and restored the
+  permission control. All 97 Python tests and Flutter analysis passed,
+  including scope rejection, checksum changes and refresh invalidation.
+  Dataset collection and project website discovery remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
