@@ -1370,6 +1370,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   tests and Flutter analysis passed. Direct visual interpretation and PDF
   layout analysis are not provided by this path and are labeled accordingly.
 - [ ] Add full-text conversation search, Markdown export, and controls for whether the model can draw on other conversations.
+  Partial delivery: conversation menus now save Markdown through the native
+  file dialog as well as copying it. Both actions use a shared formatter
+  that preserves message formatting, order, Unicode and attachment filenames
+  while escaping title/filename metadata. In the rebuilt isolated Mac app,
+  searching “violet lantern” returned Inventory question even though the
+  phrase occurred only in its assistant reply, excluding the unrelated chat.
+  Save as Markdown produced a local file containing only that conversation,
+  with its title, user/assistant sections and attachment filename. All 141
+  Python tests, 13 Flutter tests and Flutter analysis passed. App-level
+  verification of cross-conversation recall controls remains open.
 - [ ] Test project instructions, reference files, and chat branches together. Verify that a branch preserves its source conversation and stays in the same project.
 
 ## P3 · Extend the dynamic workbench and platform support

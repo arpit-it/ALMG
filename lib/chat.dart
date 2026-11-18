@@ -10,6 +10,7 @@ import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 
 import 'project_settings.dart';
 import 'attachment_preview.dart';
+import 'chat_export.dart';
 import 'backend_address.dart';
 
 /// Refreshes immediately, then retries while the local backend is unavailable.
@@ -1099,22 +1100,23 @@ class _ChatPageState extends State<ChatPage> {
     );
   }
 
-  Future<void> _exportMarkdown(String id, String title) async {
+  Future<void> _exportMarkdown(String id, String title, {bool saveFile = false}) async {
     try {
       final result = await _request('/chats/$id');
-      final document = StringBuffer('# $title\n');
-      for (final message in result['messages'] as List) {
-        final speaker = message['role'] == 'user' ? 'You' : 'Qwen';
-        document.writeln('\n## $speaker\n');
-        if (message['file_name'] case final String name when name.isNotEmpty) {
-          document.writeln('Attachment: $name\n');
-        }
-        document.writeln(message['content']);
+      if (!mounted) return;
+      final document = conversationMarkdown(title, result['messages'] as List);
+      if (saveFile) {
+        final destination = await getSaveLocation(suggestedName: 'almg-conversation.md',
+          acceptedTypeGroups: const [XTypeGroup(label: 'Markdown', extensions: ['md'])]);
+        if (destination == null) return;
+        await XFile.fromData(Uint8List.fromList(utf8.encode(document)), mimeType: 'text/markdown',
+          name: 'almg-conversation.md').saveTo(destination.path);
+      } else {
+        await Clipboard.setData(ClipboardData(text: document));
       }
-      await Clipboard.setData(ClipboardData(text: document.toString()));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Conversation copied as Markdown')),
+          SnackBar(content: Text(saveFile ? 'Conversation saved as Markdown' : 'Conversation copied as Markdown')),
         );
       }
     } catch (error) {
@@ -1321,8 +1323,8 @@ class _ChatPageState extends State<ChatPage> {
                           enabled: !busy,
                           onSelected: (action) {
                             if (modal) Navigator.pop(context);
-                            if (action == 'export') {
-                              _exportMarkdown(id, chat['title'] as String);
+                            if (action == 'export' || action == 'save-markdown') {
+                              _exportMarkdown(id, chat['title'] as String, saveFile: action == 'save-markdown');
                             } else if (action == 'move') {
                               _moveChat(id);
                             } else if (action == 'delete') {
@@ -1335,6 +1337,10 @@ class _ChatPageState extends State<ChatPage> {
                             const PopupMenuItem(
                               value: 'export',
                               child: Text('Copy as Markdown'),
+                            ),
+                            const PopupMenuItem(
+                              value: 'save-markdown',
+                              child: Text('Save as Markdown'),
                             ),
                             const PopupMenuItem(
                               value: 'rename',
