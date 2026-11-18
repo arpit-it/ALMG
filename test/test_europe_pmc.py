@@ -127,3 +127,22 @@ class PublicationDiscoveryTest(unittest.TestCase):
             studio.review_publication(job, record["source"])
         self.assertNotIn("reuse_approval", record)
         self.assertEqual(record["reuse_status"], "unverified")
+
+    def test_collection_requires_selected_urls_and_permission_for_current_text(self):
+        from backend.europe_pmc import abstract_reuse_evidence, approved_abstract_rows
+        record = {"source": "https://europepmc.org/article/MED/12345", "title": "Orchard research",
+                  "approved_query": "orchard", "abstract_reviewed": True, "reuse_status": "user_approved",
+                  "abstract": "Orchard fruit grows on cultivated trees in this local research fixture."}
+        record["reuse_approval"] = abstract_reuse_evidence(record, {
+            "approved_url": record["source"], "confirmed": True, "permission_basis": "Local fixture permission granted.",
+        })
+        row = approved_abstract_rows([record], [record["source"]])[0]
+        self.assertEqual(row["text"], record["abstract"])
+        self.assertEqual(row["reuse_approval"], record["reuse_approval"])
+        self.assertEqual(row["provider"], "europe_pmc")
+        for approved in ([], ["unknown"], [record["source"], record["source"]]):
+            with self.assertRaises(ValueError):
+                approved_abstract_rows([record], approved)
+        for change in ({"abstract": record["abstract"] + " Changed."}, {"abstract_reviewed": False}, {"reuse_status": "unverified"}):
+            with self.assertRaises(ValueError):
+                approved_abstract_rows([{**record, **change}], [record["source"]])

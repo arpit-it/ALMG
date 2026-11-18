@@ -526,6 +526,7 @@ class _StudioPageState extends State<StudioPage> {
   Map<String, dynamic>? _job;
   final Set<String> _excludedTextSources = {};
   final Set<String> _excludedCatalogSources = {};
+  final Set<String> _excludedPublications = {};
   final Set<String> _excludedImageSources = {};
   String? _error;
   bool _busy = false;
@@ -683,6 +684,10 @@ class _StudioPageState extends State<StudioPage> {
         if (_job?['id'] != job['id'] ||
             !{'catalog_candidates', 'reviewing_catalog_item'}.contains(job['status'])) {
           _excludedCatalogSources.clear();
+        }
+        if (_job?['id'] != job['id'] ||
+            !{'publication_candidates', 'reviewing_publication'}.contains(job['status'])) {
+          _excludedPublications.clear();
         }
         _job = job;
       });
@@ -1141,6 +1146,7 @@ class _StudioPageState extends State<StudioPage> {
       return 'English Wikipedia: $source';
     }
     if (provider == 'loc') return 'Library of Congress: $source';
+    if (provider == 'europe_pmc') return 'Europe PMC: $source';
     if (provider == 'commons' ||
         (provider == null && source.startsWith('https://upload.wikimedia.org/'))) {
       return 'Wikimedia Commons: $source';
@@ -1292,6 +1298,12 @@ class _StudioPageState extends State<StudioPage> {
     };
     final catalogRecords = job?['catalog_candidates'] as List? ?? const [];
     final selectedCatalogUrls = selectedCatalogSources(catalogRecords, _excludedCatalogSources);
+    final publicationRecords = job?['publication_candidates'] as List? ?? const [];
+    final selectedPublicationUrls = [
+      for (final record in publicationRecords)
+        if (collectablePublication(record as Map) && !_excludedPublications.contains(record['source']))
+          record['source'] as String,
+    ];
     final states = {
       'planning': 'Qwen is drafting the plan',
       'approval': 'Dataset approval required',
@@ -1535,7 +1547,7 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'publication_candidates') ...[
           const Text('Review publication metadata and record permission for each abstract. '
-              'Training collection and full-text loading are not available yet.'),
+              'Only selected, reuse-approved abstracts can enter the dataset. Full-text loading is not available yet.'),
           for (final record in job?['publication_candidates'] as List? ?? const [])
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -1543,6 +1555,15 @@ class _StudioPageState extends State<StudioPage> {
                 ListTile(
                   title: Text(record['title'] as String),
                   subtitle: SelectableText('${record['source']}\nApproved query: ${record['approved_query']}'),
+                  trailing: collectablePublication(record as Map) ? Checkbox(
+                    value: !_excludedPublications.contains(record['source']),
+                    semanticLabel: "Include abstract: ${record['title']}",
+                    onChanged: _busy ? null : (checked) => setState(() {
+                      final source = record['source'] as String;
+                      if (checked == true) { _excludedPublications.remove(source); }
+                      else { _excludedPublications.add(source); }
+                    }),
+                  ) : null,
                 ),
                 if (record['abstract_reviewed'] == true)
                   SelectableText((record['abstract'] as String).isEmpty
@@ -1552,7 +1573,7 @@ class _StudioPageState extends State<StudioPage> {
                   SelectableText('User reuse approval: ${approval['permission_basis']}\nReviewed abstract SHA-256: ${approval['abstract_sha256']}')
                 else if (record['abstract_reviewed'] == true && (record['abstract'] as String).isNotEmpty)
                   TextButton(
-                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record,
                         action: 'approve-publication-reuse'),
                     child: const Text('Record abstract reuse approval'),
                   ),
@@ -1564,6 +1585,14 @@ class _StudioPageState extends State<StudioPage> {
                   child: const Text('Approve loading abstract metadata'),
                 ),
               ],
+            ),
+          if (publicationRecords.any((record) => collectablePublication(record as Map)))
+            OutlinedButton(
+              onPressed: _busy || selectedPublicationUrls.isEmpty ? null
+                  : () => _submit('/jobs/$id/use-publication-abstracts', {
+                      'approved_urls': selectedPublicationUrls,
+                    }),
+              child: Text('Approve abstract collection (${selectedPublicationUrls.length} selected)'),
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-publications', {}),
@@ -1904,8 +1933,10 @@ class _StudioPageState extends State<StudioPage> {
                         if (row['title'] case final String title when title.isNotEmpty)
                           row['provider'] == 'loc'
                               ? 'Catalog record: $title'
-                              : 'Article: $title',
-                        if (row['provider'] == 'loc' && row['reuse_approval'] is Map)
+                              : row['provider'] == 'europe_pmc'
+                                  ? 'Publication: $title'
+                                  : 'Article: $title',
+                        if ({'loc', 'europe_pmc'}.contains(row['provider']) && row['reuse_approval'] is Map)
                           'User reuse approval: ${row['reuse_approval']['permission_basis']}',
                         if (row['approved_query'] case final String query)
                           'Approved query: $query',

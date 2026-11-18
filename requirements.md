@@ -590,6 +590,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   passed. Tests reject missing review, unmatched URL and unconfirmed or
   short permission decisions. Dataset collection, full-text loading and
   remaining provider implementation are still open.
+  Selected, reuse-approved Europe PMC abstracts can now enter classifier
+  datasets after separate collection approval. In the rebuilt Mac app,
+  deselecting one of three offline abstracts changed approval to two;
+  dataset preview and saved rows contained exactly those two URLs, with
+  titles, queries and permission evidence. Collection verifies the current
+  abstract checksum against its permission record. All 56 Python tests
+  and Flutter analysis passed. Full-text loading and other starter
+  providers remain open, so the overall requirement stays incomplete.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

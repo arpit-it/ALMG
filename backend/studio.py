@@ -748,6 +748,8 @@ def restore_jobs():
                 if job.get("text_candidates"):
                     stage = ("catalog_candidates" if job.get("catalog_candidates")
                              and all(row.get("provider") == "loc" for row in job["text_candidates"])
+                             else "publication_candidates" if job.get("text_candidates")
+                             and all(row.get("provider") == "europe_pmc" for row in job["text_candidates"])
                              else "text_candidates")
                     job.update(status=stage, mode=None, error=(
                         "Excerpt preparation was interrupted. Review and approve the excerpts to retry."
@@ -1105,7 +1107,9 @@ def prepare_dataset(job, imported_rows=None):
         elif job.get("mode") == "web":
             stage = ("catalog_candidates" if job.get("text_candidates")
                      and all(row.get("provider") == "loc" for row in job["text_candidates"])
-                     else "text_candidates")
+                     else "publication_candidates" if job.get("text_candidates")
+                             and all(row.get("provider") == "europe_pmc" for row in job["text_candidates"])
+                             else "text_candidates")
             update(job, status=stage, mode=None, error=str(error))
         else:
             update(job, status="failed", error=str(error))
@@ -1615,6 +1619,10 @@ class Handler(BaseHTTPRequestHandler):
                         append_activity(job, "User reuse permission recorded for the reviewed abstract.")
                         store_job(job)
                         return self.respond({"id": job["id"]})
+                    elif action == "use-publication-abstracts" and status == "publication_candidates":
+                        rows = europe_pmc.approved_abstract_rows(job["publication_candidates"], data.get("approved_urls"))
+                        job.update(status="creating_dataset", error=None, mode="web", text_candidates=rows)
+                        worker = (prepare_dataset, (job,))
                     elif action == "close-publications" and status == "publication_candidates":
                         job.pop("publication_candidates", None)
                         job.update(status="approval", error=None)

@@ -12,3 +12,10 @@ List<String> selectedCatalogSources(List records, Set<String> excluded) => [
     if (collectableCatalogRecord(record) && !excluded.contains(record['source']))
       record['source'] as String,
 ];
+
+/// Whether a reviewed abstract has permission and enough text for collection.
+bool collectablePublication(Map record) =>
+    record['abstract_reviewed'] == true &&
+    record['reuse_status'] == 'user_approved' &&
+    record['reuse_approval'] is Map &&
+    (record['abstract'] as String? ?? '').length >= 40;

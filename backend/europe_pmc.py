@@ -75,3 +75,25 @@ def abstract_reuse_evidence(record, decision):
         raise ValueError("Review the abstract and record a reuse permission basis first.")
     return {"source": record["source"], "permission_basis": basis.strip(),
             "abstract_sha256": hashlib.sha256(text.encode("utf-8")).hexdigest(), "time": time.time()}
+
+
+def approved_abstract_rows(records, approved_urls):
+    """Validate collection consent and permission against the current abstract text."""
+    import hashlib
+    if (not isinstance(approved_urls, list) or not approved_urls
+            or any(not isinstance(url, str) for url in approved_urls)
+            or len(set(approved_urls)) != len(approved_urls)):
+        raise ValueError("Select publication URLs before approving collection.")
+    selected = [record for record in records if record.get("source") in approved_urls]
+    if len(selected) != len(approved_urls):
+        raise ValueError("Approve only listed publication URLs.")
+    rows = []
+    for record in selected:
+        text, approval = record.get("abstract"), record.get("reuse_approval")
+        if (record.get("abstract_reviewed") is not True or record.get("reuse_status") != "user_approved"
+                or not isinstance(text, str) or len(text) < 40 or not isinstance(approval, dict)
+                or approval.get("source") != record["source"]
+                or approval.get("abstract_sha256") != hashlib.sha256(text.encode("utf-8")).hexdigest()):
+            raise ValueError("Review the abstract and record current reuse permission before collection.")
+        rows.append({**record, "provider": "europe_pmc", "text": text, "group": record["source"]})
+    return rows
