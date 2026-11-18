@@ -1406,7 +1406,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
 
 ## P3 · Extend the dynamic workbench and platform support
 
-- [ ] Define a training recipe interface for dataset format, hardware needs, parameters, metrics, and export format. Validate a small LoRA run on Apple silicon before adding more recipes.
+- [x] Define a training recipe interface for dataset format, hardware needs, parameters, metrics, and export format. Validate a small LoRA run on Apple silicon before adding more recipes.
   Partial delivery: a versioned recipe-contract catalog now describes the
   two existing recipes' dataset formats, hardware, parameter types/defaults,
   metric keys, exported artifacts and resume limitations. Planning records
@@ -1531,6 +1531,21 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and adapter reload error 0.0. This verifies the tiny projection runtime only;
   a representative language-model LoRA run remains unverified, so the item
   stays open and no additional recipe is enabled.
+  Completed the small Apple-silicon LoRA validation with a tiny causal
+  self-attention language model, replacing the projection-only smoke test.
+  Generated four-token cycles use length-8 training and distinct length-12
+  held-out contexts. Only the rank-2 output adapters train (24 parameters);
+  all 256 initialized base parameters remain frozen. In the rebuilt Mac app,
+  Run local LoRA fixture completed 100 Metal GPU steps: next-token loss fell
+  from 1.532488 to 0.007317, held-out accuracy was 100%, and autoregressive
+  generation produced 0 1 2 3 0 1 2 3 0 1 2 3. Changing a future token left
+  earlier logits unchanged; causal-prefix and saved-adapter reload errors were
+  both 0.0. All 171 Python tests passed with ALMG_METAL_TESTS=1 (including the
+  real GPU run), plus 13 Flutter tests and clean Flutter analysis. Together
+  with the verified existing-recipe contract/execution/export integration
+  above, this satisfies this item's interface and small-run criteria. This is
+  a deliberately tiny offline validation fixture, not a production fine-tuning
+  recipe; no additional recipe, downloads or external collection were enabled.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 

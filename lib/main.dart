@@ -1496,6 +1496,10 @@ class _StudioPageState extends State<StudioPage> {
         content: Text('${result['scope']}\n\n'
           'Device: ${result['device']} · rank ${result['rank']} · ${result['steps']} steps\n'
           'Loss: ${(result['initial_loss'] as num).toStringAsFixed(6)} → ${(result['final_loss'] as num).toStringAsFixed(6)}\n'
+          'Held-out next-token accuracy: ${((result['held_out_next_token_accuracy'] as num) * 100).toStringAsFixed(1)}%\n'
+          'Trainable / frozen parameters: ${result['trainable_parameters']} / ${result['frozen_parameters']}\n'
+          'Generated token IDs: ${(result['generated_tokens'] as List).join(' ')}\n'
+          'Causal prefix error: ${result['causal_prefix_max_error']}\n'
           'Base weights unchanged: ${result['base_weights_unchanged']}\n'
           'Adapter reload error: ${result['reload_max_error']}'),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
@@ -1539,7 +1543,7 @@ class _StudioPageState extends State<StudioPage> {
           const SizedBox(height: 12),
           Text('Resume: ${contract['resume']}'),
           const SizedBox(height: 12),
-          const Text('Optional local LoRA check: trains a tiny generated projection fixture on this Mac. No downloads; language-model fine-tuning remains unavailable.'),
+          const Text('Optional local LoRA check: trains rank-2 adapters in a tiny causal language model using generated token sequences. No downloads; fine-tuning your own models remains unavailable.'),
           TextButton(onPressed: () {
             Navigator.pop(context);
             _validateLocalLora();
