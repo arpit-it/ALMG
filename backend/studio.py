@@ -2521,11 +2521,9 @@ class Handler(BaseHTTPRequestHandler):
                                 (groups[index] for index in usable),
                                 (rows[index]["label"] for index in usable), job["plan"]["labels"],
                             )
-                        target = float(data["target"])
-                        if not 0 < target <= 1:
-                            raise ValueError("Enter a score between 0 and 1.")
-                        job.update(status="queued", target=target, idle=data.get("idle") is True,
-                                   allow_repair=data.get("allow_repair") is True, error=None)
+                        parameters = recipe_contracts.training_parameters(
+                            job.get("recipe", "classifier"), data, job.get("recipe_contract"))
+                        job.update(status="queued", **parameters, error=None)
                         TRAINING_WORKERS.add(job["id"])
                         worker = (run, (job,))
                     elif action == "preview" and status in ("preview_ready", "passed"):

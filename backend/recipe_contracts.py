@@ -43,3 +43,39 @@ def recipe_contract(recipe_id):
 def recipe_catalog():
     """List implemented recipes only; future recipes require separate validation."""
     return [recipe_contract(recipe_id) for recipe_id in _CONTRACTS]
+
+
+def training_parameters(recipe_id, values, snapshot=None):
+    """Validate approved execution settings against a supported recipe contract."""
+    import math
+    contract = recipe_contract(recipe_id)
+    if snapshot is not None and (not isinstance(snapshot, dict)
+            or type(snapshot.get('schema_version')) is not int or snapshot['schema_version'] != SCHEMA_VERSION
+            or snapshot.get('id') != recipe_id or type(snapshot.get('version')) is not int
+            or snapshot['version'] != contract['version']):
+        raise ValueError('This job uses an unsupported recipe contract. Create a new training plan.')
+    if not isinstance(values, dict):
+        raise ValueError('Training parameters must be an object.')
+    supplied = dict(values)
+    # Older image clients always sent this classifier-only switch as false.
+    if recipe_id == 'text_to_image' and supplied.get('allow_repair') is False:
+        supplied.pop('allow_repair')
+    allowed = {parameter['id'] for parameter in contract['parameters']}
+    if set(supplied) - allowed:
+        raise ValueError('Unsupported training parameters: ' + ', '.join(sorted(set(supplied) - allowed)))
+    if 'target' not in supplied:
+        raise ValueError('Approve a target score before starting training.')
+    result = {}
+    for parameter in contract['parameters']:
+        value = supplied.get(parameter['id'], parameter['default'])
+        if parameter['type'] == 'boolean':
+            if type(value) is not bool:
+                raise ValueError(parameter['label'] + ' must be true or false.')
+        elif parameter['type'] == 'number':
+            if (type(value) not in (int, float) or value <= parameter['minimum_exclusive']
+                    or value > parameter['maximum'] or not math.isfinite(value)):
+                raise ValueError(parameter['label'] + ' must be a finite number greater than 0 and at most 1.')
+            value = float(value)
+        result[parameter['id']] = value
+    result.setdefault('allow_repair', False)
+    return result

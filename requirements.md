@@ -1419,6 +1419,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   API routes, snapshot independence, unknown-recipe rejection and unchanged
   restart of a legacy job without contract metadata. No recipes were added.
   LoRA validation and further execution-interface integration remain open.
+  Training approval now validates recipe-specific parameter types, finite
+  target bounds, supported settings and contract identity/version before
+  queuing a worker. Contract defaults apply to omitted flags; legacy image
+  requests with a false classifier-retry flag remain accepted, while the
+  current image UI omits that unsupported option. In the rebuilt Mac app,
+  both a 48-row classifier and the 45-example local shape recipe passed
+  validated approval and reached inference preview with held-out scores of
+  1.000. Saved jobs retained normalized settings and matching contract IDs.
+  All 151 Python tests, 13 Flutter tests and Flutter analysis passed, including
+  invalid-target/type/version rejection and no-worker failure behavior.
+  LoRA validation and remaining execution-interface integration stay open;
+  no recipe was added.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 

@@ -63,3 +63,35 @@ class RecipeContractsTest(unittest.TestCase):
             self.assertEqual(studio.JOBS[job_id], legacy)
             self.assertEqual(record.read_bytes(), before)
             self.assertNotIn('recipe_contract', studio.JOBS[job_id])
+
+    def test_execution_parameters_enforce_types_bounds_and_recipe_options(self):
+        valid = recipe_contracts.training_parameters('classifier', {'target': 0.9, 'idle': False, 'allow_repair': True})
+        self.assertEqual(valid, {'target': 0.9, 'idle': False, 'allow_repair': True})
+        self.assertTrue(recipe_contracts.training_parameters('classifier', {'target': 1})['idle'])
+        for target in (True, '0.8', float('nan'), float('inf'), 10 ** 1000, 0, -1, 1.1):
+            with self.assertRaises(ValueError): recipe_contracts.training_parameters('classifier', {'target': target})
+        for values in ({'target': 0.8, 'idle': 'false'}, {'target': 0.8, 'allow_repair': 1},
+                       {'target': 0.8, 'unknown': True}, {}):
+            with self.assertRaises(ValueError): recipe_contracts.training_parameters('classifier', values)
+        self.assertFalse(recipe_contracts.training_parameters('text_to_image', {'target': 0.8, 'allow_repair': False})['allow_repair'])
+        with self.assertRaises(ValueError):
+            recipe_contracts.training_parameters('text_to_image', {'target': 0.8, 'allow_repair': True})
+
+    def test_unsupported_snapshot_rejects_execution_and_legacy_jobs_use_catalog(self):
+        snapshot = recipe_contracts.recipe_contract('classifier')
+        snapshot['version'] = 99
+        with self.assertRaisesRegex(ValueError, 'unsupported recipe contract'):
+            recipe_contracts.training_parameters('classifier', {'target': 0.8}, snapshot)
+        self.assertEqual(recipe_contracts.training_parameters('classifier', {'target': 0.8})['target'], 0.8)
+
+    def test_invalid_parameters_leave_image_approval_pending_without_worker(self):
+        import io
+        from unittest.mock import Mock
+        job = {'id': 'parameter-fixture', 'recipe': 'text_to_image', 'status': 'dataset_ready'}
+        body = json.dumps({'target': 0.8, 'idle': 'false'}).encode()
+        handler = Mock(path='/jobs/parameter-fixture/start', headers={'Content-Length': str(len(body))}, rfile=io.BytesIO(body))
+        with patch.object(studio, 'JOBS', {job['id']: job}), patch.object(studio, 'store_job'), patch.object(studio.threading, 'Thread') as worker:
+            studio.Handler.do_POST(handler)
+        self.assertEqual(job['status'], 'dataset_ready')
+        self.assertEqual(handler.respond.call_args.args[1], 400)
+        worker.assert_not_called()

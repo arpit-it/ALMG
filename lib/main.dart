@@ -2984,7 +2984,7 @@ class _StudioPageState extends State<StudioPage> {
     _submit('/jobs/$id/start', {
       'target': target,
       'idle': _idle,
-      'allow_repair': _allowRepair,
+      if (!_imageRecipe) 'allow_repair': _allowRepair,
     });
   }
 
