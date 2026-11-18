@@ -1332,7 +1332,19 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
 
 ## P2 · Improve chat and project work
 
-- [ ] Save unsent drafts across app restarts. Test that a backend outage preserves the draft and exposes any partial response without duplicating a saved turn.
+- [x] Save unsent drafts across app restarts. Test that a backend outage preserves the draft and exposes any partial response without duplicating a saved turn.
+  Chat now saves the pending payload and retry token before sending, retains
+  interrupted text with the draft, and restores recovery state across app
+  restarts. Offline recovery displays the saved draft and interrupted reply.
+  The rebuilt isolated Mac app restored an unsent draft after restart, then
+  survived a fixture connection loss after the backend committed the reply
+  but before its completion event arrived. After stopping the backend and
+  restarting the app again, both draft and partial reply were visible offline.
+  Reconnection and retry reused the same saved token and recovered the full
+  response. Logs and SQLite verified one generation, one chat and exactly
+  one user/assistant pair. Existing preferences were preserved by using an
+  isolated fixture state file. All 141 Python tests, 8 Flutter tests and
+  Flutter analysis passed, including lost-acknowledgement idempotency.
 - [ ] Expand support for PDF and image attachments. Show which text or image content the model can use, and cite filenames and page numbers when available.
 - [ ] Add full-text conversation search, Markdown export, and controls for whether the model can draw on other conversations.
 - [ ] Test project instructions, reference files, and chat branches together. Verify that a branch preserves its source conversation and stays in the same project.

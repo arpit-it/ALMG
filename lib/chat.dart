@@ -90,6 +90,7 @@ class _ChatPageState extends State<ChatPage> {
   bool _showSettings = false;
 
   final _drafts = <String, String>{};
+  final _pendingReplies = <String, Map<String, String>>{};
   String? _retryToken;
   String? _retryPayload;
   Future<void> _draftWrites = Future<void>.value();
@@ -97,7 +98,7 @@ class _ChatPageState extends State<ChatPage> {
 
   File get _chatPreferences => File(
     '${Platform.environment['APPDATA'] ?? Platform.environment['HOME'] ?? Directory.systemTemp.path}'
-    '${Platform.isMacOS ? '/Library/Application Support' : ''}/ALMG/chat-preferences.json',
+    '${Platform.isMacOS ? '/Library/Application Support' : ''}/ALMG/${const String.fromEnvironment('ALMG_CHAT_STATE_NAME', defaultValue: 'chat-preferences.json')}',
   );
 
   String get _draftKey => _chatId ?? 'new:${_projectId ?? 'personal'}';
@@ -112,8 +113,22 @@ class _ChatPageState extends State<ChatPage> {
           if (entry.value case final String draft) _drafts[entry.key] = draft;
         }
       }
+      if (saved['pending_replies'] case final Map pending) {
+        for (final entry in pending.entries) {
+          if (entry.key is String && entry.value is Map) {
+            final value = entry.value as Map;
+            if (value['token'] is String && RegExp(r'^[a-f0-9]{32}$').hasMatch(value['token'] as String) && value['payload'] is String) {
+              _pendingReplies[entry.key as String] = {
+                'token': value['token'] as String, 'payload': value['payload'] as String,
+                if (value['partial'] is String) 'partial': value['partial'] as String,
+              };
+            }
+          }
+        }
+      }
       setState(() => _recall = saved['recall'] != false);
       if (_input.text.isEmpty) _input.text = _drafts[_draftKey] ?? '';
+      _restorePendingReply();
     } on FileSystemException {
       // The first session has no saved preferences.
     } on TypeError {
@@ -139,9 +154,22 @@ class _ChatPageState extends State<ChatPage> {
     _saveChatPreferences();
   }
 
-  void _saveChatPreferences() {
-    final snapshot = jsonEncode({'recall': _recall, 'drafts': _drafts});
-    _draftWrites = _draftWrites.then((_) async {
+  void _restorePendingReply() {
+    final pending = _pendingReplies[_draftKey];
+    _interruptedReply = pending?['partial'];
+    if (pending == null) return;
+    try {
+      final payload = jsonDecode(pending['payload']!) as Map;
+      if (payload['text'] == _input.text.trim() && payload['attachment'] is Map) {
+        _attachment = Map<String, String>.from(payload['attachment'] as Map);
+      }
+    } on FormatException { /* Ignore invalid recovery metadata. */ }
+      on TypeError { /* Ignore unsupported recovery metadata. */ }
+  }
+
+  Future<void> _saveChatPreferences({bool failOnError = false}) {
+    final snapshot = jsonEncode({'recall': _recall, 'drafts': _drafts, 'pending_replies': _pendingReplies});
+    final write = _draftWrites.then((_) async {
       final file = _chatPreferences;
       try {
         await file.parent.create(recursive: true);
@@ -152,8 +180,11 @@ class _ChatPageState extends State<ChatPage> {
         if (mounted) {
           setState(() => _error = 'Could not save chat preferences. $error');
         }
+        rethrow;
       }
     });
+    _draftWrites = write.catchError((Object _) {});
+    return failOnError ? write : _draftWrites;
   }
 
   /// Registers keyboard shortcuts and loads the initial backend state.
@@ -570,6 +601,7 @@ class _ChatPageState extends State<ChatPage> {
         _chatId = id;
         _attachment = null;
         _input.text = _drafts[_draftKey] ?? '';
+        _restorePendingReply();
         _messages
           ..clear()
           ..addAll(messages);
@@ -592,6 +624,7 @@ class _ChatPageState extends State<ChatPage> {
       _messages.clear();
       _interruptedReply = null;
       _input.text = _drafts[_draftKey] ?? '';
+      _restorePendingReply();
       _error = null;
     });
   }
@@ -696,7 +729,7 @@ class _ChatPageState extends State<ChatPage> {
   /// Streams a reply and restores the draft if generation is interrupted.
   Future<void> _send() async {
     final text = _input.text.trim();
-    if (text.isEmpty || _sending || _openingChat || _deleting) return;
+    if (text.isEmpty || !_draftsLoaded || _sending || _openingChat || _deleting) return;
     final attachment = _attachment;
     final draftKey = _draftKey;
     final payload = {
@@ -707,6 +740,11 @@ class _ChatPageState extends State<ChatPage> {
       'recall': _recall,
     };
     final fingerprint = jsonEncode(payload);
+    final pending = _pendingReplies[draftKey];
+    if (pending?['payload'] == fingerprint) {
+      _retryPayload = fingerprint;
+      _retryToken = pending!['token'];
+    }
     if (_retryPayload != fingerprint) {
       final random = Random.secure();
       _retryPayload = fingerprint;
@@ -716,6 +754,9 @@ class _ChatPageState extends State<ChatPage> {
       ).join();
     }
 
+    _pendingReplies[draftKey] = {'token': _retryToken!, 'payload': fingerprint,
+      if (pending?['partial'] case final String partial) 'partial': partial};
+    _drafts[draftKey] = text;
     final answer = {'role': 'assistant', 'content': ''};
     setState(() {
       _sending = true;
@@ -735,6 +776,8 @@ class _ChatPageState extends State<ChatPage> {
     _followReply = true;
     _scrollToEnd();
     try {
+      await _saveChatPreferences(failOnError: true);
+      if (!mounted) return;
       final response = await _openRequest(
         '/chats/stream',
         body: {...payload, 'token': _retryToken},
@@ -782,6 +825,7 @@ class _ChatPageState extends State<ChatPage> {
           _retryPayload = null;
           _retryToken = null;
           _drafts.remove(draftKey);
+          _pendingReplies.remove(draftKey);
           _saveChatPreferences();
           _chatId = id;
           _attachment = null;
@@ -801,6 +845,7 @@ class _ChatPageState extends State<ChatPage> {
         _input.text = text;
         final partial = answer['content']!;
         _interruptedReply = partial.isEmpty ? null : partial;
+        if (partial.isNotEmpty) _pendingReplies[draftKey]!['partial'] = partial;
         _error = error.toString();
       });
     } finally {
@@ -810,6 +855,7 @@ class _ChatPageState extends State<ChatPage> {
           _stopping = false;
           _streamId = null;
         });
+        _saveChatPreferences();
       }
     }
   }
@@ -1002,7 +1048,23 @@ class _ChatPageState extends State<ChatPage> {
         ],
       ),
       body: _runtimeStopped || (_backendOffline && !ready)
-          ? Center(child: _backendRecovery())
+          ? Center(child: SingleChildScrollView(
+              padding: const EdgeInsets.all(24),
+              child: SizedBox(width: 600, child: Column(mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                  _backendRecovery(),
+                  if (_input.text.isNotEmpty) ...[
+                    const SizedBox(height: 24),
+                    const Text('Saved unsent draft', style: TextStyle(fontWeight: FontWeight.bold)),
+                    SelectableText(_input.text),
+                  ],
+                  if (_interruptedReply case final String partial) ...[
+                    const SizedBox(height: 24),
+                    const Text('Interrupted reply', style: TextStyle(fontWeight: FontWeight.bold)),
+                    SelectableText(partial),
+                  ],
+                ])),
+            ))
           : ready
           ? LayoutBuilder(
               builder: (context, constraints) {

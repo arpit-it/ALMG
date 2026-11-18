@@ -46,3 +46,32 @@ class ChatStreamTest(unittest.TestCase):
                     [message["content"] for message in chat_history.messages(chat_id)],
                     ["Summarize the fixture", "Recovered"],
                 )
+
+    def test_persisted_retry_token_recovers_lost_commit_ack_without_duplicate_turn(self):
+        class LostAcknowledgement(io.BytesIO):
+            def write(self, value):
+                if b'"done"' in value:
+                    raise BrokenPipeError('Fixture lost completion event')
+                return super().write(value)
+        payload = {'text': 'Durable retry fixture', 'token': 'abcdef12' * 4}
+        with tempfile.TemporaryDirectory() as folder, patch.object(chat_history, 'DATABASE', Path(folder) / 'chat.sqlite3'):
+            writer = LostAcknowledgement()
+            handler = Mock(wfile=writer)
+            def generate(messages, **kwargs):
+                kwargs['on_delta']('Partial fixture response')
+                return 'Complete fixture response'
+            with patch.object(studio.inference, 'reply', side_effect=generate):
+                studio.Handler.stream_chat(handler, payload)
+            self.assertIn(b'Partial fixture response', writer.getvalue())
+            saved_recovery = Path(folder) / 'recovery.json'
+            saved_recovery.write_text(json.dumps({'token': payload['token'], 'payload': json.dumps({'text': payload['text']})}))
+            restored = json.loads(saved_recovery.read_text())
+            retry_payload = {**json.loads(restored['payload']), 'token': restored['token']}
+            retry = Mock(wfile=io.BytesIO())
+            with patch.object(studio.inference, 'reply') as model:
+                studio.Handler.stream_chat(retry, retry_payload)
+                model.assert_not_called()
+            chats = chat_history.list_chats()
+            self.assertEqual(len(chats), 1)
+            self.assertEqual([message['content'] for message in chat_history.messages(chats[0]['id'])],
+                             ['Durable retry fixture', 'Complete fixture response'])
