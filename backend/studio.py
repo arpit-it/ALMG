@@ -1622,6 +1622,24 @@ def cancelled_classifier_rows(job, confirmed):
     return rows
 
 
+class TrainingWindowInterrupted(ValueError):
+    """Require renewed approval after a sleep-like clock discontinuity."""
+
+
+def training_clock():
+    return time.time(), time.monotonic()
+
+
+def check_training_clock(previous, current):
+    """Detect suspended uptime or a forward wall-clock adjustment at a boundary."""
+    wall_elapsed = current[0] - previous[0]
+    uptime_elapsed = current[1] - previous[1]
+    if wall_elapsed - uptime_elapsed > 5:
+        raise TrainingWindowInterrupted(
+            "Sleep or a system-clock change was detected. Dataset and existing checkpoints are retained; approve training again to continue safely.")
+    return current
+
+
 def wait_for_training_window(job):
     """Pause at a reported training boundary, never in the middle of a fit."""
     if not job.get("idle"):
@@ -1656,6 +1674,7 @@ def wait_for_training_window(job):
 def run(job):
     """Train and evaluate an approved dataset, then wait for inference preview."""
     try:
+        clock_sample = [training_clock()]
         with LOCK:
             if job["status"] != "queued":
                 return
@@ -1680,7 +1699,9 @@ def run(job):
             with LOCK:
                 if job["status"] == "cancelled":
                     raise TrainingCancelled()
+            clock_sample[0] = check_training_clock(clock_sample[0], training_clock())
             wait_for_training_window(job)
+            clock_sample[0] = check_training_clock(clock_sample[0], training_clock())
             activity(job, message)
         def repair(mistakes):
             report("Generating one additional batch from validation mistakes.")
@@ -1712,7 +1733,7 @@ def run(job):
         activity(job, "Evaluation complete. Waiting for inference preview and release approval.")
     except TrainingCancelled:
         return
-    except training_resources.ResourceUnavailable as error:
+    except (training_resources.ResourceUnavailable, TrainingWindowInterrupted) as error:
         with LOCK:
             if job["status"] != "cancelled":
                 job.update(status="dataset_ready", error=str(error))

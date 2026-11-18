@@ -1576,6 +1576,19 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   retained idle=true and both pause/resume activity entries. No external
   collection occurred. Physical sleep/wake recovery and real-device busy/power
   transition verification remain open; the native transition used local fixtures.
+  Training now checks wall versus monotonic elapsed time at progress
+  boundaries, including after an idle wait. A gap over five seconds (suspended
+  uptime or a forward clock adjustment) conservatively returns the retained
+  dataset to fresh approval instead of proceeding automatically. Existing
+  checkpoints are retained and individual fits are not interrupted. The
+  181-test Python suite passed (180 executed; opt-in Metal test skipped),
+  including ordinary elapsed work and discontinuity recovery. In the rebuilt
+  Mac app, an injected 60-second wall/one-second uptime transition displayed
+  the sleep-or-clock-change recovery message and preserved all 45 examples.
+  Explicit reapproval trained the retained dataset to preview at accuracy
+  1.000. No external collection occurred. Actual physical sleep/wake and real
+  busy/power transitions remain unverified; this is a conservative clock guard,
+  not a platform sleep notification implementation.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.

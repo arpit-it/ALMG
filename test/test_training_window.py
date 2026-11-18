@@ -42,3 +42,21 @@ class TrainingWindowTest(unittest.TestCase):
             self.assertFalse(studio.idle_ready())
             power.side_effect = subprocess.TimeoutExpired('pmset', 3)
             self.assertFalse(studio.idle_ready())
+
+    def test_clock_guard_distinguishes_elapsed_work_from_suspended_uptime(self):
+        self.assertEqual(studio.check_training_clock((100, 10), (200, 110)), (200, 110))
+        self.assertEqual(studio.check_training_clock((100, 10), (101, 11)), (101, 11))
+        with self.assertRaisesRegex(studio.TrainingWindowInterrupted, 'approve training again'):
+            studio.check_training_clock((100, 10), (160, 11))
+
+    def test_clock_interruption_retains_dataset_and_returns_to_approval(self):
+        job = {'id': 'sleep-fixture', 'status': 'queued', 'idle': False,
+               'recipe': 'text_to_image', 'target': 0.8}
+        rows = studio.image_recipe.dataset()
+        with patch.object(studio, 'TRAINING_DATA', {job['id']: rows}), patch.object(studio, 'store_job'), patch.object(studio, 'training_clock', side_effect=[(100, 10), (160, 11)]), patch.object(studio.training_resources, 'check', return_value={}), patch.object(studio.image_recipe, 'train') as trainer:
+            trainer.side_effect = lambda rows, target, report: report('Before fitting')
+            studio.run(job)
+            self.assertEqual(job['status'], 'dataset_ready')
+            self.assertIn('Sleep or a system-clock change', job['error'])
+            self.assertEqual(studio.TRAINING_DATA[job['id']], rows)
+            self.assertNotIn(job['id'], studio.TRAINING_WORKERS)
