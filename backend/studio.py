@@ -38,7 +38,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register
+    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery
 else:
     import chat_history
     import inference
@@ -48,6 +48,7 @@ else:
     import wikidata_discovery
     import world_bank
     import federal_register
+    import crossref_discovery
 
 ROOT = Path(os.environ.get("STUDIO_DATA", Path(__file__).resolve().parent / "runs"))
 MODEL = inference.MODEL
@@ -218,6 +219,32 @@ def discover_text(job):
                 candidates.append({"text": snippet, "source": source, "title": title,
                                    "approved_query": query, "group": source, "provider": "wikipedia"})
     return candidates
+
+
+def search_bibliography(job):
+    try:
+        candidates, seen = [], set()
+        for query in job["plan"]["queries"]:
+            if len(candidates) >= 40:
+                break
+            url = "https://api.crossref.org/works?" + urlencode({
+                "query": query, "rows": 20, "select": "DOI,title,publisher,type",
+            })
+            result = request_json(url, headers={
+                "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+            }, opener=DISCOVERY)
+            for record in crossref_discovery.bibliographic_candidates(result, query):
+                key = record["doi"].lower()
+                if key not in seen and len(candidates) < 40:
+                    seen.add(key)
+                    candidates.append(record)
+        if not candidates:
+            update(job, status="approval", error="Crossref found no supported bibliographic records. Edit the queries or choose another source.")
+            return
+        activity(job, f"Found {len(candidates)} Crossref bibliographic records for review.")
+        update(job, status="bibliographic_candidates", bibliographic_candidates=candidates)
+    except (OSError, ValueError, IncompleteRead):
+        update(job, status="approval", error="Crossref search failed. Review the queries and approve another attempt or choose another source.")
 
 
 def search_notices(job):
@@ -849,7 +876,7 @@ def restore_jobs():
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "loading_indicators", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "loading_indicators", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.pop("publication_candidates", None)
@@ -888,7 +915,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -1725,6 +1752,19 @@ class Handler(BaseHTTPRequestHandler):
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
                         job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))
+                    elif action == "search-bibliography" and status == "approval" and job.get("recipe") == "classifier":
+                        queries = job["plan"]["queries"]
+                        if (not queries or data.get("approved_queries") != queries
+                                or data.get("approved_provider") != "crossref"
+                                or data.get("approved_result_limit") != 20 or data.get("approved_total_limit") != 40):
+                            raise ValueError("Approve the Crossref queries and result limits first.")
+                        job.update(status="searching_bibliography", error=None)
+                        worker = (search_bibliography, (job,))
+                    elif action == "close-bibliography" and status == "bibliographic_candidates":
+                        job.pop("bibliographic_candidates", None)
+                        job.update(status="approval", error=None)
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "search-notices" and status == "approval" and job.get("recipe") == "classifier":
                         queries = job["plan"]["queries"]
                         if (not queries or data.get("approved_queries") != queries

@@ -95,7 +95,7 @@ jobs:
           codesign --verify --deep --strict "$package_dir/$app"
           cp README.md PROJECT_TASKS.md "$package_dir/"
           cp backend/chat_history.py backend/image_recipe.py backend/inference.py \
-            backend/loc_discovery.py backend/europe_pmc.py backend/wikidata_discovery.py backend/world_bank.py backend/federal_register.py backend/model_setup.py backend/register-macos-service.py backend/studio.py \
+            backend/loc_discovery.py backend/europe_pmc.py backend/wikidata_discovery.py backend/world_bank.py backend/federal_register.py backend/crossref_discovery.py backend/model_setup.py backend/register-macos-service.py backend/studio.py \
             backend/requirements.txt backend/start-backend.command "$package_dir/backend/"
           ditto -c -k "$package_dir" release/"$ARCHIVE"
           cd release

@@ -717,6 +717,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_publications',
         'searching_entities',
         'searching_notices',
+        'searching_bibliography',
         'reviewing_notice',
         'loading_indicators',
         'reviewing_publication',
@@ -1249,16 +1250,17 @@ class _StudioPageState extends State<StudioPage> {
                   title: Text('Federal Register'),
                   subtitle: Text('www.federalregister.gov · Document preview for text classification'),
                 ),
+                const ListTile(
+                  title: Text('Crossref'),
+                  subtitle: Text('api.crossref.org · Bibliographic preview for text classification'),
+                ),
                 const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
                 const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('SEC EDGAR'),
                   subtitle: Text('sec.gov · Company filings'),
                 ),
-                const ListTile(
-                  title: Text('Crossref'),
-                  subtitle: Text('crossref.org · Bibliographic metadata'),
-                ),
+
               ],
             ),
           ),
@@ -1364,6 +1366,8 @@ class _StudioPageState extends State<StudioPage> {
       'searching_publications': 'Searching Europe PMC',
       'searching_entities': 'Searching Wikidata',
       'searching_notices': 'Searching Federal Register',
+      'searching_bibliography': 'Searching Crossref',
+      'bibliographic_candidates': 'Review Crossref bibliographic records',
       'notice_candidates': 'Review Federal Register documents',
       'reviewing_notice': 'Loading document summary metadata',
       'loading_indicators': 'Loading World Bank indicator catalog',
@@ -1639,6 +1643,31 @@ class _StudioPageState extends State<StudioPage> {
               'approved_result_limit': 20, 'approved_total_limit': 40,
             }),
             child: const Text('Approve Federal Register search'),
+          ),
+        ],
+        if (status == 'approval' && !_imageRecipe &&
+            plan != null && (plan['queries'] as List).isNotEmpty) ...[
+          const Text('Crossref bibliographic preview · api.crossref.org. '
+              'Sends the listed queries for up to 20 records per query and 40 total.'),
+          for (final query in plan['queries'] as List) SelectableText('• $query'),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/search-bibliography', {
+              'approved_provider': 'crossref', 'approved_queries': plan['queries'],
+              'approved_result_limit': 20, 'approved_total_limit': 40,
+            }),
+            child: const Text('Approve Crossref search'),
+          ),
+        ],
+        if (status == 'bibliographic_candidates') ...[
+          const Text('Bibliographic metadata only. Reuse is unverified. Abstract and publisher-page collection are not available yet.'),
+          for (final record in job?['bibliographic_candidates'] as List? ?? const [])
+            ListTile(
+              title: Text(record['title'] as String),
+              subtitle: SelectableText('DOI: ${record['doi']}\n${record['publisher']} · ${record['work_type']}\n${record['source']}\nApproved query: ${record['approved_query']}'),
+            ),
+          TextButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/close-bibliography', {}),
+            child: const Text('Return to dataset approval'),
           ),
         ],
         if (status == 'notice_candidates') ...[

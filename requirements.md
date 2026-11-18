@@ -697,6 +697,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   checksums. All 80 Python tests and Flutter analysis passed. Full-text
   loading and the remaining providers remain open, so the overall
   discovery requirement is not complete.
+  Crossref now provides consent-gated bibliographic metadata discovery.
+  The rebuilt Mac app disclosed api.crossref.org, both queries and
+  20-per-query/40-total limits before an offline search. Review showed
+  titles, publishers, types, DOI URLs and matching queries; malformed
+  records were omitted and return navigation worked. All 84 Python tests
+  and Flutter analysis passed, including metadata-only fields, DOI
+  validation, deduplication and contact limits. Abstract collection,
+  publisher-page reuse and SEC EDGAR remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
