@@ -60,3 +60,38 @@ class TrainingWindowTest(unittest.TestCase):
             self.assertIn('Sleep or a system-clock change', job['error'])
             self.assertEqual(studio.TRAINING_DATA[job['id']], rows)
             self.assertNotIn(job['id'], studio.TRAINING_WORKERS)
+
+    def test_readiness_reports_idle_power_and_unavailable_states(self):
+        from unittest.mock import Mock
+        import subprocess
+        query = Mock(return_value=42.9)
+        with patch.object(studio.sys, 'platform', 'darwin'), patch.object(studio.ctypes, 'CDLL', return_value=Mock(CGEventSourceSecondsSinceLastEventType=query)), patch.object(studio.subprocess, 'check_output', return_value="Now drawing from 'AC Power'") as power:
+            state = studio.training_readiness()
+            self.assertFalse(state['ready'])
+            self.assertTrue(state['ac_power'])
+            self.assertEqual(state['idle_seconds'], 42)
+            self.assertIn('42 of 600', state['message'])
+            query.return_value = 700.
+            self.assertTrue(studio.training_readiness()['ready'])
+            power.return_value = "Now drawing from 'Battery Power'"
+            self.assertFalse(studio.training_readiness()['ac_power'])
+            power.side_effect = subprocess.TimeoutExpired('pmset', 3)
+            self.assertIsNone(studio.training_readiness()['idle_seconds'])
+
+    def test_waiting_job_readiness_is_fresh_response_metadata_not_saved_state(self):
+        from unittest.mock import Mock
+        job = {'id': 'readiness-fixture', 'status': 'waiting_idle'}
+        handler = Mock(path='/jobs/readiness-fixture')
+        state = {'ready': False, 'message': 'Fixture waiting'}
+        with patch.object(studio, 'JOBS', {job['id']: job}), patch.object(studio, 'training_readiness', return_value=state):
+            studio.Handler.do_GET(handler)
+        self.assertEqual(handler.respond.call_args.args[0]['training_readiness'], state)
+        self.assertNotIn('training_readiness', job)
+
+    def test_readiness_route_exposes_current_probe_without_job(self):
+        from unittest.mock import Mock
+        handler = Mock(path='/runtime/training-readiness')
+        state = {'ready': True, 'ac_power': True, 'idle_seconds': 700, 'message': 'Ready fixture'}
+        with patch.object(studio, 'training_readiness', return_value=state):
+            studio.Handler.do_GET(handler)
+        self.assertEqual(handler.respond.call_args.args[0], state)

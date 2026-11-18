@@ -1487,6 +1487,20 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _showTrainingReadiness() async {
+    try {
+      final result = await _request('/runtime/training-readiness');
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: Text(result['ready'] == true ? 'Device ready for idle-gated training' : 'Device waiting'),
+        content: Text(result['message'] as String),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   Future<void> _validateLocalLora() async {
     try {
       final result = await _request('/runtime/lora-fixture', {'confirmed': true});
@@ -1542,6 +1556,10 @@ class _StudioPageState extends State<StudioPage> {
           for (final artifact in contract['exports'] as List) Text(artifact as String),
           const SizedBox(height: 12),
           Text('Resume: ${contract['resume']}'),
+          TextButton(onPressed: () {
+            Navigator.pop(context);
+            _showTrainingReadiness();
+          }, child: const Text('Check current idle and power status')),
           const SizedBox(height: 12),
           const Text('Optional local LoRA check: trains rank-2 adapters in a tiny causal language model using generated token sequences. No downloads; fine-tuning your own models remains unavailable.'),
           TextButton(onPressed: () {
@@ -1691,6 +1709,8 @@ class _StudioPageState extends State<StudioPage> {
         Text('Model creation', style: Theme.of(context).textTheme.titleLarge),
         const SizedBox(height: 12),
         Text(states[status] ?? 'Waiting for a model goal'),
+        if (status == 'waiting_idle' && _job?['training_readiness'] is Map)
+          Text(_job!['training_readiness']['message'] as String),
         if (_busy || working) ...[
           const SizedBox(height: 12),
           const LinearProgressIndicator(),

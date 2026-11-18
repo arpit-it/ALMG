@@ -1589,6 +1589,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   1.000. No external collection occurred. Actual physical sleep/wake and real
   busy/power transitions remain unverified; this is a conservative clock guard,
   not a platform sleep notification implementation.
+  Idle/power probing now exposes live readiness details used by both the
+  scheduler and a read-only Recipe details action. Waiting jobs display AC
+  confirmation and progress toward the 600-second idle threshold; probe errors
+  remain ineligible. Readiness is response metadata, not saved approval state.
+  The 184-test Python suite passed (183 executed; opt-in Metal test skipped),
+  plus 13 Flutter tests and clean analysis. In the rebuilt Mac app, the real
+  host probe showed Device ready for idle-gated training, AC connected and
+  600/600 seconds; a preceding real-probe admission also trained the local
+  shape fixture to preview at accuracy 1.000. A controlled busy fixture then
+  showed 42/600 seconds in the waiting UI, and Cancel queued training stopped
+  it. No external collection occurred. Physical sleep/wake and actual
+  busy/power transitions remain open; the busy state was a local fixture.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.

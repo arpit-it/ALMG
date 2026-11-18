@@ -999,8 +999,10 @@ def repair_synthetic(job, mistakes):
     ]
 
 
-def idle_ready():
-    """Check whether the host is idle and running on external power."""
+def training_readiness():
+    """Report fresh local idle/power measurements without changing a job."""
+    unavailable = {"ready": False, "ac_power": None, "idle_seconds": None, "required_idle_seconds": 600,
+                   "message": "Idle or power status is unavailable; training remains waiting."}
     try:
         if sys.platform == "darwin":
             query = ctypes.CDLL("/System/Library/Frameworks/CoreGraphics.framework/CoreGraphics").CGEventSourceSecondsSinceLastEventType
@@ -1017,16 +1019,27 @@ def idle_ready():
             info = LastInput(ctypes.sizeof(LastInput), 0)
             power = (ctypes.c_ubyte * 12)()
             if not ctypes.windll.user32.GetLastInputInfo(ctypes.byref(info)):
-                return False
+                return dict(unavailable)
             if not ctypes.windll.kernel32.GetSystemPowerStatus(ctypes.byref(power)):
-                return False
+                return dict(unavailable)
             idle = ((ctypes.windll.kernel32.GetTickCount() - info.tick) & 0xffffffff) / 1000
             ac = power[0] == 1
         else:
-            return False
-        return ac and idle >= 600
+            return dict(unavailable)
+        if not 0 <= idle < 1e12:
+            return dict(unavailable)
+        seconds = int(idle)
+        return {"ready": ac and idle >= 600, "ac_power": ac, "idle_seconds": seconds,
+                "required_idle_seconds": 600,
+                "message": f"Power: {'AC connected' if ac else 'AC not confirmed'}. Idle: {min(seconds, 600)} of 600 seconds."}
     except (OSError, subprocess.SubprocessError):
-        return False
+        return dict(unavailable)
+
+
+
+def idle_ready():
+    """Keep admission and boundary checks on the same local readiness probe."""
+    return training_readiness()["ready"]
 
 
 def store_job(job):
@@ -1831,6 +1844,8 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as error:
                 return self.respond({"error": str(error)}, 404)
         route = urlsplit(self.path)
+        if route.path == "/runtime/training-readiness":
+            return self.respond(training_readiness())
         if route.path == "/recipes":
             return self.respond({"schema_version": recipe_contracts.SCHEMA_VERSION, "recipes": recipe_contracts.recipe_catalog()})
         if route.path.startswith("/recipes/"):
@@ -1903,6 +1918,8 @@ class Handler(BaseHTTPRequestHandler):
         with LOCK:
             job = dict(JOBS.get(self.path.removeprefix("/jobs/"), {}))
         if job:
+            if job.get("status") == "waiting_idle":
+                job["training_readiness"] = training_readiness()
             job["search_result_limit"] = (
                 IMAGE_SEARCH_LIMIT if job.get("recipe") == "text_to_image" else WIKIPEDIA_SEARCH_LIMIT
             )
