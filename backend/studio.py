@@ -1662,6 +1662,7 @@ def run(job):
                 checkpoint_path=ROOT / "training-sessions" / job["id"] / "classifier-checkpoint.joblib",
             )
         recipe_contracts.validate_metrics(job.get("recipe", "classifier"), job.get("mode"), metrics, job["target"])
+        recipe_contracts.validate_model(job.get("recipe", "classifier"), job.get("mode"), model)
         with LOCK:
             if job["status"] == "cancelled":
                 return

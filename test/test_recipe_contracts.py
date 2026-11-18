@@ -125,3 +125,33 @@ class RecipeContractsTest(unittest.TestCase):
             self.assertIn('validation_macro_f1', job['error'])
             self.assertNotIn(job['id'], studio.CANDIDATES)
             self.assertEqual(list(Path(folder).rglob('candidate.*')), [])
+
+    def test_candidate_models_match_existing_runtime_and_export_formats(self):
+        from sklearn.pipeline import Pipeline
+        from sklearn.dummy import DummyClassifier
+        recipe_contracts.validate_model('classifier', 'local', Pipeline([('classifier', DummyClassifier())]))
+        with self.assertRaises(ValueError):
+            recipe_contracts.validate_model('classifier', 'local', {'format': 'almg-shapes-v1'})
+        for mode, expected in [('local', 'almg-shapes-v1'), ('web_images', 'almg-caption-ridge-v1')]:
+            recipe_contracts.validate_model('text_to_image', mode, {'format': expected, 'size': 48})
+            for model in ({'format': 'unknown', 'size': 48}, {'format': expected, 'size': True},
+                          {'format': expected, 'size': 64}, {'format': expected, 'size': 48, 'weights': [float('nan')]},
+                          {'format': expected, 'size': 48, 'weights': object()}):
+                with self.subTest(mode=mode, model=model), self.assertRaises(ValueError):
+                    recipe_contracts.validate_model('text_to_image', mode, model)
+
+    def test_invalid_model_never_saves_preview_candidate(self):
+        import tempfile
+        from pathlib import Path
+        job = {'id': 'invalid-model', 'status': 'queued', 'idle': False,
+               'recipe': 'text_to_image', 'target': 0.8}
+        metrics = {'held_out_pixel_accuracy': 0.9, 'target_pixel_accuracy': 0.8, 'passed': True}
+        with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), \
+                patch.object(studio, 'TRAINING_DATA', {job['id']: []}), \
+                patch.object(studio, 'CANDIDATES', {}), patch.object(studio, 'store_job'), \
+                patch.object(studio.image_recipe, 'train', return_value=({'format': 'unknown'}, [], metrics)):
+            studio.run(job)
+            self.assertEqual(job['status'], 'failed')
+            self.assertIn('unsupported model format', job['error'])
+            self.assertNotIn(job['id'], studio.CANDIDATES)
+            self.assertEqual(list(Path(folder).rglob('candidate.*')), [])

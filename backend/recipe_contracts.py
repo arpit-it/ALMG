@@ -98,3 +98,21 @@ def validate_metrics(recipe_id, mode, metrics, target):
         raise ValueError('Recipe evaluation target does not match the approved target.')
     if metrics['passed'] and any(metrics[key] < target for key in keys if key != target_key):
         raise ValueError('Recipe evaluation passed despite a score below the approved target.')
+
+
+def validate_model(recipe_id, mode, model):
+    """Check the existing runtime/export format before candidate persistence."""
+    recipe_contract(recipe_id)
+    if recipe_id == 'classifier':
+        from sklearn.pipeline import Pipeline
+        if not isinstance(model, Pipeline) or not callable(getattr(model, 'predict', None)):
+            raise ValueError('Classifier recipe must return a scikit-learn pipeline.')
+    else:
+        import json
+        expected = 'almg-caption-ridge-v1' if mode == 'web_images' else 'almg-shapes-v1'
+        if not isinstance(model, dict) or model.get('format') != expected or type(model.get('size')) is not int or model['size'] != 48:
+            raise ValueError('Image recipe returned an unsupported model format or size: expected ' + expected)
+        try:
+            json.dumps(model, allow_nan=False)
+        except (ValueError, TypeError) as error:
+            raise ValueError('Image recipe model must contain finite JSON values.') from error

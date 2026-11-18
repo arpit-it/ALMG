@@ -1440,6 +1440,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   45-example shape model to inference preview, each showing a held-out score
   of 1.000 against the approved 0.800 target. No external collection occurred.
   LoRA validation and remaining interface integration are still open.
+  Candidate persistence now checks the existing model export/runtime formats:
+  a scikit-learn pipeline for classifiers, and the expected versioned image
+  format with 48x48 size and finite JSON values. Unsupported models fail before
+  any preview candidate is saved. All 155 Python tests passed, including both
+  image variants, invalid formats/sizes/nonfinite values and failure without
+  candidate persistence. In the rebuilt Mac app, fresh 48-row classifier and
+  45-example shape fixtures both passed approval, training and the new format
+  checks to reach inference preview with held-out scores of 1.000. No external
+  collection or downloads occurred. LoRA validation and remaining interface
+  integration stay open; no recipe was added.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
