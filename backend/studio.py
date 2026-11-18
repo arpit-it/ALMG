@@ -246,6 +246,32 @@ def search_notices(job):
         update(job, status="approval", error="Federal Register search failed. Review the queries and approve another attempt or choose another source.")
 
 
+def review_notice(job, source):
+    try:
+        result = request_json(federal_register.summary_request_url(source), headers={
+            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+        }, opener=DISCOVERY)
+        review = federal_register.document_summary(result, source)
+        with LOCK:
+            for record in job["notice_candidates"]:
+                if record["source"] == source:
+                    record.update(review)
+                    record.pop("reuse_approval", None)
+            job.update(status="notice_candidates", error=None)
+            append_activity(job, "Document summary metadata loaded for review. Reuse remains unverified.")
+            store_job(job)
+    except (OSError, ValueError, IncompleteRead):
+        with LOCK:
+            for record in job["notice_candidates"]:
+                if record["source"] == source:
+                    record.pop("summary", None)
+                    record.pop("summary_reviewed", None)
+                    record.pop("reuse_approval", None)
+                    record["reuse_status"] = "unverified"
+            job.update(status="notice_candidates", error="Document summary metadata could not be loaded. Review the URL and approve another attempt.")
+            store_job(job)
+
+
 def load_indicators(job, page=1):
     try:
         result = request_json(f"https://api.worldbank.org/v2/indicator?format=json&per_page=20&page={page}", headers={
@@ -790,6 +816,14 @@ def restore_jobs():
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
                 job["candidate_directory"] = str(work)
+            elif job["status"] == "reviewing_notice" and job.get("notice_candidates"):
+                for candidate in job["notice_candidates"]:
+                    candidate.pop("summary", None)
+                    candidate.pop("summary_reviewed", None)
+                    candidate.pop("reuse_approval", None)
+                    candidate["reuse_status"] = "unverified"
+                job.update(status="notice_candidates", error="Summary loading was interrupted. Review and approve the document URL to retry.")
+                store_job(job)
             elif job["status"] == "loading_indicators" and job.get("indicator_candidates"):
                 job.update(status="indicator_candidates", error=(
                     "Catalog page loading was interrupted. Review and approve the next page to retry."
@@ -815,7 +849,7 @@ def restore_jobs():
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "loading_indicators", "reviewing_publication", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "loading_indicators", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.pop("publication_candidates", None)
@@ -1695,6 +1729,13 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the Federal Register queries and result limits first.")
                         job.update(status="searching_notices", error=None)
                         worker = (search_notices, (job,))
+                    elif action == "review-notice" and status == "notice_candidates":
+                        source = data.get("approved_url")
+                        if not isinstance(source, str) or not any(record["source"] == source for record in job["notice_candidates"]):
+                            raise ValueError("Approve a listed document URL first.")
+                        federal_register.summary_request_url(source)
+                        job.update(status="reviewing_notice", error=None)
+                        worker = (review_notice, (job, source))
                     elif action == "close-notices" and status == "notice_candidates":
                         job.pop("notice_candidates", None)
                         job.update(status="approval", error=None)

@@ -712,6 +712,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_publications',
         'searching_entities',
         'searching_notices',
+        'reviewing_notice',
         'loading_indicators',
         'reviewing_publication',
         'reviewing_catalog_item',
@@ -1350,6 +1351,7 @@ class _StudioPageState extends State<StudioPage> {
       'searching_entities': 'Searching Wikidata',
       'searching_notices': 'Searching Federal Register',
       'notice_candidates': 'Review Federal Register documents',
+      'reviewing_notice': 'Loading document summary metadata',
       'loading_indicators': 'Loading World Bank indicator catalog',
       'indicator_candidates': 'Review World Bank indicators',
       'entity_candidates': 'Review Wikidata entities',
@@ -1628,9 +1630,22 @@ class _StudioPageState extends State<StudioPage> {
         if (status == 'notice_candidates') ...[
           const Text('Document metadata only. Reuse is unverified. Full-text and dataset collection are not available yet.'),
           for (final record in job?['notice_candidates'] as List? ?? const [])
-            ListTile(
-              title: Text('${record['title']} (${record['document_number']})'),
-              subtitle: SelectableText('${record['source']}\nApproved query: ${record['approved_query']}'),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  title: Text('${record['title']} (${record['document_number']})'),
+                  subtitle: SelectableText('${record['source']}\nApproved query: ${record['approved_query']}'),
+                ),
+                if (record['summary_reviewed'] == true)
+                  SelectableText((record['summary'] as String).isEmpty
+                      ? 'No summary was supplied for this document.' : 'Summary: ${record['summary']}'),
+                const Text('Loads summary metadata from www.federalregister.gov for this document. Reuse stays unverified.'),
+                OutlinedButton(
+                  onPressed: _busy ? null : () => _submit('/jobs/$id/review-notice', {'approved_url': record['source']}),
+                  child: const Text('Approve loading document summary'),
+                ),
+              ],
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-notices', {}),

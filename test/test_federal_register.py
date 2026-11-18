@@ -53,3 +53,28 @@ class FederalRegisterDiscoveryTest(unittest.TestCase):
                 studio.search_notices(job)
             self.assertEqual(job["status"], "approval")
             self.assertIn("Federal Register", job["error"])
+
+    def test_summary_request_and_metadata_are_bound_to_approved_document(self):
+        from backend.federal_register import summary_request_url, document_summary
+        record = document("2026-12345")
+        source = record["html_url"]
+        url = summary_request_url(source)
+        self.assertEqual(urlsplit(url).path, "/api/v1/documents/2026-12345.json")
+        self.assertEqual(parse_qs(urlsplit(url).query)["fields[]"], ["title", "document_number", "html_url", "abstract"])
+        result = document_summary({**record, "abstract": "<h4>Orchards</h4>Fruit &amp; trees."}, source)
+        self.assertEqual(result["summary"], "Orchards Fruit & trees.")
+        self.assertEqual(result["reuse_status"], "unverified")
+        self.assertEqual(document_summary(record, source)["summary"], "")
+        for payload in (document("2026-54321"), {**record, "abstract": "x" * 30001}, {**record, "abstract": "bad\ud800"}):
+            with self.assertRaises(ValueError):
+                document_summary(payload, source)
+
+    def test_failed_summary_refresh_clears_stale_review(self):
+        record = {"source": document("2026-12345")["html_url"], "summary": "Earlier summary", "summary_reviewed": True}
+        job = {"notice_candidates": [record]}
+        with patch.object(studio, "request_json", side_effect=ValueError("invalid metadata")) as request, patch.object(studio, "store_job"):
+            studio.review_notice(job, record["source"])
+        request.assert_called_once()
+        self.assertEqual(job["status"], "notice_candidates")
+        self.assertNotIn("summary", record)
+        self.assertNotIn("summary_reviewed", record)

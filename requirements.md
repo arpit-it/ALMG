@@ -675,6 +675,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   passed, including metadata-only field requests, URL identity checks,
   deduplication and contact limits. Reuse review, content collection and
   the remaining provider work stay open.
+  Federal Register summary metadata now requires separate approval of a
+  listed document URL. The rebuilt Mac app loaded the offline summary
+  only for the approved document; the second remained unloaded. Fixture
+  logs showed one exact-document summary request after approval. All 77
+  Python tests and Flutter analysis passed, including response identity,
+  summary size/text validation and stale-text removal after failure.
+  Reuse review, dataset collection and full-text loading remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

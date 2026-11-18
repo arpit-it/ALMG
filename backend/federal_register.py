@@ -24,3 +24,32 @@ def document_candidates(payload, query, *, limit=20):
         rows.append({"document_number": number, "title": title.strip(), "source": source,
                      "provider": "federal_register", "approved_query": query, "reuse_status": "unverified"})
     return rows
+
+
+def summary_request_url(source):
+    """Build one document metadata request from an approved review URL."""
+    from urllib.parse import urlencode
+    match = re.fullmatch(r"https://www\.federalregister\.gov/documents/[0-9]{4}/[0-9]{2}/[0-9]{2}/([0-9]{4}-[0-9]{5})/[A-Za-z0-9_-]+/?", source) if isinstance(source, str) else None
+    if not match:
+        raise ValueError("Approve a supported document URL first.")
+    return f"https://www.federalregister.gov/api/v1/documents/{match[1]}.json?" + urlencode([
+        ("fields[]", field) for field in ("title", "document_number", "html_url", "abstract")
+    ])
+
+
+def document_summary(payload, source):
+    """Validate identity and display summary metadata without granting reuse."""
+    from html import unescape
+    summary_request_url(source)
+    candidates = document_candidates({"results": [payload]}, "", limit=1)
+    if len(candidates) != 1 or candidates[0]["source"] != source:
+        raise ValueError("Summary metadata does not match the approved document URL.")
+    text = payload.get("abstract")
+    if text is None:
+        text = ""
+    if not isinstance(text, str) or len(text) > 30000:
+        raise ValueError("Federal Register returned unreadable summary metadata.")
+    text = " ".join(unescape(re.sub(r"<[^>]+>", " ", text)).split())
+    if any(unicodedata.category(c) in {"Cc", "Cs"} for c in text):
+        raise ValueError("Federal Register returned unreadable summary metadata.")
+    return {"title": candidates[0]["title"], "summary": text, "summary_reviewed": True, "reuse_status": "unverified"}
