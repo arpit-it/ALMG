@@ -775,6 +775,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   permission control. All 97 Python tests and Flutter analysis passed,
   including scope rejection, checksum changes and refresh invalidation.
   Dataset collection and project website discovery remain open.
+
+  Selected SEC filing previews with current preview-scoped permission can
+  now enter text classification datasets. In the rebuilt Mac app with
+  local fixtures, deselecting one of three approved previews changed the
+  count to two; collection showed exactly those two with SEC URLs, filing
+  identity, preview scope and permission basis. Class-count warnings stayed
+  visible and training was not started. All 98 Python tests and Flutter
+  analysis passed, including stale-text, changed-truncation and invalid-
+  selection rejection. Project website discovery and remaining broad
+  provider criteria stay open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

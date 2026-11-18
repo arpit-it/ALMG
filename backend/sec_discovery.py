@@ -166,3 +166,25 @@ def filing_reuse_evidence(record, decision):
         raise ValueError('Review the filing preview and record permission for that preview scope first.')
     return {'source': record['source'], 'scope': 'sec_filing_preview', 'permission_basis': basis.strip(),
             'filing_preview_sha256': filing_preview_checksum(record), 'time': time.time()}
+
+
+def approved_preview_rows(records, approved_urls):
+    """Collect only selected filing previews with current preview-scoped evidence."""
+    if (not isinstance(approved_urls, list) or not approved_urls
+            or any(not isinstance(url, str) for url in approved_urls)
+            or len(set(approved_urls)) != len(approved_urls)):
+        raise ValueError('Select filing preview URLs before approving collection.')
+    selected = [record for record in records if record.get('source') in approved_urls]
+    if len(selected) != len(approved_urls):
+        raise ValueError('Approve only listed filing preview URLs.')
+    rows = []
+    for record in selected:
+        text, approval = record.get('filing_text'), record.get('reuse_approval')
+        if (not isinstance(text, str) or len(text) < 40 or record.get('filing_reviewed') is not True
+                or record.get('reuse_status') != 'user_approved' or not isinstance(approval, dict)
+                or approval.get('source') != record.get('source') or approval.get('scope') != 'sec_filing_preview'
+                or approval.get('filing_preview_sha256') != filing_preview_checksum(record)):
+            raise ValueError('Record current filing preview reuse permission before collection.')
+        rows.append({**record, 'provider': 'sec_edgar', 'text': text, 'group': record['source'],
+                     'title': f"{record['company']} · {record['form']}", 'collection_scope': 'sec_filing_preview'})
+    return rows

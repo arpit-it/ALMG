@@ -106,3 +106,21 @@ class SecDiscoveryTest(unittest.TestCase):
             studio.review_filing(job, record['source'], 'fixture@example.invalid')
         self.assertNotIn('reuse_approval', job['filing_candidates'][0])
         self.assertEqual(job['filing_candidates'][0]['reuse_status'], 'unverified')
+
+    def test_collection_requires_current_permission_and_selected_preview(self):
+        record = {**sec.filing_candidates(payload(), '1234')[0],
+                  **sec.document_preview(b'Orchard fruit harvest and cultivation revenue in this local filing preview.', 'text/plain')}
+        record['reuse_approval'] = sec.filing_reuse_evidence(record, {'approved_url': record['source'], 'confirmed': True,
+            'approved_scope': 'sec_filing_preview', 'permission_basis': 'Local fixture permission reviewed.'})
+        record['reuse_status'] = 'user_approved'
+        rows = sec.approved_preview_rows([record, {'source': 'unselected'}], [record['source']])
+        self.assertEqual(rows[0]['text'], record['filing_text'])
+        self.assertEqual(rows[0]['collection_scope'], 'sec_filing_preview')
+        for urls in ([], ['unknown'], [record['source'], record['source']]):
+            with self.assertRaises(ValueError):
+                sec.approved_preview_rows([record], urls)
+        for changes in ({'filing_text': 'Changed filing preview text which must invalidate permission.'},
+                        {'filing_text_truncated': True}, {'reuse_status': 'unverified'},
+                        {'reuse_approval': {**record['reuse_approval'], 'scope': 'whole_filing'}}):
+            with self.assertRaises(ValueError):
+                sec.approved_preview_rows([{**record, **changes}], [record['source']])

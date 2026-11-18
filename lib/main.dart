@@ -532,6 +532,7 @@ class _StudioPageState extends State<StudioPage> {
   final Set<String> _excludedIndicators = {};
   final Set<String> _excludedNotices = {};
   final Set<String> _excludedBibliography = {};
+  final Set<String> _excludedFilings = {};
   final _secQuery = TextEditingController();
   final _secCik = TextEditingController();
   final _secContact = TextEditingController();
@@ -712,6 +713,10 @@ class _StudioPageState extends State<StudioPage> {
         if (_job?['id'] != job['id'] ||
             !{'bibliographic_candidates', 'reviewing_bibliography'}.contains(job['status'])) {
           _excludedBibliography.clear();
+        }
+        if (_job?['id'] != job['id'] ||
+            !{'filing_candidates', 'reviewing_filing'}.contains(job['status'])) {
+          _excludedFilings.clear();
         }
         _job = job;
       });
@@ -1195,6 +1200,7 @@ class _StudioPageState extends State<StudioPage> {
     if (provider == 'europe_pmc') return 'Europe PMC: $source';
     if (provider == 'wikidata') return 'Wikidata: $source';
     if (provider == 'world_bank') return 'World Bank indicator catalog: $source';
+    if (provider == 'sec_edgar') return 'SEC EDGAR: $source';
     if (provider == 'crossref') return 'Crossref: $source';
     if (provider == 'federal_register') return 'Federal Register: $source';
     if (provider == 'commons' ||
@@ -1368,6 +1374,12 @@ class _StudioPageState extends State<StudioPage> {
     final selectedIndicatorUrls = [
       for (final record in visibleIndicators)
         if (collectableIndicator(record) && !_excludedIndicators.contains(record['source']))
+          record['source'] as String,
+    ];
+    final filingRecords = job?['filing_candidates'] as List? ?? const [];
+    final selectedFilingUrls = [
+      for (final record in filingRecords)
+        if (collectableFiling(record as Map) && !_excludedFilings.contains(record['source']))
           record['source'] as String,
     ];
     final bibliographyRecords = job?['bibliographic_candidates'] as List? ?? const [];
@@ -1752,13 +1764,23 @@ class _StudioPageState extends State<StudioPage> {
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-companies', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'filing_candidates') ...[
-          const Text('Review each filing URL before loading its text, then record permission for the displayed preview. Dataset collection is not available yet.'),
+          const Text('Approve collection of selected, reuse-approved filing previews for text classification. Only the displayed text is collected, including any truncation.'),
           if ((job?['filing_candidates'] as List? ?? const []).isEmpty)
             const Text('No supported recent filings were found for this company.'),
-          for (final record in job?['filing_candidates'] as List? ?? const [])
+          for (final record in filingRecords)
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               ListTile(title: Text('${record['company']} · ${record['form']}'),
                 subtitle: SelectableText('CIK ${record['cik']} · ${record['filing_date']}\nAccession ${record['accession']}\n${record['source']}')),
+              if (collectableFiling(record as Map))
+                CheckboxListTile(title: Text("Include filing preview: ${record['company']} · ${record['form']}"),
+                  value: !_excludedFilings.contains(record['source']),
+                  onChanged: _busy ? null : (checked) => setState(() {
+                    final source = record['source'] as String;
+                    if (checked == true) { _excludedFilings.remove(source); }
+                    else { _excludedFilings.add(source); }
+                  })),
+              if (record['filing_reviewed'] == true && (record['filing_text'] as String).length < 40)
+                const Text('This filing preview is too short for collection. At least 40 characters are required.'),
               if (record['filing_reviewed'] == true) ...[
                 SelectableText('Filing text preview: ${record['filing_text']}'),
                 if (record['filing_text_truncated'] == true) const Text('Preview truncated to 50,000 characters.'),
@@ -1767,7 +1789,7 @@ class _StudioPageState extends State<StudioPage> {
               if (record['reuse_approval'] case final Map approval)
                 SelectableText('SEC filing preview reuse approval: ${approval['permission_basis']}')
               else if (record['filing_reviewed'] == true)
-                TextButton(onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                TextButton(onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record,
                     action: 'approve-filing-reuse', scope: 'sec_filing_preview'),
                   child: const Text('Record filing preview reuse approval')),
               OutlinedButton(onPressed: _busy ? null : () async {
@@ -1784,6 +1806,10 @@ class _StudioPageState extends State<StudioPage> {
                 }
               }, child: const Text('Review filing text request')),
             ]),
+          if (filingRecords.any((record) => collectableFiling(record as Map)))
+            OutlinedButton(onPressed: _busy || selectedFilingUrls.isEmpty ? null
+                : () => _submit('/jobs/$id/use-filing-previews', {'approved_urls': selectedFilingUrls}),
+              child: Text('Approve filing preview collection (${selectedFilingUrls.length} selected)')),
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-filings', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'bibliographic_candidates') ...[
@@ -2399,9 +2425,15 @@ class _StudioPageState extends State<StudioPage> {
                                           : row['provider'] == 'federal_register'
                                               ? 'Document: $title'
                                               : 'Article: $title',
-                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'crossref'}.contains(row['provider']) && row['reuse_approval'] is Map)
+                        if ({'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'crossref', 'sec_edgar'}.contains(row['provider']) && row['reuse_approval'] is Map)
                           'User reuse approval: ${row['reuse_approval']['permission_basis']}',
                         if (row['provider'] == 'crossref') 'Content scope: abstract',
+                        if (row['provider'] == 'sec_edgar') ...[
+                          'Content scope: filing preview',
+                          'CIK ${row['cik']} · ${row['form']} · ${row['filing_date']}',
+                          'Accession: ${row['accession']}',
+                          if (row['filing_text_truncated'] == true) 'Text truncated to the reviewed preview.',
+                        ],
                         if (row['provider'] == 'federal_register') ...[
                           'Content scope: document summary',
                           'Document number: ${row['document_number']}',

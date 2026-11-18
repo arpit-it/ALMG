@@ -42,3 +42,9 @@ bool collectableBibliography(Map record) =>
     record['abstract_reviewed'] == true && record['reuse_status'] == 'user_approved' &&
     record['reuse_approval'] is Map && record['reuse_approval']['scope'] == 'crossref_abstract' &&
     (record['abstract'] as String? ?? '').length >= 40;
+
+/// Whether a filing preview has scoped permission and enough text to collect.
+bool collectableFiling(Map record) =>
+    record['filing_reviewed'] == true && record['reuse_status'] == 'user_approved' &&
+    record['reuse_approval'] is Map && record['reuse_approval']['scope'] == 'sec_filing_preview' &&
+    (record['filing_text'] as String? ?? '').length >= 40;
