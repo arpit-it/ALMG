@@ -819,6 +819,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   rule; other-page checks and crawling remained unavailable. All 105 Python
   tests and Flutter analysis passed. Crawl-time robots enforcement,
   discovery crawling and per-page reuse approval remain open.
+
+  Project websites now support separately approved one-page link discovery
+  after current access-rule review and robots allowance. The request is
+  bounded to 512 KiB and 20 allowed same-origin links, with a one-hour
+  guidance lifetime and bounded crawl-delay handling. In the rebuilt Mac
+  app, cancellation made no discovery request; approval of a local fixture
+  showed exactly two allowed URLs and omitted disallowed/off-site links.
+  No linked pages or resources were loaded and reuse stayed unverified.
+  All 108 Python tests and Flutter analysis passed. Per-page fetching,
+  content reuse review and dataset collection remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

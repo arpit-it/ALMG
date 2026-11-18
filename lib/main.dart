@@ -734,6 +734,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_filings',
         'reviewing_filing',
         'reviewing_website_access',
+        'discovering_website',
         'searching_companies',
         'reviewing_bibliography',
         'reviewing_notice',
@@ -1428,6 +1429,8 @@ class _StudioPageState extends State<StudioPage> {
       'searching_notices': 'Searching Federal Register',
       'searching_companies': 'Finding SEC companies',
       'company_candidates': 'Choose an SEC company',
+      'discovering_website': 'Discovering links from approved website page',
+      'website_candidates': 'Review discovered website URLs',
       'reviewing_website_access': 'Loading approved robots.txt',
       'website_access_review': 'Review project website access guidance',
       'reviewing_filing': 'Loading approved SEC filing text',
@@ -1793,7 +1796,7 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'website_access_review') ...[
           SelectableText('Website: ${job?['website_access']['website']}\nRobots URL: ${job?['website_access']['robots_url']}'),
-          const Text('Review the robots guidance and the site’s access rules. Content reuse remains unverified. Crawling is not available yet.'),
+          const Text('Review the robots guidance and the site’s access rules. Content reuse remains unverified. Discovery can load only the approved starting page.'),
           SelectableText('Robots path check for ALMG: ${job?['website_access']['robots_decision'] ?? 'undetermined'}\n${job?['website_access']['robots_rule'] ?? 'Refresh the robots guidance to check this URL.'}'),
           const Text('This checks only the saved website URL. Other pages need their own robots checks before any crawl.'),
           if (job?['website_access']['robots_status'] == 404)
@@ -1805,7 +1808,29 @@ class _StudioPageState extends State<StudioPage> {
           else
             TextButton(onPressed: _busy ? null : () => _approveWebsiteRules(id as String, job!['website_access'] as Map),
               child: const Text('Record website access-rule review')),
+          if (job?['website_access']['access_approval'] is Map && job?['website_access']['robots_decision'] == 'allowed')
+            OutlinedButton(onPressed: _busy ? null : () async {
+              final website = job!['website_access']['website'];
+              final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+                title: const Text('Approve website link discovery'),
+                content: SelectableText('$website\nLoads this one HTML page, at most 512 KiB, and lists up to 20 same-site links allowed by the reviewed robots guidance. Model queries are not sent. Linked pages and resources are not loaded. Access review expires after one hour.'),
+                actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                  FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve discovery page request'))],
+              ));
+              if (confirmed == true) {
+                await _submit('/jobs/$id/discover-website-links', {'approved_url': website,
+                  'approved_byte_limit': 524288, 'approved_result_limit': 20});
+              }
+            }, child: const Text('Review website link discovery request')),
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-website-access', {}), child: const Text('Return to dataset approval')),
+        ],
+        if (status == 'website_candidates') ...[
+          const Text('Discovered URLs only. Linked pages have not been fetched and reuse remains unverified. Page collection is not available yet.'),
+          if ((job?['website_candidates'] as List? ?? const []).isEmpty)
+            const Text('No supported same-site links were found within the preview limits.'),
+          for (final record in job?['website_candidates'] as List? ?? const [])
+            SelectableText(record['source'] as String),
+          TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-website-links', {}), child: const Text('Return to website access review')),
         ],
         if (status == 'company_candidates') ...[
           Text('Matches for "${job?['company_query']}" in the SEC association catalog. This catalog may be incomplete or inaccurate. Choosing a CIK does not load filings.'),

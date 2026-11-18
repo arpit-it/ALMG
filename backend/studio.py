@@ -227,6 +227,15 @@ SEC_REQUEST_LOCK = threading.Lock()
 SEC_LAST_REQUEST = 0.0
 
 
+def discover_website_links(job, website):
+    try:
+        rows = website_access.fetch_seed_links(job["website_access"], website)
+        activity(job, f"Discovered {len(rows)} website links from the approved page; linked content was not loaded.")
+        update(job, status="website_candidates", website_candidates=rows)
+    except (OSError, ValueError, IncompleteRead, UnicodeError) as error:
+        update(job, status="website_access_review", error=f"Website discovery failed: {error}")
+
+
 def review_website_access(job, website):
     try:
         result = website_access.fetch_robots(website)
@@ -997,7 +1006,7 @@ def restore_jobs():
                     record["reuse_status"] = "unverified"
                 job.update(status="filing_candidates", error="Filing preview was interrupted. Review and approve the URL again.")
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "searching_filings", "searching_companies", "reviewing_website_access", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "searching_filings", "searching_companies", "reviewing_website_access", "discovering_website", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.pop("publication_candidates", None)
@@ -1040,7 +1049,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "filing_candidates", "company_candidates", "website_access_review", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "filing_candidates", "company_candidates", "website_access_review", "website_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -1894,6 +1903,18 @@ class Handler(BaseHTTPRequestHandler):
                         review["access_approval"] = website_access.access_rule_evidence(review, data, website)
                         review["access_status"] = "user_reviewed"
                         append_activity(job, "User site access-rule review recorded; content reuse remains unverified.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
+                    elif action == "discover-website-links" and status == "website_access_review":
+                        website = chat_history.project_details(job.get("project_id"))["source_website"]
+                        website_access.require_discovery_access(job["website_access"], website)
+                        if (data.get("approved_url") != website or data.get("approved_byte_limit") != website_access.SEED_LIMIT
+                                or data.get("approved_result_limit") != 20):
+                            raise ValueError("Approve the current website discovery URL, 512 KiB and 20-link limits first.")
+                        job.update(status="discovering_website", error=None)
+                        worker = (discover_website_links, (job, website))
+                    elif action == "close-website-links" and status == "website_candidates":
+                        job.update(status="website_access_review", error=None)
                         store_job(job)
                         return self.respond({"id": job["id"]})
                     elif action == "close-website-access" and status == "website_access_review":

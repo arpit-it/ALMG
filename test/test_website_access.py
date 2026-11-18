@@ -84,3 +84,46 @@ class WebsiteAccessTest(unittest.TestCase):
         self.assertEqual(access.robots_path_decision('https://example.org', '', 404)['robots_decision'], 'undetermined')
         self.assertEqual(access.robots_path_decision('https://example.org', 'User-agent: *\nDisallow: broken')['robots_decision'], 'undetermined')
         self.assertEqual(access.robots_review('https://example.org/private/', 200, b'User-agent: *\nDisallow: /private/')['robots_decision'], 'disallowed')
+
+    def discovery_review(self):
+        review = access.robots_review('https://example.org/archive/', 200, b'User-agent: ALMG\nDisallow: /private/\nCrawl-delay: 5\n')
+        review['access_approval'] = access.access_rule_evidence(review, {'approved_website': review['website'],
+            'confirmed': True, 'approved_scope': 'website_access_rules', 'access_basis': 'Local fixture access policy reviewed.'}, review['website'])
+        return review
+
+    def test_discovery_requires_current_access_and_robots_allow(self):
+        review = self.discovery_review()
+        self.assertEqual(access.require_discovery_access(review, review['website']), 5)
+        for changed in ({'access_approval': {}}, {'robots_text': 'User-agent: *\nDisallow: /'}, {'reviewed_at': 1}):
+            with self.assertRaises(ValueError):
+                access.require_discovery_access({**review, **changed}, review['website'])
+        with self.assertRaises(ValueError):
+            access.require_discovery_access(review, 'https://other.org')
+
+    def test_discovery_lists_only_safe_allowed_same_origin_links(self):
+        review = self.discovery_review()
+        html = b'''<a href="fruit">Fruit</a><a href="fruit#part">Duplicate</a><a href="/private/data">Blocked</a>
+        <a href="https://other.org/page">Other</a><a href="http://example.org/page">HTTP</a>
+        <a href="/archive/%2e%2e/escape">Escape</a><a href="/search?q=fruit">Query</a><img src="image.jpg">
+        <a href="/stars">Stars</a>'''
+        rows = access.discovered_links(review['website'], html, review)
+        self.assertEqual([row['source'] for row in rows], ['https://example.org/archive/fruit', 'https://example.org/stars'])
+        self.assertTrue(all(row['reuse_status'] == 'unverified' for row in rows))
+        many = ''.join(f'<a href="/page{i}">Page</a>' for i in range(30)).encode()
+        self.assertEqual(len(access.discovered_links(review['website'], many, review)), 20)
+        with self.assertRaises(ValueError):
+            access.discovered_links(review['website'], b'x' * (access.SEED_LIMIT + 1), review)
+
+    def test_discovery_fetches_only_seed_with_bounded_read(self):
+        review = self.discovery_review()
+        response = MagicMock(status=200)
+        response.getheader.return_value = 'text/html'
+        response.read.return_value = b'<a href="fruit">Fruit</a>'
+        connection = MagicMock()
+        connection.getresponse.return_value = response
+        with patch.object(access, 'public_address', return_value='93.184.216.34'), patch.object(access.socket, 'create_connection'), patch.object(access.ssl, 'create_default_context'), patch.object(access, 'HTTPSConnection', return_value=connection), patch.object(access.time, 'sleep'):
+            rows = access.fetch_seed_links(review, review['website'])
+        self.assertEqual(len(rows), 1)
+        connection.request.assert_called_once()
+        self.assertEqual(connection.request.call_args.args[:2], ('GET', '/archive/'))
+        response.read.assert_called_once_with(access.SEED_LIMIT + 1)

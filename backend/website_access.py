@@ -5,6 +5,8 @@ import ipaddress
 import re
 import socket
 import ssl
+import threading
+import time
 import unicodedata
 from urllib.parse import urlsplit
 import certifi
@@ -41,7 +43,7 @@ def robots_review(website, status, data):
     if any(unicodedata.category(c) in {'Cc', 'Cs'} and c not in '\n\r\t' for c in text):
         raise ValueError('robots.txt contains unreadable text.')
     return {'website': website, 'robots_url': url, 'robots_status': status, 'robots_text': text,
-            'robots_sha256': hashlib.sha256(data).hexdigest(), 'access_status': 'unverified', 'reuse_status': 'unverified',
+            'reviewed_at': time.time(), 'robots_sha256': hashlib.sha256(data).hexdigest(), 'access_status': 'unverified', 'reuse_status': 'unverified',
             **robots_path_decision(website, text, status)}
 
 
@@ -72,13 +74,14 @@ def guidance_checksum(review):
     import json
     if (review.get('robots_url') != robots_url(review.get('website'))
             or review.get('robots_status') not in (200, 404)
+            or not isinstance(review.get('reviewed_at'), (int, float))
             or not isinstance(review.get('robots_text'), str)
             or len(review['robots_text'].encode('utf-8')) > ROBOTS_LIMIT
             or (review['robots_status'] == 404 and review['robots_text'])
             or not isinstance(review.get('robots_sha256'), str)
             or not re.fullmatch(r'[0-9a-f]{64}', review['robots_sha256'])):
         raise ValueError('Review the website robots guidance first.')
-    fields = {key: review[key] for key in ('website', 'robots_url', 'robots_status', 'robots_text', 'robots_sha256')}
+    fields = {key: review[key] for key in ('website', 'robots_url', 'robots_status', 'robots_text', 'robots_sha256', 'reviewed_at')}
     return hashlib.sha256(json.dumps(fields, sort_keys=True, ensure_ascii=False).encode('utf-8')).hexdigest()
 
 
@@ -172,3 +175,91 @@ def robots_path_decision(website, text, status=200):
         return {'robots_decision': 'allowed' if allowed else 'disallowed', 'robots_rule': f'{key.title()}: {value}'}
     except ValueError:
         return {'robots_decision': 'undetermined', 'robots_rule': 'A matching group contains unsupported rules; crawling must remain blocked.'}
+
+
+SEED_LIMIT = 512 * 1024
+SEED_LOCK = threading.Lock()
+SEED_LAST_REQUEST = 0.0
+
+
+def require_discovery_access(review, current_website):
+    approval = review.get('access_approval')
+    if (review.get('website') != current_website or not isinstance(approval, dict)
+            or approval.get('scope') != 'website_access_rules' or approval.get('website') != current_website
+            or approval.get('guidance_sha256') != guidance_checksum(review)
+            or not isinstance(review.get('reviewed_at'), (int, float))
+            or not 0 <= time.time() - review['reviewed_at'] <= 3600
+            or robots_path_decision(current_website, review['robots_text'], review['robots_status'])['robots_decision'] != 'allowed'):
+        raise ValueError('Refresh robots guidance and record current access-rule review for an allowed website URL first.')
+    # Apply the most conservative supplied extension until richer scheduling exists.
+    delay = 1.0
+    for line in review['robots_text'].splitlines():
+        key, separator, value = line.split('#', 1)[0].partition(':')
+        if separator and key.strip().casefold() == 'request-rate':
+            raise ValueError('Request-rate directives need review before discovery is supported.')
+        if separator and key.strip().casefold() == 'crawl-delay':
+            try:
+                number = float(value.strip())
+            except ValueError:
+                raise ValueError('Unsupported crawl-delay directive.') from None
+            if not 0 <= number <= 60:
+                raise ValueError('Crawl-delay over 60 seconds is not supported for this preview.')
+            delay = max(delay, number)
+    return delay
+
+
+def discovered_links(website, data, review):
+    """List at most 20 same-origin links without loading their content."""
+    from html.parser import HTMLParser
+    from urllib.parse import urljoin, urldefrag, unquote_to_bytes
+    if len(data) > SEED_LIMIT:
+        raise ValueError('The website discovery page exceeds 512 KiB.')
+    text = data.decode('utf-8-sig')
+    origin = urlsplit(website)
+    rows, seen = [], {website}
+    class Links(HTMLParser):
+        def handle_starttag(self, tag, attrs):
+            if tag != 'a' or len(rows) >= 20:
+                return
+            href = dict(attrs).get('href')
+            if not isinstance(href, str) or len(href) > 2048:
+                return
+            source = urldefrag(urljoin(website, href))[0]
+            try:
+                robots_url(source)
+                parsed = urlsplit(source)
+                if (parsed.hostname != origin.hostname or parsed.port != origin.port
+                        or any(part in (b'.', b'..') for part in unquote_to_bytes(parsed.path).split(b'/'))
+                        or '\\' in parsed.path or source in seen
+                        or robots_path_decision(source, review['robots_text'], review['robots_status'])['robots_decision'] != 'allowed'):
+                    return
+            except (ValueError, UnicodeError):
+                return
+            seen.add(source)
+            rows.append({'source': source, 'discovered_from': website, 'provider': 'project_website', 'reuse_status': 'unverified'})
+    parser = Links()
+    parser.feed(text)
+    return rows
+
+
+def fetch_seed_links(review, current_website):
+    global SEED_LAST_REQUEST
+    delay = require_discovery_access(review, current_website)
+    parsed = urlsplit(current_website)
+    address = public_address(parsed.hostname)
+    context = ssl.create_default_context(cafile=certifi.where())
+    connection = HTTPSConnection(parsed.hostname, timeout=30, context=context)
+    with SEED_LOCK:
+        time.sleep(max(0, delay - (time.time() - max(SEED_LAST_REQUEST, review['reviewed_at']))))
+        raw = socket.create_connection((address, 443), timeout=30)
+        try:
+            connection.sock = context.wrap_socket(raw, server_hostname=parsed.hostname)
+            SEED_LAST_REQUEST = time.time()
+            connection.request('GET', parsed.path or '/', headers={'User-Agent': USER_AGENT, 'Accept': 'text/html', 'Accept-Encoding': 'identity'})
+            response = connection.getresponse()
+            if response.status != 200 or response.getheader('Content-Type', '').split(';')[0].strip().lower() not in {'text/html', 'application/xhtml+xml'}:
+                raise ValueError('Discovery requires a successful HTML page; redirects are not followed.')
+            return discovered_links(current_website, response.read(SEED_LIMIT + 1), review)
+        finally:
+            connection.close()
+            raw.close()
