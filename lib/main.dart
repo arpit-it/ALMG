@@ -1280,11 +1280,9 @@ class _StudioPageState extends State<StudioPage> {
                   title: Text('Crossref'),
                   subtitle: Text('api.crossref.org · Bibliographic preview for text classification'),
                 ),
-                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
-                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('SEC EDGAR'),
-                  subtitle: Text('sec.gov · Company filings'),
+                  subtitle: Text('www.sec.gov · Company name/ticker lookup\ndata.sec.gov · Recent filings by CIK\nSeparate approval for filing text and reuse; declared contact required.'),
                 ),
 
               ],

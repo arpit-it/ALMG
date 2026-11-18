@@ -785,6 +785,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   analysis passed, including stale-text, changed-truncation and invalid-
   selection rejection. Project website discovery and remaining broad
   provider criteria stay open.
+
+  The built-in discovery provider dialog now lists SEC EDGAR as available
+  instead of planned, with the company-lookup and submissions hosts and
+  separate text/reuse approval requirements. The rebuilt Mac app displayed
+  the updated entry from a local approval-stage fixture. Both existing
+  navigation/layout widget tests passed. Project website crawling and
+  remaining broad discovery criteria stay open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
