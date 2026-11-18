@@ -1822,7 +1822,11 @@ class _StudioPageState extends State<StudioPage> {
                         if (row['csv_group'] case final String group)
                           'Source group: $group',
                         if (row['title'] case final String title when title.isNotEmpty)
-                          'Article: $title',
+                          row['provider'] == 'loc'
+                              ? 'Catalog record: $title'
+                              : 'Article: $title',
+                        if (row['provider'] == 'loc' && row['reuse_approval'] is Map)
+                          'User reuse approval: ${row['reuse_approval']['permission_basis']}',
                         if (row['approved_query'] case final String query)
                           'Approved query: $query',
                         if (row['source'] case final String source

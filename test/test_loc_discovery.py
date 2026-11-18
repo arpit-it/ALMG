@@ -137,3 +137,22 @@ class CatalogCandidatesTest(unittest.TestCase):
         self.assertEqual(len(records), 1)
         self.assertEqual(records[0]["source"],
                          "https://www.loc.gov/item/sn85033000/1911-08-10/ed-1/")
+
+    def test_dataset_preview_retains_catalog_permission_evidence(self):
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        from unittest.mock import patch
+        from backend import studio
+
+        permission = {"permission_basis": "Local fixture permission granted.",
+                      "source": "https://www.loc.gov/item/12345/",
+                      "advisories": {"rights": ["Permission required."]}}
+        row = {"text": "Orchard fruit grows on cultivated trees.", "label": "fruit",
+               "provider": "loc", "title": "Orchard archive", "reuse_approval": permission}
+        job = {"id": "preview-fixture", "recipe": "classifier", "plan": {"labels": ["fruit"]}}
+        with TemporaryDirectory() as directory, patch.object(studio, "ROOT", Path(directory)), \
+             patch.object(studio, "TRAINING_DATA", {}), patch.object(studio, "store_job"):
+            studio.prepare_dataset(job, imported_rows=[row])
+        self.assertEqual(job["status"], "dataset_ready")
+        self.assertEqual(job["preview"][0]["reuse_approval"], permission)
+        self.assertEqual(job["preview"][0]["title"], "Orchard archive")

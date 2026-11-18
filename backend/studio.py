@@ -1028,7 +1028,7 @@ def prepare_dataset(job, imported_rows=None):
                                  **({"csv_group": row["group"].removeprefix("source:")}
                                     if row.get("source") == "local-csv" and row.get("group", "").startswith("source:")
                                     else {}),
-                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "restrictions", "csv_end_line", "approved_query", "title", "provider") if key in row}}
+                                 **{key: row[key] for key in ("image", "source", "license", "license_url", "artist", "credit", "attribution_required", "restrictions", "csv_end_line", "approved_query", "title", "provider", "reuse_approval") if key in row}}
                                 for row in preview_rows])
             store_job(job)
     except Exception as error:

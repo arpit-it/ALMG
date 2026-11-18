@@ -522,6 +522,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   After offline catalog search approval, the rebuilt Mac app retained a
   newspaper issue URL with date and edition path segments in source review.
   Parser tests rejected literal and encoded parent-directory segments.
+  Verified partial provider delivery (2026-11-18): after explicit collection
+  approval in the rebuilt local Mac app, two offline catalog descriptions
+  reached dataset preview with catalog record titles, source URLs, query,
+  and recorded user reuse permission beside each example. The backend
+  preview retains permission and advisory evidence. All 40 Python tests
+  passed; Flutter analysis found no issues. Full document collection
+  and remaining providers stay open under key-free web discovery.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
