@@ -35,3 +35,20 @@ class IndicatorCatalogTest(unittest.TestCase):
                 studio.load_indicators(job)
             self.assertEqual(job["status"], "approval")
             self.assertIn("World Bank", job["error"])
+
+    def test_next_page_requires_matching_response_page_and_valid_total(self):
+        for header in ({"page": 1, "pages": 2}, {"page": 2, "pages": 1}, {"page": True, "pages": 2}, {"page": 2, "pages": "3"}):
+            with self.subTest(header=header), self.assertRaises(ValueError):
+                indicator_candidates([header, []], expected_page=2)
+        self.assertEqual(indicator_candidates([{"page": 2, "pages": 2}, []], expected_page=2), [])
+
+    def test_next_page_loading_is_one_request_and_failed_refresh_retains_previous_page(self):
+        record = {"source": "old"}
+        job = {"indicator_candidates": [record], "indicator_page": 1, "indicator_pages": 2}
+        with patch.object(studio, "request_json", side_effect=ValueError("unavailable")) as request, patch.object(studio, "store_job"):
+            studio.load_indicators(job, 2)
+        request.assert_called_once()
+        self.assertIn("page=2", request.call_args.args[0])
+        self.assertEqual(job["indicator_candidates"], [record])
+        self.assertEqual(job["indicator_page"], 1)
+        self.assertEqual(job["status"], "indicator_candidates")

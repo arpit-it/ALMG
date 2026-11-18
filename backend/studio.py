@@ -219,19 +219,22 @@ def discover_text(job):
     return candidates
 
 
-def load_indicators(job):
+def load_indicators(job, page=1):
     try:
-        result = request_json("https://api.worldbank.org/v2/indicator?format=json&per_page=20&page=1", headers={
+        result = request_json(f"https://api.worldbank.org/v2/indicator?format=json&per_page=20&page={page}", headers={
             "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
         }, opener=DISCOVERY)
-        candidates = world_bank.indicator_candidates(result)
+        candidates = world_bank.indicator_candidates(result, expected_page=page)
         if not candidates:
-            update(job, status="approval", error="No supported World Bank indicators were available. Approve another attempt or choose another source.")
+            update(job, status="indicator_candidates" if job.get("indicator_candidates") else "approval",
+                   error="No supported World Bank indicators were available. Approve another attempt or choose another source.")
             return
         activity(job, f"Loaded {len(candidates)} World Bank indicator catalog records for review.")
-        update(job, status="indicator_candidates", indicator_candidates=candidates)
+        update(job, status="indicator_candidates", indicator_candidates=candidates,
+               indicator_page=page, indicator_pages=result[0].get("pages", page))
     except (OSError, ValueError, IncompleteRead):
-        update(job, status="approval", error="World Bank catalog loading failed. Approve another attempt or choose another source.")
+        update(job, status="indicator_candidates" if job.get("indicator_candidates") else "approval",
+               error="World Bank catalog loading failed. Approve another attempt or choose another source.")
 
 
 def search_entities(job):
@@ -760,6 +763,11 @@ def restore_jobs():
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
                 job["candidate_directory"] = str(work)
+            elif job["status"] == "loading_indicators" and job.get("indicator_candidates"):
+                job.update(status="indicator_candidates", error=(
+                    "Catalog page loading was interrupted. Review and approve the next page to retry."
+                ))
+                store_job(job)
             elif job["status"] == "reviewing_publication" and job.get("publication_candidates"):
                 for candidate in job["publication_candidates"]:
                     candidate.pop("abstract", None)
@@ -1655,6 +1663,16 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the World Bank catalog page and limit first.")
                         job.update(status="loading_indicators", error=None)
                         worker = (load_indicators, (job,))
+                    elif action == "next-indicators" and status == "indicator_candidates":
+                        page = data.get("approved_page")
+                        if (type(page) is not int or page != job.get("indicator_page", 1) + 1
+                                or page > job.get("indicator_pages", 1)
+                                or data.get("approved_provider") != "world_bank"
+                                or data.get("approved_scope") != "indicator_catalog"
+                                or data.get("approved_result_limit") != 20):
+                            raise ValueError("Approve the next World Bank catalog page and limit first.")
+                        job.update(status="loading_indicators", error=None)
+                        worker = (load_indicators, (job, page))
                     elif action == "close-indicators" and status == "indicator_candidates":
                         job.pop("indicator_candidates", None)
                         job.update(status="approval", error=None)

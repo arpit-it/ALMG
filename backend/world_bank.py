@@ -4,9 +4,12 @@ import unicodedata
 from urllib.parse import urlencode
 
 
-def indicator_candidates(payload, *, limit=20):
+def indicator_candidates(payload, *, limit=20, expected_page=1):
     if (not isinstance(payload, list) or len(payload) != 2 or not isinstance(payload[0], dict)
-            or payload[0].get("page") != 1 or not isinstance(payload[1], list)):
+            or type(payload[0].get("page")) is not int or payload[0]["page"] != expected_page
+            or type(payload[0].get("pages", expected_page)) is not int
+            or payload[0].get("pages", expected_page) < expected_page
+            or not isinstance(payload[1], list)):
         raise ValueError("World Bank returned invalid indicator catalog metadata.")
     rows, seen = [], set()
     for item in payload[1][:limit]:

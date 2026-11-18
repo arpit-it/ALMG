@@ -1317,6 +1317,8 @@ class _StudioPageState extends State<StudioPage> {
         if (collectableEntity(record as Map) && !_excludedEntities.contains(record['source']))
           record['source'] as String,
     ];
+    final indicatorPage = job?['indicator_page'] as int? ?? 1;
+    final indicatorPages = job?['indicator_pages'] as int? ?? indicatorPage;
     final states = {
       'planning': 'Qwen is drafting the plan',
       'approval': 'Dataset approval required',
@@ -1589,13 +1591,23 @@ class _StudioPageState extends State<StudioPage> {
           ),
         ],
         if (status == 'indicator_candidates') ...[
-          const Text('World Bank catalog page 1 · up to 20 indicators. '
+          Text('World Bank catalog page $indicatorPage of $indicatorPages · up to 20 indicators. '
               'Reuse rights are unverified. Observation and dataset collection are not available yet.'),
           for (final record in job?['indicator_candidates'] as List? ?? const [])
             ListTile(
               title: Text('${record['title']} (${record['indicator_id']})'),
               subtitle: SelectableText('${record['description']}\nSource ${record['source_id']}: ${record['source_name']}\n${record['organization']}\n${record['source']}'),
             ),
+          if (indicatorPage < indicatorPages) ...[
+            Text('Loads catalog page ${indicatorPage + 1} from api.worldbank.org, up to 20 indicators. Replaces this preview.'),
+            OutlinedButton(
+              onPressed: _busy ? null : () => _submit('/jobs/$id/next-indicators', {
+                'approved_provider': 'world_bank', 'approved_scope': 'indicator_catalog',
+                'approved_page': indicatorPage + 1, 'approved_result_limit': 20,
+              }),
+              child: Text('Approve loading catalog page ${indicatorPage + 1}'),
+            ),
+          ],
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-indicators', {}),
             child: const Text('Return to dataset approval'),

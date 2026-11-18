@@ -636,6 +636,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and return navigation worked. All 67 Python tests and Flutter analysis
   passed. Query-based indicator discovery, reuse review, observations
   and dataset collection remain open.
+  World Bank catalog paging now needs separate approval for each next
+  page. The rebuilt Mac app disclosed page 2 and its 20-record limit,
+  loaded the offline second page only after approval, and showed page 2
+  of 2 without another next-page action. Fixture logs contained only the
+  two approved catalog requests. All 69 Python tests and Flutter analysis
+  passed, including mismatched-page rejection and retaining the prior
+  preview after loading failure. Query matching, reuse review and
+  observation/dataset collection are still open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
