@@ -1005,7 +1005,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   acceptance tests exercise every provider's missing-consent, valid-consent
   and disabled-provider dispatch boundary without API credentials.
 
-- [ ] Store collected page text and its source URL in a local index owned by
+- [x] Store collected page text and its source URL in a local index owned by
   the project. Search saved pages in later runs and preserve the index when
   updating the app. Include the index and provider settings in project
   export and restore so a fresh installation can reuse them without
@@ -1066,6 +1066,19 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   remained byte-for-byte unchanged. All 127 Python tests passed with
   warnings treated as errors, and Flutter analysis passed. Fresh-install
   restore/reuse verification remains open.
+
+  Final acceptance: a separate release folder and empty isolated user-data
+  directory showed No projects yet in the rebuilt Mac app. Native-file
+  restore imported the previously exported project and all three sources.
+  The new Open Model Training action opened that restored project directly.
+  Selecting two saved sources and confirming their recorded permission
+  produced exactly two locally labeled examples, with both source URLs,
+  content/access evidence and project-index origin preserved. Provider
+  settings and references were restored with the project; no websites were
+  contacted. Together with the verified release-folder replacement above,
+  this completes the index, later-run search/reuse, export/restore and
+  separate-storage acceptance criteria. All 128 Python tests passed with
+  warnings treated as errors, and Flutter analysis passed.
 
 
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.

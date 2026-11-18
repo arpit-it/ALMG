@@ -180,7 +180,11 @@ class _DashboardPageState extends State<DashboardPage> {
       if (response.statusCode != 201) throw FormatException(data['error']?.toString() ?? 'Could not restore project.');
       if (!mounted) return;
       setState(() { _dashboard = _load(); });
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Restored ${data['name']} with ${data['page_count']} indexed sources.')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('Restored ${data['name']} with ${data['page_count']} indexed sources.'),
+        action: SnackBarAction(label: 'Open Model Training',
+          onPressed: () => _open(StudioPage(initialProject: data['id'] as String))),
+      ));
     } catch (error) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(error.toString())));
     }
