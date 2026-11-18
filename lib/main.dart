@@ -733,6 +733,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_bibliography',
         'searching_filings',
         'reviewing_filing',
+        'reviewing_website_access',
         'searching_companies',
         'reviewing_bibliography',
         'reviewing_notice',
@@ -1253,7 +1254,7 @@ class _StudioPageState extends State<StudioPage> {
                   else
                     ListTile(
                       title: SelectableText(website),
-                      subtitle: const Text('Discovery unavailable'),
+                      subtitle: const Text('Robots review available; crawling unavailable'),
                     ),
                 ],
                 const ListTile(
@@ -1374,6 +1375,8 @@ class _StudioPageState extends State<StudioPage> {
         if (collectableIndicator(record) && !_excludedIndicators.contains(record['source']))
           record['source'] as String,
     ];
+    final projectWebsite = _projects.where((project) => project['id'] == _project)
+        .firstOrNull?['source_website'] as String? ?? '';
     final filingRecords = job?['filing_candidates'] as List? ?? const [];
     final selectedFilingUrls = [
       for (final record in filingRecords)
@@ -1404,6 +1407,8 @@ class _StudioPageState extends State<StudioPage> {
       'searching_notices': 'Searching Federal Register',
       'searching_companies': 'Finding SEC companies',
       'company_candidates': 'Choose an SEC company',
+      'reviewing_website_access': 'Loading approved robots.txt',
+      'website_access_review': 'Review project website access guidance',
       'reviewing_filing': 'Loading approved SEC filing text',
       'searching_filings': 'Loading SEC company filings',
       'filing_candidates': 'Review SEC filing URLs',
@@ -1555,6 +1560,23 @@ class _StudioPageState extends State<StudioPage> {
                 _showDiscoveryProviders((plan['queries'] as List).isNotEmpty),
             child: const Text('Browse discovery providers'),
           ),
+          if (!_imageRecipe && projectWebsite.isNotEmpty) ...[
+            SelectableText('Project website: $projectWebsite'),
+            OutlinedButton(onPressed: _busy ? null : () async {
+              final site = Uri.parse(projectWebsite);
+              final destination = Uri(scheme: 'https', host: site.host, path: '/robots.txt').toString();
+              final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+                title: const Text('Approve website robots review'),
+                content: SelectableText('$destination\nUser-Agent: ALMG/1.0 (https://github.com/arpit-it/ALMG)\nOne request, at most 64 KiB. Redirects are not followed. No website pages are crawled. Access rules and reuse permission still need separate review.'),
+                actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                  FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve robots.txt request'))],
+              ));
+              if (confirmed == true) {
+                await _submit('/jobs/$id/review-website-access', {'approved_website': projectWebsite,
+                  'approved_url': destination, 'approved_byte_limit': 65536});
+              }
+            }, child: const Text('Review project website robots.txt request')),
+          ],
           if (_imageRecipe && (plan['queries'] as List).isNotEmpty) ...[
             const ListTile(
               contentPadding: EdgeInsets.zero,
@@ -1747,6 +1769,15 @@ class _StudioPageState extends State<StudioPage> {
             }),
             child: const Text('Approve Crossref search'),
           ),
+        ],
+        if (status == 'website_access_review') ...[
+          SelectableText('Website: ${job?['website_access']['website']}\nRobots URL: ${job?['website_access']['robots_url']}'),
+          const Text('Access and reuse remain unverified. Review the robots guidance and the site’s access rules before crawling. No pages have been crawled.'),
+          if (job?['website_access']['robots_status'] == 404)
+            const Text('robots.txt was not found (HTTP 404). This does not establish access or reuse permission.')
+          else
+            SelectableText('robots.txt:\n${job?['website_access']['robots_text']}'),
+          TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-website-access', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'company_candidates') ...[
           Text('Matches for "${job?['company_query']}" in the SEC association catalog. This catalog may be incomplete or inaccurate. Choosing a CIK does not load filings.'),

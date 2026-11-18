@@ -792,6 +792,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   the updated entry from a local approval-stage fixture. Both existing
   navigation/layout widget tests passed. Project website crawling and
   remaining broad discovery criteria stay open.
+
+  Saved project websites now offer a separately approved robots.txt review
+  with an exact destination and 64 KiB limit. In the rebuilt Mac app using
+  local fixtures, cancellation made no request; approval showed the robots
+  guidance, and the final build reopened it with access and reuse still
+  unverified. No pages were crawled. All 102 Python tests and Flutter
+  analysis passed; targeted tests also passed after explicit multicast
+  rejection was added. Network tests cover public-address pinning, TLS
+  hostname preservation and bounded reads. Site access-rule approval,
+  robots enforcement, crawling and per-page reuse review remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

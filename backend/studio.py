@@ -38,7 +38,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery
+    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access
 else:
     import chat_history
     import inference
@@ -50,6 +50,7 @@ else:
     import federal_register
     import crossref_discovery
     import sec_discovery
+    import website_access
 
 ROOT = Path(os.environ.get("STUDIO_DATA", Path(__file__).resolve().parent / "runs"))
 MODEL = inference.MODEL
@@ -224,6 +225,16 @@ def discover_text(job):
 
 SEC_REQUEST_LOCK = threading.Lock()
 SEC_LAST_REQUEST = 0.0
+
+
+def review_website_access(job, website):
+    try:
+        result = website_access.fetch_robots(website)
+        activity(job, "Loaded the approved project robots.txt review; access and reuse remain unverified.")
+        update(job, status="website_access_review", website_access=result)
+    except (OSError, ValueError, IncompleteRead, UnicodeError):
+        update(job, status="approval", website_access=None,
+               error="Website robots review failed. Check the public HTTPS destination and approve another attempt. Redirects, unreadable responses and files over 64 KiB are not loaded.")
 
 
 def load_sec_document(source, agent):
@@ -986,7 +997,7 @@ def restore_jobs():
                     record["reuse_status"] = "unverified"
                 job.update(status="filing_candidates", error="Filing preview was interrupted. Review and approve the URL again.")
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "searching_filings", "searching_companies", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "searching_filings", "searching_companies", "reviewing_website_access", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
                 job.pop("publication_candidates", None)
@@ -1029,7 +1040,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "filing_candidates", "company_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "filing_candidates", "company_candidates", "website_access_review", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -1870,6 +1881,17 @@ class Handler(BaseHTTPRequestHandler):
                         rows = read_classifier_csv(data.get("csv"), job["plan"]["labels"])
                         job.update(status="creating_dataset", error=None, mode="local_csv")
                         worker = (prepare_dataset, (job, rows))
+                    elif action == "review-website-access" and status == "approval" and job.get("recipe") == "classifier":
+                        website = chat_history.project_details(job.get("project_id"))["source_website"]
+                        if (data.get("approved_website") != website or data.get("approved_url") != website_access.robots_url(website)
+                                or data.get("approved_byte_limit") != website_access.ROBOTS_LIMIT):
+                            raise ValueError("Approve the saved website, robots.txt destination and 64 KiB limit first.")
+                        job.update(status="reviewing_website_access", website_access=None, error=None)
+                        worker = (review_website_access, (job, website))
+                    elif action == "close-website-access" and status == "website_access_review":
+                        job.update(status="approval", error=None)
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "search-companies" and status == "approval" and job.get("recipe") == "classifier":
                         query, contact = sec_discovery.company_query(data.get("query")), data.get("contact")
                         sec_discovery.submissions_request("1", contact)
