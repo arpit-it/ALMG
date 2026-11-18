@@ -711,6 +711,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_catalog',
         'searching_publications',
         'searching_entities',
+        'searching_notices',
         'loading_indicators',
         'reviewing_publication',
         'reviewing_catalog_item',
@@ -1235,12 +1236,12 @@ class _StudioPageState extends State<StudioPage> {
                   title: Text('World Bank Open Data'),
                   subtitle: Text('api.worldbank.org · Indicator catalog preview'),
                 ),
-                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
-                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('Federal Register'),
-                  subtitle: Text('federalregister.gov · Public notices and regulations'),
+                  subtitle: Text('www.federalregister.gov · Document preview for text classification'),
                 ),
+                const Text('Planned', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Text('These providers cannot be used for discovery yet.'),
                 const ListTile(
                   title: Text('SEC EDGAR'),
                   subtitle: Text('sec.gov · Company filings'),
@@ -1347,6 +1348,8 @@ class _StudioPageState extends State<StudioPage> {
       'searching_catalog': 'Searching the Library of Congress',
       'searching_publications': 'Searching Europe PMC',
       'searching_entities': 'Searching Wikidata',
+      'searching_notices': 'Searching Federal Register',
+      'notice_candidates': 'Review Federal Register documents',
       'loading_indicators': 'Loading World Bank indicator catalog',
       'indicator_candidates': 'Review World Bank indicators',
       'entity_candidates': 'Review Wikidata entities',
@@ -1607,6 +1610,31 @@ class _StudioPageState extends State<StudioPage> {
               'approved_page': 1, 'approved_result_limit': 20,
             }),
             child: const Text('Approve World Bank catalog preview'),
+          ),
+        ],
+        if (status == 'approval' && !_imageRecipe &&
+            plan != null && (plan['queries'] as List).isNotEmpty) ...[
+          const Text('Federal Register document preview · www.federalregister.gov. '
+              'Sends the listed queries for up to 20 documents per query and 40 total.'),
+          for (final query in plan['queries'] as List) SelectableText('• $query'),
+          OutlinedButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/search-notices', {
+              'approved_provider': 'federal_register', 'approved_queries': plan['queries'],
+              'approved_result_limit': 20, 'approved_total_limit': 40,
+            }),
+            child: const Text('Approve Federal Register search'),
+          ),
+        ],
+        if (status == 'notice_candidates') ...[
+          const Text('Document metadata only. Reuse is unverified. Full-text and dataset collection are not available yet.'),
+          for (final record in job?['notice_candidates'] as List? ?? const [])
+            ListTile(
+              title: Text('${record['title']} (${record['document_number']})'),
+              subtitle: SelectableText('${record['source']}\nApproved query: ${record['approved_query']}'),
+            ),
+          TextButton(
+            onPressed: _busy ? null : () => _submit('/jobs/$id/close-notices', {}),
+            child: const Text('Return to dataset approval'),
           ),
         ],
         if (status == 'indicator_candidates') ...[

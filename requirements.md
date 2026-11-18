@@ -667,6 +667,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   tests and Flutter analysis passed; changed source context and
   observation-scoped permission are rejected. Country/year observations,
   provider-side query discovery and the remaining providers stay open.
+  Federal Register now provides consent-gated document metadata discovery.
+  The rebuilt Mac app disclosed the destination, both queries and limits
+  before an offline search, then showed two titles, document numbers,
+  validated URLs and matching queries. A malformed URL was omitted and
+  return navigation worked. All 75 Python tests and Flutter analysis
+  passed, including metadata-only field requests, URL identity checks,
+  deduplication and contact limits. Reuse review, content collection and
+  the remaining provider work stay open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
