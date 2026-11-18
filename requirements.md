@@ -644,6 +644,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   passed, including mismatched-page rejection and retaining the prior
   preview after loading failure. Query matching, reuse review and
   observation/dataset collection are still open.
+  Loaded World Bank catalog pages can now be filtered locally across
+  codes, names, notes, source names and organizations. In the rebuilt
+  Mac app, a case-insensitive fixture filter reduced two records to one,
+  clearing restored both, and an unmatched filter showed recovery
+  guidance. Fixture logs showed no extra provider calls. All six Flutter
+  tests and analysis passed. Filtering covers only the loaded page;
+  provider-side query discovery, reuse and observation collection stay open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

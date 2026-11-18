@@ -12,6 +12,7 @@ import 'backend_address.dart';
 
 import 'chat.dart';
 import 'catalog_selection.dart';
+import 'indicator_filter.dart';
 import 'project_settings.dart';
 
 /// Starts the Flutter desktop application.
@@ -528,6 +529,7 @@ class _StudioPageState extends State<StudioPage> {
   final Set<String> _excludedCatalogSources = {};
   final Set<String> _excludedPublications = {};
   final Set<String> _excludedEntities = {};
+  final _indicatorFilter = TextEditingController();
   final Set<String> _excludedImageSources = {};
   String? _error;
   bool _busy = false;
@@ -693,6 +695,7 @@ class _StudioPageState extends State<StudioPage> {
         if (_job?['id'] != job['id'] || job['status'] != 'entity_candidates') {
           _excludedEntities.clear();
         }
+        if (_job?['id'] != job['id']) _indicatorFilter.clear();
         _job = job;
       });
       const active = {
@@ -877,6 +880,7 @@ class _StudioPageState extends State<StudioPage> {
     _prompt.dispose();
     _target.dispose();
     _previewInput.dispose();
+    _indicatorFilter.dispose();
     super.dispose();
   }
 
@@ -1319,6 +1323,8 @@ class _StudioPageState extends State<StudioPage> {
     ];
     final indicatorPage = job?['indicator_page'] as int? ?? 1;
     final indicatorPages = job?['indicator_pages'] as int? ?? indicatorPage;
+    final indicatorRecords = job?['indicator_candidates'] as List? ?? const [];
+    final visibleIndicators = filterIndicators(indicatorRecords, _indicatorFilter.text);
     final states = {
       'planning': 'Qwen is drafting the plan',
       'approval': 'Dataset approval required',
@@ -1593,7 +1599,21 @@ class _StudioPageState extends State<StudioPage> {
         if (status == 'indicator_candidates') ...[
           Text('World Bank catalog page $indicatorPage of $indicatorPages · up to 20 indicators. '
               'Reuse rights are unverified. Observation and dataset collection are not available yet.'),
-          for (final record in job?['indicator_candidates'] as List? ?? const [])
+          TextField(
+            controller: _indicatorFilter,
+            maxLength: 160,
+            decoration: const InputDecoration(labelText: 'Filter loaded catalog page'),
+            onChanged: (_) => setState(() {}),
+          ),
+          Text('Showing ${visibleIndicators.length} of ${indicatorRecords.length} indicators on this loaded page. Filtering stays on this machine.'),
+          if (_indicatorFilter.text.isNotEmpty)
+            TextButton(
+              onPressed: () => setState(() => _indicatorFilter.clear()),
+              child: const Text('Clear indicator filter'),
+            ),
+          if (visibleIndicators.isEmpty)
+            const Text('No indicators on this loaded page match. Clear the filter or review another catalog page.'),
+          for (final record in visibleIndicators)
             ListTile(
               title: Text('${record['title']} (${record['indicator_id']})'),
               subtitle: SelectableText('${record['description']}\nSource ${record['source_id']}: ${record['source_name']}\n${record['organization']}\n${record['source']}'),
