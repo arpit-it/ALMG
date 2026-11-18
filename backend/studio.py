@@ -1056,6 +1056,8 @@ def store_job(job):
 
 def restore_jobs():
     """Reopen saved sessions and mark interrupted in-memory work as failed."""
+    POWER_EVENT_RECEIPTS.clear()
+    POWER_EVENT_RECEIPTS.update(load_power_event_receipts())
     for record in (ROOT / "training-sessions").glob("*.json"):
         try:
             job = json.loads(record.read_text(encoding="utf-8"))
@@ -1647,6 +1649,33 @@ class TrainingWindowInterrupted(ValueError):
     """Require renewed approval after a sleep-like clock discontinuity."""
 
 
+def load_power_event_receipts():
+    """Read optional versioned replay metadata; legacy runs have no receipt file."""
+    try:
+        payload = json.loads((ROOT / "power-event-receipts.json").read_text(encoding="utf-8"))
+        receipts = payload["receipts"]
+        if (type(payload.get("schema_version")) is not int or payload["schema_version"] != 1
+                or not isinstance(receipts, dict) or len(receipts) > 256):
+            return {}
+        for token, receipt in receipts.items():
+            if (not re.fullmatch(r"[A-Za-z0-9_-]{1,80}", token) or not isinstance(receipt, dict)
+                    or receipt.get("event") not in ("sleep", "wake")
+                    or type(receipt.get("affected_jobs")) is not int or receipt["affected_jobs"] < 0):
+                return {}
+        return receipts
+    except (OSError, ValueError, KeyError, TypeError):
+        return {}
+
+
+def store_power_event_receipts(receipts):
+    """Atomically save a bounded receipt cache before acknowledging delivery."""
+    ROOT.mkdir(parents=True, exist_ok=True)
+    record = ROOT / "power-event-receipts.json"
+    pending = record.with_suffix(".tmp")
+    pending.write_text(json.dumps({"schema_version": 1, "receipts": receipts}), encoding="utf-8")
+    pending.replace(record)
+
+
 def record_power_event(event, event_id=None):
     """Invalidate active training windows on local native sleep/wake events."""
     if event not in ("sleep", "wake"):
@@ -1666,9 +1695,12 @@ def record_power_event(event, event_id=None):
             store_job(job)
         receipt = {"event": event, "affected_jobs": len(affected)}
         if event_id is not None:
-            POWER_EVENT_RECEIPTS[event_id] = receipt
-            while len(POWER_EVENT_RECEIPTS) > 256:
-                POWER_EVENT_RECEIPTS.pop(next(iter(POWER_EVENT_RECEIPTS)))
+            receipts = {**POWER_EVENT_RECEIPTS, event_id: receipt}
+            while len(receipts) > 256:
+                receipts.pop(next(iter(receipts)))
+            store_power_event_receipts(receipts)
+            POWER_EVENT_RECEIPTS.clear()
+            POWER_EVENT_RECEIPTS.update(receipts)
         return dict(receipt)
 
 

@@ -223,7 +223,7 @@ class TrainingWindowTest(unittest.TestCase):
 
     def test_duplicate_power_event_does_not_invalidate_renewed_approval(self):
         job = {'id': 'deduplicated-power', 'status': 'training'}
-        with patch.object(studio, 'JOBS', {job['id']: job}), patch.object(studio, 'POWER_INTERRUPTED_JOBS', set()), patch.object(studio, 'POWER_EVENT_RECEIPTS', {}), patch.object(studio, 'store_job'):
+        with patch.object(studio, 'JOBS', {job['id']: job}), patch.object(studio, 'POWER_INTERRUPTED_JOBS', set()), patch.object(studio, 'POWER_EVENT_RECEIPTS', {}), patch.object(studio, 'store_job'), patch.object(studio, 'store_power_event_receipts'):
             first = studio.record_power_event('wake', 'event-fixture')
             studio.POWER_INTERRUPTED_JOBS.clear()
             job['status'] = 'queued'  # Fresh user approval after first delivery.
@@ -235,3 +235,30 @@ class TrainingWindowTest(unittest.TestCase):
                 studio.record_power_event('sleep', 'event-fixture')
             with self.assertRaisesRegex(ValueError, 'event ID'):
                 studio.record_power_event('wake', [])
+
+    def test_power_event_receipt_survives_restart_and_keeps_new_approval(self):
+        import tempfile
+        from pathlib import Path
+        job = {'id': 'receipt-restart', 'status': 'training'}
+        with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), patch.object(studio, 'JOBS', {job['id']: job}), patch.object(studio, 'POWER_INTERRUPTED_JOBS', set()), patch.object(studio, 'POWER_EVENT_RECEIPTS', {}), patch.object(studio, 'store_job'):
+            first = studio.record_power_event('wake', 'durable-event')
+            self.assertTrue((Path(folder) / 'power-event-receipts.json').is_file())
+            self.assertFalse((Path(folder) / 'power-event-receipts.tmp').exists())
+            studio.POWER_EVENT_RECEIPTS.clear()
+            studio.restore_jobs()
+            studio.POWER_INTERRUPTED_JOBS.clear()
+            job['status'] = 'queued'
+            self.assertEqual(studio.record_power_event('wake', 'durable-event'), first)
+            self.assertNotIn(job['id'], studio.POWER_INTERRUPTED_JOBS)
+            self.assertEqual(len(job['activity']), 1)
+
+    def test_receipt_cache_accepts_legacy_absence_and_preserves_malformed_file_on_read(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)):
+            self.assertEqual(studio.load_power_event_receipts(), {})
+            record = Path(folder) / 'power-event-receipts.json'
+            for content in ('not json', '{"schema_version":99,"receipts":{}}', '{"schema_version":1,"receipts":{"token":{"event":"wake","affected_jobs":true}}}'):
+                record.write_text(content)
+                self.assertEqual(studio.load_power_event_receipts(), {})
+                self.assertEqual(record.read_text(), content)

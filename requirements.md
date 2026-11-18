@@ -1661,6 +1661,19 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   returned to approval and explicit reapproval reached preview at accuracy
   1.000. No external collection occurred. Physical suspend/resume and real
   busy/power transitions remain unverified; this requirement stays open.
+  Power-event receipts now survive backend restart in an atomically replaced,
+  version-1 cache bounded to 256 entries. Receipts are saved before delivery is
+  acknowledged and restored with jobs. Legacy absence is accepted; malformed
+  cache input is ignored without rewriting it on load. The 195-test Python
+  suite passed (194 executed; opt-in Metal test skipped), covering receipt
+  round-trip, atomic replacement, legacy absence and malformed input. In the
+  rebuilt Mac app, a fresh backend restored a saved queued job and an event
+  receipt produced by a separate fixture process. After native reapproval,
+  replaying the acknowledged wake ID returned 200 without changing waiting
+  state or adding another wake activity. Cancel/reopen and immediate approval
+  then trained the same 45-example dataset to preview at accuracy 1.000. No
+  external collection occurred. Physical suspend/resume and real busy/power
+  transitions remain unverified; this requirement stays open.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
