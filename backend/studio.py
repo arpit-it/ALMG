@@ -1125,6 +1125,7 @@ def append_activity(job, message):
 
 
 IMAGE_SEARCH_LIMIT = 20
+IMAGE_TOTAL_LIMIT = 40
 IMAGE_DOWNLOAD_LIMIT_MIB = 8
 
 
@@ -1158,84 +1159,84 @@ def search_images(job):
     try:
         activity(job, "Approved image search on commons.wikimedia.org.")
         activity(job, "Searching Wikimedia Commons for image candidates.")
-        query = job["plan"]["queries"][0]
-        url = "https://commons.wikimedia.org/w/api.php?" + urlencode({
-            "action": "query", "format": "json", "generator": "search",
-            "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": IMAGE_SEARCH_LIMIT,
-            "prop": "imageinfo", "iiprop": "url|mime|extmetadata",
-            "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions",
-        })
-        response = request_json(url, headers={
-            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
-        }, opener=DISCOVERY)
-        if isinstance(response, dict) and "error" in response:
-            raise ValueError("Wikimedia Commons rejected the image search.")
-        query_result = response.get("query") if isinstance(response, dict) else None
-        pages = query_result.get("pages") if isinstance(query_result, dict) else None
-        if isinstance(response, dict) and "batchcomplete" in response and "query" not in response:
-            pages = {}
-        if not isinstance(pages, dict):
-            raise ValueError("Wikimedia Commons returned an invalid search response. Try again or choose a local dataset.")
-        candidates = []
-        seen_sources = set()
-        seen_titles = set()
-        for index, page in enumerate(pages.values()):
-            if index >= IMAGE_SEARCH_LIMIT:
+        candidates, seen_sources, seen_titles = [], set(), set()
+        for query in job["plan"]["queries"]:
+            if len(candidates) >= IMAGE_TOTAL_LIMIT:
                 break
-            if not isinstance(page, dict) or not isinstance(page.get("title"), str):
-                continue
-            if not page["title"].startswith("File:"):
-                continue
-            images = page.get("imageinfo")
-            if not isinstance(images, list) or not images or not isinstance(images[0], dict):
-                continue
-            info = images[0]
-            source = info.get("url", "")
-            if (valid_commons_image_url(source) and source not in seen_sources
-                    and info.get("mime") in ("image/jpeg", "image/png", "image/webp")):
-                metadata = info.get("extmetadata")
-                license_field = metadata.get("LicenseShortName") if isinstance(metadata, dict) else None
-                raw_license = license_field.get("value") if isinstance(license_field, dict) else None
-                if not isinstance(raw_license, str):
+            url = "https://commons.wikimedia.org/w/api.php?" + urlencode({
+                "action": "query", "format": "json", "generator": "search",
+                "gsrsearch": query, "gsrnamespace": 6, "gsrlimit": IMAGE_SEARCH_LIMIT,
+                "prop": "imageinfo", "iiprop": "url|mime|extmetadata",
+                "iiextmetadatafilter": "LicenseShortName|LicenseUrl|Artist|Credit|AttributionRequired|Restrictions",
+            })
+            response = request_json(url, headers={
+                "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+            }, opener=DISCOVERY)
+            if isinstance(response, dict) and "error" in response:
+                raise ValueError("Wikimedia Commons rejected the image search.")
+            query_result = response.get("query") if isinstance(response, dict) else None
+            pages = query_result.get("pages") if isinstance(query_result, dict) else None
+            if isinstance(response, dict) and "batchcomplete" in response and "query" not in response:
+                pages = {}
+            if not isinstance(pages, dict):
+                raise ValueError("Wikimedia Commons returned an invalid search response. Try again or choose a local dataset.")
+            for index, page in enumerate(pages.values()):
+                if index >= IMAGE_SEARCH_LIMIT or len(candidates) >= IMAGE_TOTAL_LIMIT:
+                    break
+                if not isinstance(page, dict) or not isinstance(page.get("title"), str):
                     continue
-                license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()
-                if len(license_name) > 120 or not valid_commons_metadata_label(license_name):
+                if not page["title"].startswith("File:"):
                     continue
-                title = page["title"].removeprefix("File:").strip()
-                title_key = commons_title_key(title)
-                if not valid_commons_metadata_label(title) or not title_key or title_key in seen_titles:
+                images = page.get("imageinfo")
+                if not isinstance(images, list) or not images or not isinstance(images[0], dict):
                     continue
-                try:
-                    source.encode("utf-8")
-                except UnicodeEncodeError:
-                    continue
-                license_url_field = metadata.get("LicenseUrl")
-                license_url = license_url_field.get("value") if isinstance(license_url_field, dict) else None
-                candidate = {"title": title, "url": source, "license": license_name,
-                             "approved_query": query}
-                if (isinstance(license_url, str) and len(license_url) <= 2048
-                        and re.fullmatch(r"https://[A-Za-z0-9.-]+/[^\s]*", license_url)
-                        and valid_commons_metadata_label(license_url)):
-                    candidate["license_url"] = license_url
-                unreadable_restrictions = False
-                for field in ("Artist", "Credit", "Restrictions"):
-                    entry = metadata.get(field)
-                    value = entry.get("value") if isinstance(entry, dict) else None
-                    if field == "Restrictions" and field in metadata:
-                        unreadable_restrictions = not isinstance(value, str) or bool(value.strip())
-                    if isinstance(value, str):
-                        label = " ".join(unescape(re.sub(r"<[^>]+>", "", value)).split())
-                        if len(label) <= 255 and valid_commons_metadata_label(label):
-                            candidate[field.lower()] = label
-                attribution = metadata.get("AttributionRequired")
-                if isinstance(attribution, dict) and attribution.get("value") == "true":
-                    candidate["attribution_required"] = True
-                if unreadable_restrictions and "restrictions" not in candidate:
-                    # Keep an unreadable restriction out of the approval list.
-                    continue
-                seen_sources.add(source)
-                seen_titles.add(title_key)
-                candidates.append(candidate)
+                info = images[0]
+                source = info.get("url", "")
+                if (valid_commons_image_url(source) and source not in seen_sources
+                        and info.get("mime") in ("image/jpeg", "image/png", "image/webp")):
+                    metadata = info.get("extmetadata")
+                    license_field = metadata.get("LicenseShortName") if isinstance(metadata, dict) else None
+                    raw_license = license_field.get("value") if isinstance(license_field, dict) else None
+                    if not isinstance(raw_license, str):
+                        continue
+                    license_name = unescape(re.sub(r"<[^>]+>", "", raw_license)).strip()
+                    if len(license_name) > 120 or not valid_commons_metadata_label(license_name):
+                        continue
+                    title = page["title"].removeprefix("File:").strip()
+                    title_key = commons_title_key(title)
+                    if not valid_commons_metadata_label(title) or not title_key or title_key in seen_titles:
+                        continue
+                    try:
+                        source.encode("utf-8")
+                    except UnicodeEncodeError:
+                        continue
+                    license_url_field = metadata.get("LicenseUrl")
+                    license_url = license_url_field.get("value") if isinstance(license_url_field, dict) else None
+                    candidate = {"title": title, "url": source, "license": license_name,
+                                 "approved_query": query}
+                    if (isinstance(license_url, str) and len(license_url) <= 2048
+                            and re.fullmatch(r"https://[A-Za-z0-9.-]+/[^\s]*", license_url)
+                            and valid_commons_metadata_label(license_url)):
+                        candidate["license_url"] = license_url
+                    unreadable_restrictions = False
+                    for field in ("Artist", "Credit", "Restrictions"):
+                        entry = metadata.get(field)
+                        value = entry.get("value") if isinstance(entry, dict) else None
+                        if field == "Restrictions" and field in metadata:
+                            unreadable_restrictions = not isinstance(value, str) or bool(value.strip())
+                        if isinstance(value, str):
+                            label = " ".join(unescape(re.sub(r"<[^>]+>", "", value)).split())
+                            if len(label) <= 255 and valid_commons_metadata_label(label):
+                                candidate[field.lower()] = label
+                    attribution = metadata.get("AttributionRequired")
+                    if isinstance(attribution, dict) and attribution.get("value") == "true":
+                        candidate["attribution_required"] = True
+                    if unreadable_restrictions and "restrictions" not in candidate:
+                        # Keep an unreadable restriction out of the approval list.
+                        continue
+                    seen_sources.add(source)
+                    seen_titles.add(title_key)
+                    candidates.append(candidate)
 
         if not candidates:
             raise ValueError("Wikimedia Commons found no eligible images with license information. Try a broader query or choose a local dataset.")
@@ -1879,6 +1880,8 @@ class Handler(BaseHTTPRequestHandler):
                             job["error"] = "The search result limit changed. Review the updated limit and approve again."
                             store_job(job)
                             return self.respond({"id": job["id"]})
+                        if type(data.get("approved_total_limit")) is not int or data["approved_total_limit"] != IMAGE_TOTAL_LIMIT:
+                            raise ValueError("Approve the Commons total result limit first.")
                         job.update(status="searching_images", error=None)
                         worker = (search_images, (job,))
                     elif action == "download-images" and status == "image_candidates":

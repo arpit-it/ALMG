@@ -1651,7 +1651,7 @@ class _StudioPageState extends State<StudioPage> {
               subtitle: Text('commons.wikimedia.org · Images and captions'),
             ),
             Text(
-              'Approving this query sends it to Wikimedia Commons for up to $searchLimit results.',
+              'Approving these queries sends them to Wikimedia Commons for up to $searchLimit results per query and 40 total.',
             ),
             for (final query in plan['queries'] as List)
               SelectableText(query as String),
@@ -1661,6 +1661,7 @@ class _StudioPageState extends State<StudioPage> {
                   : () => _submit('/jobs/$id/search-images', {
                       'approved_provider': 'commons',
                       'approved_result_limit': searchLimit,
+                      'approved_total_limit': 40,
                       'approved_queries': plan['queries'],
                     }),
               child: const Text('Approve Wikimedia Commons search'),

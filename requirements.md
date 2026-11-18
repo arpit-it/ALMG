@@ -887,6 +887,15 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   and Flutter analysis passed, including stale-text, invalid-source and
   wrong-scope rejection. Cross-provider acceptance verification remains
   open.
+
+  Commons now searches the approved query list with 20 results per query
+  and an explicitly approved 40-result total cap, deduplicating source URLs
+  and normalized file titles across queries. In the rebuilt Mac app, two
+  local fixture queries produced five unique licensed results with both
+  query origins displayed; download approval remained pending and no image
+  contents were fetched. All 118 Python tests and Flutter analysis passed,
+  including cross-query deduplication, early cap stopping and total-limit
+  consent. Cross-provider acceptance verification remains open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.
