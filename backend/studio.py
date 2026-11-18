@@ -707,6 +707,15 @@ def restore_jobs():
                 rows = json.loads((work / "dataset.json").read_text(encoding="utf-8"))
                 CANDIDATES[job["id"]] = (candidate, rows, job["metrics"])
                 job["candidate_directory"] = str(work)
+            elif job["status"] == "reviewing_publication" and job.get("publication_candidates"):
+                for candidate in job["publication_candidates"]:
+                    candidate.pop("abstract", None)
+                    candidate.pop("abstract_reviewed", None)
+                    candidate["reuse_status"] = "unverified"
+                job.update(status="publication_candidates", error=(
+                    "Abstract loading was interrupted. Review and approve the publication URL to retry."
+                ))
+                store_job(job)
             elif job["status"] == "reviewing_catalog_item" and job.get("catalog_candidates"):
                 for candidate in job["catalog_candidates"]:
                     candidate.pop("advisories", None)

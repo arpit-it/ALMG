@@ -74,3 +74,31 @@ class PublicationDiscoveryTest(unittest.TestCase):
         self.assertEqual(job["status"], "publication_candidates")
         self.assertNotIn("abstract", record)
         self.assertNotIn("abstract_reviewed", record)
+
+    def test_interrupted_abstract_review_preserves_publications_without_network(self):
+        import json
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        identity = "a" * 32
+        source = "https://europepmc.org/article/MED/12345"
+        job = {"id": identity, "status": "reviewing_publication", "publication_candidates": [{
+            "source": source, "title": "Orchard research", "approved_query": "orchard",
+            "abstract": "Stale abstract", "abstract_reviewed": True,
+        }]}
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "training-sessions").mkdir()
+            saved = root / "training-sessions" / (identity + ".json")
+            saved.write_text(json.dumps(job))
+            with patch.object(studio, "ROOT", root), patch.object(studio, "JOBS", {}), patch.object(studio, "request_json") as request:
+                studio.restore_jobs()
+                restored = studio.JOBS[identity]
+                self.assertEqual(restored["status"], "publication_candidates")
+                self.assertIn("approve the publication URL", restored["error"])
+                candidate = restored["publication_candidates"][0]
+                self.assertEqual(candidate["source"], source)
+                self.assertNotIn("abstract", candidate)
+                self.assertNotIn("abstract_reviewed", candidate)
+                self.assertEqual(candidate["reuse_status"], "unverified")
+                self.assertEqual(json.loads(saved.read_text())["status"], "publication_candidates")
+                request.assert_not_called()
