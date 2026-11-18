@@ -16,7 +16,36 @@ import 'indicator_filter.dart';
 import 'project_settings.dart';
 
 /// Starts the Flutter desktop application.
-void main() => runApp(const ModelStudio());
+void main() {
+  WidgetsFlutterBinding.ensureInitialized();
+  const MethodChannel('almg/power_events').setMethodCallHandler((call) async {
+    if (call.method != 'powerEvent') return;
+    try {
+      await forwardPowerEvent(call.arguments as String);
+    } catch (_) {
+      // If the backend stopped, saved jobs require renewed approval on restart.
+    }
+  });
+  runApp(const ModelStudio());
+}
+
+/// Forwards local native power events using the desktop backend's HTTP framing.
+Future<void> forwardPowerEvent(String event, {int port = backendPort}) async {
+  final client = HttpClient()..connectionTimeout = const Duration(seconds: 3);
+  try {
+    final request = await client.postUrl(Uri.parse('http://127.0.0.1:$port/runtime/power-event'));
+    request.headers.set('X-Model-Studio', 'desktop');
+    request.headers.contentType = ContentType.json;
+    final bytes = utf8.encode(jsonEncode({'event': event}));
+    request.contentLength = bytes.length;
+    request.add(bytes);
+    final response = await request.close().timeout(const Duration(seconds: 5));
+    await response.drain<void>();
+    if (response.statusCode >= 400) throw HttpException('Power event was rejected.');
+  } finally {
+    client.close(force: true);
+  }
+}
 
 /// Defines the ALMG theme and launch dashboard.
 class ModelStudio extends StatelessWidget {
@@ -1560,6 +1589,17 @@ class _StudioPageState extends State<StudioPage> {
             Navigator.pop(context);
             _showTrainingReadiness();
           }, child: const Text('Check current idle and power status')),
+          if (Platform.isMacOS) ...[
+            const Text('Local recovery fixture sends sleep/wake notifications inside ALMG only. Active training returns to approval; the Mac stays awake.'),
+            TextButton(onPressed: () async {
+              Navigator.pop(context);
+              try {
+                await const MethodChannel('almg/power_events').invokeMethod<void>('localNotificationFixture');
+              } catch (error) {
+                if (mounted) setState(() => _error = error.toString());
+              }
+            }, child: const Text('Run local sleep/wake recovery fixture')),
+          ],
           const SizedBox(height: 12),
           const Text('Optional local LoRA check: trains rank-2 adapters in a tiny causal language model using generated token sequences. No downloads; fine-tuning your own models remains unavailable.'),
           TextButton(onPressed: () {

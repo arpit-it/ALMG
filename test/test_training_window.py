@@ -175,3 +175,22 @@ class TrainingWindowTest(unittest.TestCase):
         self.assertEqual(job['status'], 'creating_dataset')
         self.assertEqual(thread.call_args.kwargs['target'], studio.prepare_dataset)
         self.assertEqual(thread.call_args.kwargs['args'], (job, rows))
+
+    def test_native_power_event_invalidates_only_active_jobs(self):
+        active = {'id': 'active-power', 'status': 'training'}
+        ready = {'id': 'ready-power', 'status': 'dataset_ready'}
+        with patch.object(studio, 'JOBS', {job['id']: job for job in (active, ready)}), patch.object(studio, 'POWER_INTERRUPTED_JOBS', set()), patch.object(studio, 'store_job'):
+            self.assertEqual(studio.record_power_event('wake')['affected_jobs'], 1)
+            self.assertIn(active['id'], studio.POWER_INTERRUPTED_JOBS)
+            studio.check_training_power(ready)
+            with self.assertRaisesRegex(studio.TrainingWindowInterrupted, 'sleep/wake was reported'):
+                studio.check_training_power(active)
+            with self.assertRaises(ValueError): studio.record_power_event('unknown')
+
+    def test_power_event_returns_waiting_worker_to_approval_without_trainer(self):
+        job = {'id': 'power-wait', 'status': 'queued', 'idle': True}
+        with patch.object(studio, 'POWER_INTERRUPTED_JOBS', {job['id']}), patch.object(studio, 'store_job'), patch.object(studio.recipe_contracts, 'execute') as execute:
+            studio.run(job)
+            self.assertEqual(job['status'], 'dataset_ready')
+            self.assertIn('approve training again', job['error'])
+            execute.assert_not_called()

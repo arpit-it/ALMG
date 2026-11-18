@@ -6,6 +6,13 @@ import ImageIO
 
 /// Hosts the Flutter view in the main AppKit window.
 class MainFlutterWindow: NSWindow {
+  private var powerObservers: [NSObjectProtocol] = []
+  private var powerChannel: FlutterMethodChannel?
+
+  deinit {
+    for observer in powerObservers { NSWorkspace.shared.notificationCenter.removeObserver(observer) }
+  }
+
   /// Installs the Flutter view controller and registers desktop plugins.
   override func awakeFromNib() {
     let flutterViewController = FlutterViewController()
@@ -30,6 +37,27 @@ class MainFlutterWindow: NSWindow {
         let text = Self.attachmentText(bytes.data, format: format)
         DispatchQueue.main.async { result(text) }
       }
+    }
+
+    let power = FlutterMethodChannel(
+      name: "almg/power_events", binaryMessenger: flutterViewController.engine.binaryMessenger
+    )
+    powerChannel = power
+    let center = NSWorkspace.shared.notificationCenter
+    for (name, event) in [(NSWorkspace.willSleepNotification, "sleep"), (NSWorkspace.didWakeNotification, "wake")] {
+      powerObservers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
+        self?.powerChannel?.invokeMethod("powerEvent", arguments: event)
+      })
+    }
+    power.setMethodCallHandler { call, result in
+      guard call.method == "localNotificationFixture" else {
+        result(FlutterMethodNotImplemented)
+        return
+      }
+      // Local-process notifications only: this does not sleep or wake the Mac.
+      center.post(name: NSWorkspace.willSleepNotification, object: nil)
+      center.post(name: NSWorkspace.didWakeNotification, object: nil)
+      result(nil)
     }
 
     super.awakeFromNib()

@@ -1624,6 +1624,20 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   preview with accuracy 1.000. The dataset SHA-256 stayed unchanged. No external
   collection occurred. Physical sleep/wake and real busy/power transitions
   remain open.
+  macOS now observes NSWorkspace sleep/wake notifications and forwards them
+  through a process-wide Flutter channel to the local backend. Active queued,
+  waiting or training jobs require fresh approval at the next safe boundary;
+  prepared data and existing checkpoints remain retained. New approval clears
+  the event guard. A clearly labeled local notification fixture exercises the
+  actual native observer/channel/HTTP path without suspending the Mac. The
+  190-test Python suite passed (189 executed; opt-in Metal test skipped), plus
+  14 Flutter tests and clean analysis. The loopback test verifies desktop
+  authorization and exact Content-Length framing. In the rebuilt Mac app, the
+  native fixture delivered both sleep and wake events, returned a waiting
+  45-example image job to approval with the recovery message, and explicit
+  reapproval reached preview at accuracy 1.000. Saved activity confirms both
+  events. No external collection or power-setting changes occurred. Actual
+  physical suspend/resume and real busy/power transitions remain unverified.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.

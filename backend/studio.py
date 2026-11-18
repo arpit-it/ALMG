@@ -76,6 +76,7 @@ JOBS = {}
 CHAT_STREAMS = {}
 TRAINING_DATA = {}
 TRAINING_WORKERS = set()
+POWER_INTERRUPTED_JOBS = set()
 CANDIDATES = {}
 
 
@@ -1645,6 +1646,25 @@ class TrainingWindowInterrupted(ValueError):
     """Require renewed approval after a sleep-like clock discontinuity."""
 
 
+def record_power_event(event):
+    """Invalidate active training windows on local native sleep/wake events."""
+    if event not in ("sleep", "wake"):
+        raise ValueError("Unknown system power event.")
+    with LOCK:
+        affected = [job for job in JOBS.values() if job["status"] in ("queued", "waiting_idle", "training")]
+        for job in affected:
+            POWER_INTERRUPTED_JOBS.add(job["id"])
+            append_activity(job, f"System {event} notification received. Training will require fresh approval at the next safe boundary.")
+            store_job(job)
+    return {"event": event, "affected_jobs": len(affected)}
+
+
+def check_training_power(job):
+    with LOCK:
+        if job["id"] in POWER_INTERRUPTED_JOBS:
+            raise TrainingWindowInterrupted("System sleep/wake was reported. Dataset and existing checkpoints are retained; approve training again to continue safely.")
+
+
 def training_clock():
     return time.time(), time.monotonic()
 
@@ -1668,6 +1688,7 @@ def wait_for_training_window(job):
         with LOCK:
             if job["status"] == "cancelled":
                 raise TrainingCancelled()
+        check_training_power(job)
         if idle_ready():
             if paused:
                 # Recheck resources after waiting before allowing another step.
@@ -1700,9 +1721,11 @@ def run(job):
             if job["idle"]:
                 job["status"] = "waiting_idle"
                 store_job(job)
+        check_training_power(job)
         if job["idle"]:
             activity(job, "Waiting for the device to be idle and connected to AC power.")
             while not idle_ready():
+                check_training_power(job)
                 with LOCK:
                     if job["status"] != "waiting_idle":
                         return
@@ -1718,8 +1741,10 @@ def run(job):
             with LOCK:
                 if job["status"] == "cancelled":
                     raise TrainingCancelled()
+            check_training_power(job)
             clock_sample[0] = check_training_clock(clock_sample[0], training_clock())
             wait_for_training_window(job)
+            check_training_power(job)
             clock_sample[0] = check_training_clock(clock_sample[0], training_clock())
             activity(job, message)
         def repair(mistakes):
@@ -1992,6 +2017,8 @@ class Handler(BaseHTTPRequestHandler):
                 self.wfile.flush()
                 os.kill(os.getpid(), signal.SIGTERM)
                 return
+            if self.path == "/runtime/power-event":
+                return self.respond(record_power_event(data.get("event")))
             if self.path == "/runtime/lora-fixture":
                 if data.get("confirmed") is not True:
                     raise ValueError("Confirm the local LoRA fixture before running it.")
@@ -2616,6 +2643,7 @@ class Handler(BaseHTTPRequestHandler):
                             job.get("recipe", "classifier"), data, job.get("recipe_contract"))
                         recipe_contracts.execution_variant(job.get("recipe", "classifier"), job.get("mode"))
                         resources = training_resources.check(TRAINING_DATA.get(job["id"], []), ROOT)
+                        POWER_INTERRUPTED_JOBS.discard(job["id"])
                         job.update(status="queued", **parameters, resource_check=resources, error=None)
                         TRAINING_WORKERS.add(job["id"])
                         worker = (run, (job,))
