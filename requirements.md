@@ -1489,6 +1489,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   followed their intended trainers and reached preview with held-out scores
   of 1.000. No external collection occurred. LoRA validation and remaining
   recipe-interface integration stay open; no recipe was added.
+  Supported dataset modes and their execution variants now come from the
+  versioned recipe catalog rather than a second hardcoded routing table.
+  Recipe details displays deduplicated source labels; older saved snapshots
+  without mode metadata still open. All 163 Python tests, 13 Flutter tests
+  and Flutter analysis passed. In the rebuilt Mac app, both recipe dialogs
+  displayed their supported sources, and the fresh 45-example shape fixture
+  trained through its catalog-defined mode to preview with accuracy 1.000.
+  The installed environment has MLX inference but no mlx_lm package or ALMG
+  LoRA workflow; small LoRA validation remains unverified. No recipe, external
+  collection or downloads were added. Remaining recipe integration stays open.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 

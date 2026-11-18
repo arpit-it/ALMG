@@ -269,3 +269,15 @@ class RecipeContractsTest(unittest.TestCase):
         self.assertEqual(job['status'], 'dataset_ready')
         self.assertEqual(handler.respond.call_args.args[1], 400)
         worker.assert_not_called()
+
+    def test_execution_modes_are_derived_from_versioned_catalog(self):
+        for contract in recipe_contracts.recipe_catalog():
+            modes = contract['dataset']['modes']
+            self.assertTrue(modes)
+            for mode, details in modes.items():
+                self.assertTrue(details['label'])
+                self.assertIn(details['variant'], contract['metrics'])
+                self.assertEqual(recipe_contracts.execution_variant(contract['id'], mode), details['variant'])
+        with patch.dict(recipe_contracts._CONTRACTS['classifier']['dataset']['modes'],
+                        {'fixture_mode': {'label': 'Fixture', 'variant': 'classifier'}}):
+            self.assertEqual(recipe_contracts.execution_variant('classifier', 'fixture_mode'), 'classifier')

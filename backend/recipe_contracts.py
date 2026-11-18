@@ -10,7 +10,11 @@ _CONTRACTS = {
     "classifier": {
         "id": "classifier", "version": 1, "name": "Text classification",
         "description": "Compare supervised classifiers and evaluate a held-out split.",
-        "dataset": {"format": "JSON rows: text, label, group", "imports": "UTF-8 CSV: text, label, optional group"},
+        "dataset": {"format": "JSON rows: text, label, group", "imports": "UTF-8 CSV: text, label, optional group",
+                    "modes": {"synthetic": {"label": "Local generated examples", "variant": "classifier"},
+                              "local": {"label": "Local generated examples", "variant": "classifier"},
+                              "local_csv": {"label": "Imported CSV", "variant": "classifier"},
+                              "web": {"label": "Approved web excerpts", "variant": "classifier"}}},
         "hardware": {"training": "CPU; no accelerator required", "planning": "Local Qwen on Apple silicon"},
         "parameters": [*_COMMON_PARAMETERS, {"id": "allow_repair", "label": "One local-example retry", "type": "boolean", "default": False}],
         "metrics": {"classifier": ["validation_macro_f1", "test_macro_f1", "target_macro_f1"]},
@@ -21,7 +25,10 @@ _CONTRACTS = {
     "text_to_image": {
         "id": "text_to_image", "version": 1, "name": "Text to image (experimental)",
         "description": "Learn 48×48 images from local shape pairs or approved Commons captions.",
-        "dataset": {"format": "Local shape rows: text, shape, color, position, mask, rgb, split; Commons rows: text, image, split", "imports": "Local synthetic shapes or separately approved Commons images"},
+        "dataset": {"format": "Local shape rows: text, shape, color, position, mask, rgb, split; Commons rows: text, image, split", "imports": "Local synthetic shapes or separately approved Commons images",
+                    "modes": {"synthetic": {"label": "Local generated shapes", "variant": "local shapes"},
+                              "local": {"label": "Local generated shapes", "variant": "local shapes"},
+                              "web_images": {"label": "Approved Commons images", "variant": "Commons captions"}}},
         "hardware": {"training": "CPU with NumPy and Pillow; no accelerator required", "planning": "Local Qwen on Apple silicon"},
         "parameters": _COMMON_PARAMETERS,
         "metrics": {"local shapes": ["held_out_pixel_accuracy", "target_pixel_accuracy"],
@@ -83,15 +90,11 @@ def training_parameters(recipe_id, values, snapshot=None):
 
 def execution_variant(recipe_id, mode):
     """Resolve only the existing recipe/source combinations, including legacy local jobs."""
-    recipe_contract(recipe_id)
-    if recipe_id == 'classifier' and mode in (None, 'local', 'synthetic', 'local_csv', 'web'):
-        return 'classifier'
-    if recipe_id == 'text_to_image':
-        if mode in (None, 'local', 'synthetic'):
-            return 'local shapes'
-        if mode == 'web_images':
-            return 'Commons captions'
-    raise ValueError('Dataset mode is not supported by this training recipe.')
+    modes = recipe_contract(recipe_id)['dataset']['modes']
+    selected = 'synthetic' if mode is None else mode
+    if not isinstance(selected, str) or selected not in modes:
+        raise ValueError('Dataset mode is not supported by this training recipe.')
+    return modes[selected]['variant']
 
 
 def validate_metrics(recipe_id, mode, metrics, target):

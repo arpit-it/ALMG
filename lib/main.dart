@@ -1502,6 +1502,8 @@ class _StudioPageState extends State<StudioPage> {
           const SizedBox(height: 12),
           Text('Dataset: ${contract['dataset']['format']}'),
           Text('Input: ${contract['dataset']['imports']}'),
+          if (contract['dataset']['modes'] is Map)
+            Text('Supported sources: ${(contract['dataset']['modes'] as Map).values.map((mode) => mode['label']).toSet().join(', ')}'),
           Text('Training hardware: ${contract['hardware']['training']}'),
           Text('Planning: ${contract['hardware']['planning']}'),
           const SizedBox(height: 12),
