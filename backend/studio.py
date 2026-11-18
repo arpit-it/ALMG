@@ -1066,14 +1066,19 @@ def restore_jobs():
             if job["status"] == "exporting" and output.is_dir():
                 job.update(status="passed", output=str(output))
             elif (job["status"] in ("dataset_ready", "queued", "waiting_idle", "reviewing_labels")
-                  or (job["status"] == "training" and job.get("recipe") == "classifier")):
-                TRAINING_DATA[job["id"]] = json.loads(
+                  or (job["status"] == "training" and job.get("recipe", "classifier") in TRAINING_RECIPES)):
+                rows = json.loads(
                     ((ROOT / "training-sessions" / job["id"]) / "dataset.json").read_text(encoding="utf-8")
                 )
+                if job.get("recipe") == "text_to_image":
+                    recipe_contracts.validate_dataset("text_to_image", job.get("mode"), rows)
+                TRAINING_DATA[job["id"]] = rows
                 if job["status"] != "dataset_ready":
                     message = (
-                        "Training was interrupted. Approve training from the saved dataset to reuse matching candidate checkpoints; an unfinished fit restarts."
-                        if job["status"] == "training"
+                        "Image training was interrupted. Approve training from the saved dataset again; image fitting restarts because this recipe has no partial-fit checkpoint."
+                        if job.get("recipe") == "text_to_image" and job["status"] in ("training", "waiting_idle")
+                        else "Training was interrupted. Approve training from the saved dataset to reuse matching candidate checkpoints; an unfinished fit restarts."
+                        if job["status"] in ("training", "waiting_idle")
                         else "Local label review was interrupted. Review again from the saved dataset."
                         if job["status"] == "reviewing_labels"
                         else "The backend restarted before training began. Approve training to queue it again."

@@ -1601,6 +1601,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   showed 42/600 seconds in the waiting UI, and Cancel queued training stopped
   it. No external collection occurred. Physical sleep/wake and actual
   busy/power transitions remain open; the busy state was a local fixture.
+  Backend restart recovery now reopens valid prepared datasets for interrupted
+  image training as well as classifier training. Waiting image jobs explain
+  that fitting restarts without a partial-fit checkpoint; classifier waits
+  retain the matching-checkpoint explanation. Fresh approval is required and
+  no worker starts during restore. Invalid saved image rows are rejected.
+  The 186-test Python suite passed (185 executed; opt-in Metal test skipped),
+  covering in-training and waiting recovery and malformed rows. In the rebuilt
+  Mac app, a saved in-training image fixture reopened with its recovery message
+  and all 45 examples at approval; explicit reapproval reached preview at
+  accuracy 1.000. The prepared dataset's SHA-256 was unchanged. No external
+  collection occurred. Physical sleep/wake and actual busy/power transitions
+  remain unverified, so this scheduler requirement stays open.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.

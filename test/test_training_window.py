@@ -95,3 +95,45 @@ class TrainingWindowTest(unittest.TestCase):
         with patch.object(studio, 'training_readiness', return_value=state):
             studio.Handler.do_GET(handler)
         self.assertEqual(handler.respond.call_args.args[0], state)
+
+    def test_interrupted_image_training_restores_valid_saved_rows_for_reapproval(self):
+        import tempfile
+        import json
+        from pathlib import Path
+        from unittest.mock import Mock
+        for status in ('training', 'waiting_idle'):
+            with self.subTest(status=status), tempfile.TemporaryDirectory() as folder:
+                root = Path(folder)
+                job_id = 'c' * 32
+                directory = root / 'training-sessions' / job_id
+                directory.mkdir(parents=True)
+                data = directory / 'dataset.json'
+                data.write_text(json.dumps(studio.image_recipe.dataset()))
+                before = data.read_bytes()
+                record = directory.parent / (job_id + '.json')
+                record.write_text(json.dumps({'id': job_id, 'recipe': 'text_to_image', 'mode': 'synthetic', 'status': status}))
+                with patch.object(studio, 'ROOT', root), patch.object(studio, 'JOBS', {}), patch.object(studio, 'TRAINING_DATA', {}), patch.object(studio.threading, 'Thread') as worker:
+                    studio.restore_jobs()
+                    job = studio.JOBS[job_id]
+                    self.assertEqual(job['status'], 'dataset_ready')
+                    self.assertIn('image fitting restarts', job['error'])
+                    self.assertEqual(len(studio.TRAINING_DATA[job_id]), 45)
+                    self.assertEqual(json.loads(record.read_text())['status'], 'dataset_ready')
+                    self.assertEqual(data.read_bytes(), before)
+                    worker.assert_not_called()
+
+    def test_corrupt_interrupted_image_dataset_is_not_reopened(self):
+        import tempfile
+        import json
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            job_id = 'd' * 32
+            directory = root / 'training-sessions' / job_id
+            directory.mkdir(parents=True)
+            (directory / 'dataset.json').write_text('[{"text":"bad"}]')
+            (directory.parent / (job_id + '.json')).write_text(json.dumps({'id': job_id, 'recipe': 'text_to_image', 'status': 'training'}))
+            with patch.object(studio, 'ROOT', root), patch.object(studio, 'JOBS', {}), patch.object(studio, 'TRAINING_DATA', {}):
+                studio.restore_jobs()
+                self.assertEqual(studio.JOBS[job_id]['status'], 'failed')
+                self.assertNotIn(job_id, studio.TRAINING_DATA)
