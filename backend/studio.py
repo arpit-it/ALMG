@@ -1617,6 +1617,12 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as error:
                 return self.respond({"error": str(error)}, 404)
         route = urlsplit(self.path)
+        if route.path == "/project-export":
+            params = parse_qs(route.query)
+            try:
+                return self.respond(chat_history.export_project_data(params.get("project_id", [None])[0]))
+            except ValueError as error:
+                return self.respond({"error": str(error)}, 400)
         if route.path == "/project-pages":
             params = parse_qs(route.query)
             try:

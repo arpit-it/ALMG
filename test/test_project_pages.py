@@ -47,3 +47,24 @@ class ProjectPagesTest(unittest.TestCase):
             other = history.create_project('Other')['id']
             with self.assertRaises(ValueError):
                 history.approved_project_pages(other, decision)
+
+    def test_export_contains_saved_providers_references_and_full_index(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(history, 'DATABASE', Path(folder) / 'chat.sqlite3'):
+            project = history.create_project('Portable fixture')['id']
+            other = history.create_project('Other')['id']
+            history.update_project(project, 'Fixture instructions', 'https://example.org/archive/', ['wikipedia', 'project_website'])
+            history.add_project_file(project, 'notes.txt', 'Local fixture reference.')
+            row = {'source': 'https://example.org/fruit', 'text': 'Fruit cultivation and harvest revenue.',
+                   'provider': 'project_website', 'collection_scope': 'website_page_preview',
+                   'reuse_approval': {'source': 'https://example.org/fruit', 'permission_basis': 'Fixture content permission.'}}
+            history.index_project_pages(project, [row])
+            history.index_project_pages(other, [{**row, 'source': 'https://other.org/private'}])
+            exported = history.export_project_data(project)
+            self.assertEqual((exported['format'], exported['version']), ('almg-project', 1))
+            self.assertEqual(exported['project']['enabled_providers'], ['wikipedia', 'project_website'])
+            self.assertEqual(exported['project']['source_website'], 'https://example.org/archive/')
+            self.assertEqual(exported['reference_files'], [{'name': 'notes.txt', 'content': 'Local fixture reference.'}])
+            self.assertEqual([page['source'] for page in exported['pages']], [row['source']])
+            self.assertEqual(exported['pages'][0]['text'], row['text'])
+            self.assertEqual(exported['pages'][0]['metadata']['reuse_approval'], row['reuse_approval'])
+            self.assertNotIn('id', exported['project'])

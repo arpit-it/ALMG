@@ -1033,6 +1033,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   passed. Export/restore with provider settings and installation-update
   storage verification remain open.
 
+  Project settings now exports a versioned JSON snapshot of saved provider
+  selections, website, instructions, reference files and the complete local
+  page index with permission evidence. In the rebuilt Mac app, Export
+  project data opened the native save dialog and saved a local fixture
+  export, then reported three indexed sources. Reading that saved file
+  verified all three full texts and URLs, both permission records, the two
+  selected providers and the saved reference/settings. No website requests
+  occurred. All 123 Python tests and Flutter analysis passed. Restore and
+  installation-update storage verification remain open.
+
 
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples

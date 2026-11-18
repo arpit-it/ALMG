@@ -521,3 +521,25 @@ def approved_project_pages(project_id, decision):
                          "source_provider": page["metadata"].get("provider"), "provider": "local_index",
                          "group": page["source"], "collection_origin": "project_index", "index_revision": page["revision"]})
     return rows
+
+
+def export_project_data(project_id):
+    """Return a bounded, portable snapshot of saved project configuration and pages."""
+    with closing(connect()) as db:
+        db.execute("BEGIN")
+        require_project(db, project_id)
+        project = project_record(db.execute("SELECT * FROM projects WHERE id = ?", (project_id,)).fetchone())
+        size = db.execute("SELECT COALESCE(sum(length(text) + length(metadata) + length(source) + length(title)), 0) FROM project_pages WHERE project_id = ?", (project_id,)).fetchone()[0]
+        size += db.execute("SELECT COALESCE(sum(length(content)), 0) FROM project_files WHERE project_id = ?", (project_id,)).fetchone()[0]
+        if size > 20 * 1024 * 1024:
+            raise ValueError("Project export exceeds the 20 MiB JSON limit.")
+        files = [dict(row) for row in db.execute("SELECT name, content FROM project_files WHERE project_id = ? ORDER BY rowid", (project_id,))]
+        pages = [dict(row) for row in db.execute("SELECT source, title, text, metadata, updated FROM project_pages WHERE project_id = ? ORDER BY source", (project_id,))]
+        for page in pages:
+            page["metadata"] = json.loads(page["metadata"])
+        snapshot = {"format": "almg-project", "version": 1,
+                    "project": {key: project[key] for key in ("name", "instructions", "source_website", "enabled_providers")},
+                    "reference_files": files, "pages": pages}
+        if len(json.dumps(snapshot, ensure_ascii=False).encode("utf-8")) > 20 * 1024 * 1024:
+            raise ValueError("Project export exceeds the 20 MiB JSON limit.")
+        return snapshot

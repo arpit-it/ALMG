@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:typed_data';
 
 import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart';
@@ -44,6 +45,7 @@ class _ProjectSettingsState extends State<ProjectSettings> {
       (widget.project['enabled_providers'] as List? ?? discoveryProviderNames.keys.toList()).cast<String>().toSet();
   bool _busy = false;
   String? _error;
+  String? _exportStatus;
 
   Future<void> _update(Future<void> Function() action) async {
     setState(() {
@@ -97,6 +99,16 @@ class _ProjectSettingsState extends State<ProjectSettings> {
       },
     );
     if (mounted) Navigator.pop(context, true);
+  });
+
+  Future<void> _exportProject() => _update(() async {
+    final snapshot = await widget.request('/project-export?project_id=${Uri.encodeQueryComponent(_project['id'] as String)}');
+    final destination = await getSaveLocation(suggestedName: 'almg-project.json',
+      acceptedTypeGroups: [const XTypeGroup(label: 'ALMG project JSON', extensions: ['json'])]);
+    if (destination == null) return;
+    final bytes = Uint8List.fromList(utf8.encode(const JsonEncoder.withIndent('  ').convert(snapshot)));
+    await XFile.fromData(bytes, mimeType: 'application/json', name: 'almg-project.json').saveTo(destination.path);
+    if (mounted) setState(() => _exportStatus = 'Exported saved project settings, references and ${snapshot['pages'].length} indexed sources.');
   });
 
   /// Confirms removal of a reference before calling the backend.
@@ -203,6 +215,10 @@ class _ProjectSettingsState extends State<ProjectSettings> {
             icon: const Icon(Icons.attach_file),
             label: const Text('Add reference file'),
           ),
+          const Text('Export uses saved settings and includes reference files and the local page index. Save pending edits first.'),
+          TextButton.icon(onPressed: _busy ? null : _exportProject,
+            icon: const Icon(Icons.download), label: const Text('Export project data')),
+          if (_exportStatus case final String status) Text(status),
           if (_busy) const LinearProgressIndicator(),
           if (_error case final String error)
             Text(
