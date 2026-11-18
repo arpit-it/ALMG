@@ -2626,6 +2626,11 @@ class _StudioPageState extends State<StudioPage> {
                   : 'Cancel queued training',
             ),
           ),
+        if (status == 'cancelled' && !_imageRecipe) ...[
+          const Text('Reopen the saved dataset for approval. Matching candidate checkpoints will be reused; unfinished fits restart.'),
+          OutlinedButton(onPressed: _busy ? null : () => _submit('/jobs/$id/reopen-cancelled', {'confirmed': true}),
+            child: const Text('Reopen cancelled training dataset')),
+        ],
         if (status == 'dataset_ready') ...[
           if (!_imageRecipe)
             OutlinedButton(

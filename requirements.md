@@ -1274,7 +1274,7 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The isolated Mac app reopened a seven-row offline search fixture and
   showed the last two rows first because their labels conflicted. Training
   still awaited approval.
-- [ ] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
+- [x] Persist jobs and progress across backend restarts. Show logs, metrics, and artifact locations. Add cancellation and resume where the training recipe can restore a checkpoint.
   After a backend restart, the isolated Mac app reopened a saved classifier
   candidate with its activity, held-out score, and folder containing the model
   and dataset. In the rebuilt Mac app, cancelling while waiting for idle
@@ -1301,6 +1301,20 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   assignments match uninterrupted training. An unfinished individual fit
   still restarts, and a user action to resume a deliberately cancelled job
   remains open.
+  Final acceptance: cancelled classifiers can reopen their validated saved
+  dataset only after the previous worker stops, and training still requires
+  fresh approval. In the rebuilt Mac app, a 48-row fixture was cancelled
+  after candidate one was saved. Cancellation and the checkpoint survived
+  backend restart, with no completed model created. Reopen cancelled training
+  dataset restored class balance and approval controls; approval then reused
+  candidate one and reached inference preview with validation and held-out
+  macro F1 of 1.000. Activity history showed the reused checkpoint and saved
+  artifact location. All 140 Python tests and Flutter analysis passed,
+  including missing confirmation, active-worker rejection, invalid saved
+  rows and worker cleanup. Checkpoint resume is supported between completed
+  classifier candidates; an individual fit restarts. The stated persistence,
+  progress/logs/metrics/artifacts, cancellation and supported-resume criteria
+  are verified.
 - [x] Keep validation separate from final testing. Use validation errors to guide a bounded retry, retain the best candidate, and report the final score on a held-out dataset. Test the full path from an approved dataset to a reloadable model and report.
   The rebuilt Mac app ran one opt-in retry from validation errors using a local
   Qwen fixture and reported a separate held-out score. The saved dataset

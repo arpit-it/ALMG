@@ -72,6 +72,7 @@ LOCK = threading.Lock()
 JOBS = {}
 CHAT_STREAMS = {}
 TRAINING_DATA = {}
+TRAINING_WORKERS = set()
 CANDIDATES = {}
 
 
@@ -1604,6 +1605,23 @@ class TrainingCancelled(Exception):
     """Stop a training worker at its next progress boundary."""
 
 
+def cancelled_classifier_rows(job, confirmed):
+    """Reopen cancelled classifier data only after its previous worker stops."""
+    if confirmed is not True:
+        raise ValueError("Confirm reopening the saved dataset first.")
+    if job["id"] in TRAINING_WORKERS:
+        raise ValueError("Cancellation is still stopping the training worker. Try again shortly.")
+    try:
+        rows = json.loads((ROOT / "training-sessions" / job["id"] / "dataset.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError) as error:
+        raise ValueError("The saved dataset is unavailable. Start a new training conversation and import it again.") from error
+    if (not isinstance(rows, list) or not rows or any(not isinstance(row, dict)
+            or not isinstance(row.get("text"), str) or not row["text"].strip()
+            or row.get("label") not in job["plan"]["labels"] or not isinstance(row.get("group"), str) for row in rows)):
+        raise ValueError("The saved classifier dataset is invalid. Import it in a new training conversation.")
+    return rows
+
+
 def run(job):
     """Train and evaluate an approved dataset, then wait for inference preview."""
     try:
@@ -1666,6 +1684,10 @@ def run(job):
             if job["status"] != "cancelled":
                 job.update(status="failed", error=str(error))
                 store_job(job)
+
+    finally:
+        with LOCK:
+            TRAINING_WORKERS.discard(job["id"])
 
 
 def export_candidate(job, candidate):
@@ -2470,6 +2492,10 @@ class Handler(BaseHTTPRequestHandler):
                         else:
                             job.update(status="creating_dataset", error=None, mode=mode)
                             worker = (prepare_dataset, (job,))
+                    elif action == "reopen-cancelled" and status == "cancelled" and job.get("recipe") == "classifier":
+                        rows = cancelled_classifier_rows(job, data.get("confirmed"))
+                        job.update(status="creating_dataset", error=None)
+                        worker = (prepare_dataset, (job, rows))
                     elif action == "cancel" and status in ("queued", "waiting_idle", "training"):
                         job.update(status="cancelled", error=None)
                         store_job(job)
@@ -2495,6 +2521,7 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Enter a score between 0 and 1.")
                         job.update(status="queued", target=target, idle=data.get("idle") is True,
                                    allow_repair=data.get("allow_repair") is True, error=None)
+                        TRAINING_WORKERS.add(job["id"])
                         worker = (run, (job,))
                     elif action == "preview" and status in ("preview_ready", "passed"):
                         prompt = data["text"].strip()
