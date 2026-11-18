@@ -613,6 +613,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   All 62 Python tests and Flutter analysis passed, including API scope,
   deduplication and contact-limit checks. Entity dataset collection and
   the remaining providers stay open.
+  Wikidata review now discloses structured-data terms with their source
+  URL and records explicit per-entity reuse permission. In the rebuilt
+  Mac app, approving one offline entity displayed its permission basis
+  while the second stayed unapproved. Saved evidence matched the label
+  and description SHA-256 and retained the terms source. All 63 Python
+  tests and Flutter analysis passed. Entity dataset collection and
+  remaining provider work are still open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

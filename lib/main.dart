@@ -1565,10 +1565,25 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'entity_candidates') ...[
           const Text('Review entity labels, descriptions and source URLs. Entity dataset collection is not available yet.'),
+          const Text('Wikidata structured entity data is supplied under CC0. Review the source and project use before recording permission.'),
+          const SelectableText('Terms source: https://www.wikidata.org/wiki/Wikidata:Copyright'),
           for (final record in job?['entity_candidates'] as List? ?? const [])
-            ListTile(
-              title: Text('${record['title']} (${record['entity_id']})'),
-              subtitle: SelectableText('${record['description']}\n${record['source']}\nApproved query: ${record['approved_query']}'),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  title: Text('${record['title']} (${record['entity_id']})'),
+                  subtitle: SelectableText('${record['description']}\n${record['source']}\nApproved query: ${record['approved_query']}'),
+                ),
+                if (record['reuse_approval'] case final Map approval)
+                  SelectableText('User reuse approval: ${approval['permission_basis']}')
+                else
+                  TextButton(
+                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record as Map,
+                        action: 'approve-entity-reuse'),
+                    child: const Text('Record entity reuse approval'),
+                  ),
+              ],
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-entities', {}),

@@ -1636,6 +1636,16 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the Wikidata queries and result limits first.")
                         job.update(status="searching_entities", error=None)
                         worker = (search_entities, (job,))
+                    elif action == "approve-entity-reuse" and status == "entity_candidates":
+                        record = next((record for record in job["entity_candidates"]
+                                       if record["source"] == data.get("approved_url")), None)
+                        if record is None:
+                            raise ValueError("Approve a listed entity URL first.")
+                        record["reuse_approval"] = wikidata_discovery.entity_reuse_evidence(record, data)
+                        record["reuse_status"] = "user_approved"
+                        append_activity(job, "User reuse permission recorded for the reviewed entity text.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "close-entities" and status == "entity_candidates":
                         job.pop("entity_candidates", None)
                         job.update(status="approval", error=None)

@@ -50,3 +50,18 @@ class EntityDiscoveryTest(unittest.TestCase):
             studio.search_entities(job)
         self.assertEqual(request.call_count, 2)
         self.assertEqual(len(job["entity_candidates"]), 40)
+
+    def test_reuse_permission_is_explicit_and_tied_to_reviewed_entity_text(self):
+        import hashlib
+        from backend.wikidata_discovery import entity_reuse_evidence
+        record = {"entity_id": "Q42", "title": "Orchard", "description": "Cultivated fruit trees",
+                  "source": "https://www.wikidata.org/wiki/Q42"}
+        decision = {"approved_url": record["source"], "confirmed": True, "permission_basis": "CC0 fixture metadata reviewed."}
+        evidence = entity_reuse_evidence(record, decision)
+        self.assertEqual(evidence["entity_text_sha256"], hashlib.sha256(b"Orchard\nCultivated fruit trees").hexdigest())
+        self.assertEqual(evidence["terms_source"], "https://www.wikidata.org/wiki/Wikidata:Copyright")
+        for changes in ({"confirmed": False}, {"approved_url": "other"}, {"permission_basis": "short"}):
+            with self.assertRaises(ValueError):
+                entity_reuse_evidence(record, {**decision, **changes})
+        with self.assertRaises(ValueError):
+            entity_reuse_evidence({**record, "source": "https://evil.example/Q42"}, decision)
