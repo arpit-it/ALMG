@@ -40,8 +40,9 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
+    import recipe_contracts
     import chat_history
     import inference
     import image_recipe
@@ -108,10 +109,7 @@ def ask(system, data):
     return result
 
 
-TRAINING_RECIPES = {
-    "classifier": "Supervised text classification. Compare candidate classifiers and evaluate a held-out split.",
-    "text_to_image": "Experimental 48×48 image generation from captioned Commons images or synthetic shapes.",
-}
+TRAINING_RECIPES = {item["id"]: item["description"] for item in recipe_contracts.recipe_catalog()}
 
 
 def choose_recipe(goal):
@@ -1769,6 +1767,13 @@ class Handler(BaseHTTPRequestHandler):
             except ValueError as error:
                 return self.respond({"error": str(error)}, 404)
         route = urlsplit(self.path)
+        if route.path == "/recipes":
+            return self.respond({"schema_version": recipe_contracts.SCHEMA_VERSION, "recipes": recipe_contracts.recipe_catalog()})
+        if route.path.startswith("/recipes/"):
+            try:
+                return self.respond(recipe_contracts.recipe_contract(route.path.removeprefix("/recipes/")))
+            except ValueError as error:
+                return self.respond({"error": str(error)}, 404)
         if route.path == "/project-export":
             params = parse_qs(route.query)
             try:
@@ -2578,7 +2583,8 @@ class Handler(BaseHTTPRequestHandler):
                 activity(job, "Qwen is drafting labels and data collection queries from the model goal.")
                 proposal = plan(job["prompt"])
             activity(job, "Plan ready. Waiting for dataset approval.")
-            update(job, recipe=recipe, planner_message=reason, plan=proposal, status="approval")
+            update(job, recipe=recipe, recipe_contract=recipe_contracts.recipe_contract(recipe),
+                   planner_message=reason, plan=proposal, status="approval")
         except Exception as error:
             update(job, status="failed", error=str(error))
 

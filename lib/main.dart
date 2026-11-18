@@ -1488,6 +1488,44 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   /// Shows the current proposal, dataset preview, evaluation, and release gate.
+  Future<void> _showRecipeContract() async {
+    try {
+      final recipe = _job?['recipe'] as String?;
+      if (recipe == null) return;
+      final contract = _job?['recipe_contract'] as Map? ?? await _request('/recipes/$recipe');
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: Text('${contract['name']} · version ${contract['version']}'),
+        scrollable: true,
+        content: SizedBox(width: 520, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(contract['description'] as String),
+          const SizedBox(height: 12),
+          Text('Dataset: ${contract['dataset']['format']}'),
+          Text('Input: ${contract['dataset']['imports']}'),
+          Text('Training hardware: ${contract['hardware']['training']}'),
+          Text('Planning: ${contract['hardware']['planning']}'),
+          const SizedBox(height: 12),
+          const Text('Parameters'),
+          for (final parameter in contract['parameters'] as List)
+            Text('${parameter['label']}: ${parameter['type']}, default ${parameter['default']}'
+              '${parameter['maximum'] == null ? '' : ', greater than ${parameter['minimum_exclusive']} up to ${parameter['maximum']}'}'),
+          const SizedBox(height: 12),
+          const Text('Metrics'),
+          for (final entry in (contract['metrics'] as Map).entries)
+            Text('${entry.key}: ${(entry.value as List).join(', ')}'),
+          const SizedBox(height: 12),
+          const Text('Exported artifacts'),
+          for (final artifact in contract['exports'] as List) Text(artifact as String),
+          const SizedBox(height: 12),
+          Text('Resume: ${contract['resume']}'),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   Widget _modelProgress() {
     final job = _job;
     final webImages = job?['mode'] == 'web_images';
@@ -1663,6 +1701,8 @@ class _StudioPageState extends State<StudioPage> {
                 ? 'Workflow: Text to image'
                 : 'Workflow: Text classification',
           ),
+        if (job?['recipe'] is String)
+          TextButton(onPressed: _busy ? null : _showRecipeContract, child: const Text('Training recipe details')),
         if (plan != null && !_imageRecipe) ...[
           const SizedBox(height: 16),
           Text('Labels: ${(plan['labels'] as List).join(', ')}'),

@@ -1407,6 +1407,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
 ## P3 · Extend the dynamic workbench and platform support
 
 - [ ] Define a training recipe interface for dataset format, hardware needs, parameters, metrics, and export format. Validate a small LoRA run on Apple silicon before adding more recipes.
+  Partial delivery: a versioned recipe-contract catalog now describes the
+  two existing recipes' dataset formats, hardware, parameter types/defaults,
+  metric keys, exported artifacts and resume limitations. Planning records
+  an independent contract snapshot in each new job; the planner's supported
+  IDs come from the catalog, and release packaging includes the module.
+  In the rebuilt Mac app, Training recipe details displayed both classifier
+  and experimental image contracts with all sections, while dataset approval
+  remained pending. Saved fixture jobs retained version-1 snapshots. All
+  148 Python tests, 13 Flutter tests and Flutter analysis passed, including
+  API routes, snapshot independence, unknown-recipe rejection and unchanged
+  restart of a legacy job without contract metadata. No recipes were added.
+  LoRA validation and further execution-interface integration remain open.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
