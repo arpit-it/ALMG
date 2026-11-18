@@ -52,3 +52,18 @@ class IndicatorCatalogTest(unittest.TestCase):
         self.assertEqual(job["indicator_candidates"], [record])
         self.assertEqual(job["indicator_page"], 1)
         self.assertEqual(job["status"], "indicator_candidates")
+
+    def test_reuse_evidence_is_scoped_to_metadata_and_source_context(self):
+        from backend.world_bank import indicator_reuse_evidence, indicator_metadata_checksum
+        record = indicator_candidates([{"page": 1}, [{"id": "NY.GDP.MKTP.CD", "name": "GDP",
+            "source": {"id": "2", "value": "Development indicators"}, "sourceNote": "Economic output",
+            "sourceOrganization": "Fixture organization"}]])[0]
+        decision = {"approved_url": record["source"], "approved_scope": "catalog_description",
+                    "confirmed": True, "permission_basis": "Local fixture metadata permission reviewed."}
+        evidence = indicator_reuse_evidence(record, decision)
+        self.assertEqual(evidence["scope"], "catalog_description")
+        self.assertEqual(evidence["metadata_sha256"], indicator_metadata_checksum(record))
+        self.assertNotEqual(evidence["metadata_sha256"], indicator_metadata_checksum({**record, "organization": "Other source"}))
+        for changes in ({"confirmed": False}, {"approved_scope": "observations"}, {"approved_url": "other"}, {"permission_basis": "short"}):
+            with self.assertRaises(ValueError):
+                indicator_reuse_evidence(record, {**decision, **changes})

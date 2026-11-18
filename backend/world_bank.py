@@ -31,3 +31,30 @@ def indicator_candidates(payload, *, limit=20, expected_page=1):
                      "source": f"https://api.worldbank.org/v2/indicator/{identity}?" + urlencode({"source": source_id, "format": "json"}),
                      "provider": "world_bank", "reuse_status": "unverified"})
     return rows
+
+
+def indicator_metadata_checksum(record):
+    """Hash the reviewed description together with its source context."""
+    import hashlib
+    import json
+    fields = {key: record.get(key) for key in ("indicator_id", "title", "description", "source_id", "source_name", "organization")}
+    if any(not isinstance(value, str) for value in fields.values()):
+        raise ValueError("Review the catalog metadata before recording permission.")
+    return hashlib.sha256(json.dumps(fields, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+
+
+def indicator_reuse_evidence(record, decision):
+    """Record human permission for metadata descriptions, separately from observations."""
+    import time
+    identity, source_id = record.get("indicator_id"), record.get("source_id")
+    basis = decision.get("permission_basis")
+    if (not isinstance(identity, str) or not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9_.-]*", identity)
+            or not isinstance(source_id, str) or not re.fullmatch(r"[0-9]+", source_id)
+            or record.get("source") != f"https://api.worldbank.org/v2/indicator/{identity}?" + urlencode({"source": source_id, "format": "json"})
+            or decision.get("approved_url") != record["source"] or decision.get("confirmed") is not True
+            or decision.get("approved_scope") != "catalog_description"
+            or not isinstance(basis, str) or not 10 <= len(basis.strip()) <= 2000):
+        raise ValueError("Review the indicator description and record permission for that metadata scope.")
+    return {"source": record["source"], "permission_basis": basis.strip(), "scope": "catalog_description",
+            "metadata_sha256": indicator_metadata_checksum(record),
+            "terms_source": "https://www.worldbank.org/ext/en/legal/terms-conditions", "time": time.time()}

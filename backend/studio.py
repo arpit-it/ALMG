@@ -1673,6 +1673,16 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the next World Bank catalog page and limit first.")
                         job.update(status="loading_indicators", error=None)
                         worker = (load_indicators, (job, page))
+                    elif action == "approve-indicator-reuse" and status == "indicator_candidates":
+                        record = next((record for record in job["indicator_candidates"]
+                                       if record["source"] == data.get("approved_url")), None)
+                        if record is None:
+                            raise ValueError("Approve a listed indicator metadata URL first.")
+                        record["reuse_approval"] = world_bank.indicator_reuse_evidence(record, data)
+                        record["reuse_status"] = "user_approved"
+                        append_activity(job, "User reuse permission recorded for the indicator catalog description.")
+                        store_job(job)
+                        return self.respond({"id": job["id"]})
                     elif action == "close-indicators" and status == "indicator_candidates":
                         job.pop("indicator_candidates", None)
                         job.update(status="approval", error=None)

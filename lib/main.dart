@@ -1106,7 +1106,7 @@ class _StudioPageState extends State<StudioPage> {
     });
   }
 
-  Future<void> _approveCatalogReuse(String id, Map record, {String action = 'approve-catalog-reuse'}) async {
+  Future<void> _approveCatalogReuse(String id, Map record, {String action = 'approve-catalog-reuse', String? scope}) async {
     var basis = '';
     final approved = await showDialog<bool>(
       context: context,
@@ -1119,6 +1119,8 @@ class _StudioPageState extends State<StudioPage> {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               SelectableText(record['source'] as String),
+              if (scope == 'catalog_description')
+                const Text('This decision covers the displayed catalog description only. Country/year observations need separate review.'),
               const Text('Confirm you have permission to use this item for the project dataset. Record the license, permission, or other basis you reviewed.'),
               TextField(
                 autofocus: true,
@@ -1144,6 +1146,7 @@ class _StudioPageState extends State<StudioPage> {
       await _submit('/jobs/$id/$action', {
         'approved_url': record['source'],
         'permission_basis': basis,
+        'approved_scope': ?scope,
         'confirmed': true,
       });
     }
@@ -1598,7 +1601,9 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'indicator_candidates') ...[
           Text('World Bank catalog page $indicatorPage of $indicatorPages · up to 20 indicators. '
-              'Reuse rights are unverified. Observation and dataset collection are not available yet.'),
+              'Review permission for catalog descriptions. Observation and dataset collection are not available yet.'),
+          const Text('The catalog supplies no per-indicator reuse license. Review the source organization and applicable terms. Permission recorded here covers catalog descriptions only.'),
+          const SelectableText('Terms reference: https://www.worldbank.org/ext/en/legal/terms-conditions'),
           TextField(
             controller: _indicatorFilter,
             maxLength: 160,
@@ -1614,9 +1619,22 @@ class _StudioPageState extends State<StudioPage> {
           if (visibleIndicators.isEmpty)
             const Text('No indicators on this loaded page match. Clear the filter or review another catalog page.'),
           for (final record in visibleIndicators)
-            ListTile(
-              title: Text('${record['title']} (${record['indicator_id']})'),
-              subtitle: SelectableText('${record['description']}\nSource ${record['source_id']}: ${record['source_name']}\n${record['organization']}\n${record['source']}'),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  title: Text('${record['title']} (${record['indicator_id']})'),
+                  subtitle: SelectableText('${record['description']}\nSource ${record['source_id']}: ${record['source_name']}\n${record['organization']}\n${record['source']}'),
+                ),
+                if (record['reuse_approval'] case final Map approval)
+                  SelectableText('Catalog description reuse approval: ${approval['permission_basis']}')
+                else
+                  TextButton(
+                    onPressed: _busy ? null : () => _approveCatalogReuse(id as String, record,
+                        action: 'approve-indicator-reuse', scope: 'catalog_description'),
+                    child: const Text('Record description reuse approval'),
+                  ),
+              ],
             ),
           if (indicatorPage < indicatorPages) ...[
             Text('Loads catalog page ${indicatorPage + 1} from api.worldbank.org, up to 20 indicators. Replaces this preview.'),
