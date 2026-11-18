@@ -529,6 +529,10 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   preview retains permission and advisory evidence. All 40 Python tests
   passed; Flutter analysis found no issues. Full document collection
   and remaining providers stay open under key-free web discovery.
+  The rebuilt Mac app also explained the 40-character collection minimum
+  for an empty and a short offline catalog description. Neither exposed
+  collection approval; returning to dataset approval restored the source
+  choices. All four Flutter tests passed. Provider delivery remains partial.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

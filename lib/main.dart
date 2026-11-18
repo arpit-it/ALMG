@@ -1521,6 +1521,12 @@ class _StudioPageState extends State<StudioPage> {
                 if (record['metadata_reviewed'] == true) ...[
                   if (record['description'] case final String text when text.isNotEmpty)
                     SelectableText('Catalog description: $text'),
+                  if ((record['description'] as String? ?? '').length < 40)
+                    const Text(
+                      'This item has no collectable catalog description. '
+                      'Dataset collection needs at least 40 characters. '
+                      'Review another item or return to dataset approval.',
+                    ),
                   if ((record['advisories'] as Map).isEmpty)
                     const Text('No rights or access advisories were supplied for this item.'),
                   for (final entry in (record['advisories'] as Map).entries)
