@@ -218,14 +218,21 @@ def discover_text(job):
 
 def search_catalog(job):
     try:
-        query = job["plan"]["queries"][0]
-        url = "https://www.loc.gov/search/?" + urlencode({
-            "q": query, "fo": "json", "c": WIKIPEDIA_SEARCH_LIMIT,
-        })
-        result = request_json(url, headers={
-            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
-        }, opener=DISCOVERY)
-        candidates = loc_discovery.catalog_candidates(result, query, limit=WIKIPEDIA_SEARCH_LIMIT)
+        candidates = []
+        seen = set()
+        for query in job["plan"]["queries"]:
+            if len(candidates) >= 40:
+                break
+            url = "https://www.loc.gov/search/?" + urlencode({
+                "q": query, "fo": "json", "c": WIKIPEDIA_SEARCH_LIMIT,
+            })
+            result = request_json(url, headers={
+                "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+            }, opener=DISCOVERY)
+            for record in loc_discovery.catalog_candidates(result, query, limit=WIKIPEDIA_SEARCH_LIMIT):
+                if record["source"] not in seen and len(candidates) < 40:
+                    seen.add(record["source"])
+                    candidates.append(record)
         if not candidates:
             update(job, status="approval", error=(
                 "No Library of Congress records were available for review. Edit the query or choose another source."
@@ -1524,9 +1531,10 @@ class Handler(BaseHTTPRequestHandler):
                         worker = (prepare_dataset, (job, rows))
                     elif action == "search-catalog" and status == "approval" and job.get("recipe") == "classifier":
                         queries = job["plan"]["queries"]
-                        if (not queries or data.get("approved_query") != queries[0]
+                        if (not queries or data.get("approved_queries") != queries
                                 or data.get("approved_provider") != "loc"
-                                or data.get("approved_result_limit") != WIKIPEDIA_SEARCH_LIMIT):
+                                or data.get("approved_result_limit") != WIKIPEDIA_SEARCH_LIMIT
+                                or data.get("approved_total_limit") != 40):
                             raise ValueError("Approve the Library of Congress query and result limit first.")
                         job.update(status="searching_catalog", error=None)
                         worker = (search_catalog, (job,))

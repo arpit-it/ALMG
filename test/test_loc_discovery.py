@@ -156,3 +156,39 @@ class CatalogCandidatesTest(unittest.TestCase):
         self.assertEqual(job["status"], "dataset_ready")
         self.assertEqual(job["preview"][0]["reuse_approval"], permission)
         self.assertEqual(job["preview"][0]["title"], "Orchard archive")
+
+    def test_catalog_queries_deduplicate_sources_and_retain_query(self):
+        from unittest.mock import patch
+        from urllib.parse import parse_qs, urlsplit
+        from backend import studio
+
+        queries = ["orchard", "astronomy"]
+        job = {"plan": {"queries": queries}}
+        def response(url, **kwargs):
+            query = parse_qs(urlsplit(url).query)["q"][0]
+            return {"results": [
+                {"id": "https://www.loc.gov/item/shared/", "title": "Shared", "access-restricted": False},
+                {"id": f"https://www.loc.gov/item/{query}/", "title": query, "access-restricted": False},
+            ]}
+        with patch.object(studio, "request_json", side_effect=response) as request, \
+             patch.object(studio, "activity"), patch.object(studio, "store_job"):
+            studio.search_catalog(job)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(job["status"], "catalog_candidates")
+        self.assertEqual([row["approved_query"] for row in job["catalog_candidates"]],
+                         ["orchard", "orchard", "astronomy"])
+
+    def test_catalog_stops_before_contacting_queries_beyond_total_limit(self):
+        from unittest.mock import patch
+        from backend import studio
+
+        job = {"plan": {"queries": ["orchard", "astronomy", "unused"]}}
+        responses = [{"results": [
+            {"id": f"https://www.loc.gov/item/{batch}-{index}/", "title": "Archive", "access-restricted": False}
+            for index in range(25)
+        ]} for batch in range(2)]
+        with patch.object(studio, "request_json", side_effect=responses) as request, \
+             patch.object(studio, "activity"), patch.object(studio, "store_job"):
+            studio.search_catalog(job)
+        self.assertEqual(request.call_count, 2)
+        self.assertEqual(len(job["catalog_candidates"]), 40)

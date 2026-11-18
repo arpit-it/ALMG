@@ -539,6 +539,13 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   exactly those two URLs. Five Flutter tests passed, including rejection
   of unreviewed, unapproved and short records; analysis found no issues.
   Full document collection and remaining providers are still open.
+  Library of Congress discovery now requires approval of the full displayed
+  query list, 20 records per query and 40 total. In the rebuilt Mac app,
+  approving orchard and astronomy fixture queries produced both records
+  with the matching query beside each URL; the fixture logged exactly
+  those two searches. Tests verify cross-query URL deduplication and
+  stopping contacts at the total limit. All 42 Python tests passed and
+  Flutter analysis passed. The overall provider requirement remains open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

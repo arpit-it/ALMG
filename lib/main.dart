@@ -1500,13 +1500,15 @@ class _StudioPageState extends State<StudioPage> {
             plan != null && (plan['queries'] as List).isNotEmpty) ...[
           Text(
             'Library of Congress catalog preview · www.loc.gov. '
-            'Sends the first query for up to $searchLimit records.',
+            'Sends the listed queries for up to $searchLimit records per query and 40 total.',
           ),
-          SelectableText((plan['queries'] as List).first as String),
+          for (final query in plan['queries'] as List)
+            SelectableText('• $query'),
           OutlinedButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/search-catalog', {
               'approved_provider': 'loc',
-              'approved_query': (plan['queries'] as List).first,
+              'approved_queries': plan['queries'],
+              'approved_total_limit': 40,
               'approved_result_limit': searchLimit,
             }),
             child: const Text('Approve Library of Congress search'),
@@ -1514,17 +1516,17 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'catalog_candidates') ...[
           const Text('Review the item advisories and record permission before dataset collection.'),
-          if ((job?['catalog_candidates'] as List?)?.firstOrNull
-              case final Map record)
-            if (record['approved_query'] case final String query)
-              SelectableText('Approved catalog query: $query'),
           for (final record in job?['catalog_candidates'] as List? ?? const [])
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 ListTile(
                   title: Text(record['title'] as String),
-                  subtitle: SelectableText(record['source'] as String),
+                  subtitle: SelectableText([
+                    record['source'],
+                    if (record['approved_query'] case final String query)
+                      'Approved catalog query: $query',
+                  ].join('\n')),
                   trailing: collectableCatalogRecord(record as Map)
                       ? Checkbox(
                           value: !_excludedCatalogSources.contains(record['source']),
