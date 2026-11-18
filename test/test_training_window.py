@@ -137,3 +137,41 @@ class TrainingWindowTest(unittest.TestCase):
                 studio.restore_jobs()
                 self.assertEqual(studio.JOBS[job_id]['status'], 'failed')
                 self.assertNotIn(job_id, studio.TRAINING_DATA)
+
+    def test_cancelled_image_reopen_requires_confirmation_stopped_worker_and_valid_rows(self):
+        import tempfile
+        import json
+        from pathlib import Path
+        job = {'id': 'e' * 32, 'recipe': 'text_to_image', 'mode': 'synthetic', 'status': 'cancelled'}
+        with tempfile.TemporaryDirectory() as folder, patch.object(studio, 'ROOT', Path(folder)), patch.object(studio, 'TRAINING_WORKERS', set()):
+            directory = Path(folder) / 'training-sessions' / job['id']
+            directory.mkdir(parents=True)
+            data = directory / 'dataset.json'
+            rows = studio.image_recipe.dataset()
+            data.write_text(json.dumps(rows))
+            before = data.read_bytes()
+            with self.assertRaisesRegex(ValueError, 'Confirm reopening'):
+                studio.cancelled_training_rows(job, False)
+            studio.TRAINING_WORKERS.add(job['id'])
+            with self.assertRaisesRegex(ValueError, 'still stopping'):
+                studio.cancelled_training_rows(job, True)
+            studio.TRAINING_WORKERS.clear()
+            self.assertEqual(studio.cancelled_training_rows(job, True), rows)
+            self.assertEqual(data.read_bytes(), before)
+            data.write_text('[{"text":"invalid"}]')
+            with self.assertRaisesRegex(ValueError, 'saved dataset is invalid'):
+                studio.cancelled_training_rows(job, True)
+
+    def test_cancelled_image_reopen_route_prepares_without_starting_training(self):
+        import io
+        import json
+        from unittest.mock import Mock
+        job = {'id': 'image-cancel-fixture', 'recipe': 'text_to_image', 'status': 'cancelled'}
+        body = json.dumps({'confirmed': True}).encode()
+        handler = Mock(path='/jobs/image-cancel-fixture/reopen-cancelled', headers={'Content-Length': str(len(body))}, rfile=io.BytesIO(body))
+        rows = studio.image_recipe.dataset()
+        with patch.object(studio, 'JOBS', {job['id']: job}), patch.object(studio, 'store_job'), patch.object(studio, 'cancelled_training_rows', return_value=rows), patch.object(studio.threading, 'Thread') as thread:
+            studio.Handler.do_POST(handler)
+        self.assertEqual(job['status'], 'creating_dataset')
+        self.assertEqual(thread.call_args.kwargs['target'], studio.prepare_dataset)
+        self.assertEqual(thread.call_args.kwargs['args'], (job, rows))

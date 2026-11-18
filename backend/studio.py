@@ -1623,8 +1623,8 @@ class TrainingCancelled(Exception):
     """Stop a training worker at its next progress boundary."""
 
 
-def cancelled_classifier_rows(job, confirmed):
-    """Reopen cancelled classifier data only after its previous worker stops."""
+def cancelled_training_rows(job, confirmed):
+    """Reopen saved recipe data only after its previous worker stops."""
     if confirmed is not True:
         raise ValueError("Confirm reopening the saved dataset first.")
     if job["id"] in TRAINING_WORKERS:
@@ -1633,10 +1633,11 @@ def cancelled_classifier_rows(job, confirmed):
         rows = json.loads((ROOT / "training-sessions" / job["id"] / "dataset.json").read_text(encoding="utf-8"))
     except (OSError, ValueError) as error:
         raise ValueError("The saved dataset is unavailable. Start a new training conversation and import it again.") from error
-    if (not isinstance(rows, list) or not rows or any(not isinstance(row, dict)
-            or not isinstance(row.get("text"), str) or not row["text"].strip()
-            or row.get("label") not in job["plan"]["labels"] or not isinstance(row.get("group"), str) for row in rows)):
-        raise ValueError("The saved classifier dataset is invalid. Import it in a new training conversation.")
+    try:
+        recipe_contracts.validate_dataset(job.get("recipe", "classifier"), job.get("mode"),
+                                          rows, job.get("plan", {}).get("labels", ()))
+    except ValueError as error:
+        raise ValueError("The saved dataset is invalid. Start a new training conversation and prepare it again.") from error
     return rows
 
 
@@ -2587,8 +2588,8 @@ class Handler(BaseHTTPRequestHandler):
                         else:
                             job.update(status="creating_dataset", error=None, mode=mode)
                             worker = (prepare_dataset, (job,))
-                    elif action == "reopen-cancelled" and status == "cancelled" and job.get("recipe") == "classifier":
-                        rows = cancelled_classifier_rows(job, data.get("confirmed"))
+                    elif action == "reopen-cancelled" and status == "cancelled" and job.get("recipe", "classifier") in TRAINING_RECIPES:
+                        rows = cancelled_training_rows(job, data.get("confirmed"))
                         job.update(status="creating_dataset", error=None)
                         worker = (prepare_dataset, (job, rows))
                     elif action == "cancel" and status in ("queued", "waiting_idle", "training"):

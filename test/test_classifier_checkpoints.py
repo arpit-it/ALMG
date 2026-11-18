@@ -49,16 +49,16 @@ class ClassifierCheckpointTest(unittest.TestCase):
             rows = fixture_rows()
             (work / 'dataset.json').write_text(json.dumps(rows))
             with self.assertRaisesRegex(ValueError, 'Confirm'):
-                studio.cancelled_classifier_rows(job, False)
+                studio.cancelled_training_rows(job, False)
             studio.TRAINING_WORKERS.add(job['id'])
             with self.assertRaisesRegex(ValueError, 'still stopping'):
-                studio.cancelled_classifier_rows(job, True)
+                studio.cancelled_training_rows(job, True)
             studio.TRAINING_WORKERS.clear()
-            self.assertEqual(studio.cancelled_classifier_rows(job, True), rows)
+            self.assertEqual(studio.cancelled_training_rows(job, True), rows)
             self.assertEqual(job['status'], 'cancelled')
             (work / 'dataset.json').write_text('[]')
             with self.assertRaisesRegex(ValueError, 'invalid'):
-                studio.cancelled_classifier_rows(job, True)
+                studio.cancelled_training_rows(job, True)
 
     def test_training_worker_registration_clears_after_cancellation(self):
         from unittest.mock import patch

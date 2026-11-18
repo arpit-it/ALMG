@@ -1613,6 +1613,17 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   accuracy 1.000. The prepared dataset's SHA-256 was unchanged. No external
   collection occurred. Physical sleep/wake and actual busy/power transitions
   remain unverified, so this scheduler requirement stays open.
+  Cancelled image jobs now support the same explicit saved-dataset reopen
+  action as classifiers. Reopening requires confirmation, waits for the old
+  training worker to stop, validates saved rows against the recipe, and returns
+  to fresh training approval. The image UI explicitly says fitting restarts
+  without a partial-fit checkpoint. The 188-test Python suite passed (187
+  executed; opt-in Metal test skipped), plus 13 Flutter tests and clean analysis.
+  In the rebuilt Mac app, a saved cancelled image job showed the new action;
+  reopening restored 45 examples at approval, and explicit approval trained to
+  preview with accuracy 1.000. The dataset SHA-256 stayed unchanged. No external
+  collection occurred. Physical sleep/wake and real busy/power transitions
+  remain open.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
