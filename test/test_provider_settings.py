@@ -26,3 +26,13 @@ class ProviderSettingsTest(unittest.TestCase):
             chat_history.update_project(one, '', enabled_providers=[])
             with self.assertRaises(ValueError):
                 studio.require_enabled_provider({'project_id': one}, 'prepare', {'mode': 'web'})
+
+    def test_disabled_commons_blocks_existing_result_downloads(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(chat_history, 'DATABASE', Path(folder) / 'chat.sqlite3'):
+            project = chat_history.create_project('Offline images')['id']
+            chat_history.update_project(project, '', enabled_providers=['wikipedia'])
+            for action in ('search-images', 'download-images'):
+                with self.assertRaisesRegex(ValueError, 'disabled'):
+                    studio.require_enabled_provider({'project_id': project}, action, {})
+            chat_history.update_project(project, '', enabled_providers=['commons'])
+            studio.require_enabled_provider({'project_id': project}, 'download-images', {})

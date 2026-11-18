@@ -884,7 +884,7 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _submit(String path, Map<String, dynamic> body) async {
-    const providers = {'search-images': 'commons', 'search-catalog': 'loc', 'search-publications': 'europe_pmc',
+    const providers = {'search-images': 'commons', 'download-images': 'commons', 'search-catalog': 'loc', 'search-publications': 'europe_pmc',
       'search-entities': 'wikidata', 'load-indicators': 'world_bank', 'search-notices': 'federal_register',
       'search-companies': 'sec_edgar', 'search-filings': 'sec_edgar', 'search-bibliography': 'crossref',
       'review-website-access': 'project_website'};
@@ -1300,7 +1300,8 @@ class _StudioPageState extends State<StudioPage> {
                   else
                     ListTile(
                       title: SelectableText(website),
-                      subtitle: const Text('Robots review available; crawling unavailable'),
+                      trailing: _providerEnabled('project_website') ? null : const Text('Disabled'),
+                      subtitle: const Text('Robots review and separately approved page previews'),
                     ),
                 ],
                 ListTile(
@@ -1622,9 +1623,11 @@ class _StudioPageState extends State<StudioPage> {
                 _showDiscoveryProviders((plan['queries'] as List).isNotEmpty),
             child: const Text('Browse discovery providers'),
           ),
+          if (discoveryProviderNames.keys.any((provider) => !_providerEnabled(provider)))
+            const Text('Some providers are disabled for this project. Use Browse discovery providers, then Project discovery settings, to enable them.'),
           if (!_imageRecipe && projectWebsite.isNotEmpty) ...[
             SelectableText('Project website: $projectWebsite'),
-            OutlinedButton(onPressed: _busy ? null : () async {
+            OutlinedButton(onPressed: _busy || !_providerEnabled('project_website') ? null : () async {
               final site = Uri.parse(projectWebsite);
               final destination = Uri(scheme: 'https', host: site.host, path: '/robots.txt').toString();
               final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
@@ -1651,7 +1654,7 @@ class _StudioPageState extends State<StudioPage> {
             for (final query in plan['queries'] as List)
               SelectableText(query as String),
             OutlinedButton(
-              onPressed: _busy
+              onPressed: _busy || !_providerEnabled('commons')
                   ? null
                   : () => _submit('/jobs/$id/search-images', {
                       'approved_provider': 'commons',
@@ -1687,7 +1690,7 @@ class _StudioPageState extends State<StudioPage> {
                 ),
               if (!_imageRecipe && (plan['queries'] as List).isNotEmpty)
                 OutlinedButton(
-                  onPressed: _busy
+                  onPressed: _busy || !_providerEnabled('wikipedia')
                       ? null
                       : () => _submit('/jobs/$id/prepare', {
                           'mode': 'web',
@@ -1709,7 +1712,7 @@ class _StudioPageState extends State<StudioPage> {
           for (final query in plan['queries'] as List)
             SelectableText('• $query'),
           OutlinedButton(
-            onPressed: _busy ? null : () => _submit('/jobs/$id/search-catalog', {
+            onPressed: _busy || !_providerEnabled('loc') ? null : () => _submit('/jobs/$id/search-catalog', {
               'approved_provider': 'loc',
               'approved_queries': plan['queries'],
               'approved_total_limit': 40,
@@ -1725,7 +1728,7 @@ class _StudioPageState extends State<StudioPage> {
           for (final query in plan['queries'] as List)
             SelectableText('• $query'),
           OutlinedButton(
-            onPressed: _busy ? null : () => _submit('/jobs/$id/search-publications', {
+            onPressed: _busy || !_providerEnabled('europe_pmc') ? null : () => _submit('/jobs/$id/search-publications', {
               'approved_provider': 'europe_pmc',
               'approved_queries': plan['queries'],
               'approved_total_limit': 40,
@@ -1740,7 +1743,7 @@ class _StudioPageState extends State<StudioPage> {
               'Sends the listed queries in English for up to 20 items per query and 40 total.'),
           for (final query in plan['queries'] as List) SelectableText('• $query'),
           OutlinedButton(
-            onPressed: _busy ? null : () => _submit('/jobs/$id/search-entities', {
+            onPressed: _busy || !_providerEnabled('wikidata') ? null : () => _submit('/jobs/$id/search-entities', {
               'approved_provider': 'wikidata', 'approved_queries': plan['queries'],
               'approved_result_limit': 20, 'approved_total_limit': 40,
             }),
@@ -1751,7 +1754,7 @@ class _StudioPageState extends State<StudioPage> {
           const Text('World Bank indicator catalog preview · api.worldbank.org. '
               'Loads the first catalog page, up to 20 indicators, unfiltered by model queries. Country/year observations are not loaded.'),
           OutlinedButton(
-            onPressed: _busy ? null : () => _submit('/jobs/$id/load-indicators', {
+            onPressed: _busy || !_providerEnabled('world_bank') ? null : () => _submit('/jobs/$id/load-indicators', {
               'approved_provider': 'world_bank', 'approved_scope': 'indicator_catalog',
               'approved_page': 1, 'approved_result_limit': 20,
             }),
@@ -1764,7 +1767,7 @@ class _StudioPageState extends State<StudioPage> {
               'Sends the listed queries for up to 20 documents per query and 40 total.'),
           for (final query in plan['queries'] as List) SelectableText('• $query'),
           OutlinedButton(
-            onPressed: _busy ? null : () => _submit('/jobs/$id/search-notices', {
+            onPressed: _busy || !_providerEnabled('federal_register') ? null : () => _submit('/jobs/$id/search-notices', {
               'approved_provider': 'federal_register', 'approved_queries': plan['queries'],
               'approved_result_limit': 20, 'approved_total_limit': 40,
             }),
@@ -1776,7 +1779,7 @@ class _StudioPageState extends State<StudioPage> {
           const Text('SEC EDGAR company filing preview · data.sec.gov. Enter a CIK and contact email. One submissions request returns up to 20 recent filing records; model queries are not sent. Filing content is not loaded.'),
           TextField(controller: _secQuery, maxLength: 160, decoration: const InputDecoration(labelText: 'SEC company name or ticker')),
           OutlinedButton(
-            onPressed: _busy ? null : () async {
+            onPressed: _busy || !_providerEnabled('sec_edgar') ? null : () async {
               final query = _secQuery.text.trim();
               final contact = _secContact.text.trim();
               if (query.isEmpty) {
@@ -1800,7 +1803,7 @@ class _StudioPageState extends State<StudioPage> {
           TextField(controller: _secCik, maxLength: 10, decoration: const InputDecoration(labelText: 'SEC company CIK')),
           TextField(controller: _secContact, maxLength: 200, decoration: const InputDecoration(labelText: 'SEC user agent contact email')),
           OutlinedButton(
-            onPressed: _busy ? null : () async {
+            onPressed: _busy || !_providerEnabled('sec_edgar') ? null : () async {
               final cik = _secCik.text.trim();
               final contact = _secContact.text.trim();
               if (!RegExp(r'^[0-9]{1,10}$').hasMatch(cik) || int.parse(cik) == 0) {
@@ -1825,7 +1828,7 @@ class _StudioPageState extends State<StudioPage> {
               'Sends the listed queries for up to 20 records per query and 40 total.'),
           for (final query in plan['queries'] as List) SelectableText('• $query'),
           OutlinedButton(
-            onPressed: _busy ? null : () => _submit('/jobs/$id/search-bibliography', {
+            onPressed: _busy || !_providerEnabled('crossref') ? null : () => _submit('/jobs/$id/search-bibliography', {
               'approved_provider': 'crossref', 'approved_queries': plan['queries'],
               'approved_result_limit': 20, 'approved_total_limit': 40,
             }),

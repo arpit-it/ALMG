@@ -228,7 +228,7 @@ SEC_LAST_REQUEST = 0.0
 
 
 EXTERNAL_PROVIDER_ACTIONS = {
-    "search-images": "commons", "search-catalog": "loc", "review-catalog-item": "loc",
+    "search-images": "commons", "download-images": "commons", "search-catalog": "loc", "review-catalog-item": "loc",
     "search-publications": "europe_pmc", "review-publication": "europe_pmc", "search-entities": "wikidata",
     "load-indicators": "world_bank", "next-indicators": "world_bank", "search-notices": "federal_register",
     "review-notice": "federal_register", "search-companies": "sec_edgar", "search-filings": "sec_edgar",
