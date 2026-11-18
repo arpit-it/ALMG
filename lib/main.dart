@@ -727,6 +727,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_notices',
         'searching_bibliography',
         'searching_filings',
+        'reviewing_filing',
         'searching_companies',
         'reviewing_bibliography',
         'reviewing_notice',
@@ -1391,6 +1392,7 @@ class _StudioPageState extends State<StudioPage> {
       'searching_notices': 'Searching Federal Register',
       'searching_companies': 'Finding SEC companies',
       'company_candidates': 'Choose an SEC company',
+      'reviewing_filing': 'Loading approved SEC filing text',
       'searching_filings': 'Loading SEC company filings',
       'filing_candidates': 'Review SEC filing URLs',
       'searching_bibliography': 'Searching Crossref',
@@ -1748,12 +1750,32 @@ class _StudioPageState extends State<StudioPage> {
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-companies', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'filing_candidates') ...[
-          const Text('SEC filing metadata only. Reuse is unverified; filing content collection is not available yet.'),
+          const Text('Review each filing URL before loading its text. Reuse remains unverified; dataset collection is not available yet.'),
           if ((job?['filing_candidates'] as List? ?? const []).isEmpty)
             const Text('No supported recent filings were found for this company.'),
           for (final record in job?['filing_candidates'] as List? ?? const [])
-            ListTile(title: Text('${record['company']} · ${record['form']}'),
-              subtitle: SelectableText('CIK ${record['cik']} · ${record['filing_date']}\nAccession ${record['accession']}\n${record['source']}')),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              ListTile(title: Text('${record['company']} · ${record['form']}'),
+                subtitle: SelectableText('CIK ${record['cik']} · ${record['filing_date']}\nAccession ${record['accession']}\n${record['source']}')),
+              if (record['filing_reviewed'] == true) ...[
+                SelectableText('Filing text preview: ${record['filing_text']}'),
+                if (record['filing_text_truncated'] == true) const Text('Preview truncated to 50,000 characters.'),
+                const Text('Loading a filing does not establish permission to reuse its content.'),
+              ],
+              OutlinedButton(onPressed: _busy ? null : () async {
+                final contact = _secContact.text.trim();
+                final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+                  title: const Text('Approve SEC filing text preview'),
+                  content: SelectableText('${record['source']}\nUser-Agent: ALMG/1.0 $contact\nYour contact email will be sent to www.sec.gov. One request, at most 1 MiB, HTML or plain text only. Preview at most 50,000 characters. Linked resources are not loaded. Refreshing clears earlier reuse approval.'),
+                  actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+                    FilledButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve filing text request'))],
+                ));
+                if (confirmed == true) {
+                  await _submit('/jobs/$id/review-filing', {'approved_url': record['source'], 'contact': contact,
+                    'approved_byte_limit': 1048576});
+                }
+              }, child: const Text('Review filing text request')),
+            ]),
           TextButton(onPressed: _busy ? null : () => _submit('/jobs/$id/close-filings', {}), child: const Text('Return to dataset approval')),
         ],
         if (status == 'bibliographic_candidates') ...[

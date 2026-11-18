@@ -757,6 +757,16 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   request and no submissions request. All 94 Python tests and Flutter
   analysis passed. Filing reuse, content collection, project websites and
   the remaining broad discovery criteria stay open.
+
+  SEC filing text preview now requires separate approval of a listed URL,
+  contact header and 1 MiB limit. HTML/plain-text extraction displays at
+  most 50,000 characters without linked-resource loading. In the rebuilt
+  Mac app, cancelling left content unloaded; approval fetched only the
+  listed local fixture and displayed its text without head or script text.
+  Reuse stayed unverified and dataset collection unavailable. All 96 Python
+  tests and Flutter analysis passed, including format/size limits, source
+  validation and stale-preview removal. Filing reuse, dataset collection
+  and project website discovery remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

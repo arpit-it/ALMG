@@ -226,6 +226,41 @@ SEC_REQUEST_LOCK = threading.Lock()
 SEC_LAST_REQUEST = 0.0
 
 
+def load_sec_document(source, agent):
+    with DISCOVERY.open(Request(source, headers={"User-Agent": agent}), timeout=30) as response:
+        if response.geturl() != source:
+            raise ValueError("The filing URL changed; approve a new source.")
+        return sec_discovery.document_preview(response.read(sec_discovery.DOCUMENT_LIMIT + 1),
+                                              response.headers.get_content_type())
+
+
+def review_filing(job, source, contact):
+    global SEC_LAST_REQUEST
+    try:
+        record = next(record for record in job["filing_candidates"] if record["source"] == source)
+        sec_discovery.filing_source(record)
+        _, agent = sec_discovery.submissions_request(record["cik"], contact)
+        with SEC_REQUEST_LOCK:
+            time.sleep(max(0, 1 - (time.monotonic() - SEC_LAST_REQUEST)))
+            SEC_LAST_REQUEST = time.monotonic()
+            preview = load_sec_document(source, agent)
+        with LOCK:
+            record.update(preview)
+            record.pop("reuse_approval", None)
+            job.update(status="filing_candidates", error=None)
+            append_activity(job, "Loaded the approved SEC filing text preview; reuse remains unverified.")
+            store_job(job)
+    except (OSError, ValueError, IncompleteRead, UnicodeError):
+        with LOCK:
+            for record in job["filing_candidates"]:
+                if record["source"] == source:
+                    for key in ("filing_text", "filing_reviewed", "filing_text_truncated", "reuse_approval"):
+                        record.pop(key, None)
+                    record["reuse_status"] = "unverified"
+            job.update(status="filing_candidates", error="Filing preview failed. Only HTML or plain text up to 1 MiB is supported. Review and approve another attempt.")
+            store_job(job)
+
+
 def search_companies(job, query, contact):
     global SEC_LAST_REQUEST
     try:
@@ -943,6 +978,13 @@ def restore_jobs():
                 job.update(status="catalog_candidates", error=(
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
+                store_job(job)
+            elif job["status"] == "reviewing_filing":
+                for record in job.get("filing_candidates", []):
+                    for key in ("filing_text", "filing_reviewed", "filing_text_truncated", "reuse_approval"):
+                        record.pop(key, None)
+                    record["reuse_status"] = "unverified"
+                job.update(status="filing_candidates", error="Filing preview was interrupted. Review and approve the URL again.")
                 store_job(job)
             elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "searching_entities", "searching_notices", "searching_bibliography", "searching_filings", "searching_companies", "loading_indicators", "reviewing_bibliography", "reviewing_notice", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
@@ -1845,6 +1887,15 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the SEC destination, contact and preview limit first.")
                         job.update(status="searching_filings", error=None)
                         worker = (search_filings, (job, cik, contact))
+                    elif action == "review-filing" and status == "filing_candidates":
+                        source, contact = data.get("approved_url"), data.get("contact")
+                        record = next((record for record in job["filing_candidates"] if record["source"] == source), None)
+                        if record is None or data.get("approved_byte_limit") != sec_discovery.DOCUMENT_LIMIT:
+                            raise ValueError("Approve a listed filing URL and the 1 MiB limit first.")
+                        sec_discovery.filing_source(record)
+                        sec_discovery.submissions_request(record["cik"], contact)
+                        job.update(status="reviewing_filing", error=None)
+                        worker = (review_filing, (job, source, contact))
                     elif action == "close-filings" and status == "filing_candidates":
                         job.pop("filing_candidates", None)
                         job.update(status="approval", error=None)

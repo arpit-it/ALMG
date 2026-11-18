@@ -86,3 +86,57 @@ def company_candidates(payload, query, limit=20):
         if len(rows) >= limit:
             break
     return rows
+
+
+DOCUMENT_LIMIT = 1024 * 1024
+PREVIEW_LIMIT = 50000
+
+
+def filing_source(record):
+    """Revalidate a saved result before contacting its document URL."""
+    from urllib.parse import urlsplit
+    source = record.get('source')
+    if not isinstance(source, str):
+        raise ValueError('Approve a listed filing URL first.')
+    parts = urlsplit(source)
+    payload = {'cik': record.get('cik'), 'name': record.get('company'), 'filings': {'recent': {
+        'accessionNumber': [record.get('accession')], 'filingDate': [record.get('filing_date')],
+        'form': [record.get('form')], 'primaryDocument': [parts.path.rsplit('/', 1)[-1]]}}}
+    rows = filing_candidates(payload, str(record.get('cik')))
+    if len(rows) != 1 or rows[0]['source'] != source:
+        raise ValueError('Approve a valid listed SEC filing URL first.')
+    return source
+
+
+def document_preview(data, content_type):
+    """Extract bounded filing text without executing HTML or loading resources."""
+    from html.parser import HTMLParser
+    if len(data) > DOCUMENT_LIMIT or content_type not in {'text/html', 'application/xhtml+xml', 'text/plain'}:
+        raise ValueError('Filing preview supports HTML or plain text up to 1 MiB.')
+    try:
+        text = data.decode('utf-8')
+    except UnicodeDecodeError:
+        text = data.decode('windows-1252')
+    if content_type != 'text/plain':
+        class FilingText(HTMLParser):
+            def __init__(self):
+                super().__init__(convert_charrefs=True)
+                self.hidden = []
+                self.chunks = []
+            def handle_starttag(self, tag, attrs):
+                if self.hidden or tag in {'script', 'style', 'head', 'iframe', 'object', 'noscript', 'ix:hidden'}:
+                    self.hidden.append(tag)
+            def handle_endtag(self, tag):
+                if self.hidden and tag in self.hidden:
+                    self.hidden = self.hidden[:self.hidden.index(tag)]
+            def handle_data(self, data):
+                if not self.hidden:
+                    self.chunks.append(data)
+        parser = FilingText()
+        parser.feed(text)
+        text = ' '.join(parser.chunks)
+    text = ' '.join(text.split())
+    if not text or any(unicodedata.category(c) in {'Cc', 'Cs'} for c in text):
+        raise ValueError('No readable filing text was found.')
+    return {'filing_text': text[:PREVIEW_LIMIT], 'filing_text_truncated': len(text) > PREVIEW_LIMIT,
+            'filing_reviewed': True, 'reuse_status': 'unverified'}
