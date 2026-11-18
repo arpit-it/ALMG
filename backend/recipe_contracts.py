@@ -193,11 +193,36 @@ def validate_dataset(recipe_id, mode, rows, labels=()):
             if mode == 'web_images':
                 if not isinstance(row.get('image'), str) or not row['image']:
                     raise ValueError(prefix + 'an encoded image is required.')
+                import base64
+                import io
+                from PIL import Image
+                try:
+                    if len(row['image']) > 100_000:
+                        raise ValueError('Encoded image is too large.')
+                    content = base64.b64decode(row['image'], validate=True)
+                    with Image.open(io.BytesIO(content)) as image:
+                        if image.format != 'PNG' or image.size != (48, 48) or image.mode != 'RGB':
+                            raise ValueError('Expected a prepared 48x48 RGB PNG.')
+                        image.load()
+                except (ValueError, OSError) as error:
+                    raise ValueError(prefix + 'a valid prepared 48x48 RGB PNG is required.') from error
             elif (row.get('shape') not in ('circle', 'square', 'triangle')
                     or row.get('color') not in ('red', 'green', 'blue', 'yellow', 'purple')
                     or row.get('position') not in ('left', 'center', 'right')
                     or not isinstance(row.get('mask'), list) or len(row['mask']) != 48 * 48
                     or not isinstance(row.get('rgb'), list) or len(row['rgb']) != 3):
                 raise ValueError(prefix + 'valid shape, color, position, mask and RGB fields are required.')
+            elif (any(type(value) not in (int, float) or not 0 <= value <= 1 for value in row['mask'])
+                  or any(type(value) is not int or not 0 <= value <= 255 for value in row['rgb'])):
+                raise ValueError(prefix + 'mask values must be between 0 and 1 and RGB channels must be integers from 0 to 255.')
     if recipe_id == 'text_to_image' and {row['split'] for row in rows} != {'train', 'test'}:
         raise ValueError('Image recipe requires both training and held-out examples.')
+
+    if recipe_id == 'text_to_image' and mode != 'web_images':
+        training = [row for row in rows if row['split'] == 'train']
+        combinations = {(row['shape'], row['position']) for row in training}
+        colors = {row['color'] for row in training}
+        if (any((shape, position) not in combinations for shape in ('circle', 'square', 'triangle')
+                for position in ('left', 'center', 'right'))
+                or not {'red', 'green', 'blue', 'yellow', 'purple'} <= colors):
+            raise ValueError('Shape training requires every shape/position combination and every color.')

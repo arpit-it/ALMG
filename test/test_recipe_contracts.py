@@ -281,3 +281,33 @@ class RecipeContractsTest(unittest.TestCase):
         with patch.dict(recipe_contracts._CONTRACTS['classifier']['dataset']['modes'],
                         {'fixture_mode': {'label': 'Fixture', 'variant': 'classifier'}}):
             self.assertEqual(recipe_contracts.execution_variant('classifier', 'fixture_mode'), 'classifier')
+
+    def test_image_dataset_validates_numeric_values_and_training_coverage(self):
+        from copy import deepcopy
+        rows = studio.image_recipe.dataset()
+        for field, value in [('mask', float('nan')), ('mask', '1'), ('mask', 2),
+                             ('rgb', 256), ('rgb', -1), ('rgb', True)]:
+            invalid = deepcopy(rows)
+            invalid[0][field][0] = value
+            with self.subTest(field=field, value=value), self.assertRaisesRegex(ValueError, 'mask values'):
+                recipe_contracts.validate_dataset('text_to_image', 'synthetic', invalid)
+        invalid = [row for row in rows if not (row['shape'] == 'circle' and row['position'] == 'center' and row['split'] == 'train')]
+        with self.assertRaisesRegex(ValueError, 'every shape/position'):
+            recipe_contracts.validate_dataset('text_to_image', 'synthetic', invalid)
+
+    def test_caption_dataset_requires_prepared_rgb_png(self):
+        import base64
+        import io
+        from PIL import Image
+        def encoded(size, mode, format):
+            output = io.BytesIO()
+            Image.new(mode, size).save(output, format=format)
+            return base64.b64encode(output.getvalue()).decode()
+        valid = encoded((48, 48), 'RGB', 'PNG')
+        rows = [{'text': 'local fixture', 'split': split, 'image': valid} for split in ('train', 'test')]
+        recipe_contracts.validate_dataset('text_to_image', 'web_images', rows)
+        for content in ('invalid base64', base64.b64encode(b'not an image').decode(),
+                        encoded((49, 48), 'RGB', 'PNG'), encoded((48, 48), 'L', 'PNG'),
+                        encoded((48, 48), 'RGB', 'JPEG'), 'A' * 100001):
+            with self.assertRaisesRegex(ValueError, 'valid prepared'):
+                recipe_contracts.validate_dataset('text_to_image', 'web_images', [{**rows[0], 'image': content}, rows[1]])

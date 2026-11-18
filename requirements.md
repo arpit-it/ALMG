@@ -1499,6 +1499,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   The installed environment has MLX inference but no mlx_lm package or ALMG
   LoRA workflow; small LoRA validation remains unverified. No recipe, external
   collection or downloads were added. Remaining recipe integration stays open.
+  Image dataset validation now checks numeric mask/RGB bounds, complete
+  shape/color training coverage, and bounded, readable 48x48 RGB PNG inputs
+  for the Commons recipe. All 165 Python tests passed using local numeric and
+  encoded-image fixtures. In the rebuilt Mac app, approving an image dataset
+  with RGB=256 failed with the displayed example-1 bounds error and saved no
+  preview candidate. A separate valid 45-example fixture passed the same gate
+  and trained to inference preview with held-out accuracy 1.000. No external
+  collection occurred. LoRA validation and remaining integration stay open.
 - [ ] Check available memory and disk before training. Verify idle detection, power checks, sleep and wake recovery, and safe resume after the machine becomes busy.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
