@@ -12,7 +12,12 @@ from pathlib import Path
 from threading import Lock
 from urllib.parse import quote, unquote_to_bytes, urlsplit
 
-DATABASE = Path(os.environ.get("STUDIO_CHAT_DB", Path(__file__).parent / "runs" / "chat.sqlite3"))
+if __package__:
+    from .project_storage import project_database
+else:
+    from project_storage import project_database
+
+DATABASE = project_database(Path(__file__).parent)
 DISCOVERY_PROVIDERS = ('wikipedia', 'commons', 'loc', 'europe_pmc', 'wikidata', 'world_bank', 'federal_register', 'sec_edgar', 'crossref', 'project_website')
 SEND_LOCK = Lock()
 SCHEMA_LOCK = Lock()

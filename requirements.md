@@ -1055,6 +1055,18 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   restore rollback. Fresh-installation and app-update storage verification
   remain open.
 
+  Project databases now default to a stable per-user data directory outside
+  the release folder (Application Support/ALMG on macOS). First use copies
+  a legacy database with SQLite backup and atomic publication, leaving the
+  original intact and never replacing an existing stable database. Explicit
+  database/data-directory overrides remain supported. The rebuilt Mac app
+  reopened three migrated fixture sources, then reopened and searched them
+  after switching to a second backend release folder with no project data.
+  Both releases used the same isolated stable database; the legacy database
+  remained byte-for-byte unchanged. All 127 Python tests passed with
+  warnings treated as errors, and Flutter analysis passed. Fresh-install
+  restore/reuse verification remains open.
+
 
 - [ ] Support importing labeled datasets and previewing examples and class balance. Flag missing labels, ambiguous examples, duplicates, and near duplicates. Keep related examples together when splitting data.
   The isolated Mac app showed one billing example and zero shipping examples
