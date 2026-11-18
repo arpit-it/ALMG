@@ -28,3 +28,34 @@ def publication_candidates(payload, query, *, limit=20):
         candidates.append({"source": url, "title": title[:500], "provider": "europe_pmc",
                            "approved_query": query, "reuse_status": "unverified"})
     return candidates
+
+
+def abstract_request_url(source):
+    """Build one metadata request from a supported, previously reviewed publication URL."""
+    from urllib.parse import urlencode
+    match = re.fullmatch(r"https://europepmc\.org/article/(MED/[0-9]+|PMC/PMC[0-9]+)", source) if isinstance(source, str) else None
+    if not match:
+        raise ValueError("Approve a supported publication URL first.")
+    database, identity = match[1].split("/")
+    return "https://www.ebi.ac.uk/europepmc/webservices/rest/search?" + urlencode({
+        "query": f"EXT_ID:{identity} AND SRC:{database}", "format": "json", "resultType": "core", "pageSize": 1,
+    })
+
+
+def publication_abstract(payload, source):
+    """Validate publication identity and return display text without reuse permission."""
+    from html import unescape
+    abstract_request_url(source)
+    results = payload.get("resultList", {}).get("result") if isinstance(payload, dict) and isinstance(payload.get("resultList"), dict) else None
+    if not isinstance(results, list) or len(results) != 1 or not isinstance(results[0], dict):
+        raise ValueError("Europe PMC returned invalid abstract metadata.")
+    record = results[0]
+    if f"https://europepmc.org/article/{record.get('source')}/{record.get('id')}" != source:
+        raise ValueError("The abstract metadata does not match the approved publication.")
+    text = record.get("abstractText", "")
+    if not isinstance(text, str) or len(text) > 50000:
+        raise ValueError("Europe PMC returned unreadable abstract metadata.")
+    text = " ".join(unescape(re.sub(r"<[^>]+>", " ", text)).split())
+    if any(unicodedata.category(c) in {"Cc", "Cs"} for c in text):
+        raise ValueError("Europe PMC returned unreadable abstract metadata.")
+    return {"abstract": text, "abstract_reviewed": True, "reuse_status": "unverified"}

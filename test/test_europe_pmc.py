@@ -39,3 +39,38 @@ class PublicationDiscoveryTest(unittest.TestCase):
                 studio.search_publications(job)
             self.assertEqual(job["status"], "approval")
             self.assertIn("Europe PMC", job["error"])
+
+    def test_abstract_identity_text_and_request_scope(self):
+        from backend.europe_pmc import abstract_request_url, publication_abstract
+        source = "https://europepmc.org/article/MED/12345"
+        url = abstract_request_url(source)
+        self.assertIn("resultType=core", url)
+        self.assertIn("pageSize=1", url)
+        self.assertIn("EXT_ID%3A12345+AND+SRC%3AMED", url)
+        payload = {"resultList": {"result": [{"source": "MED", "id": "12345", "abstractText": "<h4>Orchards</h4>Fruit &amp; trees."}]}}
+        self.assertEqual(publication_abstract(payload, source), {
+            "abstract": "Orchards Fruit & trees.", "abstract_reviewed": True, "reuse_status": "unverified"})
+        payload["resultList"]["result"][0]["id"] = "54321"
+        with self.assertRaisesRegex(ValueError, "does not match"):
+            publication_abstract(payload, source)
+        with self.assertRaises(ValueError):
+            abstract_request_url(source + "/../other")
+
+    def test_missing_and_invalid_abstracts(self):
+        from backend.europe_pmc import publication_abstract
+        source = "https://europepmc.org/article/MED/12345"
+        record = {"source": "MED", "id": "12345"}
+        payload = {"resultList": {"result": [record]}}
+        self.assertEqual(publication_abstract(payload, source)["abstract"], "")
+        for text in ([], "x" * 50001, "bad\ud800", "bad\x00"):
+            with self.subTest(text_type=type(text)), self.assertRaises(ValueError):
+                publication_abstract({"resultList": {"result": [{**record, "abstractText": text}]}}, source)
+
+    def test_failed_abstract_refresh_removes_stale_text(self):
+        record = {"source": "https://europepmc.org/article/MED/12345", "abstract": "Old abstract", "abstract_reviewed": True}
+        job = {"publication_candidates": [record]}
+        with patch.object(studio, "request_json", side_effect=ValueError("bad metadata")), patch.object(studio, "store_job"):
+            studio.review_publication(job, record["source"])
+        self.assertEqual(job["status"], "publication_candidates")
+        self.assertNotIn("abstract", record)
+        self.assertNotIn("abstract_reviewed", record)

@@ -567,6 +567,14 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   approved query, omitted a malformed ID, and returned to dataset approval.
   Reuse stays unverified; abstract/full-text collection and other provider
   work remain open. All 49 Python tests and Flutter analysis passed.
+  Europe PMC abstract metadata now requires separate approval of a listed
+  publication URL. The rebuilt Mac app loaded an offline abstract only
+  for the approved record, displayed normalized text, and kept reuse
+  unverified. Fixture logs showed one discovery request and one exact-ID
+  core metadata request; no publication link was fetched. All 52 Python
+  tests and Flutter analysis passed. Tests cover mismatched identities,
+  missing/invalid text and stale-text removal on refresh failure. Rights
+  review, dataset collection and full-text loading remain open.
   The rebuilt Mac app retained three approved Wikipedia search results
   and omitted the fixture excerpt that fell below the minimum after Unicode
   normalization.

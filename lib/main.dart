@@ -694,6 +694,7 @@ class _StudioPageState extends State<StudioPage> {
         'searching_text',
         'searching_catalog',
         'searching_publications',
+        'reviewing_publication',
         'reviewing_catalog_item',
         'creating_dataset',
         'training',
@@ -1300,6 +1301,7 @@ class _StudioPageState extends State<StudioPage> {
       'searching_catalog': 'Searching the Library of Congress',
       'searching_publications': 'Searching Europe PMC',
       'publication_candidates': 'Review Europe PMC publications',
+      'reviewing_publication': 'Loading publication abstract metadata',
       'catalog_candidates': 'Review Library of Congress records',
       'reviewing_catalog_item': 'Loading catalog item advisories',
       'text_candidates': 'Review Wikipedia sources',
@@ -1533,11 +1535,27 @@ class _StudioPageState extends State<StudioPage> {
         ],
         if (status == 'publication_candidates') ...[
           const Text('Publication metadata only. Reuse rights are unverified. '
-              'Abstract and full-text collection are not available yet.'),
+              'Training collection and full-text loading are not available yet.'),
           for (final record in job?['publication_candidates'] as List? ?? const [])
-            ListTile(
-              title: Text(record['title'] as String),
-              subtitle: SelectableText('${record['source']}\nApproved query: ${record['approved_query']}'),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                ListTile(
+                  title: Text(record['title'] as String),
+                  subtitle: SelectableText('${record['source']}\nApproved query: ${record['approved_query']}'),
+                ),
+                if (record['abstract_reviewed'] == true)
+                  SelectableText((record['abstract'] as String).isEmpty
+                      ? 'No abstract was supplied for this publication.'
+                      : 'Abstract: ${record['abstract']}'),
+                const Text('Loads abstract metadata from www.ebi.ac.uk for this publication. Reuse remains unverified.'),
+                OutlinedButton(
+                  onPressed: _busy ? null : () => _submit('/jobs/$id/review-publication', {
+                    'approved_url': record['source'],
+                  }),
+                  child: const Text('Approve loading abstract metadata'),
+                ),
+              ],
             ),
           TextButton(
             onPressed: _busy ? null : () => _submit('/jobs/$id/close-publications', {}),

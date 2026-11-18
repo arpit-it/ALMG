@@ -237,6 +237,29 @@ def search_publications(job):
         update(job, status="approval", error="Europe PMC search failed. Review the query and approve another attempt or choose another source.")
 
 
+def review_publication(job, source):
+    try:
+        result = request_json(europe_pmc.abstract_request_url(source), headers={
+            "User-Agent": "ALMG/1.0 (https://github.com/arpit-it/ALMG)",
+        }, opener=DISCOVERY)
+        review = europe_pmc.publication_abstract(result, source)
+        with LOCK:
+            for record in job["publication_candidates"]:
+                if record["source"] == source:
+                    record.update(review)
+            job.update(status="publication_candidates", error=None)
+            append_activity(job, "Publication abstract metadata loaded for review. Reuse remains unverified.")
+            store_job(job)
+    except (OSError, ValueError, IncompleteRead):
+        with LOCK:
+            for record in job["publication_candidates"]:
+                if record["source"] == source:
+                    record.pop("abstract", None)
+                    record.pop("abstract_reviewed", None)
+            job.update(status="publication_candidates", error="Abstract metadata could not be loaded. Review the publication URL and approve another attempt.")
+            store_job(job)
+
+
 def search_catalog(job):
     try:
         candidates = []
@@ -694,9 +717,10 @@ def restore_jobs():
                     "Item metadata loading was interrupted. Review and approve the item URL to retry."
                 ))
                 store_job(job)
-            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "reviewing_catalog_item"):
+            elif job["status"] in ("searching_text", "searching_images", "searching_catalog", "searching_publications", "reviewing_publication", "reviewing_catalog_item"):
                 job.pop("text_candidates", None)
                 job.pop("image_candidates", None)
+                job.pop("publication_candidates", None)
                 job.update(status="approval", error=(
                     "Web search was interrupted. Review and approve the queries to retry."
                 ))
@@ -1561,6 +1585,13 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError("Approve the Europe PMC query and result limit first.")
                         job.update(status="searching_publications", error=None)
                         worker = (search_publications, (job,))
+                    elif action == "review-publication" and status == "publication_candidates":
+                        source = data.get("approved_url")
+                        if not isinstance(source, str) or not any(record["source"] == source for record in job["publication_candidates"]):
+                            raise ValueError("Approve a listed publication URL first.")
+                        europe_pmc.abstract_request_url(source)
+                        job.update(status="reviewing_publication", error=None)
+                        worker = (review_publication, (job, source))
                     elif action == "close-publications" and status == "publication_candidates":
                         job.pop("publication_candidates", None)
                         job.update(status="approval", error=None)
