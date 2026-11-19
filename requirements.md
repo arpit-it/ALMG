@@ -1752,6 +1752,29 @@ P3-LMF-01 partial progress · training approval revisions · 2026-11-19:
   approach, full versioned stage interfaces, checkpoint lineage and complete
   acceptance verification. P3-LMF-01 remains open; hardware blockers stay separate.
 
+P3-LMF-01 partial progress · classifier checkpoint lineage · 2026-11-19:
+- Completed classifier evaluations and their run records now include a versioned
+  checkpoint lineage entry: compatibility key, fresh/resumed/rejected state,
+  number of restored candidates, source checkpoint hash and final checkpoint hash.
+  Mismatched or unreadable checkpoints are identified separately and retain the
+  existing safe fresh-fit behavior. Image recipes still restart fitting and do not
+  claim checkpoint support. Existing stored jobs and checkpoints need no rewrite.
+- Local app verification: rebuilt/launched macOS ALMG with a generated 48-row
+  classifier dataset and a local checkpoint containing one completed candidate.
+  Selected the run and explicitly approved immediate training in the desktop UI.
+  The run reused that candidate and reached preview at held-out macro F1 1.000.
+  Opened the native run record and verified state resumed, restored_candidates 1,
+  compatibility key, source SHA-256 and final SHA-256 matching the checkpoint file.
+  All fixture artifacts stayed outside Git; no external collection occurred.
+- Verification: 204 Python tests (203 passed, one opt-in Metal test skipped), all
+  16 Flutter tests passed and Flutter analysis clean. Tests verify resume skips
+  completed fits and matches uninterrupted evaluation, changed-dataset rejection,
+  and corrupt-checkpoint rejection followed by successful replacement.
+- Remaining: from-scratch decoder registration/construction, explicit approach
+  selection, complete versioned pipeline interfaces and language-model-specific
+  checkpoint lineage. P3-LMF-01 stays open; physical power/Windows blockers remain
+  separate and do not block independent implementation.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

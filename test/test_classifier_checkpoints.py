@@ -25,6 +25,12 @@ class ClassifierCheckpointTest(unittest.TestCase):
             _, clean_rows, clean_metrics = studio.train(fixture_rows(), ['fruit', 'astronomy'], 0.8)
             self.assertTrue(any('Resuming 1 completed' in message for message in messages))
             self.assertFalse(any('Fitting and validating candidate 1 of' in message for message in messages))
+            lineage = resumed_metrics.pop('checkpoint_lineage')
+            self.assertEqual(lineage['state'], 'resumed')
+            self.assertEqual(lineage['restored_candidates'], 1)
+            self.assertEqual(len(lineage['source_sha256']), 64)
+            self.assertEqual(lineage['written_sha256'], studio.run_manifest.file_digest(checkpoint))
+            self.assertEqual(clean_metrics.pop('checkpoint_lineage')['state'], 'not_requested')
             self.assertEqual(resumed_metrics, clean_metrics)
             self.assertEqual(resumed_rows, clean_rows)
 
@@ -35,9 +41,24 @@ class ClassifierCheckpointTest(unittest.TestCase):
             changed = fixture_rows()
             changed[0]['text'] += ' changed'
             messages = []
-            studio.train(changed, ['fruit', 'astronomy'], 0.8, checkpoint_path=checkpoint, report=messages.append)
+            _, _, metrics = studio.train(changed, ['fruit', 'astronomy'], 0.8, checkpoint_path=checkpoint, report=messages.append)
+            self.assertEqual(metrics['checkpoint_lineage']['state'], 'rejected_mismatch')
+            self.assertEqual(metrics['checkpoint_lineage']['restored_candidates'], 0)
             self.assertTrue(any('does not match' in message for message in messages))
             self.assertTrue(any('Fitting and validating candidate 1 of' in message for message in messages))
+
+    def test_corrupt_checkpoint_records_rejection_and_successful_replacement(self):
+        with tempfile.TemporaryDirectory() as folder:
+            checkpoint = Path(folder) / 'checkpoint.joblib'
+            checkpoint.write_bytes(b'not a checkpoint')
+            original_hash = studio.run_manifest.file_digest(checkpoint)
+            _, _, metrics = studio.train(fixture_rows(), ['fruit', 'astronomy'], .8, checkpoint_path=checkpoint)
+            lineage = metrics['checkpoint_lineage']
+            self.assertEqual(lineage['state'], 'rejected_unreadable')
+            self.assertEqual(lineage['source_sha256'], original_hash)
+            self.assertEqual(lineage['restored_candidates'], 0)
+            self.assertNotEqual(lineage['written_sha256'], original_hash)
+            self.assertTrue(metrics['passed'])
 
     def test_cancelled_dataset_requires_confirmation_and_stopped_worker(self):
         import json

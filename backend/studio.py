@@ -897,18 +897,26 @@ def train(rows, labels, target, repair=None, report=None, checkpoint_path=None):
         "format": "almg-classifier-candidates-v1", "sklearn": sklearn_version,
         "rows": rows, "labels": labels, "target": target, "repair": repair is not None,
     }, sort_keys=True, ensure_ascii=False).encode("utf-8")).hexdigest()
+    checkpoint_lineage = {'schema_version': 1, 'compatibility_key': checkpoint_key,
+                          'state': 'fresh' if checkpoint_path is not None else 'not_requested',
+                          'restored_candidates': 0, 'source_sha256': None, 'written_sha256': None}
     if checkpoint_path is not None and checkpoint_path.is_file():
         try:
+            checkpoint_lineage["source_sha256"] = run_manifest.file_digest(checkpoint_path)
             saved = joblib.load(checkpoint_path)
             if (saved.get("key") == checkpoint_key and type(saved.get("completed")) is int
                     and 1 <= saved["completed"] <= len(candidates)
                     and len(saved.get("trials", [])) == saved["completed"] and saved.get("best") is not None):
                 completed, trials, best = saved["completed"], saved["trials"], saved["best"]
+                checkpoint_lineage.update(state="resumed", restored_candidates=completed)
                 if report:
                     report(f"Resuming {completed} completed classifier candidates from {checkpoint_path}.")
-            elif report:
-                report("Saved classifier checkpoint does not match this approved dataset and settings; starting candidate fits again.")
+            else:
+                checkpoint_lineage["state"] = "rejected_mismatch"
+                if report:
+                    report("Saved classifier checkpoint does not match this approved dataset and settings; starting candidate fits again.")
         except (OSError, ValueError, TypeError, KeyError, EOFError, UnpicklingError):
+            checkpoint_lineage["state"] = "rejected_unreadable"
             if report:
                 report("Saved classifier checkpoint could not be read; starting candidate fits again.")
 
@@ -979,9 +987,12 @@ def train(rows, labels, target, repair=None, report=None, checkpoint_path=None):
     for part, indices in (("train", fit), ("validation", validation), ("test", test)):
         for i in indices:
             rows[i]["split"] = part
+    if checkpoint_path is not None and checkpoint_path.is_file():
+        checkpoint_lineage['written_sha256'] = run_manifest.file_digest(checkpoint_path)
     metrics = {"algorithm": name, "validation_macro_f1": score, "test_macro_f1": test_score,
                "target_macro_f1": target, "passed": bool(passed), "trials": trials,
-               "test_examples": len(test), "test_report": test_report, "repair_error": repair_error, "split_seed": seed}
+               "test_examples": len(test), "test_report": test_report, "repair_error": repair_error, "split_seed": seed,
+               "checkpoint_lineage": checkpoint_lineage}
     return model, rows, metrics
 
 
