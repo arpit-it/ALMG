@@ -71,3 +71,39 @@ class DecoderResourcesTest(unittest.TestCase):
         for value in (True, -1, 1.5, '128000'):
             with self.assertRaises(ValueError):
                 resources.check_size(value, Path('/tmp'))
+
+    def test_boundary_loss_records_failure_and_preserves_cancel_and_checkpoint(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            submit = Mock()
+            record = decoder_trials.start(root, True, submit)
+            checkpoint = decoder_trials.folder(root, record['id'])/'artifacts/step-50/preserved'
+            checkpoint.parent.mkdir(parents=True)
+            checkpoint.write_bytes(b'unchanged checkpoint')
+            snapshot = record['resource_checks'][0]
+            def train(*args, **kwargs):
+                self.assertFalse(kwargs['stop']())
+                self.assertFalse(kwargs['stop']())
+                kwargs['stop']()
+                self.fail('Low resources must stop optimization')
+            with patch.object(resources, 'check_size', side_effect=[snapshot, snapshot, snapshot, resources.ResourceUnavailable('Memory reserve lost')]), patch.object(decoder_training, 'run', side_effect=train):
+                decoder_trials.execute(root, record['id'])
+            paused = decoder_trials.read(root, record['id'])
+            self.assertEqual(paused['interruption_reason'], 'resources_unavailable')
+            self.assertEqual(paused['resource_monitor']['successful_boundaries'], 2)
+            self.assertIn('Memory reserve lost', paused['resource_monitor']['last_failure']['error'])
+            self.assertEqual(checkpoint.read_bytes(), b'unchanged checkpoint')
+            self.assertEqual(len(paused['resource_checks']), 2)
+
+    def test_boundary_evidence_merge_keeps_concurrent_cancellation(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            record = decoder_trials.start(root, True, Mock())
+            def probe(*args):
+                decoder_trials.cancel(root, record['id'], True)
+                return record['resource_checks'][0]
+            with patch.object(resources, 'check_size', side_effect=probe):
+                decoder_trials.monitor_resources(root, record['id'], record['specification'])
+            saved = decoder_trials.read(root, record['id'])
+            self.assertTrue(saved['cancel_requested'])
+            self.assertEqual(saved['resource_monitor']['successful_boundaries'], 1)

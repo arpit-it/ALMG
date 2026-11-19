@@ -192,6 +192,26 @@ def record_resources(root, record, phase):
         'phase': phase, 'checked_at': datetime.now(timezone.utc).isoformat(), **evidence}]
 
 
+def monitor_resources(root, trial_id, spec):
+    """Probe at a cooperative boundary and merge evidence without losing cancel state."""
+    timestamp = datetime.now(timezone.utc).isoformat()
+    try:
+        evidence = training_resources.check_size(spec['resource_budget']['encoded_data_bytes'], Path(root))
+    except training_resources.ResourceUnavailable as error:
+        with _LOCK:
+            saved = read(root, trial_id)
+            monitor = saved.setdefault('resource_monitor', {'version': 1, 'successful_boundaries': 0})
+            monitor['last_failure'] = {'checked_at': timestamp, 'error': str(error)}
+            write(root, saved)
+        raise
+    with _LOCK:
+        saved = read(root, trial_id)
+        monitor = saved.setdefault('resource_monitor', {'version': 1, 'successful_boundaries': 0})
+        monitor['successful_boundaries'] += 1
+        monitor['latest'] = {'checked_at': timestamp, **evidence}
+        write(root, saved)
+
+
 def execute(root, trial_id):
     key = (str(Path(root)), trial_id)
     try:
@@ -215,7 +235,8 @@ def execute(root, trial_id):
                 return True
             if record.get('scheduling', {}).get('require_idle_ac') is True:
                 require_readiness(_READINESS.get(key))
-            return False
+            monitor_resources(root, trial_id, current_spec)
+            return stop_event.is_set()
 
         if dataset is None:
             result = decoder_training.run(recipe_contracts.initialize_recipe,

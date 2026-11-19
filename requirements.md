@@ -2332,6 +2332,37 @@ P3-LMF-01 partial progress · decoder memory/disk admission and worker checks ·
   P3-LMF-01 stays open; independent physical/Windows blockers remain skipped.
   Generated artifacts, downloaded weights and unrelated user changes are excluded.
 
+P3-LMF-01 partial progress · resource monitoring during decoder optimization · 2026-11-19:
+- Extended the shared decoder stop callback to probe memory/disk reserves at every
+  existing cooperative training boundary, including optimizer steps and the final
+  pre-publication check. The same callback serves generated and reviewed-data
+  trials. Low/unknown resources interrupt rather than continuing optimization;
+  completed checkpoints remain available for explicit approval-bound resume.
+- Persisted a bounded version-1 monitoring summary: successful-boundary count,
+  latest successful resource snapshot and timestamped last failure. Kept admission/
+  execution evidence separately. Evidence writes merge the current durable record
+  under the trial lock, retaining concurrent cancellation flags; cancellation is
+  checked again after probing. Historical failure evidence survives successful
+  resume rather than being erased by later successful probes.
+- Local app verification: rebuilt/launched macOS ALMG with an isolated seeded
+  review and synthetic memory-loss fixture triggered after actual step-50 checkpoint
+  creation. Native approval ran real Metal training, then the linked result showed
+  resources_unavailable, 151 successful boundary checks, recorded low-memory
+  evidence and an intact checkpoint. Restored actual resource probes and approved
+  resume natively: the run reused its checkpoint, completed with held-out accuracy
+  1.000, retained the prior failure and recorded 303 cumulative successful checks.
+  Restarted backend/app and reopened the linked native result; the entire saved
+  record was unchanged. Evidence: /tmp/almg-boundary-resource-qa/{paused-ui.json,
+  completed-ui.json,restarted-ui.json}. Resource loss was simulated without stressing
+  the machine or claiming physical power/sleep verification.
+- Verification: 274 backend tests passed with ALMG_METAL_TESTS=1; all 16 Flutter
+  tests passed; Flutter analysis clean. Added optimizer-boundary resource failure,
+  bounded evidence, preserved checkpoint and concurrent cancellation merge coverage.
+- Remaining: physical power/sleep/idle verification, richer data/tokenizers,
+  evaluated release gates and full acceptance verification. P3-LMF-01 remains open;
+  physical/Windows blockers stay separate and skipped. No external collection,
+  generated artifacts, downloaded weights or unrelated user edits are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
