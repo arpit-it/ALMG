@@ -2230,6 +2230,40 @@ P3-LMF-01 partial progress · automatic workbench factory routing · 2026-11-19:
   remain separate blocked criteria. Generated artifacts/weights and unrelated
   user edits are excluded from this commit.
 
+P3-LMF-01 partial progress · reviewed datasets in automatic factory conversations · 2026-11-19:
+- Added prepared local dataset selection to the main decoder approach review.
+  The native picker fetches the verified manifest, requires explicit review, then
+  requests a new asynchronous approach proposal for that exact dataset. The
+  conversation shows its dataset ID/count and saved train/validation/test scope.
+  Selecting data or asking for a proposal does not start training.
+- Backend preflight rejects missing consent, absent/changed manifests and existing
+  tokenizer/data incompatibilities before changing the review stage. New proposals
+  and the conversation retain the reviewed dataset snapshot; final approval passes
+  that snapshot into the durable trial. An earlier generated-text proposal revision
+  cannot authorize the data-bound run. Planner failure records failure without
+  submitting training; existing generated-text routing uses the same helper.
+- Local app verification: rebuilt/launched macOS ALMG against isolated local text
+  fixtures. Seeded a factory-review conversation through the local API after native
+  goal-input accessibility proved unreliable, then exercised the changed workflow
+  entirely in the native app: selected six-document data, reviewed its manifest,
+  requested a fresh proposal, verified exact corpus scope and no trial before final
+  confirmation, approved, and opened the linked completed result. Actual Metal
+  training reduced loss 1.365828 → 0.067526 with validation/test accuracy 1.000.
+  Planner input contained dataset metadata and no fixture document text. Restarted
+  backend and app, reopened the saved conversation and verified its linked result
+  (dataset/proposal/approval/metrics) was unchanged. Deterministic planner fixtures
+  verify integration rather than additional live-Qwen planning quality. Evidence:
+  /tmp/almg-factory-data-qa/{dataset-review-ui.json,proposal-review-ui.txt,
+  completed-ui.json,restarted-ui.json}.
+- Verification: 263 backend tests passed with ALMG_METAL_TESTS=1; 16 Flutter tests
+  passed; Flutter analysis clean. New tests cover reviewed data consent, invalid
+  manifests, asynchronous proposal staging, stale earlier approval rejection,
+  correct dataset linkage, restore and planning failure without training.
+- Remaining: general scheduling/idle/power integration, richer data/tokenizers,
+  evaluated release gates and full acceptance verification. P3-LMF-01 remains open;
+  physical power and Windows checks remain independent blocked items. No external
+  collection occurred; generated artifacts/weights and unrelated edits are excluded.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

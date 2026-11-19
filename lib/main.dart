@@ -1613,6 +1613,38 @@ class _StudioPageState extends State<StudioPage> {
     if (approved == true && mounted) await _startDecoderTrial(dataset: dataset);
   }
 
+  Future<void> _selectFactoryDataset() async {
+    try {
+      final datasets = (await _request('/decoder-datasets'))['datasets'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Select reviewed decoder dataset'), children: [
+          if (datasets.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Prepare local text documents in Training recipe details first.')),
+          for (final dataset in datasets) SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(dataset as Map)),
+            child: Text('${(dataset['id'] as String).substring(0, 8)} · ${dataset['unique_documents']} documents'),
+          ),
+        ],
+      ));
+      if (selected == null || !mounted) return;
+      final dataset = await _request('/decoder-datasets/${selected['id']}');
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Review dataset for this conversation'), scrollable: true,
+        content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(dataset))),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Use reviewed dataset for planning'))],
+      ));
+      if (confirmed == true && mounted) {
+        await _submit('/jobs/${_job!['id']}/plan-decoder-dataset', {
+          'confirmed': true, 'dataset': dataset,
+        });
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   Future<void> _prepareDecoderDataset() async {
     try {
       final files = await openFiles(acceptedTypeGroups: [const XTypeGroup(label: 'UTF-8 text', extensions: ['txt'])]);
@@ -2113,7 +2145,10 @@ class _StudioPageState extends State<StudioPage> {
           Text('Registered recipe: ${proposal['recipe_contract']['name']}'),
           Text('Recommended approach: ${proposal['approach']}'),
           SelectableText(proposal['reason'] as String),
-          const Text('Scope: fixed generated local text, fresh weights, 100 steps, seed 7 and immediate Metal execution. This bounded trial does not release a model. Your own documents require separate dataset review.'),
+          Text(job?['decoder_dataset'] == null
+            ? 'Scope: fixed generated local text, fresh weights, 100 steps, seed 7 and immediate Metal execution. This bounded trial does not release a model.'
+            : 'Scope: reviewed dataset ${job!['decoder_dataset']['id']}, ${job['decoder_dataset']['unique_documents']} documents and saved train/validation/test splits. Fresh weights, 100 steps, seed 7 and immediate Metal execution. This bounded trial does not release a model.'),
+          OutlinedButton(onPressed: _busy ? null : _selectFactoryDataset, child: const Text('Choose reviewed local dataset')),
           if (proposal['executable'] == true)
             FilledButton(onPressed: _busy ? null : () => _submit('/jobs/$id/approve-decoder-trial', {
               'confirmed': true, 'proposal_revision': proposal['revision'],

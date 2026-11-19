@@ -2251,12 +2251,21 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError("Training task not found.")
                     require_enabled_provider(job, action, data)
                     status = job["status"]
+                    if action == 'plan-decoder-dataset' and status == 'factory_review':
+                        if data.get('confirmed') is not True:
+                            raise ValueError('Review the selected local dataset before planning.')
+                        dataset = decoder_trials.decoder_dataset_training.preflight(ROOT, data.get('dataset'))[0]
+                        job.update(status='planning', error=None)
+                        store_job(job)
+                        threading.Thread(target=self.make_factory_plan, args=(job, dataset), daemon=True).start()
+                        return self.respond({'id': job['id']}, 202)
                     if action == 'approve-decoder-trial' and status == 'factory_review':
                         proposal = job['decoder_proposal']
                         if data.get('proposal_revision') != proposal['revision']:
                             raise ValueError('Review the current decoder approach before approval.')
                         record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
-                                                      proposal_id=proposal['id'], proposal_revision=proposal['revision'])
+                                                      proposal_id=proposal['id'], proposal_revision=proposal['revision'],
+                                                      dataset=job.get('decoder_dataset'))
                         job.update(status='factory_trial', decoder_trial_id=record['id'], error=None)
                         store_job(job)
                         return self.respond({'id': job['id']}, 202)
@@ -2822,6 +2831,18 @@ class Handler(BaseHTTPRequestHandler):
             self.respond({"error": str(error)}, 400)
 
     @staticmethod
+    def make_factory_plan(job, dataset=None):
+        """Re-propose a bounded trial against an explicitly reviewed data snapshot."""
+        try:
+            activity(job, 'Qwen is preparing a bounded decoder approach for explicit review.')
+            proposal = decoder_trials.propose(ROOT, job['prompt'], ask,
+                                             planner_identity=inference.loaded_identity, dataset=dataset)
+            update(job, recipe=proposal['recipe'], recipe_contract=proposal['recipe_contract'],
+                   decoder_proposal=proposal, decoder_dataset=dataset, status='factory_review')
+        except Exception as error:
+            update(job, status='failed', error=str(error))
+
+    @staticmethod
     def make_plan(job):
         """Generate the dataset plan and record success or failure on the job."""
         try:
@@ -2835,10 +2856,8 @@ class Handler(BaseHTTPRequestHandler):
                     update(job, planner_message=reason, status="clarification")
                     return
             if recipe in {item['id'] for item in recipe_contracts.planning_catalog('decoder_trial')}:
-                activity(job, 'Qwen is preparing a bounded decoder approach for explicit review.')
-                proposal = decoder_trials.propose(ROOT, job['prompt'], ask, planner_identity=inference.loaded_identity)
-                update(job, recipe=recipe, recipe_contract=proposal['recipe_contract'],
-                       planner_message=reason, decoder_proposal=proposal, status='factory_review')
+                update(job, planner_message=reason)
+                Handler.make_factory_plan(job)
                 return
             if recipe == "text_to_image":
                 proposal = {"labels": [], "queries": [query.strip()]}
