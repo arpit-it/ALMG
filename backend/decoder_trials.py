@@ -14,6 +14,24 @@ else:
 _LOCK = threading.Lock()
 _ACTIVE = set()
 _CANCEL = {}
+_READINESS = {}
+
+
+class ReadinessPaused(ValueError):
+    """A guarded trial needs renewed explicit approval after readiness changes."""
+
+
+def require_readiness(probe):
+    try:
+        state = probe() if callable(probe) else None
+        idle = state.get('idle_seconds') if isinstance(state, dict) else None
+        valid = (isinstance(state, dict) and state.get('ready') is True
+                 and state.get('ac_power') is True and type(idle) in (int, float)
+                 and 600 <= idle < 1e12)
+    except Exception:
+        valid = False
+    if not valid:
+        raise ReadinessPaused('Idle/AC readiness is not confirmed. Require AC power and 600 idle seconds; review and approve again when ready.')
 
 
 def specification(dataset=None):
@@ -97,6 +115,8 @@ def approved_proposal(root, proposal_id, revision, spec):
 
 
 def approval_revision(record):
+    if record.get('scheduling') is not None:
+        return run_manifest.digest({key: record.get(key) for key in ('specification', 'proposal', 'scheduling')})
     if record.get('proposal') is None:
         return run_manifest.digest(record['specification'])
     return run_manifest.digest({'specification': record['specification'], 'proposal': record['proposal']})
@@ -121,7 +141,7 @@ def read(root, trial_id):
         record = json.loads((folder(root, trial_id) / 'record.json').read_text(encoding='utf-8'))
         if (type(record.get('schema_version')) is not int or record['schema_version'] != 1 or record.get('id') != trial_id
                 or not isinstance(record.get('created_at'), str)
-                or record.get('status') not in ('queued', 'running', 'interrupted', 'complete')):
+                or record.get('status') not in ('waiting_idle', 'queued', 'running', 'interrupted', 'complete')):
             raise ValueError('Unsupported decoder trial record.')
         return record
     except (OSError, TypeError, AttributeError) as error:
@@ -145,7 +165,7 @@ def recover(root):
     """A restarted backend never resumes work without renewed approval."""
     for record in list_trials(root, limit=None):
         with _LOCK:
-            if (str(Path(root)), record['id']) not in _ACTIVE and record.get('status') in ('queued', 'running'):
+            if (str(Path(root)), record['id']) not in _ACTIVE and record.get('status') in ('waiting_idle', 'queued', 'running'):
                 record.update(status='interrupted', error='Backend stopped. Review the saved trial and approve resume.')
                 write(root, record)
 
@@ -156,7 +176,7 @@ def cancel(root, trial_id, confirmed):
     key = (str(Path(root)), trial_id)
     with _LOCK:
         record = read(root, trial_id)
-        if record['status'] not in ('queued', 'running') or key not in _CANCEL:
+        if record['status'] not in ('waiting_idle', 'queued', 'running') or key not in _CANCEL:
             raise ValueError('Only an active saved trial can be cancelled.')
         _CANCEL[key].set()
         record.update(cancel_requested=True, error='Cancellation requested; waiting for the next training boundary.')
@@ -181,12 +201,19 @@ def execute(root, trial_id):
                 raise decoder_training.Cancelled('Cancelled before training. Approve resume to continue.')
             record.update(status='running', error=None, artifact_directory=str(folder(root, trial_id) / 'artifacts'))
             write(root, record)
+        def stop():
+            if stop_event.is_set():
+                return True
+            if record.get('scheduling', {}).get('require_idle_ac') is True:
+                require_readiness(_READINESS.get(key))
+            return False
+
         if dataset is None:
             result = decoder_training.run(recipe_contracts.initialize_recipe,
-                                          work_directory=folder(root, trial_id) / 'artifacts', stop=stop_event.is_set)
+                                          work_directory=folder(root, trial_id) / 'artifacts', stop=stop)
         else:
             result = decoder_dataset_training.run(recipe_contracts.initialize_recipe, root, dataset,
-                work_directory=folder(root, trial_id) / 'artifacts', stop=stop_event.is_set)
+                work_directory=folder(root, trial_id) / 'artifacts', stop=stop)
         with _LOCK:
             record = read(root, trial_id)
             if stop_event.is_set():
@@ -201,16 +228,57 @@ def execute(root, trial_id):
             record.update(status='interrupted', error=str(error))
             if isinstance(error, decoder_training.Cancelled):
                 record['interruption_reason'] = 'user_cancelled'
+            elif isinstance(error, ReadinessPaused):
+                record['interruption_reason'] = 'readiness_changed'
             write(root, record)
     finally:
         with _LOCK:
             _ACTIVE.discard(key)
             _CANCEL.pop(key, None)
+            _READINESS.pop(key, None)
 
 
-def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_revision=None, dataset=None):
+def wait_and_submit(root, trial_id, submit):
+    """Wait outside the training worker; approval does not need an already-idle UI."""
+    key = (str(Path(root)), trial_id)
+    dispatched = False
+    try:
+        event = _CANCEL[key]
+        while True:
+            if event.is_set():
+                raise decoder_training.Cancelled('Cancelled while waiting for idle time and AC power.')
+            try:
+                require_readiness(_READINESS.get(key))
+            except ReadinessPaused:
+                if event.wait(2):
+                    raise decoder_training.Cancelled('Cancelled while waiting for idle time and AC power.')
+                continue
+            with _LOCK:
+                record = read(root, trial_id)
+                record.update(status='queued', error=None)
+                write(root, record)
+            submit(execute, root, trial_id)
+            dispatched = True
+            return
+    except Exception as error:
+        with _LOCK:
+            record = read(root, trial_id)
+            record.update(status='interrupted', error=str(error),
+                          interruption_reason='user_cancelled' if isinstance(error, decoder_training.Cancelled) else 'worker_unavailable')
+            write(root, record)
+    finally:
+        if not dispatched:
+            with _LOCK:
+                _ACTIVE.discard(key)
+                _CANCEL.pop(key, None)
+                _READINESS.pop(key, None)
+
+
+def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_revision=None, dataset=None, require_idle_ac=None, readiness=None):
     if confirmed is not True:
         raise ValueError('Approve the generated-text decoder trial before starting it.')
+    if require_idle_ac is not None and type(require_idle_ac) is not bool:
+        raise ValueError('Idle/AC guard must be true or false.')
     spec = specification()
     if dataset is not None and trial_id is not None:
         raise ValueError('Review local-dataset training separately; a generated-text proposal or existing trial cannot change data scope.')
@@ -236,21 +304,36 @@ def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_rev
                 raise ValueError('Decoder trial implementation changed. Approve a new trial instead.')
             if (folder(root, trial_id) / 'artifacts' / 'bundle').exists():
                 raise ValueError('A complete bundle already exists. Preserve it and approve a new trial instead.')
+        guarded = record.get('scheduling', {}).get('require_idle_ac', False)
+        if trial_id is not None and record.get('approval') is not None and require_idle_ac is not None and require_idle_ac != guarded:
+            raise ValueError('The saved trial execution policy cannot change during resume.')
+        if record.get('approval') is None and require_idle_ac is True:
+            record['scheduling'] = {'require_idle_ac': True, 'required_idle_seconds': 600,
+                                    'on_readiness_change': 'interrupt_and_require_approval'}
+            guarded = True
+        if guarded and not callable(readiness):
+            raise ValueError('A local readiness probe is required for guarded training.')
         if record.get('approval') is not None:
             record.setdefault('previous_approvals', []).append(record['approval'])
-        record.update(status='queued', error=None, cancel_requested=False, interruption_reason=None, specification=spec,
+        record.update(status='waiting_idle' if guarded else 'queued', error=None, cancel_requested=False, interruption_reason=None, specification=spec,
                       approval={'id': uuid.uuid4().hex, 'confirmed_at': datetime.now(timezone.utc).isoformat(),
                                 'revision': run_manifest.digest(spec)})
         record['approval']['revision'] = approval_revision(record)
         write(root, record)
         _ACTIVE.add((str(Path(root)), trial_id))
         _CANCEL[(str(Path(root)), trial_id)] = threading.Event()
+        if guarded:
+            _READINESS[(str(Path(root)), trial_id)] = readiness
     try:
-        submit(execute, root, trial_id)
+        if guarded:
+            threading.Thread(target=wait_and_submit, args=(root, trial_id, submit), daemon=True).start()
+        else:
+            submit(execute, root, trial_id)
     except Exception:
         with _LOCK:
             _ACTIVE.discard((str(Path(root)), trial_id))
             _CANCEL.pop((str(Path(root)), trial_id), None)
+            _READINESS.pop((str(Path(root)), trial_id), None)
         record.update(status='interrupted', error='Worker could not start. Review and approve resume.')
         write(root, record)
         raise

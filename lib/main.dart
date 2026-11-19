@@ -615,6 +615,7 @@ class _StudioPageState extends State<StudioPage> {
 
   bool get _imageRecipe => _job?['recipe'] == 'text_to_image';
   Map<String, dynamic>? _job;
+  bool _decoderRequireIdle = false;
   final Set<String> _excludedTextSources = {};
   final Set<String> _excludedCatalogSources = {};
   final Set<String> _excludedPublications = {};
@@ -1770,7 +1771,7 @@ class _StudioPageState extends State<StudioPage> {
       scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(record))),
       actions: [
-        if (['queued', 'running'].contains(record['status'])) TextButton(onPressed: () {
+        if (['waiting_idle', 'queued', 'running'].contains(record['status'])) TextButton(onPressed: () {
           Navigator.pop(context);
           _cancelDecoderTrial(record['id'] as String);
         }, child: const Text('Cancel saved decoder trial')),
@@ -2146,12 +2147,18 @@ class _StudioPageState extends State<StudioPage> {
           Text('Recommended approach: ${proposal['approach']}'),
           SelectableText(proposal['reason'] as String),
           Text(job?['decoder_dataset'] == null
-            ? 'Scope: fixed generated local text, fresh weights, 100 steps, seed 7 and immediate Metal execution. This bounded trial does not release a model.'
-            : 'Scope: reviewed dataset ${job!['decoder_dataset']['id']}, ${job['decoder_dataset']['unique_documents']} documents and saved train/validation/test splits. Fresh weights, 100 steps, seed 7 and immediate Metal execution. This bounded trial does not release a model.'),
+            ? 'Scope: fixed generated local text, fresh weights, 100 steps, seed 7 and Metal execution. This bounded trial does not release a model.'
+            : 'Scope: reviewed dataset ${job!['decoder_dataset']['id']}, ${job['decoder_dataset']['unique_documents']} documents and saved train/validation/test splits. Fresh weights, 100 steps, seed 7 and Metal execution. This bounded trial does not release a model.'),
+          CheckboxListTile(contentPadding: EdgeInsets.zero,
+            title: const Text('Require idle time and AC power'),
+            subtitle: const Text('Approval waits for AC power and 600 idle seconds without occupying the training worker. Readiness changes pause training; resume needs approval.'),
+            value: _decoderRequireIdle,
+            onChanged: _busy ? null : (value) => setState(() => _decoderRequireIdle = value ?? false)),
+          if (!_decoderRequireIdle) const Text('Execution: start immediately after approval.'),
           OutlinedButton(onPressed: _busy ? null : _selectFactoryDataset, child: const Text('Choose reviewed local dataset')),
           if (proposal['executable'] == true)
             FilledButton(onPressed: _busy ? null : () => _submit('/jobs/$id/approve-decoder-trial', {
-              'confirmed': true, 'proposal_revision': proposal['revision'],
+              'confirmed': true, 'proposal_revision': proposal['revision'], 'require_idle_ac': _decoderRequireIdle,
             }), child: const Text('Confirm from-scratch decoder trial'))
           else
             const Text('This approach is unavailable in the decoder trial workflow. Revise the goal to continue.'),

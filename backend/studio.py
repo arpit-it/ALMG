@@ -2130,13 +2130,14 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask, planner_identity=inference.loaded_identity, dataset=data.get('dataset')))
             if self.path == '/decoder-trials':
                 record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
-                                              proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'), dataset=data.get('dataset'))
+                                              proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'), dataset=data.get('dataset'),
+                                              require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness)
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'cancel':
                 return self.respond(decoder_trials.cancel(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'resume':
-                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit, parts[1])
+                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit, parts[1], readiness=training_readiness)
                 return self.respond({'id': record['id']}, 202)
             if self.path == "/runtime/decoder-training":
                 if data.get('confirmed') is not True:
@@ -2265,7 +2266,8 @@ class Handler(BaseHTTPRequestHandler):
                             raise ValueError('Review the current decoder approach before approval.')
                         record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
                                                       proposal_id=proposal['id'], proposal_revision=proposal['revision'],
-                                                      dataset=job.get('decoder_dataset'))
+                                                      dataset=job.get('decoder_dataset'),
+                                                      require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness)
                         job.update(status='factory_trial', decoder_trial_id=record['id'], error=None)
                         store_job(job)
                         return self.respond({'id': job['id']}, 202)

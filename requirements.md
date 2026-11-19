@@ -2264,6 +2264,40 @@ P3-LMF-01 partial progress · reviewed datasets in automatic factory conversatio
   physical power and Windows checks remain independent blocked items. No external
   collection occurred; generated artifacts/weights and unrelated edits are excluded.
 
+P3-LMF-01 partial progress · guarded idle/AC decoder execution · 2026-11-19:
+- Added an explicit opt-in idle/AC guard to main decoder approval. Approval saves
+  the policy and enters durable waiting_idle without occupying the Metal worker.
+  A cancellable waiter submits training only when the existing local probe confirms
+  AC power and at least 600 idle seconds. Unknown/failed probes remain waiting.
+  Waiting accommodates the user activity caused by clicking approval itself.
+- Guarded training rechecks readiness through existing training-boundary callbacks.
+  Readiness loss interrupts with a distinct reason, preserves completed checkpoints
+  and requires renewed explicit resume approval. Resume retains the saved policy;
+  callers cannot silently disable it. Policy participates in approval revision
+  binding. Waiting is cancellable and restart recovery never starts it implicitly.
+  Immediate legacy trials retain their original approval representation/behavior.
+- Local app verification: rebuilt/launched macOS ALMG with isolated synthetic
+  readiness fixtures and a seeded factory-review conversation. Native opt-in and
+  confirmation produced waiting_idle while unready, with no model artifacts. After
+  fixture readiness changed, actual Metal training began; readiness loss following
+  step-50 checkpoint creation interrupted the run with checkpoint preserved. Native
+  resume approval after restored readiness reused that checkpoint, retained the
+  guard, created a new approval and completed with held-out accuracy 1.000.
+  Restarted backend/app and reopened the linked native result; the entire saved
+  policy, approval history and completed result were unchanged. Final evidence:
+  /tmp/almg-readiness-final-qa/{waiting-ui.json,paused-ui.json,completed-ui.json,
+  restarted-ui.json}. Synthetic probes verify control flow, not physical power
+  transitions or real ten-minute idle behavior; those acceptance checks stay open.
+- Verification: 268 backend tests passed with ALMG_METAL_TESTS=1; 16 Flutter tests
+  passed; Flutter analysis clean. Added waiting without worker occupation, invalid
+  probes, cancellation, restart recovery, approval-policy binding, worker failure,
+  boundary interruption and real Metal checkpoint-resume coverage.
+- Remaining: broader resource scheduling and physical idle/power/sleep verification,
+  richer data/tokenizers, evaluated release gates and full acceptance verification.
+  P3-LMF-01 remains open. Unavailable Windows/physical checks remain independent
+  blocked criteria; no external collection, generated artifacts or weights are
+  committed, and unrelated user edits are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
