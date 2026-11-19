@@ -3733,6 +3733,44 @@ P3-LMF-02 partial progress · complete streamed held-out diagnostic evaluation �
   Existing physical power/Windows and scratch-space blockers remain open and were
   skipped without repeating unchanged checks. No external collection or push.
 
+P3-LMF-02 partial progress · reviewed local JSONL text ingestion · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Native dataset preparation now accepts 1 to 16 local
+  UTF-8 .jsonl files containing 3 to 16 total text records, bounded to 64 KiB per
+  source and 128000 bytes per selection. Every nonblank LF-delimited record must
+  contain exactly one string field named text. Unknown/duplicate fields, malformed
+  JSON, invalid Unicode, empty text, excessive nesting and count/byte overflows
+  reject before publication; metadata is never silently discarded. Unicode line
+  separators inside strings remain content; blank lines are counted and skipped.
+- The explicit review shows each original line and bounded text preview. Confirmed
+  preparation creates a new immutable dataset using the existing normalization,
+  deduplication, split and UTF-8 byte tokenizer policies. Preview-free provenance
+  retains original file hashes/bytes, original line numbers/raw-line hashes and
+  extracted text hashes/bytes, and survives private export. Raw JSONL is excluded
+  from that export. Source permission remains a user review; no collection,
+  training approval, pretrained weights or training execution is introduced.
+- Local app verification: rebuilt and launched native macOS ALMG with isolated
+  fixture backend port 28831. Unsupported metadata was rejected with filename and
+  line 1; reviewing then cancelling a valid Unicode/BOM/blank-line fixture created
+  no dataset. Explicit confirmation created dataset
+  4055dc6772ee4dbbbf2b7c2f81a6e4e5 with three records from original lines 1, 3 and 4.
+  The native private export flow saved a ZIP whose complete manifest equals the
+  saved dataset, including independently checked original/line/extracted hashes;
+  raw JSONL was absent. Restarting both backend and rebuilt app reopened exactly
+  the same manifest without reimporting; only one dataset exists and no trial ran.
+  Evidence: /tmp/almg-jsonl-native-qa/ (rejected-ui.txt, review-ui.txt,
+  dataset-ui.json, reopened-dataset-ui.json, export-review-ui.txt, verification.json,
+  build/restart logs and test logs). Generated files remain outside Git.
+- Verification: 397 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed, Flutter analysis and diff checks passed. Added JSONL tests cover original
+  and line provenance, exact private export, stale review/changed source/consent
+  rejection, unsupported fields, malformed encoding/nesting and bounded inputs.
+- Remaining: resumable JSONL-specific preparation drafts and larger/streamed JSONL
+  ingestion are not delivered by this bounded importer. Full streamed training,
+  supervised planning/checkpoint recovery, broader mixing/incremental policies and
+  larger-than-RAM verification remain open. Unchanged physical power/Windows and
+  safe scratch-space blockers were skipped, without polling or deleting artifacts.
+  Unrelated user changes, generated datasets, exports and weights are not committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

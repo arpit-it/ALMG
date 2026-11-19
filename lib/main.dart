@@ -2808,6 +2808,40 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _prepareJsonlDataset() async {
+    try {
+      final files = await openFiles(acceptedTypeGroups: const [XTypeGroup(label: 'Local UTF-8 JSONL text', extensions: ['jsonl'])]);
+      if (files.isEmpty) return;
+      final documents = await readLocalTextDocuments(files);
+      final review = await _request('/decoder-jsonl-review', {'documents': documents});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Review local JSONL text import'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Import 3 to 16 text records from bounded local JSONL files. Each nonblank line must be an object with exactly one string field named text; extra or duplicate fields are rejected. '
+            'Each file must fit 64 KiB and the selection 128000 bytes. This is not streaming import. Original file and line hashes survive preprocessing and private export; raw JSONL is excluded. '
+            'Review the text for personal information and source permission. A new dataset uses the UTF-8 byte tokenizer and existing duplicate/split checks. No training starts.'),
+          for (final source in review['sources'] as List) ...[
+            Text('${source['name']} · ${source['original_bytes']} original bytes · ${source['blank_lines']} blank lines skipped'),
+            for (final record in source['records'] as List) ...[
+              Text('Line ${record['line']} · ${record['extracted_bytes']} text bytes'),
+              SelectableText(record['preview'] as String),
+              if (record['preview_truncated'] == true) const Text('Preview limited to 512 characters.'),
+            ],
+          ],
+          ExpansionTile(title: const Text('View JSONL extraction method and source hashes'), children: [
+            SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
+          ]),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm JSONL dataset preparation'))],
+      ));
+      if (confirmed != true || !mounted) return;
+      final dataset = await _request('/decoder-jsonl-datasets', {'documents': documents, 'confirmed': true, 'reviewed': review});
+      if (mounted) await _showDecoderDataset(dataset);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _prepareDecoderDataset({bool saveDraft = false}) async {
     try {
       final files = await openFiles(acceptedTypeGroups: localTextTypes);
@@ -3230,6 +3264,7 @@ class _StudioPageState extends State<StudioPage> {
           }, child: const Text('Prepare local decoder text dataset')),
           TextButton(onPressed: () { Navigator.pop(context); _prepareDecoderDataset(saveDraft: true); }, child: const Text('Save local preparation draft')),
           TextButton(onPressed: () { Navigator.pop(context); _prepareHtmlDataset(); }, child: const Text('Prepare local HTML text dataset')),
+          TextButton(onPressed: () { Navigator.pop(context); _prepareJsonlDataset(); }, child: const Text('Prepare local JSONL text dataset')),
           TextButton(onPressed: () { Navigator.pop(context); _savedHtmlPreparations(); }, child: const Text('View saved HTML preparations')),
           TextButton(onPressed: () { Navigator.pop(context); _showSavedPreparations(); }, child: const Text('View saved preparation drafts')),
           TextButton(onPressed: () { Navigator.pop(context); _showDatasetProviders(); }, child: const Text('Optional dataset providers')),
