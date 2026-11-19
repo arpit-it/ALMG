@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -64,6 +64,7 @@ else:
     import decoder_stream_redactions
     import decoder_html
     import decoder_jsonl
+    import decoder_jsonl_preparations
     import decoder_html_preparations
     import decoder_stream_tokenizers
     import decoder_stream_windows
@@ -2023,6 +2024,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({"messages": chat_history.messages(self.path.removeprefix("/chats/"))})
             except ValueError as error:
                 return self.respond({"error": str(error)}, 404)
+        if self.path == '/decoder-jsonl-preparations':
+            return self.respond({'drafts': decoder_jsonl_preparations.list_drafts(ROOT)})
         if self.path == '/decoder-html-preparations':
             return self.respond({'drafts': decoder_html_preparations.list_drafts(ROOT)})
         if self.path == '/decoder-provider-contract':
@@ -2254,6 +2257,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
             if self.path == '/decoder-html-preparations':
                 return self.respond(decoder_html_preparations.create(ROOT, data.get('documents'), data.get('confirmed'), data.get('reviewed')))
+            if self.path == '/decoder-jsonl-preparations':
+                return self.respond(decoder_jsonl_preparations.create(ROOT, data.get('documents'), data.get('confirmed'), data.get('reviewed')))
             if self.path == '/decoder-jsonl-review':
                 return self.respond(decoder_jsonl.review(data.get('documents')))
             if self.path == '/decoder-jsonl-datasets':
@@ -2280,6 +2285,8 @@ class Handler(BaseHTTPRequestHandler):
                                               require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness, post_training=data.get('post_training'))
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
+            if len(parts) == 3 and parts[0] == 'decoder-jsonl-preparations' and parts[2] == 'prepare':
+                return self.respond(decoder_jsonl_preparations.resume(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-html-preparations' and parts[2] == 'prepare':
                 return self.respond(decoder_html_preparations.resume(ROOT, parts[1], data.get('confirmed')))
 

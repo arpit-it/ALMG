@@ -2808,6 +2808,41 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _showJsonlPreparation(Map<String, dynamic> draft) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Saved JSONL preparation · ${draft['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Original JSONL inputs and the extraction review are saved locally. Preparation requires confirmation, reuses the same dataset ID after interruptions and never starts training.'),
+        if (draft['implementation_current'] != true && draft['status'] != 'complete')
+          const Text('The extraction implementation changed. Keep this draft and start a newly reviewed JSONL preparation.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(draft)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (draft['implementation_current'] == true || draft['status'] == 'complete')
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(draft['status'] == 'complete' ? 'Open prepared JSONL dataset' : 'Prepare saved JSONL inputs'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final dataset = await _request('/decoder-jsonl-preparations/${draft['id']}/prepare', {'confirmed': true});
+      if (mounted) await _showDecoderDataset(dataset);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _savedJsonlPreparations() async {
+    try {
+      final drafts = (await _request('/decoder-jsonl-preparations'))['drafts'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved JSONL preparations'), children: [
+          if (drafts.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved JSONL preparations.')),
+          for (final draft in drafts) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(draft as Map)),
+            child: Text('${(draft['id'] as String).substring(0, 8)} · ${draft['status']} · ${draft['input_documents']} JSONL files · ${draft['text_records']} text records')),
+        ],
+      ));
+      if (selected != null && mounted) await _showJsonlPreparation(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _prepareJsonlDataset() async {
     try {
       final files = await openFiles(acceptedTypeGroups: const [XTypeGroup(label: 'Local UTF-8 JSONL text', extensions: ['jsonl'])]);
@@ -2815,12 +2850,12 @@ class _StudioPageState extends State<StudioPage> {
       final documents = await readLocalTextDocuments(files);
       final review = await _request('/decoder-jsonl-review', {'documents': documents});
       if (!mounted) return;
-      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
         title: const Text('Review local JSONL text import'), scrollable: true,
         content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           const Text('Import 3 to 16 text records from bounded local JSONL files. Each nonblank line must be an object with exactly one string field named text; extra or duplicate fields are rejected. '
             'Each file must fit 64 KiB and the selection 128000 bytes. This is not streaming import. Original file and line hashes survive preprocessing and private export; raw JSONL is excluded. '
-            'Review the text for personal information and source permission. A new dataset uses the UTF-8 byte tokenizer and existing duplicate/split checks. No training starts.'),
+            'Saving a draft keeps the original JSONL inputs locally for explicit recovery after restart. Review the text for personal information and source permission. A new dataset uses the UTF-8 byte tokenizer and existing duplicate/split checks. No training starts.'),
           for (final source in review['sources'] as List) ...[
             Text('${source['name']} · ${source['original_bytes']} original bytes · ${source['blank_lines']} blank lines skipped'),
             for (final record in source['records'] as List) ...[
@@ -2833,10 +2868,16 @@ class _StudioPageState extends State<StudioPage> {
             SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
           ]),
         ])),
-        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm JSONL dataset preparation'))],
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, 'save'), child: const Text('Save JSONL preparation draft')),
+          TextButton(onPressed: () => Navigator.pop(context, 'prepare'), child: const Text('Confirm JSONL dataset preparation'))],
       ));
-      if (confirmed != true || !mounted) return;
+      if (action == null || !mounted) return;
+      if (action == 'save') {
+        final draft = await _request('/decoder-jsonl-preparations', {'documents': documents, 'confirmed': true, 'reviewed': review});
+        if (mounted) await _showJsonlPreparation(draft);
+        return;
+      }
       final dataset = await _request('/decoder-jsonl-datasets', {'documents': documents, 'confirmed': true, 'reviewed': review});
       if (mounted) await _showDecoderDataset(dataset);
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
@@ -3266,6 +3307,7 @@ class _StudioPageState extends State<StudioPage> {
           TextButton(onPressed: () { Navigator.pop(context); _prepareHtmlDataset(); }, child: const Text('Prepare local HTML text dataset')),
           TextButton(onPressed: () { Navigator.pop(context); _prepareJsonlDataset(); }, child: const Text('Prepare local JSONL text dataset')),
           TextButton(onPressed: () { Navigator.pop(context); _savedHtmlPreparations(); }, child: const Text('View saved HTML preparations')),
+          TextButton(onPressed: () { Navigator.pop(context); _savedJsonlPreparations(); }, child: const Text('View saved JSONL preparations')),
           TextButton(onPressed: () { Navigator.pop(context); _showSavedPreparations(); }, child: const Text('View saved preparation drafts')),
           TextButton(onPressed: () { Navigator.pop(context); _showDatasetProviders(); }, child: const Text('Optional dataset providers')),
           if (Platform.isMacOS) TextButton(onPressed: () { Navigator.pop(context); _uploadStreamedSource(); }, child: const Text('Store a large local source in chunks')),

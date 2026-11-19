@@ -70,7 +70,7 @@ def review(documents):
     record['revision']=digest(record);return record
 
 
-def prepare(root,documents,confirmed,reviewed):
+def prepare(root,documents,confirmed,reviewed,*,_dataset_id=None):
     if confirmed is not True:raise ValueError('Confirm the exact local JSONL extraction review.')
     current=review(documents)
     if not isinstance(reviewed,dict) or reviewed!=current:raise ValueError('The JSONL extraction review changed. Select and review the current files.')
@@ -80,6 +80,6 @@ def prepare(root,documents,confirmed,reviewed):
         {**source,'records':[{k:v for k,v in row.items() if k not in ('preview','preview_truncated')} for row in source['records']]}
         for source in current['sources']])
     provenance['revision']=digest(provenance)
-    return datasets.prepare(root,extracted,True,'utf8_bytes',_derivation={
+    return datasets.prepare(root,extracted,True,'utf8_bytes',_dataset_id=_dataset_id,_derivation={
         'version':1,'operation':'extract_local_jsonl','extraction_review_revision':current['revision'],
         'extraction_provenance':provenance,'policy':'original_file_and_line_hashes_preserved_no_training_approval'})

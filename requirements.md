@@ -3771,6 +3771,40 @@ P3-LMF-02 partial progress · reviewed local JSONL text ingestion · 2026-11-20:
   safe scratch-space blockers were skipped, without polling or deleting artifacts.
   Unrelated user changes, generated datasets, exports and weights are not committed.
 
+P3-LMF-02 partial progress · restart-safe JSONL preparation drafts · 2026-11-20:
+- [ ] P3-LMF-02 remains open. The local JSONL review now offers an explicitly
+  confirmed saved preparation draft containing original bounded input bytes and
+  the exact extraction review. A separate JSONL inventory reopens pending/completed
+  drafts; nothing executes automatically. Explicit preparation reuses the stable
+  draft ID as dataset ID and preserves file/line provenance and tokenizer policy.
+- Saved input digests and implementation revisions reject tampered/stale pending
+  drafts while preserving them for review. Dataset publication followed by a draft
+  update failure recovers the same verified dataset rather than publishing another.
+  Completed records verify the dataset manifest digest and reopen idempotently.
+  Existing HTML/text preparation namespaces and already prepared datasets are
+  unchanged; saved original inputs remain local and are not added to dataset exports.
+- Local app verification: rebuilt native macOS ALMG against isolated fixture port
+  28832. Saving one JSONL file/three text records created draft
+  9beb3522e3d142e7903d5051dfd3d6bf in awaiting_preparation with no dataset. Moved the
+  original synthetic file, restarted both backend and app, and reopened the exact
+  pending record; no file picker or automatic publication occurred. Confirming
+  Prepare saved JSONL inputs created dataset with the same ID and original bytes/
+  source hash. Opening the completed draft again returned the identical dataset;
+  exactly one dataset exists and no trial/training ran. Evidence:
+  /tmp/almg-jsonl-draft-native-qa/ (review-ui.txt, draft-ui.json,
+  reopened-draft-ui.json, dataset-ui.json, reopened-dataset-ui.json,
+  completed-draft.json, verification.json and build/restart/test logs).
+- Verification: 400 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed, Flutter analysis and diff checks passed. New tests cover reload, explicit
+  consent, stable identity/idempotency, injected post-publication write failure,
+  changed implementation and input tampering. Generated fixtures stay outside Git.
+- Remaining: this is bounded JSONL recovery, not large/streamed JSONL ingestion.
+  Full streamed training/planning/checkpoint recovery, broader mixing/incremental
+  policies and larger-than-RAM acceptance remain open. Existing physical hardware,
+  Windows and safe scratch-space blockers stayed open and were skipped without
+  repeated polling. User edits, training artifacts and weights were preserved;
+  no external collection, generated artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
