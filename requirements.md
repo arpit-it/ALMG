@@ -2069,6 +2069,38 @@ P3-LMF-01 partial progress · live Qwen planning and supervisor provenance · 20
   integration, general scheduling and evaluated release gates. P3-LMF-01 stays open;
   physical power and Windows acceptance remain independently unverified.
 
+P3-LMF-01 partial progress · local decoder text-dataset preparation · 2026-11-19:
+- Added a versioned preparation interface for 3–16 local UTF-8 text documents,
+  bounded to 64 KiB each and 128000 source bytes total. The native picker sends
+  original bytes, preserving raw SHA-256 provenance including UTF-8 BOMs; NFC,
+  whitespace and leading-BOM normalization are separate preparation steps.
+- Normalized exact duplicates share a group and are reported with source names
+  and hashes. Unique groups are deterministically partitioned into disjoint train,
+  validation and test sets. A bounded tokenizer is fitted only on training text;
+  evaluation vocabulary issues are reported without refitting. License status is
+  recorded as user-provided/not reviewed. This does not claim full dataset QA.
+- Prepared datasets publish immutable documents/tokenizer/manifest artifacts under
+  decoder-datasets, with content/file hashes, source metadata, split counts and
+  findings. Reading verifies content, partitions and training-only tokenizer
+  consistency. Recipe details supports preparation and saved review; preparation
+  starts no training or external collection. The release package includes the module.
+- Local app verification: rebuilt/launched macOS ALMG and exercised the native
+  file picker with local fixtures. Too-small selection was rejected before publish.
+  Seven sources produced six unique documents, splits 4/1/1, vocabulary four and
+  one duplicate finding. Restarted the backend/app and reopened the identical
+  manifest from native history. Final original-byte import of eight sources,
+  including BOM/whitespace duplicates, again yielded six groups and two duplicate
+  findings; all source hashes matched the selected files, the prior dataset stayed
+  unchanged, and no decoder trial was created. Successful retry clears stale errors.
+- Verification: all 250 Python tests passed with ALMG_METAL_TESTS=1; all 16 Flutter
+  tests passed; Flutter analysis clean. New tests cover grouped deduplication,
+  split isolation, no evaluation-vocabulary leakage, reproducible reordered input,
+  immutable prior versions, byte/BOM provenance, invalid inputs and tamper rejection.
+- Remaining: connect reviewed user datasets to approved decoder training, main
+  planner routing, general scheduling, evaluated release gates and broader dataset
+  engineering. P3-LMF-01 remains open; hardware verification blockers stay separate.
+  No generated datasets/artifacts or downloaded weights were committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

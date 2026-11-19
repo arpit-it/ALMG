@@ -1576,6 +1576,61 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _showDecoderDataset(Map<String, dynamic> manifest) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Decoder dataset prepared for review'), scrollable: true,
+      content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(manifest))),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+    ));
+  }
+
+  Future<void> _prepareDecoderDataset() async {
+    try {
+      final files = await openFiles(acceptedTypeGroups: [const XTypeGroup(label: 'UTF-8 text', extensions: ['txt'])]);
+      if (files.isEmpty) return;
+      if (files.length < 3 || files.length > 16) throw const FormatException('Select 3 to 16 text documents.');
+      final documents = <Map<String, String>>[];
+      var total = 0;
+      for (final file in files) {
+        final length = await file.length();
+        total += length;
+        if (length > 65536 || total > 128000) throw const FormatException('Each document must fit 64 KiB; the selection must fit 128000 bytes.');
+        final bytes = await file.readAsBytes();
+        utf8.decode(bytes); // Validate without replacing the original bytes used for provenance.
+        documents.add({'name': file.name, 'data': base64Encode(bytes)});
+      }
+      final manifest = await _request('/decoder-datasets', {'confirmed': true, 'documents': documents});
+      if (mounted) {
+        setState(() => _error = null);
+        await _showDecoderDataset(manifest);
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _showSavedDecoderDatasets() async {
+    try {
+      final datasets = (await _request('/decoder-datasets'))['datasets'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Prepared decoder datasets'), children: [
+          if (datasets.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No local datasets prepared yet.')),
+          for (final dataset in datasets) SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(dataset as Map)),
+            child: Text('${(dataset['id'] as String).substring(0, 8)} · ${dataset['unique_documents']} documents'),
+          ),
+        ],
+      ));
+      if (selected != null && mounted) {
+        final verified = await _request('/decoder-datasets/${selected['id']}');
+        if (mounted) await _showDecoderDataset(verified);
+      }
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   Future<void> _planDecoderTrial() async {
     final goal = await showDialog<String>(context: context,
       builder: (context) => const _DecoderTrialGoalDialog());
@@ -1762,6 +1817,16 @@ class _StudioPageState extends State<StudioPage> {
           for (final artifact in contract['exports'] as List) Text(artifact as String),
           const SizedBox(height: 12),
           Text('Resume: ${contract['resume']}'),
+          const Text('Prepare 3–16 local UTF-8 text documents for decoder dataset review. No training or external collection starts.'),
+          TextButton(onPressed: () {
+            Navigator.pop(context);
+            _prepareDecoderDataset();
+          }, child: const Text('Prepare local decoder text dataset')),
+          TextButton(onPressed: () {
+            Navigator.pop(context);
+            _showSavedDecoderDatasets();
+          }, child: const Text('View prepared decoder datasets')),
+
           const Text('Optional CPU check constructs a tiny decoder from new weights. No downloads; language-model training is not enabled.'),
           TextButton(onPressed: () {
             Navigator.pop(context);
