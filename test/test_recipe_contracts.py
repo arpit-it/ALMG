@@ -5,6 +5,39 @@ from backend import recipe_contracts, studio
 
 
 class RecipeContractsTest(unittest.TestCase):
+    def test_registration_rejects_duplicates_missing_dependencies_and_invalid_contracts(self):
+        registry = recipe_contracts.RecipeRegistry(lambda name: name == 'numpy')
+        contract = recipe_contracts.recipe_contract('classifier')
+        with self.assertRaisesRegex(ValueError, 'unavailable: missing_runtime'):
+            registry.register(contract, dependencies=['missing_runtime'])
+        self.assertEqual(registry.catalog(), [])
+        for change in ({'version': True}, {'id': '../unsafe'}, {'metrics': {}},
+                       {'schema_version': 99}, {'schema_version': True},
+                       {'hardware': {'memory': float('nan')}}, {'description': float('nan')}):
+            with self.assertRaises(ValueError):
+                registry.register({**contract, **change})
+        registry.register(contract, dependencies=['numpy'])
+        contract['description'] = 'mutated input'
+        self.assertNotEqual(registry.contract('classifier')['description'], 'mutated input')
+        with self.assertRaisesRegex(ValueError, 'already registered'):
+            registry.register(contract)
+        catalog = registry.catalog()
+        catalog[0]['dataset']['modes'].clear()
+        self.assertTrue(registry.contract('classifier')['dataset']['modes'])
+
+    def test_planner_discovers_registry_at_request_time_and_rejects_unknown_selection(self):
+        registry = recipe_contracts.RecipeRegistry()
+        contract = recipe_contracts.recipe_contract('classifier')
+        contract['id'] = 'decoder_fixture'
+        registry.register(contract)
+        with patch.object(recipe_contracts, '_REGISTRY', registry), patch.object(
+                studio, 'ask', return_value={'recipe': 'decoder_fixture', 'reason': 'Local fixture'}) as ask:
+            self.assertEqual(studio.choose_recipe('Create a model')[0], 'decoder_fixture')
+            self.assertEqual(set(ask.call_args.args[1]['recipes']), {'decoder_fixture'})
+            ask.return_value = {'recipe': 'unregistered', 'reason': 'Unavailable'}
+            with self.assertRaisesRegex(ValueError, 'unavailable'):
+                studio.choose_recipe('Create a model')
+
     def test_catalog_describes_only_existing_recipes_and_all_contract_sections(self):
         catalog = recipe_contracts.recipe_catalog()
         self.assertEqual({item['id'] for item in catalog}, {'classifier', 'text_to_image'})
@@ -278,8 +311,11 @@ class RecipeContractsTest(unittest.TestCase):
                 self.assertTrue(details['label'])
                 self.assertIn(details['variant'], contract['metrics'])
                 self.assertEqual(recipe_contracts.execution_variant(contract['id'], mode), details['variant'])
-        with patch.dict(recipe_contracts._CONTRACTS['classifier']['dataset']['modes'],
-                        {'fixture_mode': {'label': 'Fixture', 'variant': 'classifier'}}):
+        registry = recipe_contracts.RecipeRegistry()
+        contract = recipe_contracts.recipe_contract('classifier')
+        contract['dataset']['modes']['fixture_mode'] = {'label': 'Fixture', 'variant': 'classifier'}
+        registry.register(contract)
+        with patch.object(recipe_contracts, '_REGISTRY', registry):
             self.assertEqual(recipe_contracts.execution_variant('classifier', 'fixture_mode'), 'classifier')
 
     def test_image_dataset_validates_numeric_values_and_training_coverage(self):

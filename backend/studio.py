@@ -118,6 +118,7 @@ TRAINING_RECIPES = {item["id"]: item["description"] for item in recipe_contracts
 
 def choose_recipe(goal):
     """Ask Qwen to route a goal using only the registered training capabilities."""
+    recipes = {item["id"]: item["description"] for item in recipe_contracts.recipe_catalog()}
     result = ask(
         'Select one registered recipe that can deliver the requested result. '
         'Return JSON with recipe (a registered ID or null), reason (short text), '
@@ -125,12 +126,12 @@ def choose_recipe(goal):
         'is unclear, ask a clarifying question in reason with recipe=null. '
         'If it needs an unsupported recipe or combination, explain the limitation '
         'with recipe=null. Do not execute tools or include private details in queries.',
-        {"goal": goal, "recipes": TRAINING_RECIPES},
+        {"goal": goal, "recipes": recipes},
     )
     recipe, reason = result.get("recipe"), result.get("reason")
     if not isinstance(reason, str) or not reason.strip() or len(reason) > 600:
         raise ValueError("Qwen did not return a valid workflow explanation.")
-    if recipe is not None and (not isinstance(recipe, str) or recipe not in TRAINING_RECIPES):
+    if recipe is not None and (not isinstance(recipe, str) or recipe not in recipes):
         raise ValueError("Qwen proposed an unavailable training recipe.")
     query = result.get("query")
     if recipe == "text_to_image" and (not isinstance(query, str) or not 0 < len(query.strip()) <= 160):

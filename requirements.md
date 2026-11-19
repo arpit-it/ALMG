@@ -1676,6 +1676,28 @@ ALMG is a Flutter desktop app with a local Python backend. Its goal is to turn a
   transitions remain unverified; this requirement stays open.
 - [ ] Validate the Windows build and a CPU training run on Windows. Evaluate GPU support and decide whether planning runs locally on Windows or uses a paired Mac.
 
+P3-LMF-01 partial progress · 2026-11-19 (requirement remains open):
+- Added trusted local recipe registration with version/schema validation,
+  dependency checks, duplicate rejection and independent snapshots. Planner
+  discovery reads the registry per request. Existing classifier and image
+  recipes register through this boundary; no new student recipe is enabled.
+- Rebuilt and launched the macOS app against isolated local fixtures. Through
+  the desktop UI, opened both version-1 recipe details and verified supported
+  sources, parameters, metrics and exports. Approved classifier training on 48
+  examples: validation and held-out macro F1 1.000, ready for inference preview.
+  Approved image training on 45 examples: held-out pixel accuracy 1.000, ready
+  for inference preview. Also exercised cancel/reopen and renewed image approval.
+  Local API preview previously returned fruit and a generated PNG respectively.
+  No external collection occurred. Accessibility permission restored desktop
+  verification; the earlier UI-access blocker is resolved.
+- Verification: 197 Python tests (196 passed, one opt-in Metal test skipped),
+  16 Flutter tests passed, Flutter analysis clean. Existing stored recipe
+  contracts retain their schema and contents; generated artifacts stay outside Git.
+- Remaining: registered from-scratch decoder construction, confirmed approach
+  selection, versioned pipeline stages, reproducibility manifest and complete
+  acceptance verification. Physical power checks and Windows validation remain
+  open independently and do not block this roadmap.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -40,16 +40,76 @@ _CONTRACTS = {
 }
 
 
+class RecipeRegistry:
+    """Validate and snapshot trusted local recipe registrations before discovery.
+
+    Registration is an application startup operation, never an API accepting
+    downloaded code. A contract alone does not enable an execution backend.
+    """
+
+    def __init__(self, dependency_available=None):
+        from importlib.util import find_spec
+        self._contracts = {}
+        self._dependency_available = dependency_available or (lambda name: find_spec(name) is not None)
+
+    def register(self, contract, *, dependencies=()):
+        import json
+        import re
+        if not isinstance(contract, dict):
+            raise ValueError('Recipe contract must be an object.')
+        recipe_id = contract.get('id')
+        if not isinstance(recipe_id, str) or not re.fullmatch(r'[a-z][a-z0-9_]*', recipe_id):
+            raise ValueError('Recipe ID must be a stable lowercase identifier.')
+        if recipe_id in self._contracts:
+            raise ValueError('Recipe ID is already registered: ' + recipe_id)
+        if type(contract.get('version')) is not int or contract['version'] < 1:
+            raise ValueError('Recipe version must be a positive integer.')
+        schema = contract.get('schema_version', SCHEMA_VERSION)
+        if type(schema) is not int or schema != SCHEMA_VERSION:
+            raise ValueError('Unsupported recipe contract schema.')
+        for field in ('name', 'description', 'resume', 'status'):
+            if not isinstance(contract.get(field), str) or not contract[field].strip():
+                raise ValueError('Recipe requires ' + field + '.')
+        for field, kind in (('dataset', dict), ('hardware', dict), ('parameters', list),
+                            ('metrics', dict), ('exports', list)):
+            if not isinstance(contract.get(field), kind) or not contract[field]:
+                raise ValueError('Recipe requires a nonempty ' + field + '.')
+        if not isinstance(dependencies, (tuple, list)) or any(
+                not isinstance(name, str) or not re.fullmatch(r'[A-Za-z_][A-Za-z0-9_]*', name)
+                for name in dependencies):
+            raise ValueError('Recipe dependencies must be top-level Python module names.')
+        missing = [name for name in dependencies if not self._dependency_available(name)]
+        if missing:
+            raise ValueError('Recipe dependencies are unavailable: ' + ', '.join(missing))
+        snapshot = {'schema_version': SCHEMA_VERSION, **deepcopy(contract)}
+        try:
+            json.dumps(snapshot, allow_nan=False)
+        except (TypeError, ValueError) as error:
+            raise ValueError('Recipe contract must contain finite JSON values.') from error
+        self._contracts[recipe_id] = snapshot
+
+    def contract(self, recipe_id):
+        if not isinstance(recipe_id, str) or recipe_id not in self._contracts:
+            raise ValueError('Unknown training recipe.')
+        return deepcopy(self._contracts[recipe_id])
+
+    def catalog(self):
+        return [self.contract(recipe_id) for recipe_id in self._contracts]
+
+
+_REGISTRY = RecipeRegistry()
+for _contract in _CONTRACTS.values():
+    _REGISTRY.register(_contract)
+
+
 def recipe_contract(recipe_id):
     """Return an independent contract snapshot for a supported recipe ID."""
-    if not isinstance(recipe_id, str) or recipe_id not in _CONTRACTS:
-        raise ValueError("Unknown training recipe.")
-    return {"schema_version": SCHEMA_VERSION, **deepcopy(_CONTRACTS[recipe_id])}
+    return _REGISTRY.contract(recipe_id)
 
 
 def recipe_catalog():
-    """List implemented recipes only; future recipes require separate validation."""
-    return [recipe_contract(recipe_id) for recipe_id in _CONTRACTS]
+    """Discover validated, trusted local registrations in registration order."""
+    return _REGISTRY.catalog()
 
 
 def training_parameters(recipe_id, values, snapshot=None):
