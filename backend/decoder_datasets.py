@@ -6,6 +6,9 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 import uuid
 import re
+import math
+from collections import Counter
+from statistics import median
 
 if __package__:
     from .decoder_tokenizer import Tokenizer, ByteTokenizer
@@ -169,6 +172,46 @@ def _privacy_findings(text, source):
     return sorted(findings, key=lambda row: (row['normalized_character_start'], row['category']))
 
 
+def _token_distribution(folder, manifest, records):
+    method = {'version': 1, 'source': 'saved_tokenizer_without_refitting',
+              'token_text_included': False, 'entropy_population': 'known_tokens_only'}
+    if manifest['tokenizer'] is None:
+        return {**method, 'available': False, 'reason': 'No valid saved tokenizer; resolve tokenizer findings first.'}
+    tokenizer = Tokenizer.restore(json.loads((folder / 'tokenizer.json').read_text(encoding='utf-8')))
+    vocabulary = {word: index for index, word in enumerate(tokenizer.vocabulary)}
+    split_tokens = {part: [] for part in ('train', 'validation', 'test')}
+    split_lengths = {part: [] for part in split_tokens}
+    for row in records:
+        if isinstance(tokenizer, ByteTokenizer):
+            try:
+                tokens = tokenizer.encode(row['text'])
+            except ValueError:
+                return {**method, 'available': False, 'reason': 'A document exceeds saved tokenizer encoding limits.',
+                        'record': {key: row[key] for key in ('name', 'source_sha256', 'group', 'split')}}
+        else:
+            # Keep unknown occurrences explicit; never learn vocabulary from evaluation data.
+            tokens = [vocabulary.get(word) for word in Tokenizer.words(row['text'])]
+        split_tokens[row['split']].extend(tokens)
+        split_lengths[row['split']].append(len(tokens))
+
+    def summarize(tokens, lengths):
+        counts = Counter(token for token in tokens if token is not None)
+        known = sum(counts.values())
+        return {'documents': len(lengths), 'token_count': len(tokens), 'known_tokens': known,
+                'unknown_tokens': len(tokens) - known, 'observed_vocabulary': len(counts),
+                'known_token_coverage': round(known / len(tokens), 6) if tokens else 0.0,
+                'entropy_bits': round(-sum((count / known) * math.log2(count / known) for count in counts.values()), 6),
+                'document_tokens': {'minimum': min(lengths), 'maximum': max(lengths),
+                                    'mean': round(sum(lengths) / len(lengths), 6), 'median': median(lengths)},
+                'top_token_ids': [{'token_id': token, 'count': count} for token, count in
+                                  sorted(counts.items(), key=lambda item: (-item[1], item[0]))[:20]]}
+    return {**method, 'available': True, 'tokenizer_sha256': tokenizer.fingerprint(),
+            'tokenizer_format': tokenizer.artifact()['format'], 'vocabulary_size': len(tokenizer.vocabulary),
+            'overall': summarize([token for tokens in split_tokens.values() for token in tokens],
+                                 [length for lengths in split_lengths.values() for length in lengths]),
+            'splits': {part: summarize(split_tokens[part], split_lengths[part]) for part in split_tokens}}
+
+
 def quality_report(root, dataset_id):
     """Compute overlap findings from verified data without changing stored artifacts."""
     manifest = read(root, dataset_id)
@@ -199,13 +242,14 @@ def quality_report(root, dataset_id):
             affected = [{key:records[index][key] for key in ('name','source_sha256','group','split')} for index in (left,right)]
             findings.append({'kind':'potential_evaluation_contamination' if cross_split else 'near_duplicate_documents',
                              'records':affected, 'similarity':round(similarity,6), 'cross_split':cross_split})
-    report = {'schema_version':1,'format':'almg-decoder-data-audit-v1','audit_version':2,
+    report = {'schema_version':1,'format':'almg-decoder-data-audit-v1','audit_version':3,
               'dataset_id':dataset_id,'dataset_manifest_sha256':digest(manifest),'dataset_sha256':manifest['dataset_sha256'],
               'method':{'name':'word_shingle_jaccard','version':1,'shingle_words':5,'minimum_words':12,'threshold':.8},
               'privacy_method':{'name':'local_contact_patterns','version':1,
                   'scope':['ascii_email','international_plus_phone','north_american_formatted_phone'],
                   'offsets':'normalized_text_unicode_codepoints','matched_values_included':False,
                   'limitations':'Heuristic review only; other personal information and unrecognized formats may remain.'},
+              'token_distribution':_token_distribution(Path(root)/'decoder-datasets'/dataset_id, manifest, records),
               'privacy_matches':sum(row['kind']=='potential_personal_information' for row in findings),
               'policy':'report_only_preserve_existing_approvals', 'records':summaries,'findings':findings,
               'near_duplicate_pairs':near_count,'cross_split_pairs':cross_count,
@@ -244,7 +288,7 @@ def list_audits(root, dataset_id):
             report = json.loads(path.read_text(encoding='utf-8'))
             payload = {key:value for key,value in report.items() if key!='revision'}
             if (report.get('format')!='almg-decoder-data-audit-v1' or type(report.get('audit_version')) is not int
-                    or report['audit_version'] not in (1, 2) or report.get('dataset_id')!=dataset_id
+                    or report['audit_version'] not in (1, 2, 3) or report.get('dataset_id')!=dataset_id
                     or report.get('dataset_manifest_sha256')!=digest(manifest)
                     or report.get('revision')!=digest(payload) or path.stem!=report['revision']):
                 continue

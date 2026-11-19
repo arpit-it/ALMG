@@ -2736,6 +2736,36 @@ P3-LMF-02 partial progress · reviewed contact filtering into derived versions �
   No external collection occurred; generated data/artifacts, weights and unrelated
   user edits are excluded from this commit.
 
+P3-LMF-02 partial progress · saved-tokenizer distribution analysis · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Version-3 local dataset audits report overall and
+  train/validation/test token counts, known/unknown occurrences and coverage,
+  observed vocabulary, document-length minimum/maximum/mean/median, known-token
+  Shannon entropy and the top 20 token IDs/counts with deterministic tie ordering.
+  Token text is not copied into the analysis. The method binds the saved tokenizer
+  format/hash, never refits on evaluation data, and declares entropy's known-token
+  population. Missing or over-limit tokenizers yield explicit unavailability.
+- Added a native saved-tokenizer count/unknown summary. Original dataset files,
+  tokenizer artifacts, approvals and training state are unchanged. Saved audit
+  versions 1 and 2 remain readable without migration or rewriting.
+- Native verification: rebuilt/launched ALMG and explicitly audited two local
+  fixtures. The UTF-8-byte dataset containing multibyte café text reported 188
+  tokens, zero unknowns and exact per-split byte totals; compared all source files
+  to their original hashes. The word dataset reported 30 tokens, two unknown
+  evaluation words (one per held-out split), zero training unknowns and unchanged
+  eight-word training vocabulary. No trial was created. Restarted ALMG and
+  reopened the identical complete word-audit receipt and revision. Evidence:
+  /tmp/almg-token-stats-qa/{byte-audit-ui.json,byte-summary-ui.txt,
+  word-audit-ui.json,restarted-word-ui.json,before.json}.
+- Validation: 309 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. Added regression cases verify known/unknown and split totals,
+  document lengths, top-ID bounds, multibyte UTF-8 counting, immutable tokenizer,
+  missing-tokenizer reporting and coexistence with versions 1/2.
+- Remaining: streaming/incremental/resumable ingestion, language/quality/license
+  review, broader PII/contamination policy, dataset mixing/sampling, export
+  provenance and remaining acceptance verification. Physical/Windows blockers stay
+  open and skipped. No external collection occurred; generated fixtures/artifacts,
+  downloaded weights and unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

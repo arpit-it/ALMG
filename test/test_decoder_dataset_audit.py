@@ -54,7 +54,7 @@ class DatasetAuditTests(unittest.TestCase):
         folder = self.root / 'decoder-datasets' / manifest['id']
         before = {p.name: p.read_bytes() for p in folder.iterdir()}
         report = datasets.audit(self.root, manifest['id'], True)
-        self.assertEqual(report['audit_version'], 2)
+        self.assertEqual(report['audit_version'], 3)
         self.assertEqual(report['privacy_matches'], 3)
         findings = [f for f in report['findings'] if f['kind'] == 'potential_personal_information']
         self.assertEqual(sorted(f['category'] for f in findings), ['email_address', 'phone_number', 'phone_number'])
@@ -76,14 +76,57 @@ class DatasetAuditTests(unittest.TestCase):
     def test_legacy_saved_audit_remains_readable_alongside_privacy_revision(self):
         current = datasets.audit(self.root, self.dataset_id, True)
         legacy = dict(current, audit_version=1)
-        for key in ('revision', 'privacy_matches', 'privacy_method'):
+        for key in ('revision', 'privacy_matches', 'privacy_method', 'token_distribution'):
             legacy.pop(key)
         legacy['revision'] = datasets.digest(legacy)
         path = self.root / 'decoder-dataset-audits' / self.dataset_id / (legacy['revision'] + '.json')
         path.write_text(json.dumps(legacy))
         saved = datasets.list_audits(self.root, self.dataset_id)
-        self.assertEqual({row['audit_version'] for row in saved}, {1, 2})
+        self.assertEqual({row['audit_version'] for row in saved}, {1, 3})
         self.assertEqual(json.loads(path.read_text()), legacy)
+
+    def test_word_token_distribution_counts_unknowns_without_refitting(self):
+        report = datasets.audit(self.root, self.dataset_id, True)
+        distribution = report['token_distribution']
+        self.assertTrue(distribution['available'])
+        self.assertEqual(distribution['tokenizer_sha256'], self.manifest['tokenizer']['sha256'])
+        overall = distribution['overall']
+        self.assertEqual((overall['token_count'], overall['known_tokens'], overall['unknown_tokens']), (246, 244, 2))
+        self.assertEqual(overall['document_tokens'], {'minimum': 41, 'maximum': 41, 'mean': 41.0, 'median': 41.0})
+        for part, documents in self.manifest['splits'].items():
+            summary = distribution['splits'][part]
+            self.assertEqual(summary['token_count'], 41 * documents)
+            self.assertEqual(summary['unknown_tokens'], 0 if part == 'train' else 1)
+        self.assertGreater(overall['entropy_bits'], 0)
+        self.assertEqual(len(overall['top_token_ids']), 20)
+        self.assertNotIn('unique0', json.dumps(distribution))
+
+    def test_byte_distribution_counts_multibyte_text_and_preserves_saved_tokenizer(self):
+        parent = self.privacy_dataset()
+        folder = self.root / 'decoder-datasets' / parent['id']
+        before = (folder / 'tokenizer.json').read_bytes()
+        rows = list(map(json.loads, (folder / 'documents.jsonl').read_text().splitlines()))
+        report = datasets.audit(self.root, parent['id'], True)
+        distribution = report['token_distribution']
+        counts = [len(row['text'].encode('utf-8')) for row in rows]
+        self.assertEqual(distribution['overall']['token_count'], sum(counts))
+        self.assertEqual(distribution['overall']['unknown_tokens'], 0)
+        self.assertEqual(distribution['overall']['known_token_coverage'], 1.0)
+        self.assertGreater(sum(counts), sum(len(row['text']) for row in rows))
+        self.assertEqual(before, (folder / 'tokenizer.json').read_bytes())
+        self.assertEqual(sum(s['token_count'] for s in distribution['splits'].values()), sum(counts))
+
+    def test_token_distribution_unavailable_is_explicit_and_legacy_v2_survives(self):
+        dataset = datasets.prepare(self.root, [{'name':str(i),'text':f'word{i}'} for i in range(3)], True)
+        report = datasets.audit(self.root, dataset['id'], True)
+        self.assertFalse(report['token_distribution']['available'])
+        legacy = dict(report, audit_version=2)
+        for key in ('revision', 'token_distribution'):
+            legacy.pop(key)
+        legacy['revision'] = datasets.digest(legacy)
+        path = self.root / 'decoder-dataset-audits' / dataset['id'] / (legacy['revision'] + '.json')
+        path.write_text(json.dumps(legacy))
+        self.assertEqual({r['audit_version'] for r in datasets.list_audits(self.root, dataset['id'])}, {2,3})
 
     def privacy_dataset(self):
         return datasets.prepare(self.root, [
