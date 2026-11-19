@@ -2,7 +2,7 @@
 import platform
 
 
-def run(initialize):
+def run(initialize, work_directory=None):
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
         raise ValueError('The local decoder training check requires an Apple silicon Mac.')
     try:
@@ -55,19 +55,26 @@ def run(initialize):
             return values
 
         uninterrupted = optimize(parameters, 100)
-        parameters = optimize(parameters, 50)
         from pathlib import Path
         from tempfile import TemporaryDirectory
+        from contextlib import nullcontext
         if __package__:
             from . import decoder_checkpoint
         else:
             import decoder_checkpoint
-        with TemporaryDirectory(prefix='almg-decoder-checkpoint-') as checkpoint_directory:
-            checkpoint_model = initialize('decoder_from_scratch', model.config)
-            checkpoint_model.parameters = {name: np.array(value) for name, value in parameters.items()}
-            expected_revision = decoder_checkpoint.revision(model.config, tokenizer, training_text)
+        workspace = Path(work_directory) if work_directory is not None else None
+        if workspace is not None:
+            workspace.mkdir(parents=True, exist_ok=True)
+        checkpoint_context = nullcontext(str(workspace)) if workspace is not None else TemporaryDirectory(prefix='almg-decoder-checkpoint-')
+        with checkpoint_context as checkpoint_directory:
             checkpoint_path = Path(checkpoint_directory) / 'step-50'
-            decoder_checkpoint.save(checkpoint_path, checkpoint_model, tokenizer, expected_revision, 50)
+            expected_revision = decoder_checkpoint.revision(model.config, tokenizer, training_text)
+            reused_checkpoint = checkpoint_path.exists()
+            if not reused_checkpoint:
+                parameters = optimize(parameters, 50)
+                checkpoint_model = initialize('decoder_from_scratch', model.config)
+                checkpoint_model.parameters = {name: np.array(value) for name, value in parameters.items()}
+                decoder_checkpoint.save(checkpoint_path, checkpoint_model, tokenizer, expected_revision, 50)
             restored_checkpoint, _, checkpoint_lineage = decoder_checkpoint.load(checkpoint_path, expected_revision)
             parameters = {name: mx.array(value) for name, value in restored_checkpoint.parameters.items()}
             parameters = optimize(parameters, 100 - checkpoint_lineage['completed_steps'])
@@ -88,7 +95,8 @@ def run(initialize):
         cpu_error = float(np.max(np.abs(model.logits(np.array(held_out)[:, :-1]) - np.array(scores))))
         from pathlib import Path
         from tempfile import TemporaryDirectory
-        with TemporaryDirectory(prefix='almg-decoder-roundtrip-') as folder:
+        artifact_context = nullcontext(str(workspace)) if workspace is not None else TemporaryDirectory(prefix='almg-decoder-roundtrip-')
+        with artifact_context as folder:
             if __package__:
                 from . import decoder_bundle
             else:
@@ -123,9 +131,9 @@ def run(initialize):
             'causal_prefix_max_error': causal_error, 'generated_tokens': generated,
             'generation_matches_fixture': matches, 'cpu_inference_max_error': cpu_error,
             'artifact_format': 'almg-decoder-v1', 'artifact_bytes': artifact_bytes,
-            'artifact_reload_max_error': reload_error, 'temporary_artifact_removed': True, 'generated_text': generated_text,
+            'artifact_reload_max_error': reload_error, 'temporary_artifact_removed': workspace is None, 'generated_text': generated_text,
             'checkpoint': {**checkpoint_lineage, 'resumed_steps': 50, 'uninterrupted_max_error': resume_error,
-                           'temporary_checkpoint_removed': True},
+                           'temporary_checkpoint_removed': workspace is None, 'reused_existing_checkpoint': reused_checkpoint},
             'bundle': {'format': bundle_manifest['format'], 'stage_versions': bundle_manifest['stages'],
                        'verified_files': list(bundle_manifest['files']), 'artifact_roundtrip': bundle_roundtrip,
                        'training_record_sha256': bundle_manifest['training_sha256']},

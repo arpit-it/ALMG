@@ -40,13 +40,14 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
     import recipe_contracts
     import run_manifest
     import decoder_training
+    import decoder_trials
     import chat_history
     import inference
     import image_recipe
@@ -1070,6 +1071,7 @@ def store_job(job):
 
 def restore_jobs():
     """Reopen saved sessions and mark interrupted in-memory work as failed."""
+    decoder_trials.recover(ROOT)
     POWER_EVENT_RECEIPTS.clear()
     POWER_EVENT_RECEIPTS.update(load_power_event_receipts())
     for record in (ROOT / "training-sessions").glob("*.json"):
@@ -1999,6 +2001,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({"messages": chat_history.messages(self.path.removeprefix("/chats/"))})
             except ValueError as error:
                 return self.respond({"error": str(error)}, 404)
+        if self.path == '/decoder-trials':
+            return self.respond({'trials': decoder_trials.list_trials(ROOT)})
+        if self.path.startswith('/decoder-trials/'):
+            try:
+                return self.respond(decoder_trials.read(ROOT, self.path.removeprefix('/decoder-trials/')))
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if self.path == "/model":
             return self.respond(inference.status())
         if route.path == "/models":
@@ -2106,6 +2115,13 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/runtime/power-event":
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
+            if self.path == '/decoder-trials':
+                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit)
+                return self.respond({'id': record['id']}, 202)
+            parts = self.path.strip('/').split('/')
+            if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'resume':
+                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit, parts[1])
+                return self.respond({'id': record['id']}, 202)
             if self.path == "/runtime/decoder-training":
                 if data.get('confirmed') is not True:
                     raise ValueError('Confirm the local decoder training check before running it.')

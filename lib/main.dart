@@ -1575,6 +1575,57 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _startDecoderTrial([String? id]) async {
+    try {
+      final created = await _request(id == null ? '/decoder-trials' : '/decoder-trials/$id/resume', {'confirmed': true});
+      final trialId = created['id'];
+      var record = await _request('/decoder-trials/$trialId');
+      for (var attempt = 0; attempt < 40 && ['queued', 'running'].contains(record['status']); attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        if (!mounted) return;
+        record = await _request('/decoder-trials/$trialId');
+      }
+      if (mounted) await _showDecoderTrial(record);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _showDecoderTrial(Map<String, dynamic> record) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: Text('Saved decoder trial · ${record['status']}'),
+      scrollable: true,
+      content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(record))),
+      actions: [
+        if (record['status'] == 'interrupted') TextButton(onPressed: () {
+          Navigator.pop(context);
+          _startDecoderTrial(record['id'] as String);
+        }, child: const Text('Approve resume of saved trial')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+      ],
+    ));
+  }
+
+  Future<void> _showSavedDecoderTrials() async {
+    try {
+      final trials = (await _request('/decoder-trials'))['trials'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved decoder trials'),
+        children: [
+          if (trials.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved decoder trials yet.')),
+          for (final trial in trials) SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(trial as Map)),
+            child: Text('${(trial['id'] as String).substring(0, 8)} · ${trial['status']}'),
+          ),
+        ],
+      ));
+      if (selected != null && mounted) await _showDecoderTrial(selected);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   Future<void> _checkDecoderTraining() async {
     try {
       final result = await _request('/runtime/decoder-training', {'confirmed': true});
@@ -1665,6 +1716,16 @@ class _StudioPageState extends State<StudioPage> {
               Navigator.pop(context);
               _checkDecoderTraining();
             }, child: const Text('Check from-scratch decoder training')),
+            const Text('Saved trials keep their approval receipt, checkpoint and trained bundle locally. They use fixed generated text; general pretraining and release remain unavailable.'),
+            TextButton(onPressed: () {
+              Navigator.pop(context);
+              _startDecoderTrial();
+            }, child: const Text('Approve and save a local decoder trial')),
+            TextButton(onPressed: () {
+              Navigator.pop(context);
+              _showSavedDecoderTrials();
+            }, child: const Text('View saved decoder trials')),
+
           ],
 
 

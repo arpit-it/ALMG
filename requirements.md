@@ -1942,6 +1942,40 @@ P3-LMF-01 partial progress · decoder SGD checkpoint resume · 2026-11-19:
   release integration and complete acceptance verification. P3-LMF-01 stays open;
   blocked physical power and Windows checks remain separate.
 
+P3-LMF-01 partial progress · durable approved decoder trials · 2026-11-19:
+- Added an explicitly approved, asynchronous saved-trial workflow for the bounded
+  generated-text decoder pipeline. Version-1 trial records persist approval ID,
+  timestamp, from-scratch scope/recipe/component revision, status, errors, result
+  and artifact directory under decoder-trials. Workers validate the saved approval
+  revision before training. The dedicated inference worker remains the executor.
+- Trial training can retain its step-50 checkpoint and validated trained bundle.
+  Startup recovery marks stale queued/running trials interrupted and requires
+  renewed approval; resume preserves earlier approvals and reuses a matching
+  checkpoint. Changed implementation revisions or an existing complete bundle
+  cannot be overwritten. Old classifier/image jobs and formats are unchanged.
+  The release package includes the new trial module.
+- Recipe details now offers Approve and save a local decoder trial and View saved
+  decoder trials. History exposes status/result and explicit approval to resume.
+  This is a saved generated-text trial, not planner-enabled general pretraining.
+- Local app verification: rebuilt/launched macOS ALMG with isolated fixtures.
+  Approved a saved trial in the desktop UI; a controlled fixture interruption
+  after checkpoint save produced an interrupted record with its approval and
+  checkpoint intact. Restarted the backend, reopened the same trial from native
+  history and clicked Approve resume. The same ID completed using the saved
+  checkpoint, retained its previous approval, recorded a new approval and kept a
+  validated bundle at accuracy 1.000. A further fresh desktop-approved trial
+  verified the final worker-side approval guard and persisted another valid bundle.
+  No external collection occurred; all generated artifacts stayed outside Git.
+- Verification: all 232 Python tests passed with ALMG_METAL_TESTS=1, including
+  actual interrupted training/checkpoint reuse; all 16 Flutter tests passed;
+  Flutter analysis clean. Tests cover confirmation, durable receipts/results,
+  restart recovery, renewed approval, revision rejection before training,
+  checkpoint preservation, existing-bundle protection and worker failure recovery.
+- Remaining: planner discovery and approach selection for a fully integrated
+  recipe, user dataset ingestion, scheduling/cancellation controls for general
+  decoder jobs, evaluation/release gates and complete acceptance verification.
+  P3-LMF-01 stays open; physical power and Windows blockers remain independent.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -53,3 +53,25 @@ class DecoderTrainingTest(unittest.TestCase):
         self.assertEqual(set(result['bundle']['verified_files']), {'decoder.json', 'tokenizer.json'})
         self.assertEqual(result['tokenizer']['fit_source'], 'training_documents_only')
         self.assertEqual(result['generated_text'], 'amber birch cedar dune amber birch cedar dune amber birch cedar dune')
+
+    @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS') == '1', 'Opt-in actual Metal verification')
+    def test_durable_interruption_reuses_saved_checkpoint_and_keeps_bundle(self):
+        import tempfile
+        from pathlib import Path
+        from backend import decoder_bundle
+        original_save = decoder_bundle.save
+        def interrupt(destination, *args):
+            if Path(destination).name == 'bundle':
+                raise RuntimeError('Fixture stop before final artifact')
+            return original_save(destination, *args)
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / 'artifacts'
+            with patch.object(decoder_bundle, 'save', side_effect=interrupt):
+                with self.assertRaisesRegex(RuntimeError, 'Fixture stop'):
+                    decoder_training.run(recipe_contracts.initialize_recipe, work_directory=workspace)
+            self.assertTrue((workspace / 'step-50' / 'manifest.json').is_file())
+            result = decoder_training.run(recipe_contracts.initialize_recipe, work_directory=workspace)
+            self.assertTrue(result['checkpoint']['reused_existing_checkpoint'])
+            self.assertFalse(result['temporary_artifact_removed'])
+            self.assertTrue((workspace / 'bundle' / 'manifest.json').is_file())
+            decoder_bundle.load(workspace / 'bundle')
