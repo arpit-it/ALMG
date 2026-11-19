@@ -122,7 +122,8 @@ TRAINING_RECIPES = {item["id"]: item["description"] for item in recipe_contracts
 
 def choose_recipe(goal):
     """Ask Qwen to route a goal using only the registered training capabilities."""
-    recipes = {item["id"]: item["description"] for item in recipe_contracts.recipe_catalog()}
+    recipes = {item["id"]: item["description"] for item in
+               [*recipe_contracts.recipe_catalog(), *recipe_contracts.planning_catalog('decoder_trial')]}
     result = ask(
         'Select one registered recipe that can deliver the requested result. '
         'Return JSON with recipe (a registered ID or null), reason (short text), '
@@ -1216,7 +1217,7 @@ def restore_jobs():
                 if not proposal.get("queries"):
                     proposal["queries"] = [job["prompt"].strip()[:160]]
                     job["plan"] = proposal
-            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "filing_candidates", "company_candidates", "website_access_review", "website_candidates", "clarification", "failed", "passed", "needs_review", "cancelled"):
+            elif job["status"] not in ("approval", "image_candidates", "text_candidates", "catalog_candidates", "publication_candidates", "entity_candidates", "indicator_candidates", "notice_candidates", "bibliographic_candidates", "filing_candidates", "company_candidates", "website_access_review", "website_candidates", "factory_review", "factory_trial", "clarification", "failed", "passed", "needs_review", "cancelled"):
                 job.update(status="failed", error="The backend restarted before this task finished. Start a new run.")
         except (OSError, ValueError, KeyError, TypeError, EOFError, UnpicklingError, ImportError, AttributeError):
             job.update(status="failed", error="Saved training artifacts could not be reopened. Start a new run.")
@@ -2250,6 +2251,15 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError("Training task not found.")
                     require_enabled_provider(job, action, data)
                     status = job["status"]
+                    if action == 'approve-decoder-trial' and status == 'factory_review':
+                        proposal = job['decoder_proposal']
+                        if data.get('proposal_revision') != proposal['revision']:
+                            raise ValueError('Review the current decoder approach before approval.')
+                        record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
+                                                      proposal_id=proposal['id'], proposal_revision=proposal['revision'])
+                        job.update(status='factory_trial', decoder_trial_id=record['id'], error=None)
+                        store_job(job)
+                        return self.respond({'id': job['id']}, 202)
                     if action == "edit-dataset-size" and status == "approval" and job.get("recipe") == "classifier":
                         count = data.get("examples_per_label")
                         if type(count) is not int or not 10 <= count <= 40:
@@ -2824,6 +2834,12 @@ class Handler(BaseHTTPRequestHandler):
                 if recipe is None:
                     update(job, planner_message=reason, status="clarification")
                     return
+            if recipe in {item['id'] for item in recipe_contracts.planning_catalog('decoder_trial')}:
+                activity(job, 'Qwen is preparing a bounded decoder approach for explicit review.')
+                proposal = decoder_trials.propose(ROOT, job['prompt'], ask, planner_identity=inference.loaded_identity)
+                update(job, recipe=recipe, recipe_contract=proposal['recipe_contract'],
+                       planner_message=reason, decoder_proposal=proposal, status='factory_review')
+                return
             if recipe == "text_to_image":
                 proposal = {"labels": [], "queries": [query.strip()]}
             else:

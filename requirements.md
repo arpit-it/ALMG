@@ -2197,6 +2197,39 @@ P3-LMF-01 partial progress · registered decoder planning capabilities · 2026-1
   verification remain separate blocked criteria; no external collection or
   generated artifacts/weights are committed.
 
+P3-LMF-01 partial progress · automatic workbench factory routing · 2026-11-19:
+- Main training-goal selection now includes decoder trial capabilities discovered
+  from the registry. A selected factory recipe creates a persisted approach review
+  in the existing training conversation, rather than entering classifier planning.
+  The native workbench shows the recipe, approach, rationale and generated-text
+  scope (fresh weights, 100 steps, seed 7, immediate Metal; no model release).
+- Added revision-checked explicit confirmation through the job API. Missing or
+  stale consent and unavailable approaches cannot queue a trial. Successful approval
+  saves its durable trial ID on the conversation; repeated approval cannot launch
+  another trial. The linked view reuses the existing result/cancel/resume controls.
+  Factory review/trial states survive restoration, and users can revise the goal.
+- Local app verification: rebuilt/launched macOS ALMG with isolated deterministic
+  local routing and approach fixtures. Typed a plain-language goal in the main
+  conversation and sent it using native keyboard navigation. Observed automatic
+  decoder approach review and no trial before confirmation. Native confirmation
+  completed actual fresh-weight Metal training with held-out accuracy 1.000;
+  opened the linked result and verified its exact proposal matched the conversation.
+  Restarted both backend and app, reopened the conversation from native history,
+  and verified the entire linked trial record was unchanged. Evidence:
+  /tmp/almg-workbench-qa/{routing-input.json,approach-input.json,review-ui.txt,
+  completed-ui.json,restarted-ui.json}. Planner fixtures test integration, not
+  additional live-Qwen routing quality. No external collection occurred.
+- Verification: 261 backend tests passed with ALMG_METAL_TESTS=1; all 16 Flutter
+  tests passed; Flutter analysis clean. New coverage exercises automatic recipe
+  discovery, no implicit training, stale/missing consent, duplicate approval,
+  unavailable approaches, saved review restoration and interrupted-trial linkage
+  after backend restart. Existing classifier/image planner checks still pass.
+- Remaining: automatic integration of reviewed user datasets, general scheduling/
+  idle/power integration, richer data/tokenizers, evaluated release gates and full
+  acceptance verification. P3-LMF-01 stays open. Physical power and Windows checks
+  remain separate blocked criteria. Generated artifacts/weights and unrelated
+  user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

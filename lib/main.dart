@@ -1131,6 +1131,8 @@ class _StudioPageState extends State<StudioPage> {
             {
               'approval',
               'clarification',
+              'factory_review',
+              'factory_trial',
               'preview_ready',
               'failed',
               'passed',
@@ -1222,7 +1224,7 @@ class _StudioPageState extends State<StudioPage> {
     final text = _prompt.text.trim();
     if (text.length < 5) return;
     final previous =
-        {'approval', 'clarification', 'preview_ready'}.contains(_job?['status'])
+        {'approval', 'clarification', 'factory_review', 'factory_trial', 'preview_ready'}.contains(_job?['status'])
         ? (_job!['prompt'] as String?)
         : null;
     final goal = previous == null
@@ -2026,6 +2028,8 @@ class _StudioPageState extends State<StudioPage> {
       'creating_dataset': 'Preparing dataset',
       'reviewing_labels': 'Reviewing labels with the local model',
       'cancelled': 'Training cancelled',
+      'factory_review': 'Review decoder approach',
+      'factory_trial': 'Approved decoder trial',
       'dataset_ready': 'Training approval required',
       'queued': 'Training queued',
       'waiting_idle': 'Waiting for idle time and AC power',
@@ -2105,6 +2109,27 @@ class _StudioPageState extends State<StudioPage> {
           const SizedBox(height: 16),
           Text('Labels: ${(plan['labels'] as List).join(', ')}'),
         ],
+        if (job?['decoder_proposal'] case final Map proposal when status == 'factory_review') ...[
+          Text('Registered recipe: ${proposal['recipe_contract']['name']}'),
+          Text('Recommended approach: ${proposal['approach']}'),
+          SelectableText(proposal['reason'] as String),
+          const Text('Scope: fixed generated local text, fresh weights, 100 steps, seed 7 and immediate Metal execution. This bounded trial does not release a model. Your own documents require separate dataset review.'),
+          if (proposal['executable'] == true)
+            FilledButton(onPressed: _busy ? null : () => _submit('/jobs/$id/approve-decoder-trial', {
+              'confirmed': true, 'proposal_revision': proposal['revision'],
+            }), child: const Text('Confirm from-scratch decoder trial'))
+          else
+            const Text('This approach is unavailable in the decoder trial workflow. Revise the goal to continue.'),
+        ],
+        if (status == 'factory_trial')
+          OutlinedButton(onPressed: _busy ? null : () async {
+            try {
+              final record = await _request('/decoder-trials/${job!['decoder_trial_id']}');
+              if (mounted) await _showDecoderTrial(record);
+            } catch (error) {
+              if (mounted) setState(() => _error = error.toString());
+            }
+          }, child: const Text('View linked decoder trial')),
         if (status == 'approval' || status == 'dataset_ready')
           TextField(
             controller: _target,
