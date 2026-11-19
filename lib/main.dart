@@ -1596,6 +1596,7 @@ class _StudioPageState extends State<StudioPage> {
         content: SizedBox(width: 520, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Goal: ${proposal['goal']}'),
           Text('Recommended approach: ${proposal['approach']}'),
+          Text('Planner: ${proposal['planner']?['model'] ?? proposal['planner']?['provider'] ?? 'Unspecified'}'),
           Text(proposal['reason'] as String),
           const Text('Scope: fixed generated local text. This does not enable training on your own dataset or release a model.'),
           if (proposal['executable'] != true) const Text('This approach is unavailable in the decoder trial workflow. No execution will start.'),

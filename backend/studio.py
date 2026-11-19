@@ -2116,7 +2116,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/runtime/power-event":
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
             if self.path == '/decoder-trial-proposals':
-                return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask))
+                return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask, planner_identity=inference.loaded_identity))
             if self.path == '/decoder-trials':
                 record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
                                               proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'))

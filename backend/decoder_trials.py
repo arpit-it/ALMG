@@ -24,7 +24,7 @@ def specification():
                             'decoder_checkpoint.py', 'decoder_bundle.py')}}
 
 
-def propose(root, goal, planner):
+def propose(root, goal, planner, planner_identity=None):
     if not isinstance(goal, str) or not 1 <= len(goal.strip()) <= 3000:
         raise ValueError('Describe the trial goal in 1 to 3000 characters.')
     spec = specification()
@@ -46,7 +46,8 @@ def propose(root, goal, planner):
     proposal = {'schema_version': 1, 'id': uuid.uuid4().hex, 'goal': goal.strip(),
                 'approach': approach, 'reason': reason.strip(),
                 'scope': 'generated_local_text_fixture', 'executable': approach == 'from_scratch',
-                'specification_revision': run_manifest.digest(spec)}
+                'specification_revision': run_manifest.digest(spec),
+                'planner': planner_identity() if planner_identity is not None else {'provider': 'unspecified'}}
     proposal['revision'] = run_manifest.digest(proposal)
     directory = Path(root) / 'decoder-trial-proposals'
     directory.mkdir(parents=True, exist_ok=True)

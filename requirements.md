@@ -2037,6 +2037,38 @@ P3-LMF-01 partial progress · reviewed decoder approach proposals · 2026-11-19:
   evaluated release gates and full acceptance verification. P3-LMF-01 remains open;
   physical power and Windows blockers remain independent.
 
+P3-LMF-01 partial progress · live Qwen planning and supervisor provenance · 2026-11-19:
+- Approach proposals now capture the configured local supervisor model, loaded
+  state and a SHA-256 revision of its loaded verification receipt after generation.
+  The receipt hash identifies verified model metadata; it is not a new per-request
+  hash of the full weight files. Proposal/approval revision binding includes this
+  provenance, and the review dialog displays the planner model. Unspecified local
+  test callbacks do not silently claim a loaded model identity.
+- Local app verification used the actual installed mlx-community/Qwen3.8-27B-4bit
+  model with HF_HUB_OFFLINE=1 and TRANSFORMERS_OFFLINE=1. Rebuilt/launched macOS
+  ALMG with isolated generated training fixtures and no planner stub. Qwen
+  recommended from_scratch for the tiny new-weights trial, the native review showed
+  its model identity, and no training existed before confirmation. After desktop
+  confirmation, the trial completed at accuracy 1.000 with the proposal and loaded
+  supervisor verification revision bound into its approval record.
+- A second real Qwen request recommended retrieval for a local-document/no-training
+  goal. ALMG showed the unavailable message with no confirmation control, and trial
+  count remained one. Restarted the backend (supervisor initially unloaded) and
+  reopened the completed trial from native history; the full saved record and
+  original loaded-supervisor provenance were unchanged. This closes the prior
+  live-Qwen verification gap for the bounded trial proposal workflow.
+- All 44 existing model-directory files retained identical sizes and modification
+  times; no weights/downloads were changed. Completed fixture servers created in
+  this chat were stopped to free resources, with their files/artifacts preserved.
+  No external collection or generated artifacts were committed.
+- Verification: all 243 Python tests passed with ALMG_METAL_TESTS=1; all 16 Flutter
+  tests passed; Flutter analysis clean. New tests cover unloaded identity, stable
+  verification-receipt hashing, changed receipt revisions, capture after generation
+  and identity inclusion in proposal hashes.
+- Remaining: main planner routing for the full decoder recipe, user dataset
+  integration, general scheduling and evaluated release gates. P3-LMF-01 stays open;
+  physical power and Windows acceptance remain independently unverified.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

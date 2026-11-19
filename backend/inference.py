@@ -1,5 +1,7 @@
 """On-device Qwen inference and explicit model setup."""
 import os
+import hashlib
+import json
 import platform
 from concurrent.futures import ThreadPoolExecutor
 from importlib.util import find_spec
@@ -30,6 +32,14 @@ def status():
         "model": MODEL, "directory": str(DIRECTORY), "supported": supported(),
         "runtime": find_spec("mlx_vlm") is not None, **SETUP.status(),
     }
+
+
+def loaded_identity():
+    """Describe the loaded supervisor revision without exposing or changing weights."""
+    stamp = _loaded_stamp
+    return {'provider': 'local_qwen', 'model': MODEL, 'loaded': _model is not None,
+            'verified_weights_revision': None if stamp is None else hashlib.sha256(
+                json.dumps(stamp, sort_keys=True, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()}
 
 
 def start_setup(action="resume"):
