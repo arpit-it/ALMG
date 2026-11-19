@@ -1610,8 +1610,32 @@ class _StudioPageState extends State<StudioPage> {
         const Text('Local heuristic findings highlight records for review. Likely contact details are flagged by location without copying matched values; other personal information may remain. Original data and training approvals are preserved. This audit does not filter text or start training.'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(report)),
       ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      actions: [
+        if ((report['privacy_matches'] as num? ?? 0) > 0)
+          TextButton(onPressed: () { Navigator.pop(context); _redactDecoderDataset(report); }, child: const Text('Create redacted dataset version')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+      ],
     ));
+  }
+
+  Future<void> _redactDecoderDataset(Map<String, dynamic> report) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Create redacted dataset version?'),
+      content: Text('Replace ${report['privacy_matches']} detected contact details with [CONTACT_REDACTED] in a new local dataset. '
+        'The original dataset is preserved. Splits and tokenizer are rebuilt and need a new review. '
+        'Other personal information may remain. This does not start training.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm redacted version'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final dataset = await _request('/decoder-datasets/${report['dataset_id']}/redact', {
+        'confirmed': true, 'audit_revision': report['revision'],
+      });
+      if (mounted) await _showDecoderDataset(dataset);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _auditDecoderDataset(String id) async {

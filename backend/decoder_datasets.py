@@ -15,7 +15,7 @@ else:
     from run_manifest import digest, file_digest
 
 
-def prepare(root, documents, confirmed, tokenizer_kind="words"):
+def prepare(root, documents, confirmed, tokenizer_kind="words", *, _derivation=None):
     if not isinstance(tokenizer_kind, str) or tokenizer_kind not in ('words', 'utf8_bytes'):
         raise ValueError('Choose word or UTF-8 byte tokenization.')
     tokenizer_type = ByteTokenizer if tokenizer_kind == 'utf8_bytes' else Tokenizer
@@ -90,6 +90,8 @@ def prepare(root, documents, confirmed, tokenizer_kind="words"):
                 'tokenizer': None if tokenizer is None else {'format': tokenizer.artifact()['format'],
                     'sha256': tokenizer.fingerprint(), 'fit_source': 'training_documents_only',
                     'vocabulary_size': len(tokenizer.vocabulary)}}
+    if _derivation is not None:
+        manifest['derivation'] = _derivation
     with TemporaryDirectory(prefix='.prepare-', dir=directory) as temporary:
         staged = Path(temporary) / 'dataset'
         staged.mkdir()
@@ -250,3 +252,44 @@ def list_audits(root, dataset_id):
         except (OSError,ValueError,TypeError,AttributeError):
             continue
     return result[-20:]
+
+
+def redact(root, dataset_id, confirmed, audit_revision):
+    """Create a separately reviewed version; original data and approvals are immutable."""
+    if confirmed is not True:
+        raise ValueError('Confirm creation of a redacted dataset version.')
+    report = quality_report(root, dataset_id)
+    if not isinstance(audit_revision, str) or audit_revision != report['revision']:
+        raise ValueError('The privacy audit changed. Reopen the current audit before filtering.')
+    if not report['privacy_matches']:
+        raise ValueError('No detected contact details to replace in this dataset.')
+    parent = read(root, dataset_id)
+    rows = [json.loads(line) for line in (Path(root)/'decoder-datasets'/dataset_id/'documents.jsonl').read_text(encoding='utf-8').splitlines()]
+    documents, lineage = [], []
+    for row in rows:
+        matches = [finding for finding in report['findings']
+                   if finding['kind'] == 'potential_personal_information'
+                   and finding['record']['group'] == row['group']]
+        text = row['text']
+        # Merge overlapping detections before replacement so offsets remain valid.
+        spans = []
+        for match in sorted(matches, key=lambda item: item['normalized_character_start']):
+            start, end = match['normalized_character_start'], match['normalized_character_end']
+            if spans and start < spans[-1][1]:
+                spans[-1] = (spans[-1][0], max(spans[-1][1], end))
+            else:
+                spans.append((start, end))
+        for start, end in reversed(spans):
+            text = text[:start] + '[CONTACT_REDACTED]' + text[end:]
+        documents.append({'name': row['name'], 'text': text})
+        lineage.append({'name': row['name'], 'derived_source_sha256': hashlib.sha256(text.encode('utf-8')).hexdigest(),
+                        'parent_group': row['group'], 'parent_split': row['split'],
+                        'parent_sources': [source for source in parent['sources'] if source['normalized_sha256'] == row['group']],
+                        'replacements': len(spans)})
+    derivation = {'version': 1, 'operation': 'replace_detected_contacts',
+                  'parent_dataset_id': dataset_id, 'parent_manifest_sha256': digest(parent),
+                  'audit_revision': report['revision'], 'privacy_method': report['privacy_method'],
+                  'replacement': '[CONTACT_REDACTED]', 'partition_policy': 'recompute_groups_and_splits_require_new_review',
+                  'sources': lineage}
+    tokenizer_kind = 'utf8_bytes' if (parent.get('tokenizer') or {}).get('format') == 'almg-utf8-byte-tokenizer-v1' else 'words'
+    return prepare(root, documents, True, tokenizer_kind, _derivation=derivation)

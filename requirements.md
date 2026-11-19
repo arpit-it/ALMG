@@ -2701,6 +2701,41 @@ P3-LMF-02 partial progress · local contact-detail privacy findings · 2026-11-1
   and skipped. No external collection occurred; generated fixtures/artifacts,
   downloaded weights and unrelated user edits are excluded from this commit.
 
+P3-LMF-02 partial progress · reviewed contact filtering into derived versions · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Native quality audits with contact findings now offer
+  “Create redacted dataset version”, followed by a separate confirmation showing
+  replacement count and explaining preservation, repartitioning and fresh review.
+  The backend requires literal consent and the current recomputed audit revision;
+  stale audits and datasets without detected contacts cannot create a child.
+- Detected spans are merged and replaced in reverse order with [CONTACT_REDACTED].
+  Preparation atomically publishes a new prepared_for_review dataset, refits the
+  same tokenizer kind and recomputes groups/splits. It never starts training or
+  transfers approvals. The new optional version-1 derivation binds parent ID and
+  manifest hash, audit/method, replacement policy and per-record parent source
+  hashes, licenses, groups/splits and replacement counts. Original manifests and
+  files stay untouched; existing datasets without derivation remain readable.
+- Native verification: rebuilt/launched ALMG with three synthetic local documents,
+  ran the current audit, opened redaction confirmation and verified no child
+  existed before approval. Explicit confirmation created child dataset
+  1a388539ebf443da9126ea56e2524a09 with three replacements and intact parent lineage.
+  Verified original files byte-identical, three placeholders in the child, no
+  original contact values in child text and no trial created. Audited the child
+  through the app: zero detected contact matches. Restarted ALMG and reopened
+  the identical child manifest and lineage. Evidence:
+  /tmp/almg-redaction-qa/{parent-audit-ui.json,confirmation-ui.txt,
+  child-manifest-ui.json,child-audit-ui.json,restarted-child-ui.json,before.json}.
+- Validation: 306 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. New regression cases cover provenance, byte-tokenizer
+  preservation, immutable parents, current-review/consent rejection and safe
+  failure when replacements leave fewer than three distinct documents (no
+  partially published dataset or temporary preparation folder).
+- Remaining: broader PII formats and filtering policies, language/quality/license
+  review, streaming/incremental/resumable ingestion, token distributions/mixing,
+  export provenance and remaining acceptance checks. Contact heuristics do not
+  guarantee personal-data-free text. Physical/Windows blockers remain skipped.
+  No external collection occurred; generated data/artifacts, weights and unrelated
+  user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -85,6 +85,62 @@ class DatasetAuditTests(unittest.TestCase):
         self.assertEqual({row['audit_version'] for row in saved}, {1, 2})
         self.assertEqual(json.loads(path.read_text()), legacy)
 
+    def privacy_dataset(self):
+        return datasets.prepare(self.root, [
+            {'name': 'contacts.txt', 'text': 'café contact alice@example.test or +44 20 7946 0958 today'},
+            {'name': 'domestic.txt', 'text': 'Call (415) 555-0123 for this fictional local fixture.'},
+            {'name': 'control.txt', 'text': 'Date 2026-11-19; version 1.2.3; unrelated local control.'},
+        ], True, 'utf8_bytes')
+
+    def test_redacted_version_binds_review_and_preserves_original_lineage(self):
+        parent = self.privacy_dataset()
+        folder = self.root / 'decoder-datasets' / parent['id']
+        before = {p.name: p.read_bytes() for p in folder.iterdir()}
+        audit = datasets.audit(self.root, parent['id'], True)
+        child = datasets.redact(self.root, parent['id'], True, audit['revision'])
+        self.assertNotEqual(child['id'], parent['id'])
+        self.assertEqual(datasets.read(self.root, child['id']), child)
+        self.assertEqual(child['status'], 'prepared_for_review')
+        self.assertEqual(child['tokenizer']['format'], parent['tokenizer']['format'])
+        derivation = child['derivation']
+        self.assertEqual(derivation['parent_dataset_id'], parent['id'])
+        self.assertEqual(derivation['parent_manifest_sha256'], datasets.digest(parent))
+        self.assertEqual(derivation['audit_revision'], audit['revision'])
+        self.assertEqual(sum(row['replacements'] for row in derivation['sources']), 3)
+        self.assertEqual(sorted(source['source_sha256'] for row in derivation['sources'] for source in row['parent_sources']),
+                         sorted(source['source_sha256'] for source in parent['sources']))
+        text = (self.root / 'decoder-datasets' / child['id'] / 'documents.jsonl').read_text()
+        for contact in ('alice@example.test', '+44 20 7946 0958', '(415) 555-0123'):
+            self.assertNotIn(contact, text)
+        self.assertEqual(text.count('[CONTACT_REDACTED]'), 3)
+        self.assertEqual(datasets.quality_report(self.root, child['id'])['privacy_matches'], 0)
+        self.assertEqual(before, {p.name: p.read_bytes() for p in folder.iterdir()})
+        self.assertFalse((self.root / 'decoder-trials').exists())
+
+    def test_redaction_requires_consent_current_audit_and_contact_findings(self):
+        parent = self.privacy_dataset()
+        audit = datasets.quality_report(self.root, parent['id'])
+        before = set((self.root / 'decoder-datasets').iterdir())
+        for confirmed, revision in ((False, audit['revision']), (1, audit['revision']), (True, 'stale'), (True, None)):
+            with self.assertRaises(ValueError):
+                datasets.redact(self.root, parent['id'], confirmed, revision)
+        clean_audit = datasets.quality_report(self.root, self.dataset_id)
+        with self.assertRaisesRegex(ValueError, 'No detected contact'):
+            datasets.redact(self.root, self.dataset_id, True, clean_audit['revision'])
+        self.assertEqual(before, set((self.root / 'decoder-datasets').iterdir()))
+
+    def test_redaction_collapse_fails_without_publishing_partial_dataset(self):
+        parent = datasets.prepare(self.root, [
+            {'name': str(i), 'text': f'Contact person{i}@example.test'} for i in range(3)
+        ], True, 'utf8_bytes')
+        report = datasets.quality_report(self.root, parent['id'])
+        before = set((self.root / 'decoder-datasets').iterdir())
+        with self.assertRaisesRegex(ValueError, 'three distinct documents'):
+            datasets.redact(self.root, parent['id'], True, report['revision'])
+        self.assertEqual(before, set((self.root / 'decoder-datasets').iterdir()))
+        self.assertFalse(list((self.root / 'decoder-datasets').glob('.prepare-*')))
+        self.assertEqual(datasets.read(self.root, parent['id']), parent)
+
     def test_consent_and_corrupt_dataset_do_not_publish(self):
         for consent in (False, None, 1):
             with self.assertRaises(ValueError):
