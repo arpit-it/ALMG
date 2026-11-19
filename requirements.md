@@ -3508,6 +3508,41 @@ P3-LMF-02 partial progress · durable reviewed HTML preparations · 2026-11-20:
   Generated drafts, datasets, fixtures, artifacts, weights and unrelated edits are
   excluded from this commit.
 
+P3-LMF-02 partial progress · saved streamed fixed-byte tokenizer artifacts · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed byte-distribution reports now
+  offer confirmed publication of the existing fixed 256-byte tokenizer format.
+  The artifact binds only unique training-split text in stable group order, using
+  the same canonical NFC text-array hash as the existing small byte tokenizer.
+  Validation/test text is excluded from that binding. No vocabulary is learned,
+  special tokens added or training approval granted.
+- Preparation verifies the exact reviewed report and immutable index, validates
+  every record against the current 4096-byte document limit with bounded reads,
+  checks split populations and rechecks source integrity before atomic publication.
+  Versioned manifests bind source provenance, index/report revisions, tokenizer
+  fingerprint and file checksum. Saved per-index inventory verifies and reloads
+  the standard byte-tokenizer artifact. Long records, stale/incomplete reports,
+  missing training records and altered artifacts fail closed.
+- Local app verification: rebuilt/launched ALMG, opened the completed 2,000-record
+  byte report, reviewed/confirmed tokenizer publication, then inspected saved
+  artifact 21ec94db1631466da69b4cad007a652d. Its training-only hash independently
+  matches all 1,599 unique training records in canonical order (beyond the small
+  list-fit helper's document cap). The standard tokenizer reloads and round-trips
+  UTF-8 text. Restarted backend/app and reopened identical metadata through native
+  saved-tokenizer inventory. Source index files are unchanged; no training started.
+  Evidence: /tmp/almg-stream-byte-tokenizer-qa/{consent-ui.txt,saved-ui.json,
+  restarted-ui.json,verification.json}.
+- Validation: 380 Python tests, 29 Flutter tests and Flutter analysis pass. Added
+  tests compare the artifact with the existing training-only byte fit, independently
+  reject an all-split hash, check Unicode round-trip/source preservation, consent/
+  stale/incomplete report rejection, oversized records and artifact tampering.
+- Remaining: streamed token windows/training and contamination admission, broader
+  tokenizer algorithms/policies, larger-than-RAM acceptance and other dataset
+  criteria. Final artifact validation/hashing is one bounded-memory scan with
+  atomic publication; it does not yet persist an intermediate hash state for
+  resuming that final pass. The existing byte document limit remains explicit.
+  Physical power/Windows blockers stay open and skipped. Generated artifacts,
+  reports, fixture data, weights and unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

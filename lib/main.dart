@@ -2165,6 +2165,48 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _showStreamTokenizer(Map<String, dynamic> tokenizer) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Saved streamed byte tokenizer'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Fixed 256-byte alphabet with training-only provenance. Every indexed record was checked against the existing 4096-byte document limit. '
+          'This artifact does not fit a vocabulary or grant training/evaluation approval.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(tokenizer)),
+      ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+    ));
+  }
+
+  Future<void> _saveStreamTokenizer(Map<String, dynamic> report) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Save fixed-byte tokenizer?'),
+      content: const Text('Save the existing fixed UTF-8 byte alphabet, binding only training-split text in stable group order. '
+        'Validate every record against the current tokenizer limits. Validation and test text are excluded from the training hash. '
+        'The final scan uses bounded reads and can take time for large indexes; publication is atomic. No training starts.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm streamed byte tokenizer'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final tokenizer = await _request('/decoder-stream-byte-statistics/${report['id']}/tokenizer', {'confirmed': true, 'reviewed': report}, const Duration(minutes: 10));
+      if (mounted) await _showStreamTokenizer(tokenizer);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _savedStreamTokenizers(String indexId) async {
+    try {
+      final tokenizers = (await _request('/decoder-stream-indexes/$indexId/tokenizers'))['tokenizers'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved streamed tokenizers'), children: [
+          if (tokenizers.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved streamed tokenizers.')),
+          for (final tokenizer in tokenizers) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(tokenizer as Map)),
+            child: Text('${(tokenizer['id'] as String).substring(0, 8)} · fixed UTF-8 bytes · ${tokenizer['split_counts']['train']} training records')),
+        ],
+      ));
+      if (selected != null && mounted) await _showStreamTokenizer(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _showStreamByteStatistics(Map<String, dynamic> record) async {
     final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Byte token distribution · ${record['status']}'), scrollable: true,
@@ -2180,6 +2222,9 @@ class _StudioPageState extends State<StudioPage> {
         ]),
       ])),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] == 'complete') TextButton(onPressed: () {
+          Navigator.pop(context, false); _saveStreamTokenizer(record);
+        }, child: const Text('Save streamed byte tokenizer')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume byte statistics'))],
     ));
     if (resume == true && mounted) await _runStreamByteStatistics(record);
@@ -2354,6 +2399,7 @@ class _StudioPageState extends State<StudioPage> {
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-overlap'), child: const Text('View saved streamed overlap reports')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-languages'), child: const Text('View saved streamed language reports')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'byte-statistics'), child: const Text('Analyze byte token distribution')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'tokenizers'), child: const Text('View saved streamed tokenizers')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-byte-statistics'), child: const Text('View saved byte statistics')),
         if (record['status'] == 'complete' && Platform.isMacOS) TextButton(onPressed: () => Navigator.pop(context, 'export'), child: const Text('Review private index export')),
         TextButton(onPressed: () => Navigator.pop(context, 'audits'), child: const Text('View saved full-index audits')),
@@ -2378,6 +2424,7 @@ class _StudioPageState extends State<StudioPage> {
     if (action == 'saved-overlap') await _savedStreamOverlap(record['id'] as String);
     if (action == 'saved-languages') await _savedStreamLanguages(record['id'] as String);
     if (action == 'byte-statistics') await _beginStreamByteStatistics(record);
+    if (action == 'tokenizers') await _savedStreamTokenizers(record['id'] as String);
     if (action == 'saved-byte-statistics') await _savedStreamByteStatistics(record['id'] as String);
     if (action == 'audits') await _savedStreamAudits(record['id'] as String);
   }

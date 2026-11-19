@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -64,6 +64,7 @@ else:
     import decoder_stream_redactions
     import decoder_html
     import decoder_html_preparations
+    import decoder_stream_tokenizers
     import chat_history
     import inference
     import image_recipe
@@ -2065,6 +2066,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'reports': decoder_stream_token_stats.list_reports(ROOT, stream_parts[1])})
             except ValueError as error:
                 return self.respond({'error': str(error)}, 404)
+        if len(stream_parts) == 3 and stream_parts[0] == 'decoder-stream-indexes' and stream_parts[2] == 'tokenizers':
+            try:
+                return self.respond({'tokenizers': decoder_stream_tokenizers.list_tokenizers(ROOT, stream_parts[1])})
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if self.path.startswith('/decoder-stream-byte-statistics/'):
             try:
                 return self.respond(decoder_stream_token_stats.read(ROOT, self.path.removeprefix('/decoder-stream-byte-statistics/')))
@@ -2284,6 +2290,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_stream_permissions.declare(ROOT, parts[1], data.get('confirmed'), data.get('reviewed'), data.get('basis'), data.get('note')))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'byte-statistics':
                 return self.respond(decoder_stream_token_stats.begin(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-byte-statistics' and parts[2] == 'tokenizer':
+                return self.respond(decoder_stream_tokenizers.prepare(ROOT, parts[1], data.get('confirmed'), data.get('reviewed')))
             if len(parts) == 3 and parts[0] == 'decoder-stream-byte-statistics' and parts[2] == 'step':
                 return self.respond(decoder_stream_token_stats.step(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'audits':
