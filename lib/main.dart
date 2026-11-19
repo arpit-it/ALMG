@@ -2577,6 +2577,38 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _prepareHtmlDataset() async {
+    try {
+      final files = await openFiles(acceptedTypeGroups: const [XTypeGroup(label: 'Local UTF-8 HTML', extensions: ['html', 'htm'])]);
+      if (files.isEmpty) return;
+      if (files.length < 3 || files.length > 16) throw const FormatException('Select 3 to 16 local HTML documents.');
+      final documents = await readLocalTextDocuments(files);
+      final review = await _request('/decoder-html-review', {'documents': documents});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Review local HTML extraction'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Extract static body text locally. Scripts, styles, templates, head content and marked hidden sections are omitted; '
+            'linked resources are not fetched and JavaScript is not run. This is not browser rendering. '
+            'Create a new dataset with the existing UTF-8 byte tokenizer. Original HTML hashes are preserved in provenance; raw HTML is not included. No training starts.'),
+          for (final source in review['sources'] as List) ...[
+            Text('${source['name']} · ${source['original_bytes']} original bytes → ${source['extracted_bytes']} extracted bytes'),
+            SelectableText(source['preview'] as String),
+            if (source['preview_truncated'] == true) const Text('Preview limited to 512 characters.'),
+          ],
+          ExpansionTile(title: const Text('View extraction method and source hashes'), children: [
+            SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
+          ]),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm HTML dataset preparation'))],
+      ));
+      if (confirmed != true || !mounted) return;
+      final dataset = await _request('/decoder-html-datasets', {'documents': documents, 'confirmed': true, 'reviewed': review});
+      if (mounted) await _showDecoderDataset(dataset);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _prepareDecoderDataset({bool saveDraft = false}) async {
     try {
       final files = await openFiles(acceptedTypeGroups: localTextTypes);
@@ -2998,6 +3030,7 @@ class _StudioPageState extends State<StudioPage> {
             _prepareDecoderDataset();
           }, child: const Text('Prepare local decoder text dataset')),
           TextButton(onPressed: () { Navigator.pop(context); _prepareDecoderDataset(saveDraft: true); }, child: const Text('Save local preparation draft')),
+          TextButton(onPressed: () { Navigator.pop(context); _prepareHtmlDataset(); }, child: const Text('Prepare local HTML text dataset')),
           TextButton(onPressed: () { Navigator.pop(context); _showSavedPreparations(); }, child: const Text('View saved preparation drafts')),
           TextButton(onPressed: () { Navigator.pop(context); _showDatasetProviders(); }, child: const Text('Optional dataset providers')),
           if (Platform.isMacOS) TextButton(onPressed: () { Navigator.pop(context); _uploadStreamedSource(); }, child: const Text('Store a large local source in chunks')),

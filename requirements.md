@@ -3434,6 +3434,44 @@ P3-LMF-02 partial progress · resumable contact-filtered streamed versions · 20
   skipped. Generated filtered datasets, fixtures, export packages, weights and
   unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · reviewed offline HTML text extraction · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Added a separate native local HTML preparation
+  workflow for 3–16 UTF-8 .html/.htm files under the existing 64 KiB/file and
+  128000-byte selection limits. A versioned static parser extracts body text,
+  decodes entities and omits head/script/style/template/noscript/comment content
+  plus hidden/aria-hidden=true sections. Nesting is bounded to 128 elements.
+  No JavaScript runs or linked resources are fetched; CSS/layout/browser rendering
+  are explicitly unsupported. Existing plain-text/Markdown semantics stay unchanged.
+- Native review shows extracted previews, original/extracted byte lengths and
+  progressively disclosed source hashes/method before confirmation. Prepared
+  datasets use the existing UTF-8 byte tokenizer and preserve original HTML hashes
+  linked to extracted-text hashes in versioned derivation provenance. Raw HTML is
+  not included in the dataset/export. This does not grant permission or start
+  training. Changed source bytes or extraction reviews reject publication.
+- Local app verification: rebuilt/launched ALMG with three isolated HTML sources,
+  selected them through the native chooser and inspected previews. Expected body
+  text, Unicode and decoded entities remain; hidden/executable fixture content is
+  absent. No dataset existed before confirmation. Confirmed dataset
+  a98aeef12cb04f44ba7d768a3d9be39b, verified original/extracted hashes and normalized
+  text, then completed native private ZIP export. Exported manifest/provenance
+  exactly matches the saved dataset; no raw HTML entries are present. Restarted
+  app/backend and reopened identical saved metadata without re-extracting inputs.
+  No training started. Evidence: /tmp/almg-local-html-extraction-qa/{preview-ui.txt,
+  review-ui.json,dataset-ui.json,export-review-ui.json,export-saved-ui.txt,
+  restarted-dataset-ui.json,verification.json}.
+- Validation: 374 Python tests, 29 Flutter tests and Flutter analysis pass. Added
+  coverage for excluded content/entity decoding, original-byte/extracted hashes,
+  independently revised provenance, unchanged saved readers/export, consent/stale
+  review rejection, invalid UTF-8, empty extraction, oversized/deep inputs and
+  unsupported file types. Existing fixtures remain readable; no existing dataset
+  implementation hashes or stored files are rewritten by the new extraction module.
+- Remaining: richer formats/rendered extraction and broader document policies,
+  streamed training/tokenizer/contamination integration, larger-than-RAM acceptance
+  and other dataset criteria. HTML is a bounded synchronous preparation, with
+  publication through the existing atomic dataset path; no resumable HTML draft
+  workflow is delivered. Physical power/Windows blockers remain open and skipped.
+  Generated inputs, datasets, exports, weights and unrelated edits are excluded.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
