@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -49,6 +49,7 @@ else:
     import decoder_training
     import decoder_trials
     import decoder_datasets
+    import decoder_preparations
     import chat_history
     import inference
     import image_recipe
@@ -2003,6 +2004,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({"messages": chat_history.messages(self.path.removeprefix("/chats/"))})
             except ValueError as error:
                 return self.respond({"error": str(error)}, 404)
+        if self.path == '/decoder-preparations':
+            return self.respond({'drafts': decoder_preparations.list_drafts(ROOT)})
+        if self.path.startswith('/decoder-preparations/'):
+            try:
+                return self.respond(decoder_preparations.read(ROOT, self.path.removeprefix('/decoder-preparations/')))
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if self.path == '/decoder-datasets':
             return self.respond(decoder_datasets.list_datasets(ROOT))
         dataset_parts = self.path.strip('/').split('/')
@@ -2124,7 +2132,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({"error": "Local desktop clients only."}, 403)
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            limit = 12 * 1024 * 1024 if self.path == "/decoder-imports" else 20 * 1024 * 1024 if self.path == "/projects/restore" else (1_600_000 if self.path in ("/chats/stream", "/decoder-datasets") else 200_000)
+            limit = 12 * 1024 * 1024 if self.path == "/decoder-imports" else 20 * 1024 * 1024 if self.path == "/projects/restore" else (1_600_000 if self.path in ("/chats/stream", "/decoder-datasets", "/decoder-preparations") else 200_000)
             if not 0 < length <= limit:
                 raise ValueError("Invalid request size.")
             data = json.loads(self.rfile.read(length))
@@ -2137,6 +2145,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/runtime/power-event":
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
+            if self.path == '/decoder-preparations':
+                return self.respond(decoder_preparations.create(ROOT, data.get('documents'), data.get('confirmed'), data.get('tokenizer_kind', 'words')))
             if self.path == '/decoder-datasets':
                 return self.respond(decoder_datasets.prepare(ROOT, data.get('documents'), data.get('confirmed'), data.get('tokenizer_kind', 'words')), 201)
             if self.path == '/decoder-trial-proposals':
@@ -2149,6 +2159,8 @@ class Handler(BaseHTTPRequestHandler):
                                               require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness, post_training=data.get('post_training'))
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
+            if len(parts) == 3 and parts[0] == 'decoder-preparations' and parts[2] == 'prepare':
+                return self.respond(decoder_preparations.resume(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'pipeline':
                 return self.respond(decoder_trials.pipeline_record(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'extend':

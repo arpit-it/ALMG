@@ -20,7 +20,7 @@ else:
     from run_manifest import digest, file_digest
 
 
-def prepare(root, documents, confirmed, tokenizer_kind="words", *, _derivation=None):
+def prepare(root, documents, confirmed, tokenizer_kind="words", *, _derivation=None, _dataset_id=None):
     if not isinstance(tokenizer_kind, str) or tokenizer_kind not in ('words', 'utf8_bytes'):
         raise ValueError('Choose word or UTF-8 byte tokenization.')
     tokenizer_type = ByteTokenizer if tokenizer_kind == 'utf8_bytes' else Tokenizer
@@ -85,7 +85,9 @@ def prepare(root, documents, confirmed, tokenizer_kind="words", *, _derivation=N
         findings.append({'kind': 'tokenizer_limits', 'message': str(error)})
     directory = Path(root) / 'decoder-datasets'
     directory.mkdir(parents=True, exist_ok=True)
-    dataset_id = uuid.uuid4().hex
+    dataset_id = _dataset_id or uuid.uuid4().hex
+    if not isinstance(dataset_id, str) or not re.fullmatch('[a-f0-9]{32}', dataset_id):
+        raise ValueError('Invalid decoder dataset ID.')
     sources.sort(key=lambda source: (source['name'], source['source_sha256']))
     manifest = {'format': 'almg-decoder-text-dataset-v1', 'schema_version': 1, 'id': dataset_id,
                 'status': 'prepared_for_review', 'preparation_version': 1,

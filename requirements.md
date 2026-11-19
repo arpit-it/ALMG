@@ -2833,6 +2833,42 @@ P3-LMF-02 partial progress · incremental local dataset versions · 2026-11-19:
   open and skipped. No external collection occurred; generated fixtures/artifacts,
   downloaded weights and unrelated user edits are excluded from this commit.
 
+P3-LMF-02 partial progress · saved local preparation and explicit recovery · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Added “Save local preparation draft” with native
+  document selection, tokenizer choice and explicit confirmation. A separate
+  version-1 draft atomically saves original inputs, content revision and bound
+  preparation implementation hashes. Validation uses the existing engine in a
+  disposable workspace; saving does not publish a dataset or start training.
+- “View saved preparation drafts” reopens pending/completed work after restart.
+  Explicit “Prepare saved inputs” verifies snapshot integrity and implementation,
+  then atomically publishes to the draft's stable dataset ID. If publication
+  succeeds but the completion-record write is interrupted, retry verifies and
+  reuses the bound existing output rather than creating another dataset. Completed
+  drafts reopen the original dataset. Changed implementations require reselecting
+  inputs for a new review; old snapshots are preserved. No automatic resume occurs.
+- Native verification: rebuilt/launched ALMG, selected three UTF-8 files (including
+  BOM/multibyte text), confirmed a byte-tokenizer draft and compared saved original
+  bytes. Draft 6152c39c6bac45e6ba8c8f6b7c2ce2c3 had no published output. Restarted
+  both backend and app, reopened the identical pending record, and confirmed
+  preparation. A one-shot local fixture interrupted the completion-record write
+  after publication, closing the response. Reopened the pending draft through
+  the app and confirmed retry: recovered the same verified dataset ID and file
+  hashes, with no duplicate publication or changed input snapshot. Completed status
+  appeared in the native list; “Open prepared dataset” reopened an identical
+  manifest. No training started. Evidence: /tmp/almg-preparation-qa/{draft-ui.json,
+  restarted-draft-ui.json,interrupted-ui.txt,published-before.json,
+  recovered-dataset-ui.json,completed-draft-ui.json,reopened-dataset-ui.json}.
+- Validation: 321 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. New cases cover persisted reload/idempotency, interruption
+  before preparation and after publication, literal consent, stale implementation,
+  corrupt snapshots, invalid inputs and preservation of published files.
+- Remaining: streaming beyond RAM and chunk-level large-dataset resume, language/
+  quality/license review, broader PII/contamination policy, mixing/sampling and
+  remaining acceptance verification. This resumes bounded saved local inputs and
+  atomic publication; it does not claim resumable streaming. Physical/Windows
+  blockers remain open and skipped. Generated snapshots/artifacts, downloaded
+  weights and unrelated user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

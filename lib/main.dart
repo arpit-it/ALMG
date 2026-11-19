@@ -1781,7 +1781,44 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
-  Future<void> _prepareDecoderDataset() async {
+  Future<void> _showDecoderPreparation(Map<String, dynamic> draft) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Saved preparation · ${draft['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Original inputs are saved locally. Preparation requires confirmation and never starts training. Interrupted publication reuses the same dataset ID.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(draft)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (draft['implementation_current'] == true || draft['status'] == 'complete')
+          TextButton(onPressed: () => Navigator.pop(context, true), child: Text(draft['status'] == 'complete' ? 'Open prepared dataset' : 'Prepare saved inputs'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final dataset = await _request('/decoder-preparations/${draft['id']}/prepare', {'confirmed': true});
+      if (mounted) await _showDecoderDataset(dataset);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _showSavedPreparations() async {
+    try {
+      final drafts = (await _request('/decoder-preparations'))['drafts'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved local preparations'), children: [
+          if (drafts.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved preparation drafts.')),
+          for (final draft in drafts) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(draft as Map)),
+            child: Text('${(draft['id'] as String).substring(0, 8)} · ${draft['status']} · ${draft['input_documents']} documents')),
+        ],
+      ));
+      if (selected != null && mounted) await _showDecoderPreparation(selected);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _prepareDecoderDataset({bool saveDraft = false}) async {
     try {
       final files = await openFiles(acceptedTypeGroups: [const XTypeGroup(label: 'UTF-8 text', extensions: ['txt'])]);
       if (files.isEmpty) return;
@@ -1804,6 +1841,19 @@ class _StudioPageState extends State<StudioPage> {
         ],
       ));
       if (tokenizerKind == null || !mounted) return;
+      if (saveDraft) {
+        final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+          title: const Text('Save local preparation draft?'),
+          content: Text('Save the ${files.length} selected original documents locally so preparation can be confirmed after restart. '
+            'This does not publish a dataset or start training. The current bounded size limits apply.'),
+          actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+            TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm saved inputs'))],
+        ));
+        if (confirmed != true || !mounted) return;
+        final draft = await _request('/decoder-preparations', {'confirmed': true, 'documents': documents, 'tokenizer_kind': tokenizerKind});
+        if (mounted) await _showDecoderPreparation(draft);
+        return;
+      }
       final manifest = await _request('/decoder-datasets', {'confirmed': true, 'documents': documents, 'tokenizer_kind': tokenizerKind});
       if (mounted) {
         setState(() => _error = null);
@@ -2185,6 +2235,8 @@ class _StudioPageState extends State<StudioPage> {
             Navigator.pop(context);
             _prepareDecoderDataset();
           }, child: const Text('Prepare local decoder text dataset')),
+          TextButton(onPressed: () { Navigator.pop(context); _prepareDecoderDataset(saveDraft: true); }, child: const Text('Save local preparation draft')),
+          TextButton(onPressed: () { Navigator.pop(context); _showSavedPreparations(); }, child: const Text('View saved preparation drafts')),
           TextButton(onPressed: () {
             Navigator.pop(context);
             _showSavedDecoderDatasets();
