@@ -1,4 +1,4 @@
-"""Bounded CPU decoder initialization; no pretrained loading or training pipeline."""
+"""Bounded CPU decoder construction and validated local artifact persistence."""
 import numpy as np
 
 CONTRACT = {
@@ -31,6 +31,69 @@ class Decoder:
                   'query': (d, d), 'key': (d, d), 'value': (d, d), 'attention_output': (d, d),
                   'feed_forward_in': (d, d * 2), 'feed_forward_out': (d * 2, d), 'head': (d, v)}
         self.parameters = {name: rng.normal(0, .02, shape).astype(np.float32) for name, shape in shapes.items()}
+
+    def artifact(self):
+        """Serialize only bounded, finite parameters matching this architecture."""
+        expected = Decoder(self.config)
+        if set(self.parameters) != set(expected.parameters):
+            raise ValueError('Decoder parameter names do not match the architecture.')
+        weights = {}
+        for name, reference in expected.parameters.items():
+            values = np.asarray(self.parameters[name])
+            if (values.shape != reference.shape or values.dtype.kind not in 'iuf'
+                    or not np.isfinite(values).all() or np.any(np.abs(values) > np.finfo(np.float32).max)):
+                raise ValueError('Decoder parameter shapes and finite numeric values are required.')
+            weights[name] = values.astype(np.float32).tolist()
+        return {'format': 'almg-decoder-v1', 'schema_version': 1,
+                'config': dict(self.config), 'parameters': weights}
+
+    def save(self, path):
+        """Atomically write a local JSON artifact; no executable serialization."""
+        import json
+        from pathlib import Path
+        from tempfile import NamedTemporaryFile
+        path = Path(path)
+        content = json.dumps(self.artifact(), allow_nan=False)
+        temporary = None
+        try:
+            with NamedTemporaryFile(mode='w', encoding='utf-8', dir=path.parent,
+                                    prefix='.almg-decoder-', suffix='.tmp', delete=False) as stream:
+                temporary = Path(stream.name)
+                stream.write(content)
+            temporary.replace(path)
+        finally:
+            if temporary is not None:
+                temporary.unlink(missing_ok=True)
+
+    @classmethod
+    def load(cls, path):
+        """Load a bounded local decoder artifact after validating every tensor."""
+        import json
+        from pathlib import Path
+        try:
+            with Path(path).open('rb') as stream:
+                content = stream.read(4 * 1024 * 1024 + 1)
+            if len(content) > 4 * 1024 * 1024:
+                raise ValueError('Decoder artifact exceeds the 4 MiB limit.')
+            data = json.loads(content)
+            if (not isinstance(data, dict) or data.get('format') != 'almg-decoder-v1'
+                    or type(data.get('schema_version')) is not int or data['schema_version'] != 1
+                    or set(data) != {'format', 'schema_version', 'config', 'parameters'}):
+                raise ValueError('Unsupported decoder artifact format.')
+            model = cls(data['config'])
+            if not isinstance(data['parameters'], dict) or set(data['parameters']) != set(model.parameters):
+                raise ValueError('Decoder parameter names do not match the architecture.')
+            parameters = {}
+            for name, reference in model.parameters.items():
+                value = np.asarray(data['parameters'][name])
+                if (value.shape != reference.shape or value.dtype.kind not in 'iuf'
+                        or not np.isfinite(value).all() or np.any(np.abs(value) > np.finfo(np.float32).max)):
+                    raise ValueError('Decoder parameter shapes and finite numeric values are required.')
+                parameters[name] = value.astype(np.float32)
+            model.parameters = parameters
+            return model
+        except (OSError, KeyError, TypeError, UnicodeError) as error:
+            raise ValueError('Decoder artifact is unreadable or incomplete.') from error
 
     def logits(self, tokens):
         tokens = np.asarray(tokens)

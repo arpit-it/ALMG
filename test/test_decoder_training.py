@@ -40,3 +40,6 @@ class DecoderTrainingTest(unittest.TestCase):
         self.assertEqual(result['generated_tokens'], [index % 4 for index in range(12)])
         self.assertEqual(result['causal_prefix_max_error'], 0)
         self.assertLess(result['cpu_inference_max_error'], 1e-5)
+        self.assertEqual(result['artifact_reload_max_error'], 0)
+        self.assertEqual(result['artifact_format'], 'almg-decoder-v1')
+        self.assertTrue(result['temporary_artifact_removed'])

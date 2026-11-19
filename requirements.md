@@ -1831,6 +1831,32 @@ P3-LMF-01 partial progress · full-parameter decoder training check · 2026-11-1
   evaluation/release gates and full versioned stage/manifest integration.
   P3-LMF-01 remains open; blocked physical power and Windows criteria stay separate.
 
+P3-LMF-01 partial progress · decoder artifact roundtrip · 2026-11-19:
+- Added version-1 almg-decoder-v1 local JSON persistence for decoder configuration
+  and parameters. Loading validates schema, bounded configuration, exact tensor
+  names/shapes, finite float32-compatible values and a 4 MiB read limit. It uses
+  no executable serialization. Saving validates before writing and atomically
+  replaces the destination; failed writes remove staging files and preserve an
+  existing artifact. Existing jobs and model formats are unchanged.
+- The optional from-scratch training check now saves its trained decoder in a
+  temporary directory, reloads it into CPU inference and verifies identical
+  held-out predictions. It reports artifact format/size and reload error, then
+  removes the temporary artifact. General user-model export/release remains gated.
+- Local app verification: rebuilt/launched macOS ALMG with isolated generated
+  fixtures; opened recipe details and explicitly ran the decoder training check.
+  Native result reported almg-decoder-v1, 16,233 bytes, artifact reload error 0.0,
+  temporary_artifact_removed true, and held-out accuracy 1.000. The training check
+  still constructs new weights and uses no downloads or external collection.
+- Verification: all 215 Python tests passed with ALMG_METAL_TESTS=1, including
+  trained-model roundtrip on Metal; all 16 Flutter tests passed. New tests cover
+  CPU prediction preservation, malformed versions/config/shapes/tensor names,
+  nonfinite or oversized artifacts, invalid-save preservation and failed-replace
+  cleanup. Generated artifacts and weights remain outside Git.
+- Remaining: planner-enabled workflow/approach confirmation, user dataset and
+  tokenizer integration, persistent approved training/checkpoint lifecycle,
+  evaluated release integration and complete stage/manifest contracts. P3-LMF-01
+  stays open; physical power and Windows verification remain separate blockers.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

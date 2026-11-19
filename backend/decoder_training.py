@@ -57,8 +57,16 @@ def run(initialize):
         matches = generated == [index % 4 for index in range(12)]
         model.parameters = {name: np.array(value) for name, value in parameters.items()}
         cpu_error = float(np.max(np.abs(model.logits(np.array(held_out)[:, :-1]) - np.array(scores))))
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        with TemporaryDirectory(prefix='almg-decoder-roundtrip-') as folder:
+            artifact = Path(folder) / 'decoder.json'
+            model.save(artifact)
+            restored = type(model).load(artifact)
+            reload_error = float(np.max(np.abs(model.logits(np.array(held_out)[:, :-1]) - restored.logits(np.array(held_out)[:, :-1]))))
+            artifact_bytes = artifact.stat().st_size
         if not (finite and final < initial * .1 and accuracy >= .95 and causal_error < 1e-6
-                and len(changed) == len(parameters) and matches and cpu_error < 1e-5):
+                and len(changed) == len(parameters) and matches and cpu_error < 1e-5 and reload_error < 1e-7):
             raise ValueError('Decoder training failed loss, held-out, causality, full-parameter or generation verification.')
     return {'passed': True, 'scope': 'Generated-token training fixture only; user-dataset pretraining and export remain unavailable.',
             'recipe': 'decoder_from_scratch', 'recipe_version': 1, 'stage': 'pretraining_fixture', 'stage_version': 1,
@@ -69,4 +77,6 @@ def run(initialize):
             'initial_loss': initial, 'final_loss': final, 'held_out_next_token_accuracy': accuracy,
             'train_sequence_length': 8, 'held_out_sequence_length': 12,
             'causal_prefix_max_error': causal_error, 'generated_tokens': generated,
-            'generation_matches_fixture': matches, 'cpu_inference_max_error': cpu_error}
+            'generation_matches_fixture': matches, 'cpu_inference_max_error': cpu_error,
+            'artifact_format': 'almg-decoder-v1', 'artifact_bytes': artifact_bytes,
+            'artifact_reload_max_error': reload_error, 'temporary_artifact_removed': True}
