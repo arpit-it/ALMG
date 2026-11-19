@@ -2970,6 +2970,41 @@ P3-LMF-02 partial progress · reviewed local dataset mixing and training weights
   occurred; generated mixtures/checkpoints, weights and unrelated edits are not
   included in this commit.
 
+P3-LMF-02 partial progress · source permission declarations and exported notes · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Prepared datasets now offer a source-by-hash selector,
+  user-created / permission-recorded / needs-review bases, a required evidence or
+  source note, and explicit confirmation. This records a user assertion, not an
+  ALMG permission verification, and does not grant or transfer training approval.
+- Version-1 license_declarations bind the exact selected original-byte hash,
+  supported basis, note and user_declared status. Recording copies a new immutable
+  dataset version with unchanged document/tokenizer bytes, groups, splits and
+  sampling metadata. Only matching source license statuses change. The derivation
+  binds the parent manifest and retains prior derivation; originals are preserved
+  and the new version requires fresh review. Unsupported declarations are rejected
+  by the dataset reader; legacy datasets remain readable without rewriting.
+- Native export disclosure now includes permission notes. The unchanged private
+  export mechanism preserves the new declaration metadata byte-for-byte and
+  binds it in the reviewed manifest/file hashes.
+- Native verification: rebuilt/launched ALMG, selected doc-0.txt by source hash,
+  chose user-created, entered “Created locally for the ALMG permission review
+  fixture.” and explicitly confirmed. Child 9abd3b41249f419eae684fc97cec4576 retained
+  the exact note and user-declared creation status while original parent files,
+  document/tokenizer bytes and saved splits stayed unchanged. No trial was created.
+  Reviewed/exported it through the macOS Save panel: the 6,715-byte ZIP retained
+  the complete declaration, source hash, evidence note and valid file hashes.
+  Restarted ALMG and reopened the identical child manifest and note. Evidence:
+  /tmp/almg-permission-qa/{child-ui.json,export-review-ui.json,saved-ui.txt,
+  decoder-dataset-9abd3b41.zip,restarted-child-ui.json,before.json}.
+- Validation: 334 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. New coverage verifies immutable bytes, exact source scope,
+  duplicate-hash handling, chained reviews, exported notes, consent/stale-review
+  rejection, invalid sources/bases/notes, unsupported metadata and legacy reads.
+- Remaining: streaming beyond RAM/chunk-level resume, broader language/quality/
+  PII/contamination policies, permission-evidence workflows beyond user declarations
+  and remaining acceptance verification. Physical/Windows blockers remain open
+  and skipped. No external collection or rights inference occurred; generated
+  ZIPs/fixtures, downloaded weights and unrelated user edits are excluded from Git.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

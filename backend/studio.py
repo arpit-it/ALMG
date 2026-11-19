@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -51,6 +51,7 @@ else:
     import decoder_datasets
     import decoder_preparations
     import decoder_languages
+    import decoder_licenses
     import chat_history
     import inference
     import image_recipe
@@ -2171,6 +2172,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_preparations.resume(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'pipeline':
                 return self.respond(decoder_trials.pipeline_record(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'source-permission':
+                return self.respond(decoder_licenses.declare(ROOT, parts[1], data.get('confirmed'), data.get('reviewed'), data.get('source_sha256'), data.get('basis'), data.get('note')))
             if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'languages':
                 return self.respond(decoder_languages.analyze(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'extend':

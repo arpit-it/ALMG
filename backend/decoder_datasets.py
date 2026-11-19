@@ -20,6 +20,11 @@ else:
     from run_manifest import digest, file_digest
 
 
+LICENSE_BASES = {'user_created': 'user_declared_creation',
+                 'permission_recorded': 'user_declared_permission',
+                 'needs_review': 'user_provided_not_reviewed'}
+
+
 def prepare(root, documents, confirmed, tokenizer_kind="words", *, _derivation=None, _dataset_id=None, _mixing=None):
     if not isinstance(tokenizer_kind, str) or tokenizer_kind not in ('words', 'utf8_bytes'):
         raise ValueError('Choose word or UTF-8 byte tokenization.')
@@ -135,6 +140,18 @@ def read(root, dataset_id):
                 or len({row['group'] for row in records}) != len(records)
                 or manifest['splits'] != {part: sum(row['split'] == part for row in records) for part in ('train', 'validation', 'test')}):
             raise ValueError('Decoder dataset partition metadata does not match its content.')
+        declarations = manifest.get('license_declarations', {})
+        if not isinstance(declarations, dict):
+            raise ValueError('Unsupported source permission declarations.')
+        for source_hash, declaration in declarations.items():
+            affected = [source for source in manifest['sources'] if source['source_sha256'] == source_hash]
+            if (not affected or not isinstance(declaration, dict)
+                    or set(declaration) != {'version','basis','note','user_declared'}
+                    or type(declaration.get('version')) is not int or declaration['version'] != 1
+                    or declaration.get('basis') not in LICENSE_BASES or declaration.get('user_declared') is not True
+                    or not isinstance(declaration.get('note'), str) or not 1 <= len(declaration['note']) <= 1000
+                    or any(source.get('license') != LICENSE_BASES[declaration['basis']] for source in affected)):
+                raise ValueError('Unsupported source permission declarations.')
         mixing = manifest.get('mixing')
         if mixing is not None:
             if (not isinstance(mixing, dict) or set(mixing) != {'version','unit','application','group_weights'}

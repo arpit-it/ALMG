@@ -1583,6 +1583,7 @@ class _StudioPageState extends State<StudioPage> {
       title: const Text('Decoder dataset prepared for review'), scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(manifest))),
       actions: [
+        TextButton(onPressed: () { Navigator.pop(context); _reviewDecoderSourcePermission(manifest); }, child: const Text('Review source permissions')),
         TextButton(onPressed: () { Navigator.pop(context); _mixDecoderDatasets(manifest); }, child: const Text('Mix with another local dataset')),
         TextButton(onPressed: () { Navigator.pop(context); _identifyDecoderLanguages(manifest['id'] as String); }, child: const Text('Identify local document languages')),
         TextButton(onPressed: () { Navigator.pop(context); _savedDecoderLanguages(manifest['id'] as String); }, child: const Text('View saved language reports')),
@@ -1606,6 +1607,45 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _reviewDecoderSourcePermission(Map<String, dynamic> parent) async {
+    final source = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+      title: const Text('Select source bytes to review'), children: [
+        for (final source in parent['sources'] as List) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(source as Map)),
+          child: Text('${source['name']} · ${(source['source_sha256'] as String).substring(0, 8)} · ${source['license']}')),
+      ],
+    ));
+    if (source == null || !mounted) return;
+    final basis = await showDialog<String>(context: context, builder: (context) => SimpleDialog(
+      title: const Text('Choose user-declared source basis'), children: [
+        SimpleDialogOption(onPressed: () => Navigator.pop(context, 'user_created'), child: const Text('I created this source')),
+        SimpleDialogOption(onPressed: () => Navigator.pop(context, 'permission_recorded'), child: const Text('I have recorded permission')),
+        SimpleDialogOption(onPressed: () => Navigator.pop(context, 'needs_review'), child: const Text('Needs further permission review')),
+      ],
+    ));
+    if (basis == null || !mounted) return;
+    var note = '';
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => StatefulBuilder(builder: (context, update) => AlertDialog(
+      title: const Text('Review source declaration'),
+      content: SizedBox(width: 520, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('Source: ${source['name']}\nBasis: $basis\nThis records your declaration for these source bytes in a new version. '
+          'It does not verify permission or transfer training approval. Original data is preserved. Notes are included in local exports.'),
+        TextField(autofocus: true, maxLength: 1000, maxLines: 3, onChanged: (value) => update(() => note = value),
+          decoration: const InputDecoration(labelText: 'Evidence or source note (required)')),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: note.trim().isEmpty ? null : () => Navigator.pop(context, true), child: const Text('Confirm source declaration'))],
+    )));
+    if (confirmed != true || !mounted) return;
+    try {
+      final dataset = await _request('/decoder-datasets/${parent['id']}/source-permission', {
+        'confirmed': true, 'reviewed': parent, 'source_sha256': source['source_sha256'], 'basis': basis, 'note': note,
+      });
+      if (mounted) await _showDecoderDataset(dataset);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _mixDecoderDatasets(Map<String, dynamic> parent) async {
@@ -1719,7 +1759,7 @@ class _StudioPageState extends State<StudioPage> {
       final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
         title: const Text('Review local dataset export'), scrollable: true,
         content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
-          const Text('Save a private local ZIP containing normalized document text, saved tokenizer, split manifest and source names, hashes, licenses and derivation lineage. '
+          const Text('Save a private local ZIP containing normalized document text, saved tokenizer, split manifest and source names, hashes, licenses, permission notes and derivation lineage. '
             'Text and source names may include personal information. This does not collect data, start training or include training approvals. File hashes are checked again before saving.'),
           SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
         ])),
