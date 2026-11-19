@@ -1,5 +1,6 @@
 """Explicit five-step masked Metal diagnostic; model weights are never published."""
 import json
+import math
 from pathlib import Path
 import platform
 import uuid
@@ -14,13 +15,38 @@ else:
     from run_manifest import digest,file_digest
 
 
+def evaluate_split(root,window_id,reviewed,split,score):
+    """Forward-only complete split evaluation, with bounded batches and token weighting."""
+    if split not in ('validation','test'):raise ValueError('Evaluate a held-out split.')
+    cursor=None;seen_windows=targets=correct=0;loss_sum=0.0;page_count=0
+    while True:
+        batch=batches.read_batch(root,window_id,True,reviewed,cursor,split,16)
+        if not batch['rows'] or batch['real_target_tokens']<=0:
+            raise ValueError('Held-out evaluation encountered an empty batch.')
+        page_loss,page_correct=score(batch)
+        if (not math.isfinite(page_loss) or page_loss<0 or type(page_correct) is not int
+                or not 0<=page_correct<=batch['real_target_tokens']):
+            raise ValueError('Held-out evaluation produced invalid metrics.')
+        seen_windows+=batch['rows'];targets+=batch['real_target_tokens'];page_count+=1
+        loss_sum+=page_loss;correct+=page_correct
+        following=batch['next_cursor']
+        if following is None:break
+        if following==cursor:raise ValueError('Held-out evaluation cursor did not advance.')
+        cursor=following
+    if seen_windows!=reviewed['window_counts'][split]:
+        raise ValueError('Held-out evaluation did not cover the saved split population.')
+    return {'windows':seen_windows,'target_tokens':targets,'correct_target_tokens':correct,
+            'loss':loss_sum/targets,'next_token_accuracy':correct/targets,
+            'batches':page_count,'maximum_batch_windows':16,'scope':'all_saved_split_windows',
+            'aggregation':'sum_masked_token_losses_and_correct_predictions_divided_by_real_targets',
+            'source_occurrences_expanded':False,'optimizer_updates':0}
+
+
 def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):
     if confirmed is not True:raise ValueError('Confirm the five-step masked optimizer diagnostic; no model is saved.')
     train=batches.read_batch(root,window_id,True,reviewed,cursor,'train',4)
     if not isinstance(reviewed_batch,dict) or reviewed_batch!=train:raise ValueError('The inspected training batch changed. Reopen it before the diagnostic.')
     if not train['rows']:raise ValueError('Select a nonempty training batch.')
-    validation=batches.read_batch(root,window_id,True,reviewed,split='validation',batch_size=4)
-    test=batches.read_batch(root,window_id,True,reviewed,split='test',batch_size=4)
     if platform.system()!='Darwin' or platform.machine()!='arm64':raise ValueError('This diagnostic requires Apple silicon and local Metal access.')
     import mlx.core as mx
     import numpy as np
@@ -62,14 +88,14 @@ def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):
                 or final>=initial or len(changed)!=len(parameters) or cpu_error>=1e-5
                 or padding_loss_error>1e-6 or padding_gradient_error>1e-6):
             raise ValueError('Masked optimizer diagnostic failed numerical checks; no report/model was published.')
-        def probe(batch):
+        def score(batch):
             px=mx.array(batch['inputs']);py=mx.array(batch['targets']);pm=mx.array(batch['loss_mask'],dtype=mx.float32)
             scores=logits(parameters,px)
-            return {'windows':batch['rows'],'target_tokens':batch['real_target_tokens'],
-                    'loss':float(loss(parameters,px,py,pm).item()),
-                    'next_token_accuracy':float((mx.sum((mx.argmax(scores,axis=-1)==py)*pm)/mx.sum(pm)).item()),
-                    'scope':'first_four_windows_only_not_full_evaluation'}
-        probes={'validation':probe(validation),'test':probe(test)}
+            correct_scores=mx.take_along_axis(scores,py[...,None],axis=-1).squeeze(-1)
+            return (float(mx.sum((mx.logsumexp(scores,axis=-1)-correct_scores)*pm).item()),
+                    int(mx.sum((mx.argmax(scores,axis=-1)==py)*pm).item()))
+        evaluation={split:evaluate_split(root,window_id,reviewed,split,score) for split in ('validation','test')}
+
     # Recheck the exact source batch after GPU execution before writing evidence.
     if batches.read_batch(root,window_id,True,reviewed,cursor,'train',4)!=train:
         raise ValueError('Source bindings changed during the diagnostic; no report published.')
@@ -83,11 +109,11 @@ def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):
             'initial_batch_loss':initial,'final_batch_loss':final,'cpu_inference_max_error':cpu_error,
             'padded_positions':sum(16-length for length in train['sequence_lengths']),
             'masked_target_loss_error':padding_loss_error,'masked_target_gradient_error':padding_gradient_error,
-            'probes':probes,'device':'Metal GPU','mlx_version':decoder_bundle.version('mlx'),
+            'evaluation':evaluation,'device':'Metal GPU','mlx_version':decoder_bundle.version('mlx'),
             'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in
                 ('decoder_stream_optimization.py','decoder_stream_batches.py','decoder_recipe.py','decoder_tokenizer.py')}),
             'model_saved':False,'training_approved':False,'release_approved':False,
-            'limitations':'Five-step numerical diagnostic on one batch. Held-out probes are partial and do not establish model quality or release readiness.'}
+            'limitations':'Five-step numerical diagnostic on one batch. All saved held-out windows are evaluated without optimizer updates. Five updates on one training batch do not establish usable model quality or release readiness.'}
     report['revision']=digest(report)
     folder=Path(root)/'decoder-stream-optimization-checks'/window_id;folder.mkdir(parents=True,exist_ok=True)
     temporary=folder/(uuid.uuid4().hex+'.tmp')

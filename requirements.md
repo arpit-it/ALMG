@@ -3697,6 +3697,42 @@ P3-LMF-02 partial progress · bounded committed upload batches · 2026-11-20:
   stay open and skipped. Generated sources, fixtures, metrics, weights and unrelated
   edits are excluded from this commit.
 
+P3-LMF-02 partial progress · complete streamed held-out diagnostic evaluation · 2026-11-20:
+- [ ] P3-LMF-02 remains open. The separately confirmed five-step masked optimizer
+  diagnostic now evaluates every saved validation and test window in batches of
+  at most sixteen. It sums masked token losses and correct predictions before
+  dividing by real target counts, so short final windows and batches are weighted
+  correctly. Held-out splits receive zero optimizer updates; source/overlap
+  bindings are rechecked by the existing batch reader and again before publication.
+- Incomplete population coverage, empty batches, invalid metrics and source changes
+  fail without publishing a report. Consent describes complete evaluation and the
+  need to rerun interrupted checks. Existing reports remain readable and explicitly
+  identify legacy four-window probes. Only diagnostic JSON is saved; no model,
+  training approval, usable-model claim or release is produced.
+- Local app verification: rebuilt and launched native macOS ALMG on fixture port
+  28830. Cancel saved nothing; explicit confirmation created report
+  57ab492f592c40d49ced8323471b7a36. It evaluated all 764 validation windows /
+  11,852 targets in 48 batches and all 702 test windows / 10,908 targets in 44
+  batches. Correct predictions were 2,457 and 2,228; mean losses were
+  5.464885849426455 and 5.461153159790263. An independent unpadded CPU pass over
+  SQLite windows matched every population/correct count and loss within 1.8e-7.
+  Native app restart reopened the identical report without another optimizer run.
+  All 18 source/index/tokenizer/overlap/window fixture files stayed byte-identical;
+  no decoder model was saved. Evidence: /tmp/almg-complete-heldout-native-qa/
+  (consent-ui.txt, report-ui.json, reopened-report-ui.json, verification.json,
+  build.log, restart.log and test logs); generated evidence is not committed.
+- Verification: 393 Python tests passed with ALMG_METAL_TESTS=1, including real
+  Metal optimization and rejection paths; 34 Flutter tests passed; Flutter analysis
+  and diff checks passed. Multi-page regression verifies token weighting with a
+  short final batch. Updated source/tests and this entry share one local commit.
+- Remaining: full streamed training with Qwen-supervised planning, scheduling and
+  checkpoint cursor binding, broader streamed dataset mixing/incremental ingestion,
+  and the previously recorded larger-than-RAM acceptance/scratch-space blocker.
+  This bounded-memory diagnostic evaluation is synchronous and not resumable;
+  it does not satisfy the full training or larger-than-RAM acceptance criteria.
+  Existing physical power/Windows and scratch-space blockers remain open and were
+  skipped without repeating unchanged checks. No external collection or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -15,12 +15,14 @@ void main() {
     }))));
     await tester.pumpAndSettle();
     await tester.tap(find.text('Check masked optimization')); await tester.pumpAndSettle();
+    expect(find.textContaining('Evaluate every saved validation/test window'), findsOneWidget);
     expect(calls.length, 1);
     await tester.tap(find.text('Cancel')); await tester.pumpAndSettle(); expect(calls.length, 1);
     await tester.tap(find.text('Check masked optimization')); await tester.pumpAndSettle();
     await tester.tap(find.text('Confirm five-step optimizer check')); await tester.pumpAndSettle();
     expect(calls.last.endsWith('/optimization-check'), isTrue);
     expect(find.text('Masked optimizer diagnostic verified'), findsOneWidget);
+    expect(find.textContaining('Legacy report:'), findsOneWidget);
   });
 
   testWidgets('batch inspector pages and resets cursors on split changes', (tester) async {

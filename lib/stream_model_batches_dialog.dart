@@ -33,7 +33,7 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
       title: const Text('Check five masked optimizer steps?'),
       content: const Text('Initialize the tiny registered decoder from new weights and run five SGD updates on this inspected training batch using Metal. '
         'Check that masked target changes do not alter loss/gradients and compare CPU inference. '
-        'The first four validation/test windows are probes only. Model weights are discarded; only a diagnostic report is saved. No training approval or release is granted.'),
+        'Evaluate every saved validation/test window in batches of at most sixteen, with padding excluded and metrics weighted by real target tokens. Large splits can take time; interrupted checks must be rerun. Model weights are discarded; only a diagnostic report is saved. No training approval or release is granted.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm five-step optimizer check'))],
     ));
@@ -54,7 +54,8 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
         title: const Text('Masked optimizer diagnostic verified'), scrollable: true,
         content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
           Text('Training batch loss: ${report['initial_batch_loss']} → ${report['final_batch_loss']}'),
-          const Text('Five-step numerical check only. The model was discarded; partial held-out probes do not establish model quality.'),
+          const Text('Five-step numerical check only. The model was discarded; held-out evaluation does not establish usable model quality.'),
+          if (report['evaluation'] == null) const Text('Legacy report: held-out probes cover only the first four windows of each split.'),
           SelectableText(const JsonEncoder.withIndent('  ').convert(report)),
         ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
       ));
