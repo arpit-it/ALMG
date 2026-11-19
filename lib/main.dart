@@ -1607,7 +1607,7 @@ class _StudioPageState extends State<StudioPage> {
     await showDialog<void>(context: context, builder: (context) => AlertDialog(
       title: const Text('Decoder dataset quality audit'), scrollable: true,
       content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Local heuristic findings highlight records for review. Original data and training approvals are preserved. This audit does not start training.'),
+        const Text('Local heuristic findings highlight records for review. Likely contact details are flagged by location without copying matched values; other personal information may remain. Original data and training approvals are preserved. This audit does not filter text or start training.'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(report)),
       ])),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
@@ -1631,7 +1631,7 @@ class _StudioPageState extends State<StudioPage> {
         title: const Text('Saved dataset quality audits'), children: [
           if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved audits yet.')),
           for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
-            child: Text('${(report['revision'] as String).substring(0, 8)} · ${report['near_duplicate_pairs']} near-duplicate pairs · ${report['cross_split_pairs']} cross-split pairs')),
+            child: Text('${(report['revision'] as String).substring(0, 8)} · ${report['near_duplicate_pairs']} near-duplicate pairs · ${report['cross_split_pairs']} cross-split pairs · ${report['privacy_matches'] ?? 0} privacy matches')),
         ],
       ));
       if (report != null && mounted) await _showDecoderAudit(report);

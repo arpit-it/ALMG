@@ -44,6 +44,47 @@ class DatasetAuditTests(unittest.TestCase):
         self.assertEqual([f['kind'] for f in report['findings']], ['short_document'])
         self.assertEqual(report['findings'][0]['record']['name'], 'short')
 
+    def test_privacy_locations_preserve_provenance_without_copying_contact_values(self):
+        documents = [
+            {'name': 'contacts.txt', 'text': '\ufeffcafé  contact alice@example.test or +44 20 7946 0958 today'},
+            {'name': 'domestic.txt', 'text': 'Call (415) 555-0123 for this fictional local fixture.'},
+            {'name': 'control.txt', 'text': 'Date 2026-11-19; version 1.2.3; identifier 1234567; word at example dot test.'},
+        ]
+        manifest = datasets.prepare(self.root, documents, True, 'utf8_bytes')
+        folder = self.root / 'decoder-datasets' / manifest['id']
+        before = {p.name: p.read_bytes() for p in folder.iterdir()}
+        report = datasets.audit(self.root, manifest['id'], True)
+        self.assertEqual(report['audit_version'], 2)
+        self.assertEqual(report['privacy_matches'], 3)
+        findings = [f for f in report['findings'] if f['kind'] == 'potential_personal_information']
+        self.assertEqual(sorted(f['category'] for f in findings), ['email_address', 'phone_number', 'phone_number'])
+        rows = {row['name']: row for row in map(json.loads, (folder / 'documents.jsonl').read_text().splitlines())}
+        detected = []
+        for finding in findings:
+            row = rows[finding['record']['name']]
+            self.assertEqual(finding['record']['source_sha256'], row['source_sha256'])
+            self.assertEqual(finding['record']['split'], row['split'])
+            detected.append(row['text'][finding['normalized_character_start']:finding['normalized_character_end']])
+        self.assertEqual(set(detected), {'alice@example.test', '+44 20 7946 0958', '(415) 555-0123'})
+        serialized = json.dumps(report)
+        for value in detected:
+            self.assertNotIn(value, serialized)
+        self.assertEqual(before, {p.name: p.read_bytes() for p in folder.iterdir()})
+        self.assertEqual(datasets.audit(self.root, manifest['id'], True), report)
+        self.assertEqual(datasets.list_audits(self.root, manifest['id']), [report])
+
+    def test_legacy_saved_audit_remains_readable_alongside_privacy_revision(self):
+        current = datasets.audit(self.root, self.dataset_id, True)
+        legacy = dict(current, audit_version=1)
+        for key in ('revision', 'privacy_matches', 'privacy_method'):
+            legacy.pop(key)
+        legacy['revision'] = datasets.digest(legacy)
+        path = self.root / 'decoder-dataset-audits' / self.dataset_id / (legacy['revision'] + '.json')
+        path.write_text(json.dumps(legacy))
+        saved = datasets.list_audits(self.root, self.dataset_id)
+        self.assertEqual({row['audit_version'] for row in saved}, {1, 2})
+        self.assertEqual(json.loads(path.read_text()), legacy)
+
     def test_consent_and_corrupt_dataset_do_not_publish(self):
         for consent in (False, None, 1):
             with self.assertRaises(ValueError):

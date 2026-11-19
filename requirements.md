@@ -2669,6 +2669,38 @@ P3-LMF-02 partial progress · pre-training evaluation-overlap admission · 2026-
   token/mixing work remain open. Physical power and Windows blockers stay skipped.
   No external collection, generated artifacts or downloaded weights enter Git.
 
+P3-LMF-02 partial progress · local contact-detail privacy findings · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Explicit local dataset audits now identify likely
+  ASCII email addresses, international-plus phone numbers and formatted North
+  American phone numbers. Findings retain affected record names, source hashes,
+  normalized groups/splits and Unicode-codepoint locations in normalized text.
+  Matched contact values are not copied into findings or new report fields.
+- Version-2 audits declare the version-1 local pattern method, supported formats,
+  location convention and heuristic limitations. Saved version-1 audits remain
+  readable without rewriting them; the native saved-audit list shows privacy
+  counts, defaulting to zero for legacy receipts. Native explanatory text states
+  that this action identifies findings without filtering or starting training.
+- Native verification: rebuilt/launched ALMG with three local synthetic documents,
+  explicitly ran “Analyze local text quality”, and read the displayed report.
+  Exactly three locations were identified: one email and two phone numbers across
+  two records. The date/version/identifier control was not flagged. Compared each
+  location to the prepared text and verified that none of the matched values was
+  copied into the report. Original dataset files remained byte-identical and no
+  decoder trial was created. Restarted ALMG, selected the saved audit summary
+  showing 3 privacy matches, and reopened the identical complete receipt/revision.
+  Evidence: /tmp/almg-privacy-qa/{audit-ui.json,restarted-audit-ui.json,before.json}.
+- Validation: 303 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. Added tests cover normalized Unicode locations, record/source
+  provenance, no copied matched values, unrelated controls, immutable repeatability
+  and coexistence with legacy saved audit revisions.
+- Remaining: explicit reviewed filtering/derived datasets, broader personal-data
+  detection, language/quality/license review, streaming/incremental/resumable
+  ingestion, token distribution/mixing and remaining acceptance verification.
+  These contact-format heuristics do not guarantee personal-data-free text and
+  do not change training admission policy. Physical/Windows blockers stay open
+  and skipped. No external collection occurred; generated fixtures/artifacts,
+  downloaded weights and unrelated user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

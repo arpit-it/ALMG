@@ -5,6 +5,7 @@ import base64
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import uuid
+import re
 
 if __package__:
     from .decoder_tokenizer import Tokenizer, ByteTokenizer
@@ -147,6 +148,25 @@ def list_datasets(root):
     return {'datasets': manifests[-20:]}
 
 
+# Deliberately conservative local heuristics, not a guarantee of PII-free text.
+_PRIVACY_PATTERNS = (
+    ('email_address', re.compile(r"(?<![\w.+-])[A-Z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?(?:\.[A-Z0-9](?:[A-Z0-9-]*[A-Z0-9])?)+", re.IGNORECASE | re.ASCII)),
+    ('phone_number', re.compile(r"(?<!\w)\+[1-9][0-9(). -]{6,24}[0-9](?!\w)|(?<![\w+])(?:\([0-9]{3}\)|[0-9]{3})[-. ][0-9]{3}[-. ][0-9]{4}(?!\w)", re.ASCII)),
+)
+
+
+def _privacy_findings(text, source):
+    findings = []
+    for category, pattern in _PRIVACY_PATTERNS:
+        for match in pattern.finditer(text):
+            if category == 'phone_number' and not 8 <= sum(char.isdigit() for char in match.group()) <= 15:
+                continue
+            findings.append({'kind': 'potential_personal_information', 'category': category,
+                             'record': source, 'normalized_character_start': match.start(),
+                             'normalized_character_end': match.end()})
+    return sorted(findings, key=lambda row: (row['normalized_character_start'], row['category']))
+
+
 def quality_report(root, dataset_id):
     """Compute overlap findings from verified data without changing stored artifacts."""
     manifest = read(root, dataset_id)
@@ -156,6 +176,7 @@ def quality_report(root, dataset_id):
         words = Tokenizer.words(record['text'])
         source = {'name':record['name'], 'source_sha256':record['source_sha256'],
                   'group':record['group'], 'split':record['split']}
+        findings.extend(_privacy_findings(record['text'], source))
         license_status = next((item.get('license','unknown') for item in manifest['sources']
                                if item['source_sha256']==record['source_sha256']), 'unknown')
         summaries.append({**source,'word_count':len(words),'distinct_words':len(set(words)), 'license':license_status})
@@ -176,9 +197,14 @@ def quality_report(root, dataset_id):
             affected = [{key:records[index][key] for key in ('name','source_sha256','group','split')} for index in (left,right)]
             findings.append({'kind':'potential_evaluation_contamination' if cross_split else 'near_duplicate_documents',
                              'records':affected, 'similarity':round(similarity,6), 'cross_split':cross_split})
-    report = {'schema_version':1,'format':'almg-decoder-data-audit-v1','audit_version':1,
+    report = {'schema_version':1,'format':'almg-decoder-data-audit-v1','audit_version':2,
               'dataset_id':dataset_id,'dataset_manifest_sha256':digest(manifest),'dataset_sha256':manifest['dataset_sha256'],
               'method':{'name':'word_shingle_jaccard','version':1,'shingle_words':5,'minimum_words':12,'threshold':.8},
+              'privacy_method':{'name':'local_contact_patterns','version':1,
+                  'scope':['ascii_email','international_plus_phone','north_american_formatted_phone'],
+                  'offsets':'normalized_text_unicode_codepoints','matched_values_included':False,
+                  'limitations':'Heuristic review only; other personal information and unrecognized formats may remain.'},
+              'privacy_matches':sum(row['kind']=='potential_personal_information' for row in findings),
               'policy':'report_only_preserve_existing_approvals', 'records':summaries,'findings':findings,
               'near_duplicate_pairs':near_count,'cross_split_pairs':cross_count,
               'implementation_sha256':file_digest(Path(__file__))}
@@ -216,7 +242,7 @@ def list_audits(root, dataset_id):
             report = json.loads(path.read_text(encoding='utf-8'))
             payload = {key:value for key,value in report.items() if key!='revision'}
             if (report.get('format')!='almg-decoder-data-audit-v1' or type(report.get('audit_version')) is not int
-                    or report['audit_version']!=1 or report.get('dataset_id')!=dataset_id
+                    or report['audit_version'] not in (1, 2) or report.get('dataset_id')!=dataset_id
                     or report.get('dataset_manifest_sha256')!=digest(manifest)
                     or report.get('revision')!=digest(payload) or path.stem!=report['revision']):
                 continue
