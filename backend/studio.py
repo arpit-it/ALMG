@@ -2126,7 +2126,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/decoder-datasets':
                 return self.respond(decoder_datasets.prepare(ROOT, data.get('documents'), data.get('confirmed')), 201)
             if self.path == '/decoder-trial-proposals':
-                return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask, planner_identity=inference.loaded_identity))
+                return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask, planner_identity=inference.loaded_identity, dataset=data.get('dataset')))
             if self.path == '/decoder-trials':
                 record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
                                               proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'), dataset=data.get('dataset'))

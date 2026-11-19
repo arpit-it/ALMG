@@ -2137,6 +2137,34 @@ P3-LMF-01 partial progress · approved reviewed-dataset decoder training · 2026
   power and Windows verification remain independent blockers. Generated models,
   datasets and downloaded weights are not committed.
 
+P3-LMF-01 partial progress · dataset-aware local trial proposals · 2026-11-19:
+- Added “Plan with reviewed dataset” to compatible prepared dataset reviews.
+  The local planner receives the goal, verified dataset ID, document/split counts,
+  training-only tokenizer metadata and preparation findings without document text.
+  The approach review shows the exact selected corpus and bounded training limits.
+- Revalidated data after planning and before approval/execution. Proposal approval
+  binds the dataset manifest revision and implementation; omitting or substituting
+  the selected dataset fails before queueing. Existing generated-text proposals
+  retain their original scope. Unsupported approaches remain non-executable, and
+  planning alone creates no trial. Existing direct dataset approvals still work.
+- Local app verification: rebuilt/launched macOS ALMG against isolated local
+  fixtures; selected the six-document corpus, entered a goal and observed its
+  dataset-aware approach review with no trial present before confirmation. Used a
+  deterministic local planner fixture (not a new live-Qwen quality evaluation).
+  Native confirmation ran actual Metal training: loss 1.365828 → 0.067526,
+  validation/test next-token accuracy both 1.000; the completed record retained
+  the exact proposal and dataset approval. Reopened native saved history after
+  app restart and verified the entire displayed record was unchanged. Evidence:
+  /tmp/almg-data-plan-qa/{proposal-ui.txt,completed-ui.json,restarted-ui.json}.
+- Verification: 257 Python tests passed with ALMG_METAL_TESTS=1, including actual
+  Metal training; 16 Flutter tests passed; Flutter analysis clean. New tests verify
+  no document-text disclosure, no execution during planning, dataset substitution
+  rejection, correct trainer dispatch and data tampering during planning.
+- Remaining: main planner routing, general scheduling/idle/power integration,
+  richer data/tokenizers, evaluated release gates and full acceptance verification.
+  P3-LMF-01 stays open; physical power and Windows checks remain independent blocked
+  items. No external collection, generated artifacts or weights are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

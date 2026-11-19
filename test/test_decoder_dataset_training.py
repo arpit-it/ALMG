@@ -44,7 +44,7 @@ class DecoderDatasetTrainingTest(unittest.TestCase):
                 decoder_trials.start(root, True, Mock(), dataset=bad)
             self.assertEqual(decoder_trials.list_trials(root), [])
             with self.assertRaisesRegex(ValueError, 'change data scope'):
-                decoder_trials.start(root, True, Mock(), proposal_id='a'*32, dataset=manifest)
+                decoder_trials.start(root, True, Mock(), trial_id='a'*32, dataset=manifest)
 
     def test_pending_dataset_tampering_is_rejected_before_training(self):
         with tempfile.TemporaryDirectory() as temporary, patch.object(decoder_trials, '_ACTIVE', set()), patch.object(decoder_trials, '_CANCEL', {}):

@@ -1587,6 +1587,12 @@ class _StudioPageState extends State<StudioPage> {
             Navigator.pop(context);
             _approveDatasetTrial(manifest);
           }, child: const Text('Review bounded decoder training')),
+        if (manifest['tokenizer'] != null && !(manifest['findings'] as List).any((finding) =>
+            ['tokenizer_limits', 'out_of_training_vocabulary'].contains(finding['kind'])))
+          TextButton(onPressed: () {
+            Navigator.pop(context);
+            _planDecoderTrial(dataset: manifest);
+          }, child: const Text('Plan with reviewed dataset')),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
@@ -1652,7 +1658,7 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
-  Future<void> _planDecoderTrial() async {
+  Future<void> _planDecoderTrial({Map<String, dynamic>? dataset}) async {
     final goal = await showDialog<String>(context: context,
       builder: (context) => const _DecoderTrialGoalDialog());
     if (goal == null || goal.trim().isEmpty || !mounted) return;
@@ -1662,7 +1668,7 @@ class _StudioPageState extends State<StudioPage> {
       content: Row(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(width: 16), Text('Preparing an approach proposal…')]),
     )));
     try {
-      final proposal = await _request('/decoder-trial-proposals', {'goal': goal}, const Duration(seconds: 120));
+      final proposal = await _request('/decoder-trial-proposals', {'goal': goal, 'dataset': ?dataset}, const Duration(seconds: 120));
       if (!mounted) return;
       Navigator.pop(context);
       waitingShown = false;
@@ -1674,13 +1680,15 @@ class _StudioPageState extends State<StudioPage> {
           Text('Recommended approach: ${proposal['approach']}'),
           Text('Planner: ${proposal['planner']?['model'] ?? proposal['planner']?['provider'] ?? 'Unspecified'}'),
           Text(proposal['reason'] as String),
-          const Text('Scope: fixed generated local text. This does not enable training on your own dataset or release a model.'),
+          Text(dataset == null
+            ? 'Scope: fixed generated local text. This trial does not release a model.'
+            : 'Scope: reviewed dataset ${dataset['id']}, ${dataset['unique_documents']} documents; saved train/validation/test splits. New weights, 100 steps, seed 7, immediate Metal execution. This trial does not release a model.'),
           if (proposal['executable'] != true) const Text('This approach is unavailable in the decoder trial workflow. No execution will start.'),
         ])),
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
           if (proposal['executable'] == true) TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm from-scratch trial'))],
       ));
-      if (approved == true && mounted) await _startDecoderTrial(proposal: proposal);
+      if (approved == true && mounted) await _startDecoderTrial(proposal: proposal, dataset: dataset);
     } catch (error) {
       if (mounted && waitingShown) Navigator.pop(context);
       if (mounted) setState(() => _error = error.toString());

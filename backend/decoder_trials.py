@@ -28,16 +28,20 @@ def specification(dataset=None):
     return spec
 
 
-def propose(root, goal, planner, planner_identity=None):
+def propose(root, goal, planner, planner_identity=None, dataset=None):
     if not isinstance(goal, str) or not 1 <= len(goal.strip()) <= 3000:
         raise ValueError('Describe the trial goal in 1 to 3000 characters.')
-    spec = specification()
+    if dataset is not None:
+        dataset = decoder_dataset_training.preflight(root, dataset)[0]
+    spec = specification(dataset) if dataset is not None else specification()
+    summary = None if dataset is None else {
+        key: dataset[key] for key in ('id', 'unique_documents', 'splits', 'tokenizer', 'findings')}
     result = planner(
         'Recommend one approach: from_scratch, fine_tuning, distillation, or retrieval. '
-        'Only a tiny from_scratch generated-local-text trial is executable here. '
-        'User-dataset training, pretrained adaptation and retrieval execution are not available in this trial workflow. '
+        'Only a tiny from_scratch local text trial is executable here, using the selected reviewed dataset when supplied. '
+        'The selected dataset summary contains preparation evidence, not document contents. Pretrained adaptation and retrieval execution are unavailable. '
         'Return approach and a short reason. Do not execute tools or claim that a trial satisfies a general user-model goal.',
-        {'goal': goal.strip(), 'available_trial': spec})
+        {'goal': goal.strip(), 'available_trial': spec, 'dataset_summary': summary})
     if not isinstance(result, dict):
         raise ValueError('The planner returned an invalid proposal.')
     approach, reason = result.get('approach'), result.get('reason')
@@ -45,11 +49,14 @@ def propose(root, goal, planner, planner_identity=None):
         raise ValueError('The planner returned an unsupported approach.')
     if not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 600:
         raise ValueError('The planner must provide a short explanation.')
-    if spec != specification():
+    if dataset is not None:
+        decoder_dataset_training.preflight(root, dataset)
+    if spec != (specification(dataset) if dataset is not None else specification()):
         raise ValueError('Available trial capabilities changed while planning. Request a fresh proposal.')
     proposal = {'schema_version': 1, 'id': uuid.uuid4().hex, 'goal': goal.strip(),
                 'approach': approach, 'reason': reason.strip(),
-                'scope': 'generated_local_text_fixture', 'executable': approach == 'from_scratch',
+                'scope': spec.get('scope', 'generated_local_text_fixture'), 'executable': approach == 'from_scratch',
+                'dataset_summary': summary,
                 'specification_revision': run_manifest.digest(spec),
                 'planner': planner_identity() if planner_identity is not None else {'provider': 'unspecified'}}
     proposal['revision'] = run_manifest.digest(proposal)
@@ -194,7 +201,7 @@ def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_rev
     if confirmed is not True:
         raise ValueError('Approve the generated-text decoder trial before starting it.')
     spec = specification()
-    if dataset is not None and (trial_id is not None or proposal_id is not None):
+    if dataset is not None and trial_id is not None:
         raise ValueError('Review local-dataset training separately; a generated-text proposal or existing trial cannot change data scope.')
     if dataset is not None:
         dataset = decoder_dataset_training.preflight(root, dataset)[0]
