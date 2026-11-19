@@ -19,6 +19,12 @@ def preflight(root, reviewed):
         raise ValueError('The dataset review changed. Reopen it and approve the current version.')
     if manifest['tokenizer'] is None or 'tokenizer.json' not in manifest['files'] or any(finding['kind'] in ('tokenizer_limits', 'out_of_training_vocabulary') for finding in manifest['findings']):
         raise ValueError('Resolve tokenizer or evaluation-vocabulary findings before training.')
+    report = decoder_datasets.quality_report(root, manifest['id'])
+    if report['cross_split_pairs']:
+        raise ValueError(
+            f"Evaluation contamination check blocked training: {report['cross_split_pairs']} "
+            'near-duplicate document pairs cross saved splits. Analyze local text quality '
+            'to review affected records, then prepare a dataset with independent evaluation documents.')
     folder = Path(root) / 'decoder-datasets' / manifest['id']
     tokenizer = Tokenizer.restore(json.loads((folder / 'tokenizer.json').read_text(encoding='utf-8')))
     records = [json.loads(line) for line in (folder / 'documents.jsonl').read_text(encoding='utf-8').splitlines()]

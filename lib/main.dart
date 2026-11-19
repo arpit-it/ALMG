@@ -1645,7 +1645,8 @@ class _StudioPageState extends State<StudioPage> {
       title: const Text('Approve local dataset trial'),
       content: Text('Train a tiny decoder from new weights on ${dataset['unique_documents']} reviewed documents. '
         'The trial uses the saved train/validation/test splits, 100 training steps, seed 7 and immediate Metal execution. '
-        'Duplicate documents are excluded. Cancellation and checkpoint resume remain available. '
+        'Exact duplicate documents are excluded; near-duplicate overlap across evaluation splits blocks training. '
+        'Cancellation and checkpoint resume remain available. '
         'This experimental trial does not release a model.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve training on reviewed dataset'))],

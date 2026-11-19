@@ -2638,6 +2638,37 @@ P3-LMF-02 partial progress · immutable local dataset quality audits · 2026-11-
   No external collection occurred; generated fixtures/artifacts and unrelated
   user edits are excluded from the commit.
 
+P3-LMF-02 partial progress · pre-training evaluation-overlap admission · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Reviewed local decoder datasets now recompute the
+  version-1 shingle overlap check from integrity-verified original data before
+  planning, trial admission and model construction (including worker/resume
+  preflight). Any detected cross-split pair blocks the operation with an affected
+  pair count and directions to inspect the local quality audit and prepare
+  independent evaluation data. Saved reports cannot bypass the current check.
+- Extracted side-effect-free quality computation from audit persistence, retaining
+  explicit consent for saving reports. Admission does not rewrite data, audits,
+  approvals or checkpoints. Trial specifications now bind decoder_datasets.py
+  alongside the existing training implementation hashes. Native approval copy
+  explains the evaluation-overlap block.
+- Native verification: rebuilt/launched ALMG with isolated local fixtures, reviewed
+  the six-document UTF-8-byte dataset and explicitly approved training. ALMG
+  displayed “Evaluation contamination check blocked training: 9”; no trial or
+  training artifacts were created and original dataset files stayed byte-identical.
+  Then approved the zero-detected-overlap control dataset through the same UI:
+  real Metal training completed, final train loss 0.067526, validation/held-out
+  accuracy 1.000. Only the clean trial c0a6664d380d44ac9e177069e6c8bdb3 was saved.
+  Evidence: /tmp/almg-contamination-qa/{blocked-ui.txt,clean-trial-ui.json,before.json}.
+- Validation: 301 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests, clean
+  Flutter analysis. New tests prove rejection before planner/queue/model calls,
+  immutable inputs, no incidental audit writes and fresh checks despite saved
+  audit receipts. Existing clean approval/execution/evaluation tests still pass.
+- Scope limit: this is a bounded lexical heuristic (five-word shingles, minimum
+  12 words, Jaccard >= 0.8), not comprehensive semantic contamination detection.
+  Short documents remain identified by the audit; broader contamination policy,
+  streaming/incremental/resumable preparation, language/PII/license/quality and
+  token/mixing work remain open. Physical power and Windows blockers stay skipped.
+  No external collection, generated artifacts or downloaded weights enter Git.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

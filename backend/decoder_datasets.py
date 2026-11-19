@@ -147,10 +147,8 @@ def list_datasets(root):
     return {'datasets': manifests[-20:]}
 
 
-def audit(root, dataset_id, confirmed):
-    """Save a deterministic report-only near-duplicate/partition-overlap audit."""
-    if confirmed is not True:
-        raise ValueError('Confirm the local dataset quality audit.')
+def quality_report(root, dataset_id):
+    """Compute overlap findings from verified data without changing stored artifacts."""
     manifest = read(root, dataset_id)
     records = [json.loads(line) for line in (Path(root)/'decoder-datasets'/dataset_id/'documents.jsonl').read_text(encoding='utf-8').splitlines()]
     summaries, shingles, findings = [], [], []
@@ -185,6 +183,14 @@ def audit(root, dataset_id, confirmed):
               'near_duplicate_pairs':near_count,'cross_split_pairs':cross_count,
               'implementation_sha256':file_digest(Path(__file__))}
     report['revision'] = digest(report)
+    return report
+
+
+def audit(root, dataset_id, confirmed):
+    """Save a deterministic report-only near-duplicate/partition-overlap audit."""
+    if confirmed is not True:
+        raise ValueError('Confirm the local dataset quality audit.')
+    report = quality_report(root, dataset_id)
     directory = Path(root)/'decoder-dataset-audits'/dataset_id
     directory.mkdir(parents=True,exist_ok=True)
     destination = directory/(report['revision']+'.json')
