@@ -75,3 +75,29 @@ class DecoderTrainingTest(unittest.TestCase):
             self.assertFalse(result['temporary_artifact_removed'])
             self.assertTrue((workspace / 'bundle' / 'manifest.json').is_file())
             decoder_bundle.load(workspace / 'bundle')
+
+    def test_cancel_before_work_never_initializes_or_creates_artifacts(self):
+        import tempfile
+        from pathlib import Path
+        initialize = Mock()
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / 'artifacts'
+            with self.assertRaises(decoder_training.Cancelled):
+                decoder_training.run(initialize, work_directory=workspace, stop=lambda: True)
+            initialize.assert_not_called()
+            self.assertFalse(workspace.exists())
+
+    @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS') == '1', 'Opt-in actual Metal verification')
+    def test_cancel_at_saved_checkpoint_and_resume_real_training(self):
+        import tempfile
+        from pathlib import Path
+        with tempfile.TemporaryDirectory() as temporary:
+            workspace = Path(temporary) / 'artifacts'
+            stop = lambda: (workspace / 'step-50' / 'manifest.json').is_file()
+            with self.assertRaises(decoder_training.Cancelled):
+                decoder_training.run(recipe_contracts.initialize_recipe, work_directory=workspace, stop=stop)
+            self.assertTrue(stop())
+            self.assertFalse((workspace / 'bundle').exists())
+            result = decoder_training.run(recipe_contracts.initialize_recipe, work_directory=workspace)
+            self.assertTrue(result['checkpoint']['reused_existing_checkpoint'])
+            self.assertEqual(result['held_out_next_token_accuracy'], 1)

@@ -2,7 +2,15 @@
 import platform
 
 
-def run(initialize, work_directory=None):
+class Cancelled(RuntimeError):
+    """Cooperative stop; durable checkpoint artifacts are retained."""
+
+
+def run(initialize, work_directory=None, stop=None):
+    def check_cancel():
+        if stop is not None and stop():
+            raise Cancelled('Cancelled at a training boundary. Saved checkpoints are retained; approve resume to continue.')
+    check_cancel()
     if platform.system() != 'Darwin' or platform.machine() != 'arm64':
         raise ValueError('The local decoder training check requires an Apple silicon Mac.')
     try:
@@ -49,6 +57,7 @@ def run(initialize, work_directory=None):
         gradient = mx.grad(loss)
         def optimize(values, steps):
             for _ in range(steps):
+                check_cancel()
                 gradients = gradient(values)
                 values = {name: value - .05 * gradients[name] for name, value in values.items()}
                 mx.eval(values)
@@ -109,6 +118,7 @@ def run(initialize, work_directory=None):
                                'initial_loss': initial, 'final_loss': final,
                                'held_out_next_token_accuracy': accuracy}
             destination = Path(folder) / 'bundle'
+            check_cancel()
             bundle_manifest = decoder_bundle.save(destination, model, tokenizer, training_record)
             restored, restored_tokenizer, restored_manifest = decoder_bundle.load(destination)
             token_roundtrip = (restored_tokenizer.encode(held_out_text[0]) == tokenizer.encode(held_out_text[0])

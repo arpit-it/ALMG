@@ -13,6 +13,7 @@ else:
 
 _LOCK = threading.Lock()
 _ACTIVE = set()
+_CANCEL = {}
 
 
 def specification():
@@ -71,25 +72,54 @@ def recover(root):
                 write(root, record)
 
 
+def cancel(root, trial_id, confirmed):
+    if confirmed is not True:
+        raise ValueError('Confirm cancellation of this saved trial.')
+    key = (str(Path(root)), trial_id)
+    with _LOCK:
+        record = read(root, trial_id)
+        if record['status'] not in ('queued', 'running') or key not in _CANCEL:
+            raise ValueError('Only an active saved trial can be cancelled.')
+        _CANCEL[key].set()
+        record.update(cancel_requested=True, error='Cancellation requested; waiting for the next training boundary.')
+        write(root, record)
+    return record
+
+
 def execute(root, trial_id):
+    key = (str(Path(root)), trial_id)
     try:
-        record = read(root, trial_id)
-        if (record.get('specification') != specification()
-                or record.get('approval', {}).get('revision') != run_manifest.digest(record.get('specification'))):
-            raise ValueError('Saved decoder trial approval no longer matches this implementation. Approve a new trial.')
-        record.update(status='running', error=None)
-        write(root, record)
+        with _LOCK:
+            record = read(root, trial_id)
+            stop_event = _CANCEL[key]
+            if (record.get('specification') != specification()
+                    or record.get('approval', {}).get('revision') != run_manifest.digest(record.get('specification'))):
+                raise ValueError('Saved decoder trial approval no longer matches this implementation. Approve a new trial.')
+            if stop_event.is_set():
+                raise decoder_training.Cancelled('Cancelled before training. Approve resume to continue.')
+            record.update(status='running', error=None, artifact_directory=str(folder(root, trial_id) / 'artifacts'))
+            write(root, record)
         result = decoder_training.run(recipe_contracts.initialize_recipe,
-                                      work_directory=folder(root, trial_id) / 'artifacts')
-        record.update(status='complete', result=result, artifact_directory=str(folder(root, trial_id) / 'artifacts'))
-        write(root, record)
+                                      work_directory=folder(root, trial_id) / 'artifacts', stop=stop_event.is_set)
+        with _LOCK:
+            record = read(root, trial_id)
+            if stop_event.is_set():
+                record.update(status='interrupted', interruption_reason='user_cancelled',
+                              error='Cancelled; any completed artifacts are preserved. Approve a new trial if a complete bundle exists.')
+            else:
+                record.update(status='complete', result=result, artifact_directory=str(folder(root, trial_id) / 'artifacts'))
+            write(root, record)
     except Exception as error:
-        record = read(root, trial_id)
-        record.update(status='interrupted', error=str(error))
-        write(root, record)
+        with _LOCK:
+            record = read(root, trial_id)
+            record.update(status='interrupted', error=str(error))
+            if isinstance(error, decoder_training.Cancelled):
+                record['interruption_reason'] = 'user_cancelled'
+            write(root, record)
     finally:
         with _LOCK:
-            _ACTIVE.discard((str(Path(root)), trial_id))
+            _ACTIVE.discard(key)
+            _CANCEL.pop(key, None)
 
 
 def start(root, confirmed, submit, trial_id=None):
@@ -110,16 +140,18 @@ def start(root, confirmed, submit, trial_id=None):
                 raise ValueError('A complete bundle already exists. Preserve it and approve a new trial instead.')
         if record.get('approval') is not None:
             record.setdefault('previous_approvals', []).append(record['approval'])
-        record.update(status='queued', error=None, specification=spec,
+        record.update(status='queued', error=None, cancel_requested=False, interruption_reason=None, specification=spec,
                       approval={'id': uuid.uuid4().hex, 'confirmed_at': datetime.now(timezone.utc).isoformat(),
                                 'revision': run_manifest.digest(spec)})
         write(root, record)
         _ACTIVE.add((str(Path(root)), trial_id))
+        _CANCEL[(str(Path(root)), trial_id)] = threading.Event()
     try:
         submit(execute, root, trial_id)
     except Exception:
         with _LOCK:
             _ACTIVE.discard((str(Path(root)), trial_id))
+            _CANCEL.pop((str(Path(root)), trial_id), None)
         record.update(status='interrupted', error='Worker could not start. Review and approve resume.')
         write(root, record)
         raise

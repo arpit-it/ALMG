@@ -2119,6 +2119,8 @@ class Handler(BaseHTTPRequestHandler):
                 record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit)
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
+            if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'cancel':
+                return self.respond(decoder_trials.cancel(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'resume':
                 record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit, parts[1])
                 return self.respond({'id': record['id']}, 202)

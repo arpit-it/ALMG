@@ -64,8 +64,9 @@ class DecoderTrialsTest(unittest.TestCase):
             restored = decoder_trials.read(root, record['id'])
             self.assertEqual(restored['status'], 'complete')
             self.assertTrue(restored['result']['passed'])
-            train.assert_called_once_with(decoder_trials.recipe_contracts.initialize_recipe,
-                work_directory=decoder_trials.folder(root, record['id']) / 'artifacts')
+            self.assertEqual(train.call_args.args, (decoder_trials.recipe_contracts.initialize_recipe,))
+            self.assertEqual(train.call_args.kwargs['work_directory'], decoder_trials.folder(root, record['id']) / 'artifacts')
+            self.assertTrue(callable(train.call_args.kwargs['stop']))
             decoder_trials.recover(root)
             self.assertEqual(decoder_trials.read(root, record['id']), restored)
             for trial_id in ('../escape', None, 'invalid'):
@@ -95,3 +96,63 @@ class DecoderTrialsTest(unittest.TestCase):
                 decoder_trials.execute(root, record['id'])
                 train.assert_not_called()
             self.assertEqual(decoder_trials.read(root, record['id'])['status'], 'interrupted')
+
+    def test_queued_cancellation_prevents_training_and_keeps_approval(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(decoder_trials, '_ACTIVE', set()), patch.object(decoder_trials, '_CANCEL', {}):
+            root = Path(temporary)
+            record = decoder_trials.start(root, True, Mock())
+            receipt = record['approval']
+            with self.assertRaises(ValueError): decoder_trials.cancel(root, record['id'], False)
+            decoder_trials.cancel(root, record['id'], True)
+            with patch.object(decoder_trials.decoder_training, 'run') as train:
+                decoder_trials.execute(root, record['id'])
+                train.assert_not_called()
+            restored = decoder_trials.read(root, record['id'])
+            self.assertEqual(restored['status'], 'interrupted')
+            self.assertEqual(restored['interruption_reason'], 'user_cancelled')
+            self.assertTrue(restored['cancel_requested'])
+            self.assertEqual(restored['approval'], receipt)
+            self.assertFalse(decoder_trials._CANCEL)
+
+    def test_running_cancellation_keeps_checkpoint_and_resume_requires_new_approval(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(decoder_trials, '_ACTIVE', set()), patch.object(decoder_trials, '_CANCEL', {}):
+            root = Path(temporary)
+            record = decoder_trials.start(root, True, Mock())
+            checkpoint = decoder_trials.folder(root, record['id']) / 'artifacts' / 'step-50'
+            checkpoint.mkdir(parents=True)
+            (checkpoint / 'preserved').write_text('saved checkpoint')
+            def cancel_during_training(initialize, work_directory=None, stop=None):
+                decoder_trials.cancel(root, record['id'], True)
+                self.assertTrue(stop())
+                raise decoder_trials.decoder_training.Cancelled('fixture boundary')
+            with patch.object(decoder_trials.decoder_training, 'run', side_effect=cancel_during_training):
+                decoder_trials.execute(root, record['id'])
+            interrupted = decoder_trials.read(root, record['id'])
+            self.assertEqual(interrupted['status'], 'interrupted')
+            self.assertEqual(interrupted['interruption_reason'], 'user_cancelled')
+            self.assertEqual((checkpoint / 'preserved').read_text(), 'saved checkpoint')
+            renewed = decoder_trials.start(root, True, Mock(), record['id'])
+            self.assertNotEqual(renewed['approval']['id'], record['approval']['id'])
+            self.assertFalse(renewed['cancel_requested'])
+            self.assertEqual(renewed['previous_approvals'], [record['approval']])
+            with patch.object(decoder_trials.decoder_training, 'run', return_value={'passed': True}):
+                decoder_trials.execute(root, record['id'])
+            completed = decoder_trials.read(root, record['id'])
+            with self.assertRaises(ValueError): decoder_trials.cancel(root, record['id'], True)
+            self.assertEqual(decoder_trials.read(root, record['id']), completed)
+
+    def test_legacy_record_without_cancellation_fields_remains_readable_and_recoverable(self):
+        with tempfile.TemporaryDirectory() as temporary, patch.object(decoder_trials, '_ACTIVE', set()), patch.object(decoder_trials, '_CANCEL', {}):
+            root = Path(temporary)
+            record = decoder_trials.start(root, True, Mock())
+            record.pop('cancel_requested')
+            record.pop('interruption_reason')
+            decoder_trials.write(root, record)
+            self.assertEqual(decoder_trials.read(root, record['id']), record)
+            decoder_trials._ACTIVE.clear()
+            decoder_trials._CANCEL.clear()
+            decoder_trials.recover(root)
+            recovered = decoder_trials.read(root, record['id'])
+            self.assertEqual(recovered['status'], 'interrupted')
+            self.assertEqual(recovered['approval'], record['approval'])
+            self.assertNotIn('cancel_requested', recovered)

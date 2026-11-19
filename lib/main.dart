@@ -1591,12 +1591,30 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _cancelDecoderTrial(String id) async {
+    try {
+      var record = await _request('/decoder-trials/$id/cancel', {'confirmed': true});
+      for (var attempt = 0; attempt < 40 && ['queued', 'running'].contains(record['status']); attempt++) {
+        await Future<void>.delayed(const Duration(milliseconds: 250));
+        if (!mounted) return;
+        record = await _request('/decoder-trials/$id');
+      }
+      if (mounted) await _showDecoderTrial(record);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   Future<void> _showDecoderTrial(Map<String, dynamic> record) async {
     await showDialog<void>(context: context, builder: (context) => AlertDialog(
       title: Text('Saved decoder trial · ${record['status']}'),
       scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(record))),
       actions: [
+        if (['queued', 'running'].contains(record['status'])) TextButton(onPressed: () {
+          Navigator.pop(context);
+          _cancelDecoderTrial(record['id'] as String);
+        }, child: const Text('Cancel saved decoder trial')),
         if (record['status'] == 'interrupted') TextButton(onPressed: () {
           Navigator.pop(context);
           _startDecoderTrial(record['id'] as String);

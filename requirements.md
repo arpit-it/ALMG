@@ -1976,6 +1976,35 @@ P3-LMF-01 partial progress · durable approved decoder trials · 2026-11-19:
   decoder jobs, evaluation/release gates and complete acceptance verification.
   P3-LMF-01 stays open; physical power and Windows blockers remain independent.
 
+P3-LMF-01 partial progress · cooperative saved-trial cancellation · 2026-11-19:
+- Added explicit cancellation requests for active saved decoder trials. Per-trial
+  stop events are checked before initialization, at optimizer-step boundaries and
+  before bundle publication. Queued cancellation prevents training when the worker
+  reaches that trial. Workers preserve cancellation metadata and serialize final
+  state updates with cancellation requests; completed trials cannot be cancelled.
+- Cancelled trials use the existing interrupted state with optional cancellation
+  fields, retain approvals/checkpoints/artifacts and require renewed approval to
+  resume. Resume resets the request flag and preserves earlier approvals. Legacy
+  records without cancellation fields remain readable/recoverable; reads do not
+  backfill or rewrite their history. Artifact directories are visible for running
+  and interrupted trials. General scheduling controls remain future work.
+- Local app verification: rebuilt/launched macOS ALMG with an isolated fixture
+  paused at its saved step-50 checkpoint. Approved a saved trial, clicked Cancel
+  saved decoder trial in its native dialog, and observed interrupted/user_cancelled
+  with a valid retained checkpoint and no completed bundle. Clicked Approve resume;
+  the same trial ID completed with a new approval, previous approval preserved,
+  cancel flag cleared, saved checkpoint reused and held-out accuracy 1.000.
+  The resulting saved bundle validated. No external collection occurred.
+- Verification: all 237 Python tests passed with ALMG_METAL_TESTS=1, including
+  real cancellation at a serialized checkpoint and later resume; all 16 Flutter
+  tests passed; Flutter analysis clean. Tests cover queued cancellation without
+  trainer invocation, running cancellation and artifact preservation, completed
+  trial protection, renewed approval, pre-initialization stop and legacy records.
+- Remaining: planner-enabled recipe/approach selection, user dataset integration,
+  scheduler/idle/power integration for general decoder jobs, evaluated release
+  gates and full acceptance verification. P3-LMF-01 stays open; hardware blockers
+  remain independent. Generated artifacts and weights are not committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
