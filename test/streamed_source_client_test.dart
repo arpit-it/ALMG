@@ -31,4 +31,22 @@ void main() {
     expect(sealed, isTrue);
     expect(result['status'], 'stored_not_prepared');
   });
+  test('advertised batches preserve 64 KiB chunks and pause at an acknowledged batch', () async {
+    final bytes = Uint8List.fromList(List<int>.generate(1200000, (i) => i % 251));
+    final file = XFile.fromData(bytes, name: 'source.txt');
+    var record = <String, dynamic>{'id': 'fixture', 'received_bytes': 0, 'total_bytes': bytes.length, 'upload_batch_chunks': 16};
+    final stored = <int>[]; var calls = 0; var pause = false;
+    Future<Map<String, dynamic>> request(String path, Map<String, dynamic> body) async {
+      if (path.endsWith('/seal')) return {...record, 'status': 'stored_not_prepared'};
+      expect(path.endsWith('/chunks'), isTrue); final chunks = body['chunks'] as List;
+      expect(chunks.length, lessThanOrEqualTo(16)); expect(body['offset'], stored.length);
+      for (final encoded in chunks) { final chunk = base64Decode(encoded as String); expect(chunk.length, lessThanOrEqualTo(65536)); stored.addAll(chunk); }
+      calls++; record = {...record, 'received_bytes': stored.length}; return record;
+    }
+    final pending = await sendStreamedSource(file, record, request, onProgress: (_) => pause = true, shouldPause: () => pause);
+    expect(pending['received_bytes'], 1048576); expect(calls, 1);
+    final complete = await sendStreamedSource(file, pending, request);
+    expect(calls, 2); expect(stored, bytes); expect(complete['status'], 'stored_not_prepared');
+  });
+
 }

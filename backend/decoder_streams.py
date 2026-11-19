@@ -16,6 +16,7 @@ else:
 
 _LOCK = threading.RLock()
 CHUNK_BYTES = 65536
+MAX_BATCH_CHUNKS = 16
 MAX_SOURCE_BYTES = 1024 ** 4
 
 
@@ -43,6 +44,7 @@ def _load(root, source_id):
                 or record.get('status') not in ('uploading','stored_not_prepared')
                 or type(record.get('total_bytes')) is not int or not 1<=record['total_bytes']<=MAX_SOURCE_BYTES
                 or type(record.get('received_bytes')) is not int or not 0<=record['received_bytes']<=record['total_bytes']
+                or type(record.get('upload_batch_chunks',1)) is not int or not 1<=record.get('upload_batch_chunks',1)<=MAX_BATCH_CHUNKS
                 or not isinstance(record.get('source_sha256'),str) or not re.fullmatch('[a-f0-9]{64}',record['source_sha256'])):
             raise ValueError('Invalid streamed source record.')
         size=(path/'source.bin').stat().st_size
@@ -73,7 +75,7 @@ def create(root, name, total_bytes, source_sha256, confirmed):
     source_id=uuid.uuid4().hex
     record={'format':'almg-streamed-source-v1','schema_version':1,'id':source_id,'name':name,
             'total_bytes':total_bytes,'received_bytes':0,'source_sha256':source_sha256,
-            'chunk_bytes':CHUNK_BYTES,'status':'uploading','policy':'local_source_storage_only_no_training',
+            'chunk_bytes':CHUNK_BYTES,'upload_batch_chunks':MAX_BATCH_CHUNKS,'status':'uploading','policy':'local_source_storage_only_no_training',
             'text_validation':'not_prepared_or_validated_as_utf8'}
     directory=Path(root)/'decoder-streams';directory.mkdir(parents=True,exist_ok=True)
     with TemporaryDirectory(prefix='.upload-',dir=directory) as temporary:
@@ -105,8 +107,13 @@ def append(root, source_id, offset, encoded, confirmed):
     data=base64.b64decode(encoded,validate=True)
     if not 1<=len(data)<=CHUNK_BYTES:
         raise ValueError('Upload chunks must contain 1 to 65536 bytes.')
+    return _commit(root,source_id,offset,data,1)
+
+
+def _commit(root,source_id,offset,data,chunk_count):
     with _LOCK:
         record=_load(root,source_id);path=folder(root,source_id)
+        if chunk_count>record.get('upload_batch_chunks',1):raise ValueError('This source uses legacy single-chunk upload. Resume with its advertised limit.')
         if record['status']!='uploading':
             raise ValueError('This source is already stored; no further writes are allowed.')
         if offset<record['received_bytes'] and offset+len(data)<=record['received_bytes']:
@@ -121,6 +128,20 @@ def append(root, source_id, offset, encoded, confirmed):
         record['received_bytes']+=len(data)
         _write(path,record)
         return record
+
+
+def append_batch(root,source_id,offset,encoded_chunks,confirmed):
+    if confirmed is not True:raise ValueError('Confirm this bounded local source upload batch.')
+    if (type(offset) is not int or offset<0 or not isinstance(encoded_chunks,list)
+            or not 1<=len(encoded_chunks)<=MAX_BATCH_CHUNKS):
+        raise ValueError('Provide an exact offset and 1 to 16 bounded source chunks.')
+    parts=[]
+    for encoded in encoded_chunks:
+        if not isinstance(encoded,str) or not 1<=len(encoded)<=90000:raise ValueError('Provide bounded base64 chunks.')
+        data=base64.b64decode(encoded,validate=True)
+        if not 1<=len(data)<=CHUNK_BYTES:raise ValueError('Each batch chunk must contain 1 to 65536 bytes.')
+        parts.append(data)
+    return _commit(root,source_id,offset,b''.join(parts),len(parts))
 
 
 def seal(root, source_id, confirmed):

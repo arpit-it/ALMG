@@ -60,4 +60,35 @@ class StreamedSourceTests(unittest.TestCase):
         self.assertEqual(streams.read(self.root,bad['id'])['status'],'uploading')
 
 
+    def test_bounded_batches_commit_once_retry_and_recover_uncommitted_tail(self):
+        chunks=[self.data[:65536],self.data[65536:131072]]
+        encoded=[base64.b64encode(part).decode() for part in chunks]
+        with patch.object(streams,'_write',wraps=streams._write) as write:
+            record=streams.append_batch(self.root,self.record['id'],0,encoded,True)
+            self.assertEqual(write.call_count,1)
+        self.assertEqual(record['received_bytes'],131072)
+        self.assertEqual(streams.append_batch(self.root,record['id'],0,encoded,True),record)
+        tail=base64.b64encode(self.data[131072:]).decode()
+        with patch.object(streams,'_write',side_effect=OSError('interrupted batch commit')):
+            with self.assertRaises(OSError):streams.append_batch(self.root,record['id'],131072,[tail],True)
+        restored=streams.read(self.root,record['id']);self.assertEqual(restored,record)
+        self.assertEqual((streams.folder(self.root,record['id'])/'source.bin').read_bytes(),self.data[:131072])
+        streams.append_batch(self.root,record['id'],131072,[tail],True)
+        self.assertEqual(streams.seal(self.root,record['id'],True)['status'],'stored_not_prepared')
+        self.assertEqual((streams.folder(self.root,record['id'])/'source.bin').read_bytes(),self.data)
+
+    def test_batch_limits_invalid_suffix_and_legacy_records_preserve_committed_bytes(self):
+        import json
+        chunk=base64.b64encode(b'x').decode()
+        for parts in ([],[chunk]*17,[chunk,base64.b64encode(b'x'*65537).decode()],[chunk,'bad base64']):
+            with self.assertRaises(ValueError):streams.append_batch(self.root,self.record['id'],0,parts,True)
+            self.assertEqual(streams.read(self.root,self.record['id'])['received_bytes'],0)
+        with self.assertRaises(ValueError):streams.append_batch(self.root,self.record['id'],0,[chunk],False)
+        path=streams.folder(self.root,self.record['id'])/'record.json'
+        legacy=json.loads(path.read_text());legacy.pop('upload_batch_chunks');path.write_text(json.dumps(legacy))
+        with self.assertRaisesRegex(ValueError,'legacy single-chunk'):streams.append_batch(self.root,self.record['id'],0,[chunk,chunk],True)
+        self.assertNotIn('upload_batch_chunks',streams.read(self.root,self.record['id']))
+        self.assertEqual(self.send(0,b'local')['received_bytes'],5)
+
+
 if __name__=='__main__':unittest.main()

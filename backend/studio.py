@@ -2237,7 +2237,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({"error": "Local desktop clients only."}, 403)
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            limit = 12 * 1024 * 1024 if self.path == "/decoder-imports" else 20 * 1024 * 1024 if self.path == "/projects/restore" else (1_600_000 if self.path in ("/chats/stream", "/decoder-datasets", "/decoder-preparations") else 200_000)
+            bounded_source_batch = re.fullmatch(r'/decoder-streams/[a-f0-9]{32}/chunks', self.path) is not None
+            limit = 12 * 1024 * 1024 if self.path == "/decoder-imports" else 20 * 1024 * 1024 if self.path == "/projects/restore" else (1_600_000 if bounded_source_batch or self.path in ("/chats/stream", "/decoder-datasets", "/decoder-preparations") else 200_000)
             if not 0 < length <= limit:
                 raise ValueError("Invalid request size.")
             data = json.loads(self.rfile.read(length))
@@ -2331,6 +2332,8 @@ class Handler(BaseHTTPRequestHandler):
                 if decoder_stream_indexes.read(ROOT, parts[1]).get('derivation', {}).get('operation') == 'contact_pattern_filter':
                     return self.respond(decoder_stream_redactions.step(ROOT, parts[1], data.get('confirmed')))
                 return self.respond(decoder_stream_indexes.step(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'chunks':
+                return self.respond(decoder_streams.append_batch(ROOT, parts[1], data.get('offset'), data.get('chunks'), data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'chunk':
                 return self.respond(decoder_streams.append(ROOT, parts[1], data.get('offset'), data.get('data'), data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'seal':

@@ -2665,8 +2665,8 @@ class _StudioPageState extends State<StudioPage> {
       final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
         title: Text(source == null ? 'Store local source in chunks?' : 'Resume saved source upload?'),
         content: Text('Store $total original bytes from ${file.name} privately on this machine. '
-          'Uploads can pause and resume without reading the whole source into memory. '
-          'This stores original bytes only; text preparation and training are not enabled for streamed sources.'),
+          'Copies use bounded batches of at most 1 MiB. Pause preserves the last completed batch; older uploads retain their advertised limits. '
+          'This stores original bytes only. Text preparation needs separate confirmation and model training remains disabled.'),
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
           TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm local source upload'))],
       ));

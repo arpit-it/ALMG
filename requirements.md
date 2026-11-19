@@ -3658,6 +3658,45 @@ P3-LMF-02 partial progress · confirmed masked Metal optimizer diagnostic · 202
   corpus quality. Physical power/Windows blockers stay open and skipped. Generated
   reports, fixtures, artifacts, weights and unrelated edits are excluded from Git.
 
+P3-LMF-02 partial progress · bounded committed upload batches · 2026-11-20:
+- [ ] P3-LMF-02 remains open. New streamed source sessions advertise up to sixteen
+  64 KiB chunks per request (1 MiB decoded maximum). One source flush and atomic
+  offset-record update commits each batch, reducing request/metadata-commit count.
+  Every chunk is validated before any batch write. Exact retries verify committed
+  bytes; interrupted record writes discard only the uncommitted tail on recovery.
+- Source schema version 1 gains an optional batch-capability field. Legacy records
+  without it keep the single-chunk path and are not automatically upgraded. Existing
+  single-chunk endpoints remain bounded and supported. Flutter buffers only the
+  advertised bounded batch, acknowledges offsets exactly and pauses at committed
+  boundaries. Only the UUID-specific batch endpoint receives the larger bounded
+  request limit; other request limits stay unchanged.
+- Local app verification: rebuilt/launched ALMG, selected/confirmed a 64 MiB local
+  fixture and paused at 6 MiB. Restarted backend/app, reopened identical source
+  070b200396a042a2b252cacfa26a9958, reselected the original file for hash matching,
+  then resumed the same session to stored_not_prepared. Final original/stored
+  SHA-256 hashes match. Measured 64 upload requests versus 1,024 legacy-sized
+  requests for the same bytes, with at most sixteen chunks/1 MiB per batch. This is
+  a request-count comparison, not a wall-time benchmark. No training started.
+  Evidence: /tmp/almg-bounded-upload-batch-qa/{consent-ui.txt,paused-ui.json,
+  restarted-ui.json,completed-ui.json,first-run-metrics.json,metrics.json,
+  verification.json}.
+- Validation: 391 Python tests, 34 Flutter tests and Flutter analysis pass. Added
+  tests verify one metadata commit per batch, retry equality, failed-commit tail
+  recovery, invalid/oversized batch rejection before writes, legacy-record fallback
+  and bounded client batch pause/resume with exact reconstructed bytes.
+- Larger-than-RAM acceptance remains open with a concrete scratch-space constraint:
+  this host has 36 GiB physical RAM and about 60 GiB free on the fixture volume.
+  A straightforward source-plus-backend-copy fixture above RAM needs more than
+  72 GiB, exceeding current safe free space. No oversized corpus was created and
+  no user artifacts/weights were removed. Remaining verification requires adequate
+  safe scratch space or a separately verified storage-efficient fixture strategy,
+  then full native ingestion/preparation/hash and memory evidence. Skip this
+  unchanged criterion while continuing independently actionable work.
+- Other remaining scope includes full streamed optimization/planning/checkpoint
+  recovery and broader/scalable dataset policies. Physical power/Windows blockers
+  stay open and skipped. Generated sources, fixtures, metrics, weights and unrelated
+  edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
