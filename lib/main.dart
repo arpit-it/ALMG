@@ -1896,15 +1896,96 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _showStreamAudit(Map<String, dynamic> record) async {
+    final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
+      title: Text('Full-index audit · ${record['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('${record['processed_records']} / ${record['total_records']} unique records checked · '
+          '${record['hygiene_review_records']} hygiene reviews · ${record['privacy_records']} records with potential contacts.'),
+        const Text('Raw text is omitted. These local heuristics do not establish complete PII detection, evaluation cleanliness or training approval. Source data remains unchanged.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, 'resume'), child: const Text('Resume full-index audit')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'findings'), child: const Text('Review full-index findings'))],
+    ));
+    if (!mounted) return;
+    if (action == 'resume') { await _runStreamAudit(record); return; }
+    if (action == 'findings') {
+      await showDialog<void>(context: context, builder: (context) => StreamIndexRecordsDialog(
+        indexId: record['id'] as String, recordsPath: '/decoder-stream-audits/${record['id']}/records',
+        title: 'Review full-index audit findings', description: 'Read-only diagnostic findings. Original text is omitted; inspect indexed source records separately. Current hygiene/contact heuristics do not grant training approval.',
+        request: (path, body) => _request(path, body)));
+    }
+  }
+
+  Future<void> _savedStreamAudits(String indexId) async {
+    try {
+      final audits = (await _request('/decoder-stream-indexes/$indexId/audits'))['audits'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved full-index audits'), children: [
+          if (audits.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved full-index audits.')),
+          for (final audit in audits) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(audit as Map)),
+            child: Text('${(audit['id'] as String).substring(0, 8)} · ${audit['status']} · ${audit['processed_records']}/${audit['total_records']} checked')),
+        ],
+      ));
+      if (selected != null && mounted) await _showStreamAudit(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _beginStreamAudit(Map<String, dynamic> index) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Audit the complete text index?'),
+      content: Text('Check all ${index['unique_records']} unique normalized records with the current local hygiene and contact-detail heuristics. '
+        'Save resumable findings and source references without copying raw text. This does not filter stored data, change training approval or perform comprehensive contamination checks.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm full-index audit'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final record = await _request('/decoder-stream-indexes/${index['id']}/audits', {'confirmed': true}, const Duration(minutes: 10));
+      if (mounted) await _runStreamAudit(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _runStreamAudit(Map<String, dynamic> initial) async {
+    var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: StatefulBuilder(builder: (context, update) {
+        refresh = update;
+        return AlertDialog(title: const Text('Auditing full text index'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: (record['total_records'] as num) == 0 ? 0 : (record['processed_records'] as num) / (record['total_records'] as num)),
+          Text('${record['processed_records']} / ${record['total_records']} checked'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause full-index audit'))]);
+      }))));
+    try {
+      while (!pause && record['status'] != 'complete') {
+        record = await _request('/decoder-stream-audits/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        if (!mounted) return;
+        refresh?.call(() {});
+      }
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await _showStreamAudit(record);
+    } catch (error) {
+      refresh = null;
+      if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); }
+    }
+  }
+
   Future<void> _showStreamIndex(Map<String, dynamic> record) async {
     final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: Text('Streamed text index · ${record['status']}'), scrollable: true,
       content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Line-based normalized text and exact-duplicate index. Source bytes are preserved. Training and large-index quality/evaluation integration are not yet enabled.'),
+        const Text('Line-based normalized text and exact-duplicate index. Source bytes are preserved. Full-index hygiene/contact audits are available. Training and broader evaluation integration are not yet enabled.'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])),
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'records'), child: const Text('Review indexed records')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'audit'), child: const Text('Audit full text index')),
+        TextButton(onPressed: () => Navigator.pop(context, 'audits'), child: const Text('View saved full-index audits')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, 'resume'), child: const Text('Resume text indexing'))],
     ));
     if (!mounted) return;
@@ -1915,7 +1996,10 @@ class _StudioPageState extends State<StudioPage> {
     if (action == 'records') {
       await showDialog<void>(context: context, builder: (context) => StreamIndexRecordsDialog(
         indexId: record['id'] as String, request: (path, body) => _request(path, body)));
+      return;
     }
+    if (action == 'audit') await _beginStreamAudit(record);
+    if (action == 'audits') await _savedStreamAudits(record['id'] as String);
   }
 
   Future<void> _savedStreamIndexes(String sourceId) async {

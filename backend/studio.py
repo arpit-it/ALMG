@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -54,6 +54,7 @@ else:
     import decoder_licenses
     import decoder_streams
     import decoder_stream_indexes
+    import decoder_stream_audits
     import chat_history
     import inference
     import image_recipe
@@ -2016,6 +2017,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'indexes': decoder_stream_indexes.list_indexes(ROOT, stream_parts[1])})
             except ValueError as error:
                 return self.respond({'error': str(error)}, 404)
+        if len(stream_parts) == 3 and stream_parts[0] == 'decoder-stream-indexes' and stream_parts[2] == 'audits':
+            try:
+                return self.respond({'audits': decoder_stream_audits.list_audits(ROOT, stream_parts[1])})
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
+        if self.path.startswith('/decoder-stream-audits/'):
+            try:
+                return self.respond(decoder_stream_audits.read(ROOT, self.path.removeprefix('/decoder-stream-audits/')))
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if self.path.startswith('/decoder-stream-indexes/'):
             try:
                 return self.respond(decoder_stream_indexes.read(ROOT, self.path.removeprefix('/decoder-stream-indexes/')))
@@ -2192,6 +2203,12 @@ class Handler(BaseHTTPRequestHandler):
             parts = self.path.strip('/').split('/')
             if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'indexes':
                 return self.respond(decoder_stream_indexes.begin(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'audits':
+                return self.respond(decoder_stream_audits.begin(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-audits' and parts[2] == 'step':
+                return self.respond(decoder_stream_audits.step(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-audits' and parts[2] == 'records':
+                return self.respond(decoder_stream_audits.record_page(ROOT, parts[1], data.get('confirmed'), data.get('cursor'), data.get('split', 'all'), data.get('limit', 10)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'records':
                 return self.respond(decoder_stream_indexes.record_page(ROOT, parts[1], data.get('confirmed'), data.get('cursor'), data.get('split', 'all'), data.get('limit', 10)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'step':

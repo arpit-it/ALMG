@@ -3122,6 +3122,50 @@ P3-LMF-02 partial progress · bounded indexed-record review and local findings �
   occurred; generated sources/indexes/page traces, weights and unrelated edits
   are excluded from this commit.
 
+P3-LMF-02 partial progress · resumable full-index hygiene/contact audits · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed indexes now offer an explicitly
+  confirmed full-index diagnostic scan, pause/resume, saved reports and paged
+  findings. The scan checks every unique normalized record with the current
+  hygiene/contact heuristics, counts original occurrences separately and retains
+  affected source/group/split, first line/byte offset and raw-line hashes. Original
+  text/contact values are omitted from the diagnostic store; detailed contact
+  findings remain bounded per record, with complete aggregate match counts.
+- SQLite transactions checkpoint the group cursor, counters and findings together.
+  Batches use record/character budgets and the existing bounded cache/file-backed
+  temporary storage. The source index is opened read-only, bound by revision/file
+  hash and checked for changes. Audit code plus Python/SQLite/Unicode runtime are
+  bound for resume; changed implementations/runtimes require a newly reviewed
+  audit while preserving old progress. Publication records an immutable database
+  checksum/revision and recovers after an interrupted final manifest write without
+  recounting records. This is diagnostic only and changes no training admission.
+- Native verification: rebuilt/launched ALMG, confirmed a scan of 2,000 known local
+  fixture records, paused audit bcfb9b22cb944cac8db69292ceec65f5 at 1,200 checked,
+  restarted both app and backend and reopened the identical pending checkpoint
+  without automatic work. Explicit resume completed all 2,000: 667 hygiene-review
+  records, 667 privacy records/matches, 1,334 finding records and average score
+  92.07, matching the fixture's independent expected totals. Verified absence of
+  raw contact values in the audit database and unchanged source-index files.
+  Opened native finding pages, matched provenance to the actual indexed/original
+  source bytes, verified non-overlapping next pages and validation-split filtering.
+  No trial was created. The fixture used a 0.6-second batch delay solely to make
+  pausing observable. Evidence: /tmp/almg-full-audit-qa/{confirmation-ui.txt,
+  paused-audit-ui.json,restarted-audit-ui.json,complete-audit-ui.json,
+  finding-provenance-ui.json,findings-first-ui.txt,findings-second-ui.txt,
+  validation-findings-ui.txt,finding-pages.jsonl,before.json}.
+- Validation: 350 Python tests with ALMG_METAL_TESTS=1, 23 Flutter tests and clean
+  Flutter analysis. New coverage verifies complete unique-record scan/resume,
+  occurrence-weighted contact totals, immutable originals, raw-text omission,
+  batch rollback/retry, interrupted publication, cursor/report integrity, consent,
+  source changes and code/runtime invalidation. Existing shared viewer navigation
+  and retry tests still pass.
+- Remaining: full-index language/permission/contamination policies, tokenizer/
+  training/evaluation/export integration, beyond-host-RAM verification, optional
+  external provider contracts and remaining acceptance coverage. Current heuristic
+  checks do not establish comprehensive PII detection or evaluation cleanliness.
+  Physical/Windows blockers remain open and skipped. No external collection
+  occurred; generated audits/indexes/trace fixtures, weights and unrelated edits
+  are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

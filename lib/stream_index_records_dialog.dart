@@ -4,8 +4,11 @@ import 'package:flutter/material.dart';
 typedef IndexRecordsRequest = Future<Map<String, dynamic>> Function(String, Map<String, dynamic>);
 
 class StreamIndexRecordsDialog extends StatefulWidget {
-  const StreamIndexRecordsDialog({super.key, required this.indexId, required this.request});
+  const StreamIndexRecordsDialog({super.key, required this.indexId, required this.request, this.recordsPath, this.title = 'Review indexed local records', this.description});
   final String indexId;
+  final String? recordsPath;
+  final String title;
+  final String? description;
   final IndexRecordsRequest request;
   @override
   State<StreamIndexRecordsDialog> createState() => _StreamIndexRecordsDialogState();
@@ -26,7 +29,7 @@ class _StreamIndexRecordsDialogState extends State<StreamIndexRecordsDialog> {
   Future<void> _load() async {
     setState(() { _loading = true; _error = null; _page = null; });
     try {
-      final page = await widget.request('/decoder-stream-indexes/${widget.indexId}/records', {
+      final page = await widget.request(widget.recordsPath ?? '/decoder-stream-indexes/${widget.indexId}/records', {
         'confirmed': true, 'cursor': _history[_position], 'split': _split, 'limit': 10,
       });
       if (mounted) setState(() { _page = page; _loading = false; });
@@ -39,9 +42,9 @@ class _StreamIndexRecordsDialogState extends State<StreamIndexRecordsDialog> {
   Widget build(BuildContext context) {
     final records = (_page?['records'] as List?) ?? [];
     return AlertDialog(
-      title: const Text('Review indexed local records'),
+      title: Text(widget.title),
       content: SizedBox(width: 720, height: MediaQuery.sizeOf(context).height * .55, child: Column(children: [
-        const Text('Read-only excerpts. Detected contact details are masked; other personal information may remain. Scores are local heuristics, not meaning or factual accuracy.'),
+        Text(widget.description ?? 'Read-only excerpts. Detected contact details are masked; other personal information may remain. Scores are local heuristics, not meaning or factual accuracy.'),
         Row(children: [const Text('Saved split: '), DropdownButton<String>(value: _split,
           items: [for (final split in ['all', 'train', 'validation', 'test']) DropdownMenuItem(value: split, child: Text(split))],
           onChanged: _loading ? null : (value) { if (value == null) return; _split = value; _history.clear(); _history.add(null); _position = 0; _historyTrimmed = false; _load(); }),
