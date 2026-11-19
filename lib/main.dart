@@ -1583,6 +1583,7 @@ class _StudioPageState extends State<StudioPage> {
       title: const Text('Decoder dataset prepared for review'), scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(manifest))),
       actions: [
+        TextButton(onPressed: () { Navigator.pop(context); _exportDecoderDataset(manifest['id'] as String); }, child: const Text('Review local dataset export')),
         TextButton(onPressed: () { Navigator.pop(context); _auditDecoderDataset(manifest['id'] as String); }, child: const Text('Analyze local text quality')),
         TextButton(onPressed: () { Navigator.pop(context); _showSavedDecoderAudits(manifest['id'] as String); }, child: const Text('View saved quality audits')),
 
@@ -1601,6 +1602,36 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _exportDecoderDataset(String id) async {
+    try {
+      final review = await _request('/decoder-datasets/$id/export-review', {'confirmed': true});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Review local dataset export'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Save a private local ZIP containing normalized document text, saved tokenizer, split manifest and source names, hashes, licenses and derivation lineage. '
+            'Text and source names may include personal information. This does not collect data, start training or include training approvals. File hashes are checked again before saving.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save private dataset ZIP'))],
+      ));
+      if (confirmed != true || !mounted) return;
+      final destination = await getSaveLocation(suggestedName: 'decoder-dataset-${id.substring(0, 8)}.zip',
+        acceptedTypeGroups: [const XTypeGroup(label: 'Private dataset ZIP', extensions: ['zip'])]);
+      if (destination == null || !mounted) return;
+      final result = await _request('/decoder-datasets/$id/export', {'confirmed': true, 'revision': review['revision']});
+      await XFile.fromData(base64Decode(result['data'] as String), mimeType: 'application/zip', name: result['file_name'] as String).saveTo(destination.path);
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Private dataset ZIP saved'), content: Text(destination.path),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _showDecoderAudit(Map<String, dynamic> report) async {

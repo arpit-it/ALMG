@@ -2151,6 +2151,10 @@ class Handler(BaseHTTPRequestHandler):
             parts = self.path.strip('/').split('/')
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'pipeline':
                 return self.respond(decoder_trials.pipeline_record(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'export-review':
+                return self.respond(decoder_datasets.export_review(ROOT, parts[1]))
+            if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'export':
+                return self.respond(decoder_datasets.export_dataset(ROOT, parts[1], data.get('confirmed'), data.get('revision')))
             if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'redact':
                 return self.respond(decoder_datasets.redact(ROOT, parts[1], data.get('confirmed'), data.get('audit_revision')))
             if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'audit':

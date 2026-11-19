@@ -2766,6 +2766,39 @@ P3-LMF-02 partial progress · saved-tokenizer distribution analysis · 2026-11-1
   open and skipped. No external collection occurred; generated fixtures/artifacts,
   downloaded weights and unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · reviewed local dataset export with provenance · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Prepared datasets now offer “Review local dataset
+  export”, explaining that the private ZIP includes normalized document text and
+  source metadata, followed by explicit approval and the native local Save panel.
+  Cancellation does not export. No external collection or training occurs, and
+  no training approvals are included or transferred.
+- A version-1 export receipt binds dataset/manifest revision, exact file hashes
+  and sizes, scope and implementation hash. Export revalidates integrity and the
+  exact review before returning a bounded deterministic ZIP. Fixed members include
+  the original documents.jsonl, manifest.json, optional tokenizer.json and
+  dataset-export.json. Original source/license/split and derivation metadata stay
+  byte-identical in the manifest. No export staging artifacts or dataset writes
+  are created by the backend.
+- Native verification: rebuilt/launched ALMG, selected the locally redacted child
+  dataset 364a6a9be9954ff9bc5fdf2f23b0b856, inspected the review, approved and saved
+  through the macOS file chooser. The app reported “Private dataset ZIP saved”.
+  Verified all four archive members and their hashes against the reviewed files;
+  the 7,354-byte ZIP retained parent dataset binding, original source provenance,
+  licenses and three replacement counts. Restored its controlled dataset members
+  into an isolated directory and passed the normal integrity/tokenizer reader with
+  an identical manifest. Original dataset files stayed byte-identical; no trial
+  was created. Evidence: /tmp/almg-dataset-export-qa/{export-review-ui.json,
+  saved-ui.txt,decoder-dataset-364a6a9b.zip,child-before.json,restored/}.
+- Validation: 313 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. New coverage verifies deterministic archives, exact files and
+  provenance roundtrip, consent, stale review/implementation changes, corruption,
+  and legacy datasets without tokenizer or derivation metadata.
+- Remaining: streaming/incremental/resumable ingestion, language/quality/license
+  review, broader PII/contamination policy, dataset mixing/sampling and remaining
+  acceptance verification. The export does not add a dataset-import UI. Physical
+  and Windows blockers remain open and skipped. Generated ZIPs/fixtures, weights
+  and unrelated user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -7,6 +7,8 @@ from tempfile import TemporaryDirectory
 import uuid
 import re
 import math
+import io
+import zipfile
 from collections import Counter
 from statistics import median
 
@@ -337,3 +339,54 @@ def redact(root, dataset_id, confirmed, audit_revision):
                   'sources': lineage}
     tokenizer_kind = 'utf8_bytes' if (parent.get('tokenizer') or {}).get('format') == 'almg-utf8-byte-tokenizer-v1' else 'words'
     return prepare(root, documents, True, tokenizer_kind, _derivation=derivation)
+
+
+def _export_payload(root, dataset_id):
+    manifest = read(root, dataset_id)
+    folder = Path(root) / 'decoder-datasets' / dataset_id
+    limits = {'manifest.json': 1024 * 1024, 'documents.jsonl': 256 * 1024, 'tokenizer.json': 128 * 1024}
+    payload = {}
+    for name in sorted({'manifest.json', *manifest['files']}):
+        with (folder / name).open('rb') as source:
+            data = source.read(limits[name] + 1)
+        if len(data) > limits[name]:
+            raise ValueError('The prepared dataset exceeds the bounded local export size.')
+        if name == 'manifest.json':
+            if json.loads(data) != manifest:
+                raise ValueError('The dataset manifest changed during export review.')
+        elif hashlib.sha256(data).hexdigest() != manifest['files'][name]:
+            raise ValueError('The dataset changed during export review.')
+        payload[name] = data
+    review = {'format': 'almg-decoder-dataset-export-v1', 'schema_version': 1,
+              'dataset_id': dataset_id, 'dataset_manifest_sha256': digest(manifest),
+              'scope': 'private_local_dataset', 'includes_normalized_text': True,
+              'includes_source_provenance_and_derivation': True, 'includes_training_approvals': False,
+              'files': {name: {'sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
+                        for name, data in payload.items()},
+              'implementation_sha256': file_digest(Path(__file__))}
+    review['revision'] = digest(review)
+    return review, payload
+
+
+def export_review(root, dataset_id):
+    return _export_payload(root, dataset_id)[0]
+
+
+def export_dataset(root, dataset_id, confirmed, revision):
+    if confirmed is not True:
+        raise ValueError('Confirm the private local dataset export first.')
+    review, payload = _export_payload(root, dataset_id)
+    if not isinstance(revision, str) or revision != review['revision']:
+        raise ValueError('The dataset export review changed. Reopen the current review before saving.')
+    payload['dataset-export.json'] = json.dumps(review, ensure_ascii=False, allow_nan=False,
+                                               sort_keys=True, indent=2).encode('utf-8')
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', compression=zipfile.ZIP_STORED) as archive:
+        for name, data in sorted(payload.items()):
+            entry = zipfile.ZipInfo(name, date_time=(2020, 1, 1, 0, 0, 0))
+            entry.external_attr = 0o100600 << 16
+            archive.writestr(entry, data)
+    data = buffer.getvalue()
+    return {'file_name': f'decoder-dataset-{dataset_id[:8]}.zip',
+            'data': base64.b64encode(data).decode('ascii'), 'sha256': hashlib.sha256(data).hexdigest(),
+            'bytes': len(data), 'revision': review['revision']}
