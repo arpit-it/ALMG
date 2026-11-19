@@ -3,6 +3,26 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/stream_model_batches_dialog.dart';
 
 void main() {
+  testWidgets('optimizer execution requires separate confirmation', (tester) async {
+    final calls = <String>[];
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(reviewed: const {'id': 'fixture'}, request: (path, body) async {
+      calls.add(path);
+      if (path.endsWith('/optimization-check')) {
+        expect(body['confirmed'], isTrue); expect(body['reviewed_batch'], isNotNull);
+        return {'initial_batch_loss': 2.0, 'final_batch_loss': 1.0, 'model_saved': false};
+      }
+      return {'rows': 1, 'real_target_tokens': 2, 'sequence_lengths': [2], 'next_cursor': null};
+    }))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Check masked optimization')); await tester.pumpAndSettle();
+    expect(calls.length, 1);
+    await tester.tap(find.text('Cancel')); await tester.pumpAndSettle(); expect(calls.length, 1);
+    await tester.tap(find.text('Check masked optimization')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm five-step optimizer check')); await tester.pumpAndSettle();
+    expect(calls.last.endsWith('/optimization-check'), isTrue);
+    expect(find.text('Masked optimizer diagnostic verified'), findsOneWidget);
+  });
+
   testWidgets('batch inspector pages and resets cursors on split changes', (tester) async {
     final calls = <Map<String, dynamic>>[];
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(reviewed: const {'id': 'fixture'}, request: (path, body) async {
@@ -19,6 +39,7 @@ void main() {
     await tester.tap(find.byType(DropdownButton<String>)); await tester.pumpAndSettle();
     await tester.tap(find.text('validation').last); await tester.pumpAndSettle();
     expect(calls.last['split'], 'validation'); expect(calls.last['cursor'], isNull);
+    expect(find.text('Check masked optimization'), findsNothing);
   });
   testWidgets('batch inspector allows retry after a binding failure', (tester) async {
     var attempts = 0;

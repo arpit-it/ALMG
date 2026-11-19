@@ -3620,6 +3620,44 @@ P3-LMF-02 partial progress · bounded source-bound model-input batches · 2026-1
   stay open and skipped. Generated batches, fixtures, artifacts, weights and
   unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · confirmed masked Metal optimizer diagnostic · 2026-11-20:
+- [ ] P3-LMF-02 remains open. The model-input inspector now offers a separately
+  confirmed five-step diagnostic using the existing registered from-scratch decoder
+  initializer (fixed byte vocabulary, seed 7, SGD learning rate 0.05). It optimizes
+  only the exact inspected training batch, verifies padding-target loss/gradient
+  invariance and CPU/Metal inference parity, and checks that all parameter tensors
+  changed with finite values and reduced batch loss. Source bindings are rechecked
+  after GPU execution. Model weights are discarded; no candidate/bundle is saved.
+- The first four validation/test windows are explicitly partial forward-only probes,
+  not complete evaluation or a release gate. Versioned numerical reports preserve
+  source-batch/provenance/implementation bindings and can be reopened through native
+  saved-check inventory. No training/release approval is granted. Cancellation,
+  stale data and failed checks publish no model/report. Inspector actions now wrap
+  on smaller windows and the error panel scrolls, preserving retry access.
+- Local app verification: rebuilt/launched ALMG on a real inspected partial batch
+  with sequence lengths [16,16,16,4]. Cancelled the confirmation and verified no
+  output, then explicitly confirmed the Metal run. Report
+  7146586c8cfd493fbb77246712461245 records loss 5.53477955 → 5.33783436, all nine
+  parameter tensors changed, 12 padded positions, zero masked-target loss error,
+  gradient error 1.49011612e-8 and CPU inference error 3.67044014e-8. Restarted
+  backend/app and reopened identical saved evidence without rerunning optimization.
+  All five source artifact namespaces remain byte-for-byte unchanged; only one
+  diagnostic JSON exists and no decoder model/trial files were saved. Evidence:
+  /tmp/almg-masked-optimizer-native-qa/{training-batch-ui.json,consent-ui.txt,
+  report-ui.json,verified-ui.txt,restarted-report-ui.json,verification.json}.
+- Validation: 389 Python tests (including actual Metal updates), 33 Flutter tests
+  and Flutter analysis pass. New coverage checks separate consent/cancellation,
+  stale-batch rejection before initialization, real masked SGD/tensor updates,
+  padding invariance, CPU parity, report integrity, post-GPU source-change rejection,
+  no model saving and validation-split optimizer exclusion. The small-window retry
+  regression found during verification is fixed and passes.
+- Remaining: full streamed optimization, Qwen-supervised trial planning, scheduling,
+  checkpoint/cursor recovery and complete held-out evaluation/admission; broader
+  dataset policies, scalable overlap processing and larger-than-RAM acceptance.
+  This five-step numerical check does not deliver a usable trained model or establish
+  corpus quality. Physical power/Windows blockers stay open and skipped. Generated
+  reports, fixtures, artifacts, weights and unrelated edits are excluded from Git.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
