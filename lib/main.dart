@@ -17,6 +17,7 @@ import 'project_settings.dart';
 import 'private_decoder_page.dart';
 import 'local_backend_client.dart';
 import 'streamed_source_client.dart';
+import 'stream_index_records_dialog.dart';
 
 /// Starts the Flutter desktop application.
 void main() {
@@ -1896,16 +1897,25 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _showStreamIndex(Map<String, dynamic> record) async {
-    final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+    final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: Text('Streamed text index · ${record['status']}'), scrollable: true,
       content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Text('Line-based normalized text and exact-duplicate index. Source bytes are preserved. Training and large-index quality/evaluation integration are not yet enabled.'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])),
-      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
-        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume text indexing'))],
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'records'), child: const Text('Review indexed records')),
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, 'resume'), child: const Text('Resume text indexing'))],
     ));
-    if (resume == true && mounted) await _runStreamIndex(record);
+    if (!mounted) return;
+    if (action == 'resume') {
+      await _runStreamIndex(record);
+      return;
+    }
+    if (action == 'records') {
+      await showDialog<void>(context: context, builder: (context) => StreamIndexRecordsDialog(
+        indexId: record['id'] as String, request: (path, body) => _request(path, body)));
+    }
   }
 
   Future<void> _savedStreamIndexes(String sourceId) async {

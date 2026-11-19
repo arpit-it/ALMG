@@ -3084,6 +3084,44 @@ P3-LMF-02 partial progress · transactional streamed text normalization/indexing
   collection occurred; generated sources/indexes, weights and unrelated edits are
   excluded from this commit.
 
+P3-LMF-02 partial progress · bounded indexed-record review and local findings · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed indexes now offer read-only record
+  review with next/previous/first-page navigation, saved-split filters and source
+  details. Keyset cursors bind the immutable index revision and filter; requests
+  return at most 20 records (native default 10). Client back history is bounded to
+  50 pages, with a first-page reset for long review sessions.
+- Each record shows a maximum 512-character excerpt, occurrence count, normalized
+  character count, first source line/byte offset, raw-line/source/group hashes and
+  current local hygiene/privacy findings. Detected contacts are masked before
+  excerpt truncation; total match counts remain accurate while detailed findings
+  are capped at 20 per record. The analysis version/hash and normalized-offset
+  convention are disclosed. Other personal information may remain. Pages are
+  advisory and do not filter stored data or change training/evaluation gates.
+- Native verification: rebuilt/launched ALMG, opened completed index
+  5c62810a0727435d916d443045786cc5 and reviewed ten then three records, covering all
+  thirteen fixture records without overlap. Verified masked contact values,
+  bounded/truncated excerpts and expanded provenance matching the page response.
+  Back navigation restored the exact first page; validation filtering returned
+  the correct two records. Rebuilt/restarted the final dialog and verified the
+  first-page reset from page two returned the original response. SQLite/manifest
+  bytes stayed identical and no trial was created. Also read the previously
+  completed 64 MiB index through the new endpoint without rewriting it. Evidence:
+  /tmp/almg-stream-review-qa/{first-page-ui.txt,second-page-ui.txt,provenance-ui.json,
+  validation-ui.txt,restarted-first-page-ui.txt,pages.jsonl,before.json}.
+- Validation: 346 Python tests with ALMG_METAL_TESTS=1, 23 Flutter tests and clean
+  Flutter analysis. New cases cover complete non-overlapping pages, split/cursor
+  binding, consent/limits, dense-contact masking and finding caps, unavailable or
+  corrupt indexes, immutable artifacts, next/back/filter/reset navigation, bounded
+  history and retry after a failed page. A viewport-dependent test was corrected
+  to scroll the source disclosure into view before opening it.
+- Remaining: full-index quality/PII/language/permission/contamination processing,
+  tokenizer/training/evaluation/export integration for large indexes, beyond-host-
+  RAM verification, optional external-provider contracts and remaining acceptance
+  coverage. Read-only page findings do not establish full-index admission checks.
+  Physical/Windows blockers remain open and skipped. No external collection
+  occurred; generated sources/indexes/page traces, weights and unrelated edits
+  are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

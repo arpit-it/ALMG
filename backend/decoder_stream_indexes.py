@@ -10,10 +10,12 @@ import threading
 import uuid
 
 if __package__:
+    from . import decoder_datasets as datasets
     from . import decoder_streams as streams
     from .decoder_tokenizer import Tokenizer
     from .run_manifest import digest, file_digest
 else:
+    import decoder_datasets as datasets
     import decoder_streams as streams
     from decoder_tokenizer import Tokenizer
     from run_manifest import digest, file_digest
@@ -182,3 +184,55 @@ def step(root,index_id,confirmed):
                 record['status']='awaiting_publication'
             connection.execute('UPDATE state SET value=? WHERE id=1',(json.dumps(record),))
         return _publish(root,index_id,record) if record['status']=='awaiting_publication' else record
+
+
+def record_page(root,index_id,confirmed,cursor=None,split='all',limit=10):
+    """Bounded read-only excerpts and current heuristic findings from an immutable index."""
+    if confirmed is not True:raise ValueError('Confirm local indexed-record review.')
+    if type(limit) is not int or not 1<=limit<=20 or split not in ('all','train','validation','test'):
+        raise ValueError('Choose a saved split and a page size from 1 to 20.')
+    manifest=read(root,index_id)
+    if manifest['status']!='complete':raise ValueError('Complete text indexing before reviewing immutable records.')
+    after=''
+    if cursor is not None:
+        if (not isinstance(cursor,dict) or set(cursor)!={'revision','after','split'}
+                or cursor.get('revision')!=manifest['revision'] or cursor.get('split')!=split
+                or not isinstance(cursor.get('after'),str) or not re.fullmatch('[a-f0-9]{64}',cursor['after'])):
+            raise ValueError('The record cursor changed. Reopen the first page for this index and split.')
+        after=cursor['after']
+    sql='SELECT group_sha256,text,split,first_line,first_byte_offset,raw_line_sha256,occurrences FROM documents WHERE group_sha256>?'
+    parameters=[after]
+    if split!='all':sql+=' AND split=?';parameters.append(split)
+    sql+=' ORDER BY group_sha256 LIMIT ?';parameters.append(limit+1)
+    with _connect(_folder(root,index_id)/'records.sqlite3',True) as connection:
+        rows=connection.execute(sql,parameters).fetchall()
+    records=[]
+    for group,text,part,line,offset,raw_sha,occurrences in rows[:limit]:
+        source={'name':f"{manifest['source_name']}:line {line}",'source_sha256':manifest['source_sha256'],
+                'group':group,'split':part}
+        findings=datasets._privacy_findings(text,source)
+        spans=[]
+        for finding in sorted(findings,key=lambda item:item['normalized_character_start']):
+            start,end=finding['normalized_character_start'],finding['normalized_character_end']
+            if spans and start<spans[-1][1]:spans[-1]=(spans[-1][0],max(spans[-1][1],end))
+            else:spans.append((start,end))
+        pieces=[];position=0
+        for start,end in spans:
+            pieces.extend((text[position:start],'[CONTACT_REDACTED]'));position=end
+        pieces.append(text[position:]);excerpt=''.join(pieces)
+        records.append({**source,'first_line':line,'first_byte_offset':offset,'raw_line_sha256':raw_sha,
+                        'occurrences':occurrences,'normalized_characters':len(text),
+                        'text_excerpt':excerpt[:512],'excerpt_truncated':len(excerpt)>512,
+                        'detected_contacts_masked':bool(findings),'privacy_matches':len(findings),
+                        'privacy_findings':findings[:20],'privacy_findings_truncated':len(findings)>20,
+                        'text_hygiene':datasets._text_hygiene(text,Tokenizer.words(text))})
+    return {'format':'almg-stream-index-record-page-v1','schema_version':1,'index_id':index_id,
+            'index_revision':manifest['revision'],'split':split,'page_size':limit,'records':records,
+            'source_id':manifest['source_id'],'read_only':True,
+            'analysis_method':{'version':1,'quality':'text_hygiene_v1','privacy':'local_contact_patterns_v1',
+                               'maximum_excerpt_characters':512,'maximum_findings_per_record':20,'offsets':'original_normalized_text_unicode_codepoints',
+                               'limitations':'Current local heuristics; other personal information may remain. No training gate changes.'},
+            'analysis_implementation_sha256':digest({'index':file_digest(Path(__file__)),
+                'heuristics':file_digest(Path(__file__).with_name('decoder_datasets.py'))}),
+            'next_cursor':{'revision':manifest['revision'],'after':records[-1]['group'],'split':split}
+                          if len(rows)>limit else None}

@@ -2192,6 +2192,8 @@ class Handler(BaseHTTPRequestHandler):
             parts = self.path.strip('/').split('/')
             if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'indexes':
                 return self.respond(decoder_stream_indexes.begin(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'records':
+                return self.respond(decoder_stream_indexes.record_page(ROOT, parts[1], data.get('confirmed'), data.get('cursor'), data.get('split', 'all'), data.get('limit', 10)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'step':
                 return self.respond(decoder_stream_indexes.step(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'chunk':
