@@ -39,7 +39,7 @@ def save(destination, model, tokenizer, training):
             'runtime': {'python': platform.python_version(), 'system': platform.system(),
                         'machine': platform.machine(), 'numpy': version('numpy')},
             'components': {name: file_digest(Path(__file__).with_name(name)) for name in
-                           ('decoder_recipe.py', 'decoder_tokenizer.py', 'decoder_training.py', 'decoder_bundle.py')},
+                           ('decoder_recipe.py', 'decoder_tokenizer.py', 'decoder_training.py', 'decoder_checkpoint.py', 'decoder_bundle.py')},
             'files': {name: file_digest(staged / name) for name in ('decoder.json', 'tokenizer.json')},
         }
         (staged / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, allow_nan=False, indent=2), encoding='utf-8')

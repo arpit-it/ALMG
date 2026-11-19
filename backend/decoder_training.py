@@ -47,10 +47,31 @@ def run(initialize):
 
         initial = float(loss(parameters).item())
         gradient = mx.grad(loss)
-        for _ in range(100):
-            gradients = gradient(parameters)
-            parameters = {name: value - .05 * gradients[name] for name, value in parameters.items()}
-            mx.eval(parameters)
+        def optimize(values, steps):
+            for _ in range(steps):
+                gradients = gradient(values)
+                values = {name: value - .05 * gradients[name] for name, value in values.items()}
+                mx.eval(values)
+            return values
+
+        uninterrupted = optimize(parameters, 100)
+        parameters = optimize(parameters, 50)
+        from pathlib import Path
+        from tempfile import TemporaryDirectory
+        if __package__:
+            from . import decoder_checkpoint
+        else:
+            import decoder_checkpoint
+        with TemporaryDirectory(prefix='almg-decoder-checkpoint-') as checkpoint_directory:
+            checkpoint_model = initialize('decoder_from_scratch', model.config)
+            checkpoint_model.parameters = {name: np.array(value) for name, value in parameters.items()}
+            expected_revision = decoder_checkpoint.revision(model.config, tokenizer, training_text)
+            checkpoint_path = Path(checkpoint_directory) / 'step-50'
+            decoder_checkpoint.save(checkpoint_path, checkpoint_model, tokenizer, expected_revision, 50)
+            restored_checkpoint, _, checkpoint_lineage = decoder_checkpoint.load(checkpoint_path, expected_revision)
+            parameters = {name: mx.array(value) for name, value in restored_checkpoint.parameters.items()}
+            parameters = optimize(parameters, 100 - checkpoint_lineage['completed_steps'])
+        resume_error = max(float(mx.max(mx.abs(value - uninterrupted[name])).item()) for name, value in parameters.items())
         final = float(loss(parameters).item())
         scores = logits(parameters, held_out[:, :-1])
         accuracy = float(mx.mean(mx.argmax(scores, axis=-1) == held_out[:, 1:]).item())
@@ -89,7 +110,7 @@ def run(initialize):
             artifact_bytes = (destination / 'decoder.json').stat().st_size
             bundle_roundtrip = restored_manifest == bundle_manifest
         if not (finite and final < initial * .1 and accuracy >= .95 and causal_error < 1e-6
-                and len(changed) == len(parameters) and matches and cpu_error < 1e-5 and reload_error < 1e-7 and token_roundtrip and bundle_roundtrip):
+                and len(changed) == len(parameters) and matches and cpu_error < 1e-5 and reload_error < 1e-7 and token_roundtrip and bundle_roundtrip and resume_error < 1e-6):
             raise ValueError('Decoder training failed loss, held-out, causality, full-parameter or generation verification.')
     return {'passed': True, 'scope': 'Generated local-text training fixture only; user-dataset pretraining and export remain unavailable.',
             'recipe': 'decoder_from_scratch', 'recipe_version': 1, 'stage': 'pretraining_fixture', 'stage_version': 1,
@@ -103,6 +124,8 @@ def run(initialize):
             'generation_matches_fixture': matches, 'cpu_inference_max_error': cpu_error,
             'artifact_format': 'almg-decoder-v1', 'artifact_bytes': artifact_bytes,
             'artifact_reload_max_error': reload_error, 'temporary_artifact_removed': True, 'generated_text': generated_text,
+            'checkpoint': {**checkpoint_lineage, 'resumed_steps': 50, 'uninterrupted_max_error': resume_error,
+                           'temporary_checkpoint_removed': True},
             'bundle': {'format': bundle_manifest['format'], 'stage_versions': bundle_manifest['stages'],
                        'verified_files': list(bundle_manifest['files']), 'artifact_roundtrip': bundle_roundtrip,
                        'training_record_sha256': bundle_manifest['training_sha256']},

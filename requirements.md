@@ -1914,6 +1914,34 @@ P3-LMF-01 partial progress · bound decoder pipeline bundles · 2026-11-19:
   release integration. P3-LMF-01 remains open; hardware verification blockers stay
   separate and do not prevent independent implementation.
 
+P3-LMF-01 partial progress · decoder SGD checkpoint resume · 2026-11-19:
+- Added versioned decoder SGD checkpoint save/load using validated model/tokenizer
+  bundles. Checkpoint state binds completed steps to architecture configuration,
+  tokenizer fingerprint, training-text hash, total step count, learning rate and
+  sgd-v1 optimizer identity. Changed revisions are rejected before continuing
+  optimization. State includes manifest/revision hashes for checkpoint lineage;
+  invalid progress and unsupported settings fail explicitly. Component fingerprints
+  and release packaging include the checkpoint module.
+- The optional training check now serializes a step-50 checkpoint, reconstructs
+  its weights/state, completes the remaining 50 steps and compares all parameters
+  with a separately uninterrupted 100-step run. It uses constant-rate SGD without
+  momentum, so no additional optimizer slots are required. Temporary checkpoint
+  bundles are removed; general job restart/resume integration is still pending.
+- Local app verification: rebuilt/launched macOS ALMG with isolated fixtures,
+  opened recipe details and explicitly ran from-scratch decoder training. Native
+  result reported almg-decoder-sgd-checkpoint-v1, completed_steps 50, resumed_steps
+  50, manifest/revision hashes, uninterrupted parameter difference 1.1921e-7
+  (below 1e-6), temporary checkpoint removal and held-out accuracy 1.000.
+  No external collection or generated artifacts were committed.
+- Verification: all 225 Python tests passed with ALMG_METAL_TESTS=1, including
+  actual checkpoint-resumed Metal training; all 16 Flutter tests passed. Tests
+  cover exact saved weights/progress, changed text/tokenizer/optimizer/settings
+  rejection and invalid progress/settings bounds.
+- Remaining: planner-enabled workflow/approach confirmation, user dataset
+  integration, durable approved job lifecycle and interruption recovery, evaluated
+  release integration and complete acceptance verification. P3-LMF-01 stays open;
+  blocked physical power and Windows checks remain separate.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
