@@ -3224,6 +3224,36 @@ P3-LMF-02 partial progress · optional data-provider boundary · 2026-11-20:
   remain open. Physical power and Windows blockers remain separate and skipped.
   No generated fixtures, artifacts, weights or unrelated edits are committed.
 
+P3-LMF-02 partial progress · reviewed Markdown source ingestion · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Local document selection now accepts .md and
+  .markdown alongside .txt for preparation, saved inputs and incremental additions.
+  These are original UTF-8 text sources: Markdown markup remains literal; no
+  rendered extraction or remote resource fetching is performed. Original bytes
+  and filenames continue through the existing provenance/hash pipeline.
+- Shared reads enforce 64 KiB per document and 128000 bytes per selection while
+  reading, use a bounded range, reject size changes and decode UTF-8 strictly.
+  This replaces an unbounded read after a size check. New immediate preparations
+  show filenames, actual byte counts, tokenizer and literal-Markdown behavior,
+  then require “Confirm dataset preparation” before publishing a local dataset.
+- Local app verification: rebuilt/launched ALMG with an isolated fixture, selected
+  ocean.txt (75 bytes), sky.markdown (81 bytes) and orchard.md (89 bytes) using the
+  native chooser. The review displayed all three sizes and no dataset existed
+  before confirmation. After confirmation, native dataset
+  4c2d83ce32be4b119dbbb2a57a059c75 reopened through the integrity-checking reader;
+  all three original SHA-256 hashes matched, accented text/CRLF source provenance
+  survived and splits contained one document each. Markdown text remained literal;
+  no training started. Evidence: /tmp/almg-markdown-qa/{review-ui.txt,
+  prepared-ui.txt,prepared-ui.json,verification.json}.
+- Validation: 356 Python tests, 27 Flutter tests and Flutter analysis pass. Added
+  reader tests cover exact original byte preservation, strict invalid UTF-8
+  rejection, actual oversized data despite a stale size, a size change during
+  reading, aggregate limits and excessive file counts.
+- Remaining: rendered/richer document extraction, streamed tokenizer/training and
+  contamination integration, larger-than-RAM acceptance and other dataset criteria.
+  The small-dataset limits remain explicit; this is not a large-document importer.
+  Physical power/Windows blockers remain open and skipped. Generated fixtures,
+  datasets, weights and unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

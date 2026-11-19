@@ -19,6 +19,7 @@ import 'local_backend_client.dart';
 import 'streamed_source_client.dart';
 import 'stream_index_records_dialog.dart';
 import 'stream_index_export_client.dart';
+import 'local_text_documents.dart';
 
 /// Starts the Flutter desktop application.
 void main() {
@@ -1721,21 +1722,12 @@ class _StudioPageState extends State<StudioPage> {
 
   Future<void> _extendDecoderDataset(Map<String, dynamic> parent) async {
     try {
-      final files = await openFiles(acceptedTypeGroups: [const XTypeGroup(label: 'UTF-8 text', extensions: ['txt'])]);
+      final files = await openFiles(acceptedTypeGroups: localTextTypes);
       if (files.isEmpty) return;
       if (files.length + (parent['unique_documents'] as int) > 16) {
         throw const FormatException('The combined dataset supports at most 16 documents. Prepare a separate dataset.');
       }
-      final documents = <Map<String, String>>[];
-      var total = 0;
-      for (final file in files) {
-        final length = await file.length();
-        total += length;
-        if (length > 65536 || total > 128000) throw const FormatException('Each document must fit 64 KiB; the combined dataset must fit 128000 bytes.');
-        final bytes = await file.readAsBytes();
-        utf8.decode(bytes);
-        documents.add({'name': file.name, 'data': base64Encode(bytes)});
-      }
+      final documents = await readLocalTextDocuments(files);
       if (!mounted) return;
       final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
         title: const Text('Add documents to new dataset version?'),
@@ -2268,19 +2260,10 @@ class _StudioPageState extends State<StudioPage> {
 
   Future<void> _prepareDecoderDataset({bool saveDraft = false}) async {
     try {
-      final files = await openFiles(acceptedTypeGroups: [const XTypeGroup(label: 'UTF-8 text', extensions: ['txt'])]);
+      final files = await openFiles(acceptedTypeGroups: localTextTypes);
       if (files.isEmpty) return;
       if (files.length < 3 || files.length > 16) throw const FormatException('Select 3 to 16 text documents.');
-      final documents = <Map<String, String>>[];
-      var total = 0;
-      for (final file in files) {
-        final length = await file.length();
-        total += length;
-        if (length > 65536 || total > 128000) throw const FormatException('Each document must fit 64 KiB; the selection must fit 128000 bytes.');
-        final bytes = await file.readAsBytes();
-        utf8.decode(bytes); // Validate without replacing the original bytes used for provenance.
-        documents.add({'name': file.name, 'data': base64Encode(bytes)});
-      }
+      final documents = await readLocalTextDocuments(files);
       if (!mounted) return;
       final tokenizerKind = await showDialog<String>(context: context, builder: (context) => SimpleDialog(
         title: const Text('Choose local tokenizer'), children: [
@@ -2302,6 +2285,18 @@ class _StudioPageState extends State<StudioPage> {
         if (mounted) await _showDecoderPreparation(draft);
         return;
       }
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Review selected local documents'), scrollable: true,
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Create a new immutable dataset from these original UTF-8 files. Markdown formatting stays literal text; '
+            'whitespace is normalized. Source names and original byte hashes are preserved. No training or external collection starts.'),
+          for (final document in documents) Text('${document['name']} · ${base64Decode(document['data']!).length} bytes'),
+          Text('Tokenizer: $tokenizerKind'),
+        ]),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm dataset preparation'))],
+      ));
+      if (confirmed != true || !mounted) return;
       final manifest = await _request('/decoder-datasets', {'confirmed': true, 'documents': documents, 'tokenizer_kind': tokenizerKind});
       if (mounted) {
         setState(() => _error = null);
