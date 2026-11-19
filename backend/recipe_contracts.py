@@ -50,9 +50,10 @@ class RecipeRegistry:
     def __init__(self, dependency_available=None):
         from importlib.util import find_spec
         self._contracts = {}
+        self._initializers = {}
         self._dependency_available = dependency_available or (lambda name: find_spec(name) is not None)
 
-    def register(self, contract, *, dependencies=()):
+    def register(self, contract, *, dependencies=(), initializer=None):
         import json
         import re
         if not isinstance(contract, dict):
@@ -86,7 +87,18 @@ class RecipeRegistry:
             json.dumps(snapshot, allow_nan=False)
         except (TypeError, ValueError) as error:
             raise ValueError('Recipe contract must contain finite JSON values.') from error
+        if initializer is not None and not callable(initializer):
+            raise ValueError('Recipe initializer must be callable.')
         self._contracts[recipe_id] = snapshot
+        if initializer is not None:
+            self._initializers[recipe_id] = initializer
+
+    def initialize(self, recipe_id, config):
+        self.contract(recipe_id)
+        initializer = self._initializers.get(recipe_id)
+        if initializer is None:
+            raise ValueError('Recipe has no registered initializer.')
+        return initializer(deepcopy(config))
 
     def contract(self, recipe_id):
         if not isinstance(recipe_id, str) or recipe_id not in self._contracts:
@@ -101,6 +113,16 @@ _REGISTRY = RecipeRegistry()
 for _contract in _CONTRACTS.values():
     _REGISTRY.register(_contract)
 
+if __package__:
+    from . import decoder_recipe
+else:
+    import decoder_recipe
+_REGISTRY.register(decoder_recipe.CONTRACT, dependencies=['numpy'], initializer=decoder_recipe.Decoder)
+
+
+def initialize_recipe(recipe_id, config):
+    return _REGISTRY.initialize(recipe_id, config)
+
 
 def recipe_contract(recipe_id):
     """Return an independent contract snapshot for a supported recipe ID."""
@@ -109,7 +131,7 @@ def recipe_contract(recipe_id):
 
 def recipe_catalog():
     """Discover validated, trusted local registrations in registration order."""
-    return _REGISTRY.catalog()
+    return [contract for contract in _REGISTRY.catalog() if contract['status'] != 'initialization_only']
 
 
 def training_parameters(recipe_id, values, snapshot=None):

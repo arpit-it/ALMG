@@ -1575,6 +1575,21 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _checkDecoderInitialization() async {
+    try {
+      final result = await _request('/runtime/decoder-initialization', {'confirmed': true});
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Decoder initialization passed'),
+        scrollable: true,
+        content: SelectableText(const JsonEncoder.withIndent('  ').convert(result)),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   Future<void> _showRunManifest() async {
     try {
       final manifest = await _request('/jobs/${_job!['id']}/manifest');
@@ -1624,6 +1639,12 @@ class _StudioPageState extends State<StudioPage> {
           for (final artifact in contract['exports'] as List) Text(artifact as String),
           const SizedBox(height: 12),
           Text('Resume: ${contract['resume']}'),
+          const Text('Optional CPU check constructs a tiny decoder from new weights. No downloads; language-model training is not enabled.'),
+          TextButton(onPressed: () {
+            Navigator.pop(context);
+            _checkDecoderInitialization();
+          }, child: const Text('Check decoder initialization')),
+
           if (['preview_ready', 'passed'].contains(_job?['status']))
             TextButton(onPressed: () {
               Navigator.pop(context);

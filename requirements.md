@@ -1775,6 +1775,33 @@ P3-LMF-01 partial progress · classifier checkpoint lineage · 2026-11-19:
   checkpoint lineage. P3-LMF-01 stays open; physical power/Windows blockers remain
   separate and do not block independent implementation.
 
+P3-LMF-01 partial progress · registered decoder initialization · 2026-11-19:
+- Added a bounded NumPy CPU decoder-only Transformer constructor with token and
+  positional embeddings, causal self-attention, residuals, layer normalization,
+  feed-forward block and output head. Weights come solely from a local seeded RNG;
+  its configuration interface accepts dimensions/seed and rejects pretrained-weight
+  inputs. No files, downloads or user weights are read by construction.
+- The existing recipe registry now supports validated initializer callbacks.
+  Registered decoder_from_scratch version 1 as initialization_only, with a NumPy
+  dependency check. Existing classifier/image training catalogs remain unchanged;
+  the planner cannot select this incomplete capability for training. Recipe details
+  provides an explicit optional CPU initialization check with a result dialog.
+  The backend release package includes the constructor module.
+- Local app verification: rebuilt/launched macOS ALMG with isolated generated
+  fixtures, opened recipe details and clicked Check decoder initialization.
+  The native dialog reported passed, newly_initialized, pretrained_weights_loaded
+  false, CPU, seed 7, 896 parameters, logits shape 1×4×16, deterministic true and
+  causal-prefix error 0.0. No external collection or generated artifacts in Git.
+- Verification: 208 Python tests (207 passed, one opt-in Metal test skipped), all
+  16 Flutter tests passed, Flutter analysis clean. Tests cover no-file construction,
+  same/different seeds, preserved global RNG, causal masking, bounded dimensions
+  and token inputs, missing dependency/initializer failures, training-catalog
+  exclusion and explicit runtime confirmation. Existing recipes remain covered.
+- Remaining: planner discovery of a fully executable from-scratch training recipe,
+  explicit approach selection, dataset/tokenizer/pretraining/evaluation/export and
+  inference stage integration and full acceptance verification. P3-LMF-01 remains
+  open; this delivers construction only and does not enable student training.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

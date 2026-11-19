@@ -2105,6 +2105,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/runtime/power-event":
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
+            if self.path == "/runtime/decoder-initialization":
+                if data.get('confirmed') is not True:
+                    raise ValueError('Confirm the local decoder initialization check before running it.')
+                return self.respond(recipe_contracts.decoder_recipe.verify(recipe_contracts.initialize_recipe))
             if self.path == "/runtime/lora-fixture":
                 if data.get("confirmed") is not True:
                     raise ValueError("Confirm the local LoRA fixture before running it.")
