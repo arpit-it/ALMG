@@ -1802,6 +1802,35 @@ P3-LMF-01 partial progress · registered decoder initialization · 2026-11-19:
   inference stage integration and full acceptance verification. P3-LMF-01 remains
   open; this delivers construction only and does not enable student training.
 
+P3-LMF-01 partial progress · full-parameter decoder training check · 2026-11-19:
+- Added an optional, versioned pretraining fixture that constructs the registered
+  decoder from a local seed and trains all 704 parameters on generated four-token
+  cycles using MLX/Metal. All nine parameter groups update; no student parameter
+  is frozen and no pretrained weights, downloads or external data are used.
+  The check evaluates longer held-out sequences, autoregressive generation,
+  causal masking and transfer of trained weights to the registered NumPy CPU
+  inference implementation. It runs on the existing dedicated inference worker.
+- Recipe details exposes explicit Check from-scratch decoder training on macOS.
+  Unsupported hardware returns an actionable error before construction; MLX is
+  imported lazily. The release package includes the new optional module. This is
+  a bounded local verification capability, not planner-enabled user pretraining.
+- Local app verification: rebuilt/launched macOS ALMG with isolated fixtures,
+  opened recipe details and clicked the training check. Native result dialog:
+  newly initialized weights, no pretrained weights, Metal GPU, 100 steps at
+  learning rate 0.05, 704 trainable/0 frozen parameters, all nine groups updated;
+  loss 1.372652 to 0.067307; held-out next-token accuracy 1.000 on length-12
+  sequences versus length-8 training; generated 0,1,2,3 repeated three times;
+  causal-prefix error 0; CPU/Metal inference difference 4.28e-7. No artifacts
+  or weights were committed and no external collection occurred.
+- Verification: all 211 Python tests passed with ALMG_METAL_TESTS=1, including
+  actual decoder training and the existing LoRA Metal check; all 16 Flutter tests
+  passed; Flutter analysis clean. Tests also cover confirmation and unsupported
+  hardware failure before model initialization.
+- Remaining: planner-enabled from-scratch workflow and approach confirmation,
+  user dataset/tokenizer integration, persistent training/checkpoint lifecycle,
+  evaluation/release gates and full versioned stage/manifest integration.
+  P3-LMF-01 remains open; blocked physical power and Windows criteria stay separate.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -1575,6 +1575,21 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _checkDecoderTraining() async {
+    try {
+      final result = await _request('/runtime/decoder-training', {'confirmed': true});
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Decoder training check passed'),
+        scrollable: true,
+        content: SelectableText(const JsonEncoder.withIndent('  ').convert(result)),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   Future<void> _checkDecoderInitialization() async {
     try {
       final result = await _request('/runtime/decoder-initialization', {'confirmed': true});
@@ -1644,6 +1659,14 @@ class _StudioPageState extends State<StudioPage> {
             Navigator.pop(context);
             _checkDecoderInitialization();
           }, child: const Text('Check decoder initialization')),
+          if (Platform.isMacOS) ...[
+            const Text('Optional Apple silicon check trains every tiny decoder weight on generated tokens. User-dataset pretraining and export are not enabled.'),
+            TextButton(onPressed: () {
+              Navigator.pop(context);
+              _checkDecoderTraining();
+            }, child: const Text('Check from-scratch decoder training')),
+          ],
+
 
           if (['preview_ready', 'passed'].contains(_job?['status']))
             TextButton(onPressed: () {

@@ -40,12 +40,13 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
     import recipe_contracts
     import run_manifest
+    import decoder_training
     import chat_history
     import inference
     import image_recipe
@@ -2105,6 +2106,10 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/runtime/power-event":
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
+            if self.path == "/runtime/decoder-training":
+                if data.get('confirmed') is not True:
+                    raise ValueError('Confirm the local decoder training check before running it.')
+                return self.respond(inference.WORKER.submit(decoder_training.run, recipe_contracts.initialize_recipe).result())
             if self.path == "/runtime/decoder-initialization":
                 if data.get('confirmed') is not True:
                     raise ValueError('Confirm the local decoder initialization check before running it.')
