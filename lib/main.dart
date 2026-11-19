@@ -18,6 +18,7 @@ import 'private_decoder_page.dart';
 import 'local_backend_client.dart';
 import 'streamed_source_client.dart';
 import 'stream_index_records_dialog.dart';
+import 'stream_index_export_client.dart';
 
 /// Starts the Flutter desktop application.
 void main() {
@@ -1896,6 +1897,55 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _exportStreamIndex(String indexId) async {
+    var overlay = false;
+    try {
+      final review = await _request('/decoder-stream-indexes/$indexId/export-review', {'confirmed': true}, const Duration(minutes: 10));
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Review private text-index export'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Save a new private folder with normalized document text in SQLite, its immutable manifest and an export receipt. '
+            'This includes original text values and may include personal information. Source names, hashes and first-line locations are preserved. '
+            'The original raw-source file, saved audits and training approvals are excluded. Nothing is uploaded or released.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Choose local export folder'))],
+      ));
+      if (confirmed != true || !mounted) return;
+      final parent = await getDirectoryPath(confirmButtonText: 'Choose export folder');
+      if (parent == null || !mounted) return;
+      var completed = 0; var total = 1; var cancel = false; StateSetter? refresh;
+      overlay = true;
+      unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+        child: StatefulBuilder(builder: (context, update) {
+          refresh = update;
+          return AlertDialog(title: const Text('Saving private text index'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+            LinearProgressIndicator(value: completed / total), Text('$completed / $total bytes copied; file hashes are verified before completion.'),
+          ]), actions: [TextButton(onPressed: () => cancel = true, child: const Text('Cancel index export'))]);
+        }))));
+      final destination = await saveStreamIndexExport(review, Directory(parent),
+        (path, body) => _request(path, body, const Duration(minutes: 10)), (path) async {
+          final hashed = await Process.run('/usr/bin/shasum', ['-a', '256', '--', path]);
+          final match = RegExp(r'^[a-fA-F0-9]{64}(?=\s)').firstMatch(hashed.stdout.toString());
+          if (hashed.exitCode != 0 || match == null) throw const FormatException('The exported file hash could not be verified.');
+          return match.group(0)!.toLowerCase();
+        }, onProgress: (copied, expected) { completed = copied; total = expected; if (mounted) refresh?.call(() {}); }, shouldCancel: () => cancel);
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Private text index saved'), content: SelectableText(destination.path),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } on StreamIndexExportCancelled {
+      if (mounted && overlay) Navigator.pop(context);
+    } catch (error) {
+      if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); }
+    }
+  }
+
   Future<void> _showStreamAudit(Map<String, dynamic> record) async {
     final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: Text('Full-index audit · ${record['status']}'), scrollable: true,
@@ -1985,6 +2035,7 @@ class _StudioPageState extends State<StudioPage> {
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'records'), child: const Text('Review indexed records')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'audit'), child: const Text('Audit full text index')),
+        if (record['status'] == 'complete' && Platform.isMacOS) TextButton(onPressed: () => Navigator.pop(context, 'export'), child: const Text('Review private index export')),
         TextButton(onPressed: () => Navigator.pop(context, 'audits'), child: const Text('View saved full-index audits')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, 'resume'), child: const Text('Resume text indexing'))],
     ));
@@ -1998,6 +2049,7 @@ class _StudioPageState extends State<StudioPage> {
         indexId: record['id'] as String, request: (path, body) => _request(path, body)));
       return;
     }
+    if (action == 'export') await _exportStreamIndex(record['id'] as String);
     if (action == 'audit') await _beginStreamAudit(record);
     if (action == 'audits') await _savedStreamAudits(record['id'] as String);
   }

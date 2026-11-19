@@ -3166,6 +3166,34 @@ P3-LMF-02 partial progress · resumable full-index hygiene/contact audits · 202
   occurred; generated audits/indexes/trace fixtures, weights and unrelated edits
   are excluded from this commit.
 
+P3-LMF-02 partial progress · private streamed-index export · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed indexes now offer a reviewed
+  private local folder export of their immutable manifest and normalized-text
+  SQLite database, with an export receipt preserving source identity and hashes.
+  The review explicitly discloses personal text and excludes the original raw
+  source, saved audits and training approvals. No external collection occurs.
+- Files are copied in chunks of at most 65,536 bytes, checked against reviewed
+  hashes locally, and fully verified by the backend before publication. Consent,
+  stale reviews and changed files are checked; cancellation or failure removes
+  only the operation's own staging folder. Existing files are preserved.
+- Local app verification: rebuilt and launched the native macOS app, opened the
+  completed 2,000-record fixture index, confirmed its export review and selected
+  a local folder. Observed “Private text index saved”. The resulting three-file
+  package contains 996,720 bytes of index data copied in 17 bounded requests.
+  Both exported file hashes match the unchanged originals; restoring the index
+  in an isolated directory verifies its revision, all 2,000 records and source
+  provenance/first-line offsets. Evidence: /tmp/almg-stream-export-qa/
+  {review-ui.json,saved-ui.txt,chunk-metrics.json,verification.json}.
+- Validation: 353 Python tests, 25 Flutter tests and Flutter analysis pass.
+  Tests cover exact reconstruction, provenance, consent/stale/change rejection,
+  bounded client transfers and cleanup after cancellation/hash mismatch.
+- Remaining: streamed-index tokenizer/training integration and contamination
+  admission, larger-than-RAM acceptance, broader extraction/provider contracts
+  and remaining dataset-engineering criteria. Import was verified through the
+  existing index reader; no native streamed-index import workflow is delivered.
+  Physical power and Windows blockers remain separate and skipped. Generated
+  packages, fixtures, weights and unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
