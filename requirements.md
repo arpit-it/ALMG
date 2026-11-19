@@ -3005,6 +3005,44 @@ P3-LMF-02 partial progress · source permission declarations and exported notes 
   and skipped. No external collection or rights inference occurred; generated
   ZIPs/fixtures, downloaded weights and unrelated user edits are excluded from Git.
 
+P3-LMF-02 partial progress · resumable bounded-chunk original source storage · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Added explicit macOS source selection, local whole-file
+  hashing with the installed shasum utility, confirmation, progress/pause and saved
+  source resume controls. The client streams at most 65536 decoded bytes per
+  request; it does not read the complete file into a Dart byte array. Resume
+  requires the selected file's full hash and size to match the saved source.
+- Version-1 source sessions store original bytes separately from prepared datasets.
+  The backend validates exact offsets, chunk bounds and literal consent; identical
+  committed retries are idempotent. Source writes are flushed before atomic offset
+  updates. Recovery discards only an uncommitted tail after an interrupted offset
+  write, preserving committed bytes. Final verification hashes the stored file
+  incrementally and marks it stored_not_prepared only on exact size/hash match.
+  Completed sources reject further chunk writes. No training/approval transfer or
+  automatic preparation occurs. Protocol metadata supports sources up to 1 TiB;
+  actual ingestion remains subject to available storage.
+- Native verification: rebuilt/launched ALMG, selected a generated 67,108,864-byte
+  local text fixture and confirmed upload. Paused at 28,180,480 committed bytes,
+  restarted ALMG, reopened the identical pending record, reselected the original
+  hash-matching file and explicitly resumed. Source 804c921e8c42470a8cf329915ce8a32c
+  completed at the original size/hash. Actual backend instrumentation observed
+  1,024 requests with maximum 87,384 base64 characters (65536 decoded bytes).
+  Verified stored source hash equals the unchanged original, and no prepared
+  dataset or trial was created. The fixture used a small per-chunk I/O delay to
+  make native pausing observable. Evidence: /tmp/almg-stream-upload-qa/{paused-ui.json,
+  restarted-paused-ui.json,stored-ui.json,chunk-metrics.json,large-source.txt}.
+- Validation: 338 Python tests with ALMG_METAL_TESTS=1, 20 Flutter tests and clean
+  Flutter analysis. New cases cover chunked resume, idempotent retries, committed
+  offsets, interrupted offset-write recovery, consent/bounds, incomplete sealing,
+  wrong final hashes, bounded Dart chunks and pause/resume without retransmission.
+- Remaining: streamed UTF-8 validation/extraction, normalization and indexed
+  preparation, chunk-level processing resume, prepared-stream dataset/training
+  integration, verification with sources larger than host RAM, optional provider
+  contracts and remaining acceptance coverage. This slice is original-source
+  storage, not a prepared language-model dataset or completed streaming acceptance.
+  Other existing language/quality/PII/permission limitations remain documented.
+  Physical/Windows blockers stay open and skipped. No external collection occurred;
+  generated large sources/uploads, weights and unrelated edits are excluded from Git.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

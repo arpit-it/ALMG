@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -52,6 +52,7 @@ else:
     import decoder_preparations
     import decoder_languages
     import decoder_licenses
+    import decoder_streams
     import chat_history
     import inference
     import image_recipe
@@ -2006,6 +2007,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({"messages": chat_history.messages(self.path.removeprefix("/chats/"))})
             except ValueError as error:
                 return self.respond({"error": str(error)}, 404)
+        if self.path == '/decoder-streams':
+            return self.respond({'sources': decoder_streams.list_sources(ROOT)})
+        if self.path.startswith('/decoder-streams/'):
+            try:
+                return self.respond(decoder_streams.read(ROOT, self.path.removeprefix('/decoder-streams/')))
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if self.path == '/decoder-preparations':
             return self.respond({'drafts': decoder_preparations.list_drafts(ROOT)})
         if self.path.startswith('/decoder-preparations/'):
@@ -2152,6 +2160,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/runtime/power-event":
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
+            if self.path == '/decoder-streams':
+                return self.respond(decoder_streams.create(ROOT, data.get('name'), data.get('total_bytes'), data.get('source_sha256'), data.get('confirmed')))
             if self.path == '/decoder-dataset-mixtures':
                 return self.respond(decoder_datasets.mix_datasets(ROOT, data.get('selections'), data.get('confirmed')))
             if self.path == '/decoder-preparations':
@@ -2168,6 +2178,10 @@ class Handler(BaseHTTPRequestHandler):
                                               require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness, post_training=data.get('post_training'))
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
+            if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'chunk':
+                return self.respond(decoder_streams.append(ROOT, parts[1], data.get('offset'), data.get('data'), data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'seal':
+                return self.respond(decoder_streams.seal(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-preparations' and parts[2] == 'prepare':
                 return self.respond(decoder_preparations.resume(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'pipeline':

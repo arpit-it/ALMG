@@ -16,6 +16,7 @@ import 'indicator_filter.dart';
 import 'project_settings.dart';
 import 'private_decoder_page.dart';
 import 'local_backend_client.dart';
+import 'streamed_source_client.dart';
 
 /// Starts the Flutter desktop application.
 void main() {
@@ -1894,6 +1895,94 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _showStreamedSource(Map<String, dynamic> source) async {
+    final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Local source · ${source['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Original source storage only. Streaming text preparation and training from this source are not yet enabled. Reopening an upload requires the same file hash.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(source)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (source['status'] == 'uploading') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume local source upload'))],
+    ));
+    if (resume == true && mounted) await _uploadStreamedSource(existing: source);
+  }
+
+  Future<void> _savedStreamedSources() async {
+    try {
+      final sources = (await _request('/decoder-streams'))['sources'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved streamed sources'), children: [
+          if (sources.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No streamed local sources.')),
+          for (final source in sources) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(source as Map)),
+            child: Text('${(source['id'] as String).substring(0, 8)} · ${source['name']} · ${source['received_bytes']}/${source['total_bytes']} bytes · ${source['status']}')),
+        ],
+      ));
+      if (selected != null && mounted) await _showStreamedSource(await _request('/decoder-streams/${selected['id']}'));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _uploadStreamedSource({Map<String, dynamic>? existing}) async {
+    var overlay = false;
+    try {
+      final file = await openFile(acceptedTypeGroups: [const XTypeGroup(label: 'Local text source', extensions: ['txt'])]);
+      if (file == null || !mounted) return;
+      final total = await file.length();
+      if (!mounted) return;
+      if (total < 1 || total > 1099511627776) throw const FormatException('Select a nonempty source of at most 1 TiB.');
+      overlay = true;
+      unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => const PopScope(canPop: false,
+        child: AlertDialog(title: Text('Hashing local source'), content: LinearProgressIndicator()))));
+      final hashed = await Process.run('/usr/bin/shasum', ['-a', '256', '--', file.path]);
+      final match = RegExp(r'^[a-fA-F0-9]{64}(?=\s)').firstMatch(hashed.stdout.toString());
+      if (hashed.exitCode != 0 || match == null) throw const FormatException('The local source hash could not be read.');
+      final sourceHash = match.group(0)!.toLowerCase();
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      var source = existing == null ? null : await _request('/decoder-streams/${existing['id']}');
+      if (source != null && (source['source_sha256'] != sourceHash || source['total_bytes'] != total)) {
+        throw const FormatException('This is not the original source. Select the file matching the saved hash.');
+      }
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: Text(source == null ? 'Store local source in chunks?' : 'Resume saved source upload?'),
+        content: Text('Store $total original bytes from ${file.name} privately on this machine. '
+          'Uploads can pause and resume without reading the whole source into memory. '
+          'This stores original bytes only; text preparation and training are not enabled for streamed sources.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm local source upload'))],
+      ));
+      if (confirmed != true || !mounted) return;
+      source ??= await _request('/decoder-streams', {'confirmed': true, 'name': file.name, 'total_bytes': total, 'source_sha256': sourceHash});
+      if (!mounted) return;
+      var received = source['received_bytes'] as int;
+      var pause = false;
+      StateSetter? refresh;
+      overlay = true;
+      unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+        child: StatefulBuilder(builder: (context, update) {
+          refresh = update;
+          return AlertDialog(title: const Text('Uploading local source'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+            LinearProgressIndicator(value: received / total), Text('$received / $total bytes saved'),
+          ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause source upload'))]);
+        }))));
+      final result = await sendStreamedSource(file, source, (path, body) => _request(path, body),
+        onProgress: (value) { received = value; if (mounted) refresh?.call(() {}); }, shouldPause: () => pause);
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await _showStreamedSource(result);
+    } catch (error) {
+      if (mounted) {
+        if (overlay) Navigator.pop(context);
+        setState(() => _error = error.toString());
+      }
+    }
+  }
+
   Future<void> _showDecoderPreparation(Map<String, dynamic> draft) async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Saved preparation · ${draft['status']}'), scrollable: true,
@@ -2350,6 +2439,8 @@ class _StudioPageState extends State<StudioPage> {
           }, child: const Text('Prepare local decoder text dataset')),
           TextButton(onPressed: () { Navigator.pop(context); _prepareDecoderDataset(saveDraft: true); }, child: const Text('Save local preparation draft')),
           TextButton(onPressed: () { Navigator.pop(context); _showSavedPreparations(); }, child: const Text('View saved preparation drafts')),
+          if (Platform.isMacOS) TextButton(onPressed: () { Navigator.pop(context); _uploadStreamedSource(); }, child: const Text('Store a large local source in chunks')),
+          if (Platform.isMacOS) TextButton(onPressed: () { Navigator.pop(context); _savedStreamedSources(); }, child: const Text('View saved streamed sources')),
           TextButton(onPressed: () {
             Navigator.pop(context);
             _showSavedDecoderDatasets();
