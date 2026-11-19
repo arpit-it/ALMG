@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -60,6 +60,7 @@ else:
     import decoder_stream_token_stats
     import decoder_stream_permissions
     import decoder_stream_languages
+    import decoder_stream_overlap
     import chat_history
     import inference
     import image_recipe
@@ -2024,6 +2025,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'indexes': decoder_stream_indexes.list_indexes(ROOT, stream_parts[1])})
             except ValueError as error:
                 return self.respond({'error': str(error)}, 404)
+        if len(stream_parts) == 3 and stream_parts[0] == 'decoder-stream-indexes' and stream_parts[2] == 'overlap':
+            try:
+                return self.respond({'reports': decoder_stream_overlap.list_audits(ROOT, stream_parts[1])})
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
+        if self.path.startswith('/decoder-stream-overlap/'):
+            try:
+                return self.respond(decoder_stream_overlap.read(ROOT, self.path.removeprefix('/decoder-stream-overlap/')))
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if len(stream_parts) == 3 and stream_parts[0] == 'decoder-stream-indexes' and stream_parts[2] == 'languages':
             try:
                 return self.respond({'reports': decoder_stream_languages.list_audits(ROOT, stream_parts[1])})
@@ -2241,6 +2252,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_stream_exports.chunk(ROOT, parts[1], data.get('confirmed'), data.get('review'), data.get('file_name'), data.get('offset'), data.get('limit', 65536)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'export-seal':
                 return self.respond(decoder_stream_exports.seal(ROOT, parts[1], data.get('confirmed'), data.get('review')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'overlap':
+                return self.respond(decoder_stream_overlap.begin(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-overlap' and parts[2] == 'step':
+                return self.respond(decoder_stream_overlap.step(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-overlap' and parts[2] == 'records':
+                return self.respond(decoder_stream_overlap.record_page(ROOT, parts[1], data.get('confirmed'), data.get('cursor'), data.get('split','all'), data.get('limit',10)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'languages':
                 return self.respond(decoder_stream_languages.begin(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-stream-languages' and parts[2] == 'step':

@@ -55,7 +55,9 @@ class _StreamIndexRecordsDialogState extends State<StreamIndexRecordsDialog> {
             final row = Map<String, dynamic>.from(records[index] as Map);
             final metadata = Map<String, dynamic>.from(row)..remove('text_excerpt');
             return Card(child: Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              if (row['language'] != null)
+              if (row['similarity'] != null)
+                Text('Line ${row['first_line']} · overlap ${row['similarity']} · ${row['cross_split'] == true ? 'cross-split' : 'same split'}')
+              else if (row['language'] != null)
                 Text('Line ${row['first_line']} · ${row['split']} · language ${row['language']} · ${row['status']}')
               else
               Text('Line ${row['first_line']} · ${row['split']} · ${row['occurrences']} occurrences · hygiene ${(row['text_hygiene'] as Map)['score']}'),

@@ -10,6 +10,20 @@ Map<String, dynamic> page(Map<String, dynamic> body) => {
 };
 
 void main() {
+  testWidgets('overlap findings show pair similarity without language or hygiene claims', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamIndexRecordsDialog(
+      indexId: 'fixture', recordsPath: '/decoder-stream-overlap/fixture/records', request: (path, body) async {
+        expect(path, '/decoder-stream-overlap/fixture/records');
+        return {'records': [{'first_line': 3, 'split': 'train', 'occurrences': 1,
+          'similarity': 0.95, 'cross_split': true, 'records': [{'first_line': 3}, {'first_line': 7}],
+          'text_excerpt': 'Original texts omitted.'}], 'next_cursor': null};
+      }))));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('overlap 0.95'), findsOneWidget);
+    expect(find.textContaining('cross-split'), findsOneWidget);
+    expect(find.textContaining('potential contact details'), findsNothing);
+  });
+
   testWidgets('language records show estimates without invented hygiene or privacy scores', (tester) async {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamIndexRecordsDialog(
       indexId: 'fixture', recordsPath: '/decoder-stream-languages/fixture/records', request: (path, body) async {

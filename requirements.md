@@ -3357,6 +3357,42 @@ P3-LMF-02 partial progress · resumable streamed language identification · 2026
   skipped. Generated reports, fixtures, artifacts, weights and unrelated edits are
   excluded from this commit.
 
+P3-LMF-02 partial progress · resumable streamed near-duplicate diagnostics · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed indexes now offer an explicitly
+  confirmed exhaustive unordered record-pair scan using the existing five-word
+  shingle Jaccard rule (minimum 12 words, similarity >= 0.8). Near duplicates and
+  cross-split potential evaluation contamination are reported with both source
+  hashes, first-line/byte offsets, raw-line hashes, occurrences and split labels.
+  Raw text is omitted. Exact duplicates were already grouped during indexing.
+- Processing uses bounded record buffers and batches of at most 100 pairs/about
+  one million compared characters, with a transactional pair cursor. Reports bind
+  source index/revision, implementation/runtime and final database checksum. Native
+  controls support pause/resume, saved reports and affected-pair inspection. Split
+  filters match either pair endpoint. Changed inputs/code and failed batches retain
+  committed progress. This diagnostic neither filters data nor grants training.
+- The native review explicitly discloses exhaustive quadratic comparison cost.
+  Memory is bounded, but runtime and worst-case findings storage can be quadratic;
+  this is not an approximate scalable search or comprehensive semantic overlap test.
+- Local app verification: rebuilt/launched ALMG with a 44-unique-record local
+  fixture (45 original lines), confirmed the scan and paused at 200 of 946 pairs.
+  Restarted backend/app, reopened identical saved state and resumed to completion.
+  Report 4ab3994790b54eb5b956818c37d30d14 identifies exactly three near-duplicate
+  pairs, all cross-split, matching an independent exhaustive recount. It reports
+  43 short pairs skipped. Native findings expose both source locations/similarity;
+  original index hashes are unchanged and no training started. Evidence:
+  /tmp/almg-overlap-qa/{consent-ui.txt,paused-ui.json,restarted-ui.json,
+  completed-ui.json,findings-ui.txt,pair-details-ui.json,verification.json}.
+- Validation: 368 Python tests, 29 Flutter tests and Flutter analysis pass. Added
+  tests cover all-pairs totals, exact expected cross-split findings, reload/resume,
+  batch rollback, unchanged source, omitted text, pair pagination, either-endpoint
+  split filtering, revision-bound cursors, changed source/code/consent rejection
+  and overlap-row rendering.
+- Remaining: streamed pre-training contamination admission, scalable candidate
+  indexing/semantic policies, tokenizer/training integration, richer extraction,
+  larger-than-RAM acceptance and other dataset criteria. Physical power/Windows
+  blockers remain open and skipped. Generated reports, fixtures, artifacts, weights
+  and unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

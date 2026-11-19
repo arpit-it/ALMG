@@ -2002,6 +2002,87 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _showStreamOverlap(Map<String, dynamic> record) async {
+    final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Streamed overlap · ${record['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${record['processed_pairs']} / ${record['total_pairs']} unique-record pairs checked.'),
+        const Text('Exhaustive five-word shingle Jaccard check at 0.8 similarity, for records of at least 12 words. '
+          'Quadratic comparison cost; large indexes can take a long time. Short pairs are skipped. Lexical findings do not establish complete contamination detection or training approval.'),
+        Text('${record['near_duplicate_pairs']} near-duplicate pairs · ${record['cross_split_pairs']} cross-split pairs · ${record['short_pairs_skipped']} short pairs skipped'),
+        ExpansionTile(title: const Text('View streamed overlaps and provenance'), children: [
+          SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+        ]),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] == 'complete') TextButton(onPressed: () {
+          Navigator.pop(context, false);
+          showDialog<void>(context: this.context, builder: (context) => StreamIndexRecordsDialog(
+            indexId: record['id'] as String, recordsPath: '/decoder-stream-overlap/${record['id']}/records',
+            title: 'Review streamed overlap records', description: 'Lexical overlap findings with both source locations. Split filters match either endpoint. Original texts are omitted; training remains disabled.',
+            request: (path, body) => _request(path, body)));
+        }, child: const Text('Review overlap findings')),
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume streamed overlaps'))],
+    ));
+    if (resume == true && mounted) await _runStreamOverlap(record);
+  }
+
+  Future<void> _beginStreamOverlap(Map<String, dynamic> index) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Analyze streamed overlaps?'),
+      content: Text('Compare all pairs among ${index['unique_records']} unique normalized records with the existing five-word Jaccard rule. '
+        'This has quadratic comparison cost and can take a long time for large indexes. Save resumable findings without changing the source or approving training.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm streamed overlap scan'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final record = await _request('/decoder-stream-indexes/${index['id']}/overlap', {'confirmed': true}, const Duration(minutes: 10));
+      if (mounted) await _runStreamOverlap(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _savedStreamOverlap(String indexId) async {
+    try {
+      final reports = (await _request('/decoder-stream-indexes/$indexId/overlap'))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved streamed overlap reports'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved streamed overlaps.')),
+          for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['id'] as String).substring(0, 8)} · ${report['status']} · ${report['processed_pairs']}/${report['total_pairs']} analyzed')),
+        ],
+      ));
+      if (selected != null && mounted) await _showStreamOverlap(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _runStreamOverlap(Map<String, dynamic> initial) async {
+    var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: StatefulBuilder(builder: (context, update) {
+        refresh = update;
+        return AlertDialog(title: const Text('Analyzing streamed overlaps'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: (record['total_pairs'] as num) == 0 ? 0 : (record['processed_pairs'] as num) / (record['total_pairs'] as num)),
+          Text('${record['processed_pairs']} / ${record['total_pairs']} analyzed'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause streamed overlaps'))]);
+      }))));
+    try {
+      while (!pause && record['status'] != 'complete') {
+        record = await _request('/decoder-stream-overlap/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        if (!mounted) return;
+        refresh?.call(() {});
+      }
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await _showStreamOverlap(record);
+    } catch (error) {
+      refresh = null;
+      if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); }
+    }
+  }
+
   Future<void> _showStreamLanguages(Map<String, dynamic> record) async {
     final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Streamed languages · ${record['status']}'), scrollable: true,
@@ -2251,6 +2332,8 @@ class _StudioPageState extends State<StudioPage> {
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'audit'), child: const Text('Audit full text index')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'permissions'), child: const Text('Review streamed source permissions')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'languages'), child: const Text('Identify streamed record languages')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'overlap'), child: const Text('Analyze streamed record overlap')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-overlap'), child: const Text('View saved streamed overlap reports')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-languages'), child: const Text('View saved streamed language reports')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'byte-statistics'), child: const Text('Analyze byte token distribution')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-byte-statistics'), child: const Text('View saved byte statistics')),
@@ -2272,6 +2355,8 @@ class _StudioPageState extends State<StudioPage> {
     if (action == 'audit') await _beginStreamAudit(record);
     if (action == 'permissions') await _reviewStreamSourcePermissions(record['id'] as String);
     if (action == 'languages') await _beginStreamLanguages(record);
+    if (action == 'overlap') await _beginStreamOverlap(record);
+    if (action == 'saved-overlap') await _savedStreamOverlap(record['id'] as String);
     if (action == 'saved-languages') await _savedStreamLanguages(record['id'] as String);
     if (action == 'byte-statistics') await _beginStreamByteStatistics(record);
     if (action == 'saved-byte-statistics') await _savedStreamByteStatistics(record['id'] as String);
