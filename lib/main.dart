@@ -1783,6 +1783,10 @@ class _StudioPageState extends State<StudioPage> {
           Navigator.pop(context);
           _cancelDecoderTrial(record['id'] as String);
         }, child: const Text('Cancel saved decoder trial')),
+        if (record['status'] == 'complete' && record['dataset'] is Map) TextButton(onPressed: () {
+          Navigator.pop(context);
+          _evaluateDecoderTrial(record['id'] as String);
+        }, child: const Text('Re-evaluate saved decoder')),
         if (record['status'] == 'complete') TextButton(onPressed: () {
           Navigator.pop(context);
           _previewDecoderTrial(record['id'] as String);
@@ -1794,6 +1798,27 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _evaluateDecoderTrial(String id) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Re-evaluate private decoder'),
+      content: const Text('Verify the saved bundle and reviewed dataset, then recompute training, validation and test metrics on CPU using the saved splits and tokenizer. The target remains 80%. This records a private evaluation and does not release a model.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Run local re-evaluation'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final result = await _request('/decoder-trials/$id/evaluate', {'confirmed': true});
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Saved decoder evaluation'), scrollable: true,
+        content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(result))),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _previewDecoderTrial(String id) async {

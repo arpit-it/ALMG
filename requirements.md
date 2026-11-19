@@ -2431,6 +2431,38 @@ P3-LMF-01 partial progress · optional versioned UTF-8 byte tokenization · 2026
   open; physical/Windows blockers remain skipped. Generated data/artifacts, downloaded
   weights and unrelated user edits are excluded from this commit.
 
+P3-LMF-01 partial progress · versioned saved-decoder re-evaluation · 2026-11-19:
+- Added explicit native/API re-evaluation for completed reviewed-local-data trials.
+  Verifies immutable dataset files, saved partitions, bundle integrity, dataset/
+  review revisions and tokenizer binding before computing metrics. Recomputes
+  train/validation/test next-token accuracy and stable cross-entropy on CPU; reports
+  evaluated token/window counts. It does not trust a saved “passed” flag. Version-1
+  pass criteria retain 80% validation/test accuracy plus loss below the recorded
+  valid initial-training baseline. Invalid scores or missing bindings fail closed.
+- Saves at most 20 versioned private evaluation receipts with bundle/dataset/tokenizer
+  digests, implementation revision, runtime, target and recomputed metrics. Original
+  training results, approvals, status and artifact bytes remain unchanged. This
+  adds an evaluation interface, not a model-release or post-training capability.
+- Local app verification: rebuilt/launched macOS ALMG with isolated copies of the
+  actual Metal-trained byte models from the preceding slice. Natively approved
+  re-evaluation of the passing model; independent CPU validation/test accuracy
+  matched training (97.09%/97.06%) with token counts and cross-entropy recorded.
+  Re-evaluated the below-target model natively and correctly retained a failed
+  outcome at 69.05% against the 80% target. Verified both bundles unchanged.
+  Restarted backend/app, reopened native evaluation history and verified receipts
+  persisted while both original training results and approvals stayed identical.
+  Evidence: /tmp/almg-evaluation-qa/{passing-ui.json,below-target-ui.json,
+  restarted-ui.json,bundles-before.json}. No external collection or release occurred.
+- Verification: 284 backend tests passed with ALMG_METAL_TESTS=1; 16 Flutter tests
+  passed; Flutter analysis clean. New tests prove metric recomputation rather than
+  trusting earlier success, word/byte support, consent/state checks, binding and
+  corruption guards, nonfinite rejection, immutable bundles and bounded history.
+- Remaining: evaluated release/post-training/export contracts, larger tokenizers
+  and broader data/model-quality work, physical power/sleep/idle verification and
+  full acceptance. P3-LMF-01 remains open; independent physical/Windows blockers
+  stay skipped. Generated/private artifacts, downloaded weights and unrelated user
+  edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

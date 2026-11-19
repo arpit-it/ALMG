@@ -207,6 +207,71 @@ def preview(root, trial_id, confirmed, prompt, max_new_tokens=12):
     return result
 
 
+def evaluate(root, trial_id, confirmed):
+    """Recompute a versioned private evaluation from verified held-out documents."""
+    if confirmed is not True:
+        raise ValueError('Confirm re-evaluation of this saved private decoder.')
+    with _LOCK:
+        saved = read(root, trial_id)
+        if saved['status'] != 'complete' or not isinstance(saved.get('dataset'), dict):
+            raise ValueError('Complete a reviewed-local-dataset trial before re-evaluation.')
+        reviewed = saved['dataset']
+    dataset, prepared_tokenizer, _, batches = decoder_dataset_training.preflight(root, reviewed)
+    model, tokenizer, bundle = decoder_bundle.load(folder(root, trial_id) / 'artifacts' / 'bundle')
+    training = bundle['training']
+    if (training.get('scope') != 'reviewed_local_text_trial'
+            or training.get('dataset_id') != dataset['id']
+            or training.get('dataset_sha256') != dataset['dataset_sha256']
+            or training.get('review_sha256') != run_manifest.digest(dataset)
+            or tokenizer.fingerprint() != prepared_tokenizer.fingerprint()
+            or bundle['stages'].get('pretraining_local') != 1):
+        raise ValueError('The saved bundle is not bound to this reviewed dataset and tokenizer.')
+    import numpy as np
+    initial = training.get('evaluation', {}).get('initial_train_loss')
+    if type(initial) not in (float, int) or not np.isfinite(initial) or initial <= 0:
+        raise ValueError('The bundle lacks a valid initial training-loss reference.')
+    metrics = {}
+    try:
+        with np.errstate(over='raise', invalid='raise', divide='raise'):
+            for part in ('train', 'validation', 'test'):
+                correct = count = 0
+                loss_sum = 0.0
+                for window in batches[part]:
+                    scores = model.logits([window[:-1]])[0].astype(np.float64)
+                    if not np.isfinite(scores).all():
+                        raise ValueError('The saved decoder produced invalid evaluation scores.')
+                    targets = np.array(window[1:])
+                    maximum = np.max(scores, axis=-1)
+                    losses = maximum + np.log(np.sum(np.exp(scores-maximum[:, None]), axis=-1)) - scores[np.arange(len(targets)), targets]
+                    correct += int(np.sum(np.argmax(scores, axis=-1) == targets))
+                    count += len(targets)
+                    loss_sum += float(np.sum(losses))
+                loss = loss_sum / count
+                if not np.isfinite(loss):
+                    raise ValueError('The saved decoder produced invalid evaluation loss.')
+                metrics[part] = {'next_token_accuracy': correct/count, 'cross_entropy': loss,
+                                 'evaluated_tokens': count, 'windows': len(batches[part])}
+    except FloatingPointError as error:
+        raise ValueError('The saved decoder produced invalid evaluation scores.') from error
+    passed = (min(metrics[part]['next_token_accuracy'] for part in ('validation', 'test')) >= .8
+              and metrics['train']['cross_entropy'] < initial)
+    result = {'schema_version': 1, 'evaluation_version': 1, 'id': uuid.uuid4().hex,
+              'created_at': datetime.now(timezone.utc).isoformat(), 'trial_id': trial_id,
+              'bundle_manifest_sha256': run_manifest.digest(bundle),
+              'dataset_manifest_sha256': run_manifest.digest(dataset),
+              'dataset_sha256': dataset['dataset_sha256'], 'tokenizer_sha256': tokenizer.fingerprint(),
+              'runtime': {'device': 'CPU', 'numpy': np.__version__},
+              'implementation_sha256': run_manifest.file_digest(Path(__file__)),
+              'target_next_token_accuracy': .8, 'initial_train_loss_reference': initial,
+              'metrics': metrics, 'passed': bool(passed),
+              'scope': 'Private held-out re-evaluation; no model release.'}
+    with _LOCK:
+        record = read(root, trial_id)
+        record['evaluations'] = [*record.get('evaluations', [])[-19:], result]
+        write(root, record)
+    return result
+
+
 def recover(root):
     """A restarted backend never resumes work without renewed approval."""
     for record in list_trials(root, limit=None):
