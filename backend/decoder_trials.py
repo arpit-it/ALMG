@@ -39,6 +39,7 @@ def specification(dataset=None):
     spec = {'recipe': 'decoder_from_scratch', 'recipe_version': 1, 'approach': 'from_scratch',
             'scope': 'generated_local_text_fixture', 'stage_version': 1,
             'recipe_contract': recipe_contracts.recipe_contract('decoder_from_scratch'),
+            'post_training': {'version':1, 'mode':'none'},
             'resource_budget': {'version': 1, 'encoded_data_bytes': 128000},
             'components': {name: run_manifest.file_digest(Path(__file__).with_name(name)) for name in
                            ('decoder_trials.py', 'decoder_training.py', 'decoder_recipe.py', 'decoder_tokenizer.py',
@@ -515,6 +516,44 @@ def preview_import(root, import_id, confirmed, prompt, max_new_tokens=12):
     return result
 
 
+def pipeline_record(root, trial_id, confirmed):
+    """Save a unified, integrity-checked private reproducibility snapshot."""
+    if confirmed is not True:
+        raise ValueError('Confirm saving the private pipeline manifest.')
+    with _LOCK:
+        record = read(root, trial_id)
+    if record.get('approval', {}).get('revision') != approval_revision(record):
+        raise ValueError('The saved approval no longer matches its trial specification.')
+    artifacts = {}
+    for name, relative in (('bundle','artifacts/bundle'),('checkpoint','artifacts/step-50')):
+        path = folder(root,trial_id)/relative
+        if path.exists():
+            _, _, manifest = decoder_bundle.load(path)
+            artifacts[name] = {'manifest_sha256':run_manifest.digest(manifest), 'manifest':manifest}
+    if record['status'] == 'complete' and 'bundle' not in artifacts:
+        raise ValueError('The completed trial bundle is missing.')
+    if record.get('dataset') is not None:
+        decoder_dataset_training.preflight(root,record['dataset'])
+    saved_pipeline = record.get('specification',{}).get('recipe_contract',{}).get('pipeline')
+    if saved_pipeline is None and 'bundle' in artifacts:
+        saved_pipeline = artifacts['bundle']['manifest'].get('pipeline')
+    origin = 'saved' if saved_pipeline is not None else 'legacy_derived'
+    interfaces = saved_pipeline if saved_pipeline is not None else recipe_contracts.recipe_contract('decoder_from_scratch')['pipeline']
+    recipe_contracts.decoder_recipe.validate_pipeline(interfaces)
+    result = {'schema_version':1, 'format':'almg-decoder-pipeline-record-v1', 'trial_id':trial_id,
+              'scope':'Private reproducibility record; no model release.', 'contract_origin':origin,
+              'stage_interfaces':interfaces, 'post_training':{'version':1,'mode':'none'},
+              'trial':record, 'verified_artifacts':artifacts,
+              'dataset_verified':record.get('dataset') is not None}
+    result['revision'] = run_manifest.digest(result)
+    with _LOCK:
+        path = folder(root,trial_id)/'pipeline-record.json'
+        temporary = path.with_suffix('.tmp')
+        temporary.write_text(json.dumps(result,ensure_ascii=False,allow_nan=False,indent=2),encoding='utf-8')
+        temporary.replace(path)
+    return result
+
+
 def recover(root):
     """A restarted backend never resumes work without renewed approval."""
     for record in list_trials(root, limit=None):
@@ -659,9 +698,11 @@ def wait_and_submit(root, trial_id, submit):
                 _READINESS.pop(key, None)
 
 
-def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_revision=None, dataset=None, require_idle_ac=None, readiness=None):
+def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_revision=None, dataset=None, require_idle_ac=None, readiness=None, post_training=None):
     if confirmed is not True:
         raise ValueError('Approve the generated-text decoder trial before starting it.')
+    if post_training is not None and run_manifest.digest(post_training) != run_manifest.digest({'version':1,'mode':'none'}):
+        raise ValueError('Only version-1 skipped post-training (mode none) is supported.')
     if require_idle_ac is not None and type(require_idle_ac) is not bool:
         raise ValueError('Idle/AC guard must be true or false.')
     spec = specification()

@@ -1778,6 +1778,7 @@ class _StudioPageState extends State<StudioPage> {
       scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(record))),
       actions: [
+        TextButton(onPressed: () { Navigator.pop(context); _saveDecoderPipeline(record['id'] as String); }, child: const Text('Save and inspect pipeline manifest')),
         if (['waiting_idle', 'queued', 'running'].contains(record['status'])) TextButton(onPressed: () {
           Navigator.pop(context);
           _cancelDecoderTrial(record['id'] as String);
@@ -1801,6 +1802,20 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _saveDecoderPipeline(String id) async {
+    try {
+      final result = await _request('/decoder-trials/$id/pipeline', {'confirmed': true});
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Saved decoder pipeline manifest'), scrollable: true,
+        content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(result))),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _exportPrivateDecoder(String id) async {

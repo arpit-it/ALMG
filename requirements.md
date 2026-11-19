@@ -2565,6 +2565,50 @@ P3-LMF-01 partial progress · private decoder inventory in Model Library · 2026
   No external collection occurred. Imported/generated models, downloaded weights
   and unrelated user edits are excluded from this commit.
 
+P3-LMF-01 architecture acceptance complete · versioned stage contracts and saved record · 2026-11-19:
+- [x] P3-LMF-01 — Language Model Factory architecture, for the documented bounded
+  decoder foundation. Larger-scale dataset/tokenizer work, optional post-training
+  algorithms and public release remain in their respective downstream roadmap items.
+- Added and validated all eight versioned interfaces: dataset preparation,
+  tokenization, fresh architecture, pretraining, evaluation, optional post-training,
+  private export and inference. Current post-training explicitly selects version-1
+  mode none; unsupported modes/configurations fail before queueing or model loading.
+  New bundles store the contract and selected policy. Legacy bundles remain readable;
+  derived legacy snapshots are labeled and never rewrite original artifacts.
+- Added confirmed “Save and inspect pipeline manifest” in the native saved-trial
+  view. The stored version-1 snapshot binds the saved approval/specification, stage
+  interfaces, dataset revision, implementation digests, runtime/seed/optimizer data,
+  verified bundle/checkpoint manifests and existing evaluation/preview/export history.
+  It checks integrity and approval binding and does not change training/release state.
+- Acceptance evidence:
+  - [x] Registered from-scratch recipe discovered through request-time registry
+    metadata. Native planner fixture captured the registered eight-stage contract,
+    produced a from-scratch proposal, and required confirmation before a trial existed.
+  - [x] Backend recipe/dependency validation and unavailable-alternative rejection
+    pass registry/planner tests, including invalid versions, missing dependencies,
+    initializer configuration and unsupported post-training policies.
+  - [x] Fresh construction without pretrained student weights verified by CPU
+    initializer tests and actual native Metal training: all parameters trainable,
+    newly_initialized origin, pretrained_weights_loaded false and held-out accuracy
+    1.000 on the local fixture. The supervisor was a deterministic planner fixture
+    for this replay; student execution and persistence were real.
+  - [x] Existing classifier/image recipes remain functional in the complete local
+    recipe/execution/planner regression suite and retain their existing dispatch.
+  - [x] Registration, selection, validation/failure and legacy persistence coverage
+    pass. Current total: 295 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests;
+    Flutter analysis clean.
+- Local app verification: rebuilt/launched ALMG, chose the saved approach in Training,
+  confirmed it, completed real fresh-weight training and saved/inspected the unified
+  record. Verified eight interfaces, skipped post-training, bound approval, bundle
+  and step-50 checkpoint hashes. Restarted backend/app and reopened the snapshot;
+  its complete contents and revision were unchanged. Evidence:
+  /tmp/almg-pipeline-qa/{approach-ui.txt,trial-ui.json,manifest-ui.json,
+  restarted-manifest-ui.json}, plus the trial's stored pipeline-record.json.
+- Next independent Language Model Factory requirement: P3-LMF-02 dataset engineering.
+  Physical power/sleep/idle and Windows verification remain open independent blockers.
+  No external collection occurred; generated records/artifacts, downloaded weights
+  and unrelated user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

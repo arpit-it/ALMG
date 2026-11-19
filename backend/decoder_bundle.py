@@ -7,11 +7,11 @@ import platform
 from tempfile import TemporaryDirectory
 
 if __package__:
-    from .decoder_recipe import Decoder
+    from .decoder_recipe import Decoder, PIPELINE, validate_pipeline
     from .decoder_tokenizer import Tokenizer
     from .run_manifest import digest, file_digest
 else:
-    from decoder_recipe import Decoder
+    from decoder_recipe import Decoder, PIPELINE, validate_pipeline
     from decoder_tokenizer import Tokenizer
     from run_manifest import digest, file_digest
 
@@ -35,6 +35,7 @@ def save(destination, model, tokenizer, training, pretraining_stage='pretraining
         manifest = {
             'format': 'almg-decoder-bundle-v1', 'schema_version': 1,
             'recipe': {'id': 'decoder_from_scratch', 'version': 1},
+            'pipeline': deepcopy(PIPELINE), 'post_training': {'version':1, 'mode':'none'},
             'stages': {'architecture': 1, 'tokenization': 1, pretraining_stage: 1, 'artifact': 1},
             'config': dict(model.config), 'tokenizer_sha256': tokenizer.fingerprint(),
             'training': deepcopy(training), 'training_sha256': digest(training),
@@ -71,6 +72,11 @@ def load(folder):
                 or not isinstance(manifest.get('files'), dict)
                 or set(manifest['files']) != {'decoder.json', 'tokenizer.json'}):
             raise ValueError('Unsupported decoder bundle version or file set.')
+        if 'pipeline' in manifest:
+            validate_pipeline(manifest['pipeline'])
+        if 'pipeline' in manifest or 'post_training' in manifest:
+            if digest(manifest.get('post_training')) != digest({'version':1,'mode':'none'}):
+                raise ValueError('Unsupported decoder post-training policy.')
         for name, expected in manifest['files'].items():
             if file_digest(folder / name) != expected:
                 raise ValueError('Decoder bundle file hash mismatch: ' + name)

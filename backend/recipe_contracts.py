@@ -87,6 +87,8 @@ class RecipeRegistry:
             json.dumps(snapshot, allow_nan=False)
         except (TypeError, ValueError) as error:
             raise ValueError('Recipe contract must contain finite JSON values.') from error
+        if 'pipeline' in snapshot:
+            decoder_recipe.validate_pipeline(snapshot['pipeline'])
         planning = snapshot.get('planning')
         if planning is not None:
             if (not isinstance(planning, dict) or set(planning) != {'workflow', 'approaches', 'scopes'}

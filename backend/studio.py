@@ -2140,9 +2140,11 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/decoder-trials':
                 record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
                                               proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'), dataset=data.get('dataset'),
-                                              require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness)
+                                              require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness, post_training=data.get('post_training'))
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
+            if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'pipeline':
+                return self.respond(decoder_trials.pipeline_record(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-imports' and parts[2] == 'preview':
                 return self.respond(decoder_trials.preview_import(ROOT, parts[1], data.get('confirmed'), data.get('prompt'), data.get('max_new_tokens', 12)))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'export-review':
@@ -2159,7 +2161,7 @@ class Handler(BaseHTTPRequestHandler):
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'cancel':
                 return self.respond(decoder_trials.cancel(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'resume':
-                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit, parts[1], readiness=training_readiness)
+                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit, parts[1], readiness=training_readiness, post_training=data.get('post_training'))
                 return self.respond({'id': record['id']}, 202)
             if self.path == "/runtime/decoder-training":
                 if data.get('confirmed') is not True:
@@ -2289,7 +2291,7 @@ class Handler(BaseHTTPRequestHandler):
                         record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
                                                       proposal_id=proposal['id'], proposal_revision=proposal['revision'],
                                                       dataset=job.get('decoder_dataset'),
-                                                      require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness)
+                                                      require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness, post_training=data.get('post_training'))
                         job.update(status='factory_trial', decoder_trial_id=record['id'], error=None)
                         store_job(job)
                         return self.respond({'id': job['id']}, 202)

@@ -1,6 +1,35 @@
 """Bounded CPU decoder construction and validated local artifact persistence."""
 import numpy as np
 
+PIPELINE = {
+    'schema_version': 1,
+    'stages': {
+        'dataset_preparation': {'version':1, 'interface':'almg-decoder-text-dataset-v1', 'status':'bounded_local'},
+        'tokenization': {'version':1, 'interface':'versioned_word_or_utf8_byte_artifact', 'status':'available'},
+        'architecture': {'version':1, 'interface':'almg-decoder-v1', 'status':'fresh_weights_only'},
+        'pretraining': {'version':1, 'interface':'bounded_sgd_with_checkpoint', 'status':'bounded_local'},
+        'evaluation': {'version':1, 'interface':'verified_local_split_evaluation', 'status':'available'},
+        'post_training': {'version':1, 'interface':'explicit_optional_stage', 'status':'skipped', 'modes':['none']},
+        'export': {'version':1, 'interface':'almg-private-decoder-export-v1', 'status':'private_only'},
+        'inference': {'version':1, 'interface':'bounded_cpu_greedy_preview', 'status':'private_only'},
+    },
+}
+
+
+def validate_pipeline(value):
+    expected = set(PIPELINE['stages'])
+    if (not isinstance(value, dict) or set(value) != {'schema_version','stages'}
+            or type(value.get('schema_version')) is not int or value['schema_version'] != 1
+            or not isinstance(value.get('stages'), dict) or set(value['stages']) != expected):
+        raise ValueError('A versioned decoder pipeline must define all eight stage interfaces.')
+    for stage in value['stages'].values():
+        if (not isinstance(stage, dict) or type(stage.get('version')) is not int or stage['version'] < 1
+                or any(not isinstance(stage.get(key),str) or not stage[key].strip() for key in ('interface','status'))):
+            raise ValueError('Pipeline stages require positive versions, interfaces and status.')
+    if value['stages']['post_training'].get('modes') != ['none']:
+        raise ValueError('Only explicitly skipped post-training is supported in this pipeline version.')
+
+
 CONTRACT = {
     'id': 'decoder_from_scratch', 'version': 1, 'name': 'Decoder from scratch (bounded local trial)',
     'description': 'Train a tiny decoder-only Transformer from newly initialized weights in an explicitly approved bounded local trial.',
@@ -11,6 +40,7 @@ CONTRACT = {
     'exports': ['Private versioned decoder/tokenizer bundle; no model release'],
     'resume': 'Explicitly approved restart from a revision-bound step-50 SGD checkpoint.',
     'status': 'bounded_trial', 'capabilities': ['initialize', 'approved_local_trial'],
+    'pipeline': PIPELINE,
     'planning': {'workflow': 'decoder_trial', 'approaches': ['from_scratch'],
                  'scopes': ['generated_local_text_fixture', 'reviewed_local_text_trial']},
 }
