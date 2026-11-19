@@ -2799,6 +2799,40 @@ P3-LMF-02 partial progress · reviewed local dataset export with provenance · 2
   and Windows blockers remain open and skipped. Generated ZIPs/fixtures, weights
   and unrelated user edits are excluded from this commit.
 
+P3-LMF-02 partial progress · incremental local dataset versions · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Prepared datasets now offer “Add documents to new
+  version”, opening the native UTF-8 text picker and a separate confirmation.
+  The backend requires literal consent and the unchanged reviewed parent manifest.
+  It combines inherited normalized records with approved new original bytes,
+  performs the existing exact deduplication and preparation, and atomically
+  publishes a new prepared_for_review version. The parent and approvals are not
+  rewritten or transferred, and training does not start.
+- Version-1 append_local_documents derivation binds the parent ID/manifest hash,
+  added-input count, repartition policy and inherited source hashes, licenses,
+  groups/splits, including all exact-deduplicated parent source references. New
+  inputs retain their original byte hashes. The same tokenizer kind is refitted
+  and splits recomputed, requiring fresh review. Existing bounded limits remain:
+  at most 16 combined records/inputs, 64 KiB per input and 128000 total bytes.
+- Native verification: rebuilt/launched ALMG, selected a saved three-document byte
+  dataset, chose addition.txt through the macOS picker and inspected confirmation.
+  Verified no child existed before approval. Explicit confirmation created child
+  3b6eaef1f1114e6494b0be99fe4b44c9 with four documents, the additional file's original
+  BOM/decomposed-Unicode byte hash, preserved inherited provenance and unchanged
+  parent files. No trial was created. Restarted ALMG: both versions remained
+  selectable and the complete reopened child manifest/lineage was identical.
+  Evidence: /tmp/almg-incremental-qa/{confirmation-ui.txt,child-manifest-ui.json,
+  restarted-list-ui.txt,restarted-child-ui.json,before.json,addition.txt}.
+- Validation: 317 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. New cases cover raw-byte hashes, duplicate-source lineage,
+  kind preservation, separate versions, consent/stale review, corrupt parents,
+  empty/capacity/size failures and absence of partially published datasets.
+- Remaining: streaming beyond RAM and interrupted-preparation resume, language/
+  quality/license review, broader PII/contamination policies, dataset mixing/
+  sampling and remaining acceptance checks. This is bounded incremental ingestion,
+  not large-scale streaming or resume support. Physical/Windows blockers remain
+  open and skipped. No external collection occurred; generated fixtures/artifacts,
+  downloaded weights and unrelated user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

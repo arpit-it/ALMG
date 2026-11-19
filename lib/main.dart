@@ -1583,6 +1583,7 @@ class _StudioPageState extends State<StudioPage> {
       title: const Text('Decoder dataset prepared for review'), scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(manifest))),
       actions: [
+        TextButton(onPressed: () { Navigator.pop(context); _extendDecoderDataset(manifest); }, child: const Text('Add documents to new version')),
         TextButton(onPressed: () { Navigator.pop(context); _exportDecoderDataset(manifest['id'] as String); }, child: const Text('Review local dataset export')),
         TextButton(onPressed: () { Navigator.pop(context); _auditDecoderDataset(manifest['id'] as String); }, child: const Text('Analyze local text quality')),
         TextButton(onPressed: () { Navigator.pop(context); _showSavedDecoderAudits(manifest['id'] as String); }, child: const Text('View saved quality audits')),
@@ -1602,6 +1603,42 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _extendDecoderDataset(Map<String, dynamic> parent) async {
+    try {
+      final files = await openFiles(acceptedTypeGroups: [const XTypeGroup(label: 'UTF-8 text', extensions: ['txt'])]);
+      if (files.isEmpty) return;
+      if (files.length + (parent['unique_documents'] as int) > 16) {
+        throw const FormatException('The combined dataset supports at most 16 documents. Prepare a separate dataset.');
+      }
+      final documents = <Map<String, String>>[];
+      var total = 0;
+      for (final file in files) {
+        final length = await file.length();
+        total += length;
+        if (length > 65536 || total > 128000) throw const FormatException('Each document must fit 64 KiB; the combined dataset must fit 128000 bytes.');
+        final bytes = await file.readAsBytes();
+        utf8.decode(bytes);
+        documents.add({'name': file.name, 'data': base64Encode(bytes)});
+      }
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Add documents to new dataset version?'),
+        content: Text('Add ${files.length} selected local documents to ${parent['unique_documents']} saved documents. '
+          'The parent dataset is preserved. The combined version rebuilds its tokenizer and splits and needs a new review. '
+          'This does not start training.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm additional documents'))],
+      ));
+      if (confirmed != true || !mounted) return;
+      final result = await _request('/decoder-datasets/${parent['id']}/extend', {
+        'confirmed': true, 'reviewed': parent, 'documents': documents,
+      });
+      if (mounted) await _showDecoderDataset(result);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _exportDecoderDataset(String id) async {

@@ -390,3 +390,29 @@ def export_dataset(root, dataset_id, confirmed, revision):
     return {'file_name': f'decoder-dataset-{dataset_id[:8]}.zip',
             'data': base64.b64encode(data).decode('ascii'), 'sha256': hashlib.sha256(data).hexdigest(),
             'bytes': len(data), 'revision': review['revision']}
+
+
+def extend_dataset(root, dataset_id, confirmed, reviewed, documents):
+    """Append approved local inputs into a new immutable, independently reviewed version."""
+    if confirmed is not True:
+        raise ValueError('Confirm adding local documents to a new dataset version.')
+    parent = read(root, dataset_id)
+    if not isinstance(reviewed, dict) or digest(reviewed) != digest(parent):
+        raise ValueError('The parent dataset review changed. Reopen it before adding documents.')
+    if not isinstance(documents, list) or not documents:
+        raise ValueError('Select at least one additional local text document.')
+    rows = [json.loads(line) for line in (Path(root)/'decoder-datasets'/dataset_id/'documents.jsonl').read_text(encoding='utf-8').splitlines()]
+    if len(rows) + len(documents) > 16:
+        raise ValueError('The combined dataset supports at most 16 local documents. Prepare a separate dataset.')
+    inherited = [{'name': row['name'], 'text': row['text']} for row in rows]
+    derivation = {'version': 1, 'operation': 'append_local_documents',
+                  'parent_dataset_id': dataset_id, 'parent_manifest_sha256': digest(parent),
+                  'added_input_documents': len(documents),
+                  'partition_policy': 'recompute_groups_and_splits_require_new_review',
+                  'sources': [{'name': row['name'],
+                               'derived_source_sha256': hashlib.sha256(row['text'].encode('utf-8')).hexdigest(),
+                               'parent_group': row['group'], 'parent_split': row['split'],
+                               'parent_sources': [source for source in parent['sources'] if source['normalized_sha256'] == row['group']]}
+                              for row in rows]}
+    tokenizer_kind = 'utf8_bytes' if (parent.get('tokenizer') or {}).get('format') == 'almg-utf8-byte-tokenizer-v1' else 'words'
+    return prepare(root, inherited + documents, True, tokenizer_kind, _derivation=derivation)
