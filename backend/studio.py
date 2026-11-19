@@ -40,11 +40,12 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
     import recipe_contracts
+    import run_manifest
     import chat_history
     import inference
     import image_recipe
@@ -980,7 +981,7 @@ def train(rows, labels, target, repair=None, report=None, checkpoint_path=None):
             rows[i]["split"] = part
     metrics = {"algorithm": name, "validation_macro_f1": score, "test_macro_f1": test_score,
                "target_macro_f1": target, "passed": bool(passed), "trials": trials,
-               "test_examples": len(test), "test_report": test_report, "repair_error": repair_error}
+               "test_examples": len(test), "test_report": test_report, "repair_error": repair_error, "split_seed": seed}
     return model, rows, metrics
 
 
@@ -1819,6 +1820,9 @@ def run(job):
                 (work / "candidate.json").write_text(json.dumps(model), encoding="utf-8")
             else:
                 joblib.dump(model, work / "candidate.joblib")
+            model_path = work / ("candidate.json" if job.get("recipe") == "text_to_image" else "candidate.joblib")
+            run_manifest.write(work, run_manifest.build(job, rows, metrics, model_path,
+                                                       recipe_contracts.export_metadata(job)))
             CANDIDATES[job["id"]] = (model, rows, metrics)
             job.update(status="preview_ready", metrics=metrics, examples=len(rows),
                        preview_count=0, candidate_directory=str(work))
@@ -1873,6 +1877,16 @@ def export_candidate(job, candidate):
                 (files / "model.json").write_text(json.dumps(model), encoding="utf-8")
             else:
                 joblib.dump(model, files / "model.joblib")
+            work = ROOT / "training-sessions" / job["id"]
+            if (work / "run-manifest.json").is_file():
+                manifest = run_manifest.read(work)
+                if manifest['dataset']['sha256'] != run_manifest.digest(rows) or manifest['evaluation_sha256'] != run_manifest.digest(metrics):
+                    raise ValueError("Candidate dataset or evaluation changed after the run record was captured.")
+                if manifest['settings_sha256'] != run_manifest.digest(recipe_contracts.export_metadata(job)):
+                    raise ValueError("Approved settings changed after the run record was captured.")
+                model_path = files / ("model.json" if job.get("recipe") == "text_to_image" else "model.joblib")
+                manifest['artifact'] = {'name': model_path.name, 'sha256': run_manifest.file_digest(model_path)}
+                run_manifest.write(files, manifest)
             files.rename(out)
         activity(job, "Released the model, dataset, and evaluation report together.")
         with LOCK:
@@ -1995,6 +2009,17 @@ class Handler(BaseHTTPRequestHandler):
                 sessions = [dict(job) for job in reversed(list(JOBS.values()))
                             if job.get("project_id") == project_id]
             return self.respond({"jobs": sessions})
+        parts = route.path.strip("/").split("/")
+        if len(parts) == 3 and parts[0] == "jobs" and parts[2] == "manifest":
+            with LOCK:
+                job = dict(JOBS.get(parts[1], {}))
+            if not job or job.get('status') not in ('preview_ready', 'passed'):
+                return self.respond({'error': 'A completed candidate is required.'}, 404)
+            folder = ROOT / job['id'] if job['status'] == 'passed' else ROOT / 'training-sessions' / job['id']
+            try:
+                return self.respond(run_manifest.read(folder))
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 409)
         with LOCK:
             job = dict(JOBS.get(self.path.removeprefix("/jobs/"), {}))
         if job:

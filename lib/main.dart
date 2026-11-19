@@ -1575,6 +1575,22 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _showRunManifest() async {
+    try {
+      final manifest = await _request('/jobs/${_job!['id']}/manifest');
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Run reproducibility record'),
+        scrollable: true,
+        content: SizedBox(width: 620, child: SelectableText(
+          const JsonEncoder.withIndent('  ').convert(manifest))),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   /// Shows the current proposal, dataset preview, evaluation, and release gate.
   Future<void> _showRecipeContract() async {
     try {
@@ -1608,6 +1624,12 @@ class _StudioPageState extends State<StudioPage> {
           for (final artifact in contract['exports'] as List) Text(artifact as String),
           const SizedBox(height: 12),
           Text('Resume: ${contract['resume']}'),
+          if (['preview_ready', 'passed'].contains(_job?['status']))
+            TextButton(onPressed: () {
+              Navigator.pop(context);
+              _showRunManifest();
+            }, child: const Text('View run reproducibility record')),
+
           TextButton(onPressed: () {
             Navigator.pop(context);
             _showTrainingReadiness();

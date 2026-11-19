@@ -1698,6 +1698,36 @@ P3-LMF-01 partial progress · 2026-11-19 (requirement remains open):
   acceptance verification. Physical power checks and Windows validation remain
   open independently and do not block this roadmap.
 
+P3-LMF-01 partial progress · run reproducibility records · 2026-11-19:
+- Completed classifier/image candidates now capture a version-1 run-manifest.json
+  alongside their model: evaluated dataset and partition hashes, recipe/settings
+  snapshot and hash, evaluation/hash, actual classifier split seed, CPU/runtime
+  dependency versions, component source hashes and candidate model hash. The
+  existing classifier estimators retain default random_state; the record explicitly
+  avoids promising bitwise reproduction. This is not the full future LM manifest.
+- Recipe details opens an integrity-checked, selectable run record in ALMG.
+  Reading checks model/dataset contents and settings/evaluation hashes. Releases
+  retain the captured training environment and bind the exported model file.
+  Older candidates without a record return an actionable message; no migration or
+  retroactive training metadata is written to existing jobs. The release package
+  includes the new backend module.
+- Local app verification: rebuilt/launched macOS ALMG with isolated generated
+  fixtures. Approved classifier training through the desktop UI (48 rows, held-out
+  macro F1 1.000), opened its run record and observed train/validation/test counts
+  29/9/10, split seed 0, dependency versions and hashes. Restarted the fixture
+  backend from persisted jobs, ran native model preview, approved release in ALMG,
+  and reopened the exported model.joblib record in the desktop dialog. Training
+  runtime, component hashes, dataset and partition hashes matched the candidate.
+  The live image workflow also produced a verified record for 45 rows split 36/9,
+  with held-out pixel accuracy 1.000. No external collection occurred.
+- Verification: 201 Python tests (200 passed, one opt-in Metal test skipped), all
+  16 Flutter tests passed, Flutter analysis clean. Added integrity/tampering,
+  restart/legacy read compatibility and release-runtime preservation coverage.
+- Remaining: from-scratch decoder registration/construction, explicit approach
+  selection, full versioned pipeline-stage interfaces, approval revision and
+  checkpoint lineage for future LM execution, and complete acceptance verification.
+  P3-LMF-01 remains open; physical power/Windows blockers remain independent.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
