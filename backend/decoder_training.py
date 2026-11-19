@@ -68,21 +68,28 @@ def run(initialize):
         from pathlib import Path
         from tempfile import TemporaryDirectory
         with TemporaryDirectory(prefix='almg-decoder-roundtrip-') as folder:
-            artifact = Path(folder) / 'decoder.json'
-            model.save(artifact)
-            restored = type(model).load(artifact)
-            import json
-            tokenizer_path = Path(folder) / 'tokenizer.json'
-            tokenizer_path.write_text(json.dumps(tokenizer.artifact(), ensure_ascii=False), encoding='utf-8')
-            restored_tokenizer = Tokenizer.restore(json.loads(tokenizer_path.read_text(encoding='utf-8')))
+            if __package__:
+                from . import decoder_bundle
+            else:
+                import decoder_bundle
+            training_record = {'seed': model.config['seed'], 'steps': 100, 'learning_rate': .05,
+                               'weight_origin': 'newly_initialized', 'device': 'Metal GPU',
+                               'mlx_version': decoder_bundle.version('mlx'),
+                               'training_text_sha256': decoder_bundle.digest(training_text),
+                               'held_out_text_sha256': decoder_bundle.digest(held_out_text),
+                               'initial_loss': initial, 'final_loss': final,
+                               'held_out_next_token_accuracy': accuracy}
+            destination = Path(folder) / 'bundle'
+            bundle_manifest = decoder_bundle.save(destination, model, tokenizer, training_record)
+            restored, restored_tokenizer, restored_manifest = decoder_bundle.load(destination)
             token_roundtrip = (restored_tokenizer.encode(held_out_text[0]) == tokenizer.encode(held_out_text[0])
                                and restored_tokenizer.fingerprint() == tokenizer.fingerprint())
             generated_text = restored_tokenizer.decode(generated)
-
             reload_error = float(np.max(np.abs(model.logits(np.array(held_out)[:, :-1]) - restored.logits(np.array(held_out)[:, :-1]))))
-            artifact_bytes = artifact.stat().st_size
+            artifact_bytes = (destination / 'decoder.json').stat().st_size
+            bundle_roundtrip = restored_manifest == bundle_manifest
         if not (finite and final < initial * .1 and accuracy >= .95 and causal_error < 1e-6
-                and len(changed) == len(parameters) and matches and cpu_error < 1e-5 and reload_error < 1e-7 and token_roundtrip):
+                and len(changed) == len(parameters) and matches and cpu_error < 1e-5 and reload_error < 1e-7 and token_roundtrip and bundle_roundtrip):
             raise ValueError('Decoder training failed loss, held-out, causality, full-parameter or generation verification.')
     return {'passed': True, 'scope': 'Generated local-text training fixture only; user-dataset pretraining and export remain unavailable.',
             'recipe': 'decoder_from_scratch', 'recipe_version': 1, 'stage': 'pretraining_fixture', 'stage_version': 1,
@@ -96,6 +103,9 @@ def run(initialize):
             'generation_matches_fixture': matches, 'cpu_inference_max_error': cpu_error,
             'artifact_format': 'almg-decoder-v1', 'artifact_bytes': artifact_bytes,
             'artifact_reload_max_error': reload_error, 'temporary_artifact_removed': True, 'generated_text': generated_text,
+            'bundle': {'format': bundle_manifest['format'], 'stage_versions': bundle_manifest['stages'],
+                       'verified_files': list(bundle_manifest['files']), 'artifact_roundtrip': bundle_roundtrip,
+                       'training_record_sha256': bundle_manifest['training_sha256']},
             'tokenizer': {'format': tokenizer.artifact()['format'], 'stage_version': 1,
                           'vocabulary_size': len(tokenizer.vocabulary), 'sha256': tokenizer.fingerprint(),
                           'fit_source': 'training_documents_only', 'training_documents': len(training_text),

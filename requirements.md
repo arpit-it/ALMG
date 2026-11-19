@@ -1885,6 +1885,35 @@ P3-LMF-01 partial progress · versioned decoder tokenization stage · 2026-11-19
   training/checkpoint lifecycle and evaluated release/manifest integration.
   P3-LMF-01 remains open; blocked power/Windows verification stays separate.
 
+P3-LMF-01 partial progress · bound decoder pipeline bundles · 2026-11-19:
+- Added almg-decoder-bundle-v1 to bind the model and tokenizer to versioned
+  architecture/tokenization/pretraining-fixture/artifact stages. Its manifest
+  records file hashes, tokenizer fingerprint, model configuration, training-record
+  hash, seed/steps/learning rate, training/held-out text hashes, evaluation results,
+  MLX/NumPy/Python runtime information and component source hashes.
+- Bundle loading checks format/stage versions, fixed file set, model/tokenizer
+  hashes, training metadata hash and vocabulary/configuration compatibility before
+  returning CPU inference objects. Save stages a complete validated directory,
+  refuses existing destinations and cleans up on failure. Existing user artifacts
+  and legacy classifier/image formats are unchanged. The release package includes
+  the new module; general decoder release remains unavailable.
+- Local app verification: rebuilt/launched macOS ALMG with isolated fixtures,
+  opened recipe details and explicitly ran from-scratch training. Native result
+  displayed almg-decoder-bundle-v1, four version-1 stages, decoder.json and
+  tokenizer.json as verified files, successful bundle roundtrip and training-record
+  hash. CPU prediction reload error remained 0.0 and held-out accuracy 1.000.
+  Temporary bundles were removed; no downloads, external collection or artifacts
+  were committed.
+- Verification: all 222 Python tests passed with ALMG_METAL_TESTS=1, including
+  actual trained bundle roundtrip; all 16 Flutter tests passed. New tests cover
+  roundtrip predictions/records, tamper rejection before loading weights, invalid
+  versions/file sets, training/tokenizer mismatch, preservation of existing
+  destinations and failed-stage cleanup.
+- Remaining: planner-enabled workflow and approach confirmation, user dataset
+  integration, persistent approved training/checkpoint lifecycle and evaluated
+  release integration. P3-LMF-01 remains open; hardware verification blockers stay
+  separate and do not prevent independent implementation.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
