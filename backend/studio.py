@@ -2115,8 +2115,11 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/runtime/power-event":
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
+            if self.path == '/decoder-trial-proposals':
+                return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask))
             if self.path == '/decoder-trials':
-                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit)
+                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
+                                              proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'))
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'cancel':

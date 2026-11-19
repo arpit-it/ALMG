@@ -2005,6 +2005,38 @@ P3-LMF-01 partial progress · cooperative saved-trial cancellation · 2026-11-19
   gates and full acceptance verification. P3-LMF-01 stays open; hardware blockers
   remain independent. Generated artifacts and weights are not committed.
 
+P3-LMF-01 partial progress · reviewed decoder approach proposals · 2026-11-19:
+- Added a local-Qwen proposal adapter that recommends from_scratch, fine_tuning,
+  distillation or retrieval for a decoder trial goal, validates the response and
+  persists a version-1 proposal without starting execution. Only the existing
+  generated-local-text from-scratch trial is executable. Unavailable approaches
+  can be reviewed but cannot create a trial.
+- Proposal IDs/revisions bind goal, recommendation, explanation, fixed scope and
+  implementation revision. Execution requires explicit confirmation of the exact
+  reviewed revision; changes during planning or between review/approval invalidate
+  it. The trial stores the proposal and binds it into its approval receipt. Legacy
+  direct-trial approvals retain their existing binding and records remain readable.
+- Recipe details now supports goal entry, visible planning progress and an
+  approach/scope review. Confirmation is offered only for an executable proposal.
+  The goal dialog owns/disposes its controller with its widget lifecycle and has
+  keyboard autofocus. Only planning uses the longer local-model response timeout.
+- Local app verification: rebuilt/launched macOS ALMG with a deterministic local
+  planner fixture. Entered a goal through the native keyboard, requested/reviewed
+  from_scratch, verified no trial existed before confirmation, then confirmed.
+  The trial completed at accuracy 1.000 with the reviewed proposal bound into its
+  receipt. A second retrieval proposal showed an unavailable message and no
+  confirmation control; trial count remained one. Actual decoder training used
+  Metal. Live Qwen generation was not exercised in this slice. No downloads or
+  external collection occurred; generated artifacts remained outside Git.
+- Verification: all 241 Python tests passed with ALMG_METAL_TESTS=1; all 16 Flutter
+  tests passed; Flutter analysis clean. Tests cover no execution before approval,
+  exact revision binding, unavailable approaches, stale/during-planning capability
+  changes, invalid planner output and goal bounds.
+- Remaining: main planner discovery/routing for a fully integrated decoder recipe,
+  live-Qwen approach verification, user dataset integration, general scheduling,
+  evaluated release gates and full acceptance verification. P3-LMF-01 remains open;
+  physical power and Windows blockers remain independent.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

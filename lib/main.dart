@@ -748,6 +748,7 @@ class _StudioPageState extends State<StudioPage> {
   Future<Map<String, dynamic>> _request(
     String path, [
     Map<String, dynamic>? body,
+    Duration timeout = const Duration(seconds: 8),
   ]) async {
     final request = await _http.openUrl(
       body == null ? 'GET' : 'POST',
@@ -760,7 +761,7 @@ class _StudioPageState extends State<StudioPage> {
       request.contentLength = bytes.length;
       request.add(bytes);
     }
-    final response = await request.close().timeout(const Duration(seconds: 8));
+    final response = await request.close().timeout(timeout);
     final data = jsonDecode(
       await response.transform(utf8.decoder).join(),
     ) as Map<String, dynamic>;
@@ -1575,9 +1576,46 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
-  Future<void> _startDecoderTrial([String? id]) async {
+  Future<void> _planDecoderTrial() async {
+    final goal = await showDialog<String>(context: context,
+      builder: (context) => const _DecoderTrialGoalDialog());
+    if (goal == null || goal.trim().isEmpty || !mounted) return;
+    var waitingShown = true;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => const AlertDialog(
+      title: Text('Asking local Qwen'),
+      content: Row(mainAxisSize: MainAxisSize.min, children: [CircularProgressIndicator(), SizedBox(width: 16), Text('Preparing an approach proposal…')]),
+    )));
     try {
-      final created = await _request(id == null ? '/decoder-trials' : '/decoder-trials/$id/resume', {'confirmed': true});
+      final proposal = await _request('/decoder-trial-proposals', {'goal': goal}, const Duration(seconds: 120));
+      if (!mounted) return;
+      Navigator.pop(context);
+      waitingShown = false;
+      final approved = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Review trial approach'),
+        scrollable: true,
+        content: SizedBox(width: 520, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Goal: ${proposal['goal']}'),
+          Text('Recommended approach: ${proposal['approach']}'),
+          Text(proposal['reason'] as String),
+          const Text('Scope: fixed generated local text. This does not enable training on your own dataset or release a model.'),
+          if (proposal['executable'] != true) const Text('This approach is unavailable in the decoder trial workflow. No execution will start.'),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+          if (proposal['executable'] == true) TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm from-scratch trial'))],
+      ));
+      if (approved == true && mounted) await _startDecoderTrial(proposal: proposal);
+    } catch (error) {
+      if (mounted && waitingShown) Navigator.pop(context);
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _startDecoderTrial({String? id, Map<String, dynamic>? proposal}) async {
+    try {
+      final created = await _request(id == null ? '/decoder-trials' : '/decoder-trials/$id/resume', {
+        'confirmed': true, if (proposal != null) 'proposal_id': proposal['id'],
+        if (proposal != null) 'proposal_revision': proposal['revision'],
+      });
       final trialId = created['id'];
       var record = await _request('/decoder-trials/$trialId');
       for (var attempt = 0; attempt < 40 && ['queued', 'running'].contains(record['status']); attempt++) {
@@ -1617,7 +1655,7 @@ class _StudioPageState extends State<StudioPage> {
         }, child: const Text('Cancel saved decoder trial')),
         if (record['status'] == 'interrupted') TextButton(onPressed: () {
           Navigator.pop(context);
-          _startDecoderTrial(record['id'] as String);
+          _startDecoderTrial(id: record['id'] as String);
         }, child: const Text('Approve resume of saved trial')),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
@@ -1739,6 +1777,11 @@ class _StudioPageState extends State<StudioPage> {
               Navigator.pop(context);
               _startDecoderTrial();
             }, child: const Text('Approve and save a local decoder trial')),
+            TextButton(onPressed: () {
+              Navigator.pop(context);
+              _planDecoderTrial();
+            }, child: const Text('Plan a local decoder trial with Qwen')),
+
             TextButton(onPressed: () {
               Navigator.pop(context);
               _showSavedDecoderTrials();
@@ -3276,4 +3319,30 @@ class _StudioPageState extends State<StudioPage> {
       if (mounted) setState(() => _busy = false);
     }
   }
+}
+
+class _DecoderTrialGoalDialog extends StatefulWidget {
+  const _DecoderTrialGoalDialog();
+
+  @override
+  State<_DecoderTrialGoalDialog> createState() => _DecoderTrialGoalDialogState();
+}
+
+class _DecoderTrialGoalDialogState extends State<_DecoderTrialGoalDialog> {
+  final _input = TextEditingController();
+
+  @override
+  void dispose() {
+    _input.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Plan a local decoder trial'),
+    content: SizedBox(width: 520, child: TextField(controller: _input, autofocus: true, maxLength: 3000, maxLines: 4,
+      decoration: const InputDecoration(labelText: 'Trial goal', helperText: 'Local Qwen recommends an approach. Only a tiny generated-text trial can run.'))),
+    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      TextButton(onPressed: () => Navigator.pop(context, _input.text), child: const Text('Ask local Qwen'))],
+  );
 }

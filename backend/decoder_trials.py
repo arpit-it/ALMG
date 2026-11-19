@@ -24,6 +24,61 @@ def specification():
                             'decoder_checkpoint.py', 'decoder_bundle.py')}}
 
 
+def propose(root, goal, planner):
+    if not isinstance(goal, str) or not 1 <= len(goal.strip()) <= 3000:
+        raise ValueError('Describe the trial goal in 1 to 3000 characters.')
+    spec = specification()
+    result = planner(
+        'Recommend one approach: from_scratch, fine_tuning, distillation, or retrieval. '
+        'Only a tiny from_scratch generated-local-text trial is executable here. '
+        'User-dataset training, pretrained adaptation and retrieval execution are not available in this trial workflow. '
+        'Return approach and a short reason. Do not execute tools or claim that a trial satisfies a general user-model goal.',
+        {'goal': goal.strip(), 'available_trial': spec})
+    if not isinstance(result, dict):
+        raise ValueError('The planner returned an invalid proposal.')
+    approach, reason = result.get('approach'), result.get('reason')
+    if approach not in ('from_scratch', 'fine_tuning', 'distillation', 'retrieval'):
+        raise ValueError('The planner returned an unsupported approach.')
+    if not isinstance(reason, str) or not 1 <= len(reason.strip()) <= 600:
+        raise ValueError('The planner must provide a short explanation.')
+    if spec != specification():
+        raise ValueError('Available trial capabilities changed while planning. Request a fresh proposal.')
+    proposal = {'schema_version': 1, 'id': uuid.uuid4().hex, 'goal': goal.strip(),
+                'approach': approach, 'reason': reason.strip(),
+                'scope': 'generated_local_text_fixture', 'executable': approach == 'from_scratch',
+                'specification_revision': run_manifest.digest(spec)}
+    proposal['revision'] = run_manifest.digest(proposal)
+    directory = Path(root) / 'decoder-trial-proposals'
+    directory.mkdir(parents=True, exist_ok=True)
+    temporary = directory / (proposal['id'] + '.tmp')
+    temporary.write_text(json.dumps(proposal, indent=2, ensure_ascii=False), encoding='utf-8')
+    temporary.replace(directory / (proposal['id'] + '.json'))
+    return proposal
+
+
+def approved_proposal(root, proposal_id, revision, spec):
+    folder(root, proposal_id)  # Validate the identifier before constructing a path.
+    try:
+        proposal = json.loads((Path(root) / 'decoder-trial-proposals' / (proposal_id + '.json')).read_text(encoding='utf-8'))
+        payload = {key: value for key, value in proposal.items() if key != 'revision'}
+        if (type(proposal.get('schema_version')) is not int or proposal['schema_version'] != 1
+                or proposal.get('id') != proposal_id or proposal.get('revision') != revision
+                or proposal['revision'] != run_manifest.digest(payload)
+                or proposal.get('specification_revision') != run_manifest.digest(spec)):
+            raise ValueError('The proposal changed. Request and review a fresh proposal before approving.')
+        if proposal.get('approach') != 'from_scratch' or proposal.get('executable') is not True:
+            raise ValueError('This approach cannot execute in the local decoder trial workflow.')
+        return proposal
+    except (OSError, TypeError, AttributeError) as error:
+        raise ValueError('The trial proposal is unavailable. Request and review a new proposal.') from error
+
+
+def approval_revision(record):
+    if record.get('proposal') is None:
+        return run_manifest.digest(record['specification'])
+    return run_manifest.digest({'specification': record['specification'], 'proposal': record['proposal']})
+
+
 def folder(root, trial_id):
     if not isinstance(trial_id, str) or not re.fullmatch('[a-f0-9]{32}', trial_id):
         raise ValueError('Invalid decoder trial ID.')
@@ -93,7 +148,7 @@ def execute(root, trial_id):
             record = read(root, trial_id)
             stop_event = _CANCEL[key]
             if (record.get('specification') != specification()
-                    or record.get('approval', {}).get('revision') != run_manifest.digest(record.get('specification'))):
+                    or record.get('approval', {}).get('revision') != approval_revision(record)):
                 raise ValueError('Saved decoder trial approval no longer matches this implementation. Approve a new trial.')
             if stop_event.is_set():
                 raise decoder_training.Cancelled('Cancelled before training. Approve resume to continue.')
@@ -122,7 +177,7 @@ def execute(root, trial_id):
             _CANCEL.pop(key, None)
 
 
-def start(root, confirmed, submit, trial_id=None):
+def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_revision=None):
     if confirmed is not True:
         raise ValueError('Approve the generated-text decoder trial before starting it.')
     spec = specification()
@@ -130,6 +185,8 @@ def start(root, confirmed, submit, trial_id=None):
         if trial_id is None:
             trial_id = uuid.uuid4().hex
             record = {'schema_version': 1, 'id': trial_id, 'created_at': datetime.now(timezone.utc).isoformat()}
+            if proposal_id is not None:
+                record['proposal'] = approved_proposal(root, proposal_id, proposal_revision, spec)
         else:
             record = read(root, trial_id)
             if record.get('status') != 'interrupted' or (str(Path(root)), trial_id) in _ACTIVE:
@@ -143,6 +200,7 @@ def start(root, confirmed, submit, trial_id=None):
         record.update(status='queued', error=None, cancel_requested=False, interruption_reason=None, specification=spec,
                       approval={'id': uuid.uuid4().hex, 'confirmed_at': datetime.now(timezone.utc).isoformat(),
                                 'revision': run_manifest.digest(spec)})
+        record['approval']['revision'] = approval_revision(record)
         write(root, record)
         _ACTIVE.add((str(Path(root)), trial_id))
         _CANCEL[(str(Path(root)), trial_id)] = threading.Event()
