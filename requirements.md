@@ -2363,6 +2363,39 @@ P3-LMF-01 partial progress · resource monitoring during decoder optimization ·
   physical/Windows blockers stay separate and skipped. No external collection,
   generated artifacts, downloaded weights or unrelated user edits are committed.
 
+P3-LMF-01 partial progress · versioned private decoder inference · 2026-11-19:
+- Added native prompt-based preview for completed private decoder trials, through
+  a confirmed local API. Inference loads and validates the saved model/tokenizer
+  bundle from the derived trial path (not a stored arbitrary artifact path), uses
+  CPU greedy decoding and never changes release status or weights. Initial prompts
+  must fit the saved context and vocabulary; generation uses a sliding context
+  and is bounded to 1–32 new tokens (12 in the native UI).
+- Added version-1 inference receipts with prompt/output/token IDs, algorithm/runtime,
+  context policy, implementation digest and verified bundle-manifest digest. Keeps
+  at most 20 private previews on the durable trial; immutable bundle files and
+  existing approval/results are preserved. Missing consent, incomplete trials,
+  invalid bounds, unknown words, corrupted bundles and nonfinite scores fail
+  without recording a successful preview. No tokenizer refitting occurs.
+- Local app verification: rebuilt/launched macOS ALMG using an isolated copy of an
+  existing actual Metal-trained bundle. Opened its linked result and native preview,
+  entered “cedar dune” and approved local generation. The app generated the expected
+  12-token continuation “amber birch cedar dune” repeated three times on CPU and
+  saved a matching versioned receipt. Native “unseen_word” input was rejected with
+  no added history. Verified all bundle file hashes unchanged. Restarted backend/
+  app, reopened the linked trial and verified its full record/preview history and
+  bundle hashes were unchanged. Evidence: /tmp/almg-inference-qa/{preview-ui.json,
+  invalid-prompt-ui.txt,restarted-ui.json,bundle-before.json}. No new external
+  collection, pretrained student loading or model release occurred.
+- Verification: 278 backend tests passed with ALMG_METAL_TESTS=1; 16 Flutter tests
+  passed; Flutter analysis clean. New coverage verifies context sliding, deterministic
+  CPU output, consent/state/bounds, corruption/nonfinite-score rejection, bounded
+  history, API dispatch, immutable artifacts and retention of existing approval.
+- Remaining: physical power/sleep/idle verification, richer data/tokenizers,
+  evaluated release/post-training contracts and full acceptance verification.
+  P3-LMF-01 remains open; independent physical/Windows blockers remain skipped.
+  Generated models, private preview data, downloaded weights and unrelated edits
+  are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

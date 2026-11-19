@@ -7,9 +7,9 @@ import threading
 import uuid
 
 if __package__:
-    from . import decoder_dataset_training, decoder_training, recipe_contracts, run_manifest, training_resources
+    from . import decoder_bundle, decoder_dataset_training, decoder_training, recipe_contracts, run_manifest, training_resources
 else:
-    import decoder_dataset_training, decoder_training, recipe_contracts, run_manifest, training_resources
+    import decoder_bundle, decoder_dataset_training, decoder_training, recipe_contracts, run_manifest, training_resources
 
 _LOCK = threading.Lock()
 _ACTIVE = set()
@@ -160,6 +160,51 @@ def list_trials(root, limit=20):
                 except ValueError:
                     continue
     return sorted(records, key=lambda record: record.get('created_at', ''), reverse=True)[:limit]
+
+
+def preview(root, trial_id, confirmed, prompt, max_new_tokens=12):
+    """Run bounded CPU inference from a verified private bundle; never release it."""
+    if confirmed is not True:
+        raise ValueError('Confirm local inference on this private decoder trial.')
+    if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 4096:
+        raise ValueError('Provide a prompt of 1 to 4096 characters from the saved vocabulary.')
+    if type(max_new_tokens) is not int or not 1 <= max_new_tokens <= 32:
+        raise ValueError('Generate between 1 and 32 new tokens.')
+    with _LOCK:
+        record = read(root, trial_id)
+        if record['status'] != 'complete':
+            raise ValueError('Complete the private decoder trial before previewing it.')
+    model, tokenizer, manifest = decoder_bundle.load(folder(root, trial_id) / 'artifacts' / 'bundle')
+    tokens = tokenizer.encode(prompt.strip())
+    if len(tokens) > model.config['context_length']:
+        raise ValueError('The prompt exceeds the saved decoder context length.')
+    import numpy as np
+    generated = []
+    try:
+        with np.errstate(over='raise', invalid='raise', divide='raise'):
+            for _ in range(max_new_tokens):
+                scores = model.logits([tokens[-model.config['context_length']:]])[0, -1]
+                if not np.isfinite(scores).all():
+                    raise ValueError('The private decoder produced invalid inference scores.')
+                token = int(np.argmax(scores))
+                tokens.append(token)
+                generated.append(token)
+    except FloatingPointError as error:
+        raise ValueError('The private decoder produced invalid inference scores.') from error
+    result = {'schema_version': 1, 'id': uuid.uuid4().hex,
+              'created_at': datetime.now(timezone.utc).isoformat(), 'trial_id': trial_id,
+              'prompt': prompt.strip(), 'completion': tokenizer.decode(generated),
+              'text': tokenizer.decode(tokens), 'generated_token_ids': generated,
+              'bundle_manifest_sha256': run_manifest.digest(manifest),
+              'inference': {'version': 1, 'algorithm': 'greedy', 'runtime': 'numpy_cpu',
+                            'max_new_tokens': max_new_tokens, 'context_policy': 'sliding_window',
+                            'source_sha256': run_manifest.file_digest(Path(__file__))},
+              'scope': 'Private local trial preview; no model release.'}
+    with _LOCK:
+        saved = read(root, trial_id)
+        saved['previews'] = [*saved.get('previews', [])[-19:], result]
+        write(root, saved)
+    return result
 
 
 def recover(root):

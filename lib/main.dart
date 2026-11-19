@@ -1775,6 +1775,10 @@ class _StudioPageState extends State<StudioPage> {
           Navigator.pop(context);
           _cancelDecoderTrial(record['id'] as String);
         }, child: const Text('Cancel saved decoder trial')),
+        if (record['status'] == 'complete') TextButton(onPressed: () {
+          Navigator.pop(context);
+          _previewDecoderTrial(record['id'] as String);
+        }, child: const Text('Preview private decoder')),
         if (record['status'] == 'interrupted') TextButton(onPressed: () {
           Navigator.pop(context);
           _startDecoderTrial(id: record['id'] as String);
@@ -1782,6 +1786,32 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _previewDecoderTrial(String id) async {
+    var prompt = '';
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Preview private decoder'),
+      content: SizedBox(width: 520, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Use words from the saved training vocabulary and fit the model context. Generate 12 tokens locally on CPU with greedy decoding. This does not release a model.'),
+        TextField(autofocus: true, maxLength: 4096, decoration: const InputDecoration(labelText: 'Prompt'),
+          onChanged: (value) => prompt = value),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Generate local text'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final result = await _request('/decoder-trials/$id/preview', {'confirmed': true, 'prompt': prompt, 'max_new_tokens': 12});
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Private decoder preview'), scrollable: true,
+        content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(result))),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _showSavedDecoderTrials() async {
