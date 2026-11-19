@@ -3254,6 +3254,39 @@ P3-LMF-02 partial progress · reviewed Markdown source ingestion · 2026-11-20:
   Physical power/Windows blockers remain open and skipped. Generated fixtures,
   datasets, weights and unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · resumable streamed byte-token statistics · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed indexes now offer an explicitly
+  confirmed fixed UTF-8 byte-alphabet scan. Versioned reports contain all 256 token
+  counts by split, unique-record versus original-occurrence weighted totals,
+  character/token totals, record-length extrema and counts over the current
+  byte tokenizer's 4096-byte document limit. Special tokens are excluded. This
+  performs no tokenizer fitting, word/BPE analysis or training admission.
+- Scan progress uses bounded batches (100 records/about 1 MiB of text), keyset
+  cursors and atomic report replacement. Report revisions bind index/source
+  provenance, implementation/runtime and the counting method. Source signatures
+  are checked per batch and full index integrity at start/completion. Changed
+  inputs/code reject resume while preserving progress. Completed reports remain
+  unchanged; raw record text is not stored in the report.
+- Local app verification: rebuilt/launched ALMG, confirmed the scan over the
+  isolated 2,000-record index and paused after 200 records. Restarted both backend
+  and app, reopened the saved report and verified identical content/revision,
+  then resumed to completion. Native report fe1b40880565458891c47e00c83ccb04
+  contains 473,857 byte tokens. Every one of the 256 histogram counts per split,
+  including occurrence weights, matches an independent source-index recount.
+  Source manifest/database bytes remain unchanged; no trial/tokenizer was created.
+  Evidence: /tmp/almg-byte-stats-qa/{consent-ui.txt,paused-ui.json,
+  restarted-paused-ui.json,completed-ui.json,completed-ui.txt,verification.json}.
+- Validation: 359 Python tests, 27 Flutter tests and Flutter analysis pass. New
+  tests cover exact counts, duplicate weighting, Unicode byte equivalence, long
+  record warnings, process reload, failed publication recovery, unchanged source,
+  consent/code/source rejection and report integrity checks.
+- Remaining: saved/train-fitted tokenizer and streamed training integration,
+  contamination/near-duplicate policies, broader extraction and larger-than-RAM
+  acceptance, plus other dataset-engineering criteria. This diagnostic does not
+  enable training for long records or establish evaluation cleanliness. Physical
+  power/Windows blockers remain separate and skipped. Generated reports, fixture
+  data, artifacts, weights and unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

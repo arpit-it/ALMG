@@ -1959,6 +1959,82 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _showStreamByteStatistics(Map<String, dynamic> record) async {
+    final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Byte token distribution · ${record['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${record['processed_records']} / ${record['total_records']} unique normalized records analyzed.'),
+        const Text('Fixed UTF-8 byte alphabet only. Counts exclude special tokens; repeated source occurrences are reported separately. '
+          'Records over 4096 bytes exceed the current byte tokenizer’s document limit. No tokenizer is fitted and training remains disabled.'),
+        for (final entry in (record['splits'] as Map).entries)
+          Text('${entry.key}: ${entry.value['unique_records']} records · ${entry.value['tokens']} byte tokens · '
+            '${entry.value['records_over_current_tokenizer_limit']} over the document limit'),
+        ExpansionTile(title: const Text('View byte statistics and provenance'), children: [
+          SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+        ]),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume byte statistics'))],
+    ));
+    if (resume == true && mounted) await _runStreamByteStatistics(record);
+  }
+
+  Future<void> _beginStreamByteStatistics(Map<String, dynamic> index) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Analyze byte token distribution?'),
+      content: Text('Scan all ${index['unique_records']} unique normalized records using the fixed UTF-8 byte alphabet. '
+        'Save resumable counts by split without storing text or changing the source index. This does not fit a tokenizer or approve training.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm byte statistics'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final record = await _request('/decoder-stream-indexes/${index['id']}/byte-statistics', {'confirmed': true}, const Duration(minutes: 10));
+      if (mounted) await _runStreamByteStatistics(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _savedStreamByteStatistics(String indexId) async {
+    try {
+      final reports = (await _request('/decoder-stream-indexes/$indexId/byte-statistics'))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved byte statistics'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved byte statistics.')),
+          for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['id'] as String).substring(0, 8)} · ${report['status']} · ${report['processed_records']}/${report['total_records']} analyzed')),
+        ],
+      ));
+      if (selected != null && mounted) await _showStreamByteStatistics(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _runStreamByteStatistics(Map<String, dynamic> initial) async {
+    var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: StatefulBuilder(builder: (context, update) {
+        refresh = update;
+        return AlertDialog(title: const Text('Analyzing byte distribution'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: (record['total_records'] as num) == 0 ? 0 : (record['processed_records'] as num) / (record['total_records'] as num)),
+          Text('${record['processed_records']} / ${record['total_records']} analyzed'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause byte statistics'))]);
+      }))));
+    try {
+      while (!pause && record['status'] != 'complete') {
+        record = await _request('/decoder-stream-byte-statistics/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        if (!mounted) return;
+        refresh?.call(() {});
+      }
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await _showStreamByteStatistics(record);
+    } catch (error) {
+      refresh = null;
+      if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); }
+    }
+  }
+
   Future<void> _showStreamAudit(Map<String, dynamic> record) async {
     final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: Text('Full-index audit · ${record['status']}'), scrollable: true,
@@ -2048,6 +2124,8 @@ class _StudioPageState extends State<StudioPage> {
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'records'), child: const Text('Review indexed records')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'audit'), child: const Text('Audit full text index')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'byte-statistics'), child: const Text('Analyze byte token distribution')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-byte-statistics'), child: const Text('View saved byte statistics')),
         if (record['status'] == 'complete' && Platform.isMacOS) TextButton(onPressed: () => Navigator.pop(context, 'export'), child: const Text('Review private index export')),
         TextButton(onPressed: () => Navigator.pop(context, 'audits'), child: const Text('View saved full-index audits')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, 'resume'), child: const Text('Resume text indexing'))],
@@ -2064,6 +2142,8 @@ class _StudioPageState extends State<StudioPage> {
     }
     if (action == 'export') await _exportStreamIndex(record['id'] as String);
     if (action == 'audit') await _beginStreamAudit(record);
+    if (action == 'byte-statistics') await _beginStreamByteStatistics(record);
+    if (action == 'saved-byte-statistics') await _savedStreamByteStatistics(record['id'] as String);
     if (action == 'audits') await _savedStreamAudits(record['id'] as String);
   }
 
