@@ -3582,6 +3582,44 @@ P3-LMF-02 partial progress · overlap-bound streamed token windows · 2026-11-20
   open and skipped. Generated windows, reports, fixtures, artifacts, weights and
   unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · bounded source-bound model-input batches · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed token windows now have a read-only
+  model-input adapter returning bounded rectangular inputs, shifted next-token
+  targets, sequence lengths and required loss masks, with source provenance per row.
+  Width is 16 and batch size is limited to 1–16 windows. Numeric zero padding is
+  masked storage, not a new vocabulary token. Splits and document boundaries stay
+  separate; duplicate occurrences are not expanded and no model is executed.
+- Each read requires the exact window review and revalidates the current index,
+  tokenizer and completed overlap evidence against stored revisions. Stale sources,
+  reviews/cursors, cross-split requests, invalid sizes and token contracts reject
+  without changing artifacts. The new response format is versioned; existing
+  stored artifact schemas and pending preparation implementation hashes are unchanged.
+- Native “Inspect model input batches” supports train/validation/test selection,
+  bounded Next/First controls, recoverable errors and progressively disclosed
+  arrays/masks/source references. Token IDs may encode personal text, as disclosed;
+  this does not grant training approval or start a model.
+- Local app verification: rebuilt/launched ALMG against an isolated copy of the
+  completed 401-record window fixture. Inspected real training arrays, paged to
+  a partial final window (sequence lengths [16,16,16,4]) and verified padded values
+  are zero with zero loss mask. Selected validation, paged and reset to the first
+  batch; reset output matches exactly and all rows remain validation-only. Every
+  captured input/target slice, mask and source reference independently matches
+  source data. All five source artifact namespaces remain byte-for-byte unchanged;
+  no training started. Evidence: /tmp/almg-stream-model-batch-qa/{first-batch-ui.json,
+  padded-batch-ui.json,padded-view-ui.txt,validation-batch-ui.json,
+  reset-validation-batch-ui.json,verification.json}.
+- Validation: 386 Python tests, 32 Flutter tests and Flutter analysis pass. New
+  tests cover complete training-population coverage, correct shifts/padding/masks,
+  held-out isolation, cursor/page limits, stale review/source rejection, source
+  preservation and native-widget paging/reset/split/retry behavior.
+- Remaining: actual streamed optimization, scheduling, checkpoint cursor binding
+  and final training admission; shuffling/sampling weights and broader/scalable
+  contamination policies; larger-than-RAM acceptance and other dataset criteria.
+  Revalidation currently rehashes source artifacts for correctness; caching and
+  large-corpus throughput remain future work. Physical power/Windows blockers
+  stay open and skipped. Generated batches, fixtures, artifacts, weights and
+  unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

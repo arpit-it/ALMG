@@ -20,6 +20,7 @@ import 'streamed_source_client.dart';
 import 'stream_index_records_dialog.dart';
 import 'stream_index_export_client.dart';
 import 'local_text_documents.dart';
+import 'stream_model_batches_dialog.dart';
 
 /// Starts the Flutter desktop application.
 void main() {
@@ -2103,6 +2104,11 @@ class _StudioPageState extends State<StudioPage> {
             title: 'Review streamed window records', description: 'Token IDs encode original text. Source references and split boundaries are preserved; training remains disabled.',
             request: (path, body) => _request(path, body)));
         }, child: const Text('Review token windows')),
+        if (record['status'] == 'complete') TextButton(onPressed: () {
+          Navigator.pop(context, false);
+          showDialog<void>(context: this.context, builder: (context) => StreamModelBatchesDialog(
+            reviewed: record, request: (path, body) => _request(path, body, const Duration(minutes: 10))));
+        }, child: const Text('Inspect model input batches')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume streamed windows'))],
     ));
     if (resume == true && mounted) await _runStreamWindows(record);
