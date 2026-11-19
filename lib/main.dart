@@ -2002,6 +2002,88 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _showStreamLanguages(Map<String, dynamic> record) async {
+    final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Streamed languages · ${record['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${record['processed_records']} / ${record['total_records']} unique normalized records analyzed.'),
+        const Text('Optional local dominant-language estimates only. Short, mixed or unsupported text can be unknown. '
+          'Source data remains unchanged; no filtering or training approval is granted.'),
+        Text('${record['identified_records']} identified · ${record['unknown_records']} unknown · ${record['unavailable_batches']} unavailable batches'),
+        Text('Language counts: ${record['language_counts']}'),
+        ExpansionTile(title: const Text('View streamed languages and provenance'), children: [
+          SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+        ]),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] == 'complete') TextButton(onPressed: () {
+          Navigator.pop(context, false);
+          showDialog<void>(context: this.context, builder: (context) => StreamIndexRecordsDialog(
+            indexId: record['id'] as String, recordsPath: '/decoder-stream-languages/${record['id']}/records',
+            title: 'Review streamed language records', description: 'Dominant-language estimates with source references. Original text is omitted. Unknown is retained; no training policy changes.',
+            request: (path, body) => _request(path, body)));
+        }, child: const Text('Review language records')),
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume streamed languages'))],
+    ));
+    if (resume == true && mounted) await _runStreamLanguages(record);
+  }
+
+  Future<void> _beginStreamLanguages(Map<String, dynamic> index) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Analyze streamed languages?'),
+      content: Text('Identify the dominant language of all ${index['unique_records']} unique normalized records with the optional local recognizer. '
+        'Save resumable per-record estimates and split counts without storing text or changing the source index. No collection or training starts.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm streamed language scan'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final record = await _request('/decoder-stream-indexes/${index['id']}/languages', {'confirmed': true}, const Duration(minutes: 10));
+      if (mounted) await _runStreamLanguages(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _savedStreamLanguages(String indexId) async {
+    try {
+      final reports = (await _request('/decoder-stream-indexes/$indexId/languages'))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved streamed language reports'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved streamed languages.')),
+          for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['id'] as String).substring(0, 8)} · ${report['status']} · ${report['processed_records']}/${report['total_records']} analyzed')),
+        ],
+      ));
+      if (selected != null && mounted) await _showStreamLanguages(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _runStreamLanguages(Map<String, dynamic> initial) async {
+    var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: StatefulBuilder(builder: (context, update) {
+        refresh = update;
+        return AlertDialog(title: const Text('Analyzing streamed languages'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: (record['total_records'] as num) == 0 ? 0 : (record['processed_records'] as num) / (record['total_records'] as num)),
+          Text('${record['processed_records']} / ${record['total_records']} analyzed'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause streamed languages'))]);
+      }))));
+    try {
+      while (!pause && record['status'] != 'complete') {
+        record = await _request('/decoder-stream-languages/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        if (!mounted) return;
+        refresh?.call(() {});
+      }
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await _showStreamLanguages(record);
+    } catch (error) {
+      refresh = null;
+      if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); }
+    }
+  }
+
   Future<void> _showStreamByteStatistics(Map<String, dynamic> record) async {
     final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Byte token distribution · ${record['status']}'), scrollable: true,
@@ -2168,6 +2250,8 @@ class _StudioPageState extends State<StudioPage> {
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'records'), child: const Text('Review indexed records')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'audit'), child: const Text('Audit full text index')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'permissions'), child: const Text('Review streamed source permissions')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'languages'), child: const Text('Identify streamed record languages')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-languages'), child: const Text('View saved streamed language reports')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'byte-statistics'), child: const Text('Analyze byte token distribution')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-byte-statistics'), child: const Text('View saved byte statistics')),
         if (record['status'] == 'complete' && Platform.isMacOS) TextButton(onPressed: () => Navigator.pop(context, 'export'), child: const Text('Review private index export')),
@@ -2187,6 +2271,8 @@ class _StudioPageState extends State<StudioPage> {
     if (action == 'export') await _exportStreamIndex(record['id'] as String);
     if (action == 'audit') await _beginStreamAudit(record);
     if (action == 'permissions') await _reviewStreamSourcePermissions(record['id'] as String);
+    if (action == 'languages') await _beginStreamLanguages(record);
+    if (action == 'saved-languages') await _savedStreamLanguages(record['id'] as String);
     if (action == 'byte-statistics') await _beginStreamByteStatistics(record);
     if (action == 'saved-byte-statistics') await _savedStreamByteStatistics(record['id'] as String);
     if (action == 'audits') await _savedStreamAudits(record['id'] as String);

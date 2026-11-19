@@ -10,6 +10,20 @@ Map<String, dynamic> page(Map<String, dynamic> body) => {
 };
 
 void main() {
+  testWidgets('language records show estimates without invented hygiene or privacy scores', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamIndexRecordsDialog(
+      indexId: 'fixture', recordsPath: '/decoder-stream-languages/fixture/records', request: (path, body) async {
+        expect(path, '/decoder-stream-languages/fixture/records');
+        return {'records': [{'first_line': 3, 'split': 'train', 'occurrences': 1,
+          'language': 'und', 'status': 'unknown', 'reason': 'provider_unavailable',
+          'text_excerpt': 'Original text omitted.', 'source_sha256': 'source-hash'}], 'next_cursor': null};
+      }))));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('language und'), findsOneWidget);
+    expect(find.textContaining('potential contact details'), findsNothing);
+    expect(find.textContaining('hygiene'), findsNothing);
+  });
+
   testWidgets('record review pages forward/back and resets its cursor when filtering', (tester) async {
     final calls = <Map<String, dynamic>>[];
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamIndexRecordsDialog(indexId: 'fixture', request: (path, body) async {

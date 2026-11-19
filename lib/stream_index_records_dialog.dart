@@ -55,10 +55,13 @@ class _StreamIndexRecordsDialogState extends State<StreamIndexRecordsDialog> {
             final row = Map<String, dynamic>.from(records[index] as Map);
             final metadata = Map<String, dynamic>.from(row)..remove('text_excerpt');
             return Card(child: Padding(padding: const EdgeInsets.all(8), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              if (row['language'] != null)
+                Text('Line ${row['first_line']} · ${row['split']} · language ${row['language']} · ${row['status']}')
+              else
               Text('Line ${row['first_line']} · ${row['split']} · ${row['occurrences']} occurrences · hygiene ${(row['text_hygiene'] as Map)['score']}'),
               SelectableText(row['text_excerpt'] as String),
               if (row['excerpt_truncated'] == true) const Text('Excerpt limited to 512 characters.'),
-              Text('${row['privacy_matches']} potential contact details'),
+              if (row['privacy_matches'] != null) Text('${row['privacy_matches']} potential contact details'),
               ExpansionTile(title: const Text('Source details and findings'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(metadata))]),
             ])));
           })),

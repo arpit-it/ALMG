@@ -3321,6 +3321,42 @@ P3-LMF-02 partial progress · streamed source permission history · 2026-11-20:
   blockers remain separate and skipped. Generated declarations, export packages,
   fixtures, weights and unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · resumable streamed language identification · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed indexes now offer confirmed,
+  resumable dominant-language identification through the existing optional local
+  macOS NaturalLanguage adapter. Processing is bounded to 100 records/about one
+  million characters per batch. Unsupported/unavailable recognition remains
+  explicit unknown; short text, confidence and margin rules match the existing
+  small-dataset language report. No new provider dependency or network is added.
+- Versioned SQLite reports preserve per-record source hashes, line/byte offsets,
+  occurrences, split, candidates/confidence and unknown reasons while omitting
+  source text. Summaries count languages by split. The native saved-report view
+  supports pause/resume and bounded record details/pagination. No filtering or
+  training approval changes. Source/code/runtime bindings and atomic transactions
+  preserve committed progress on failure and reject changed inputs/implementations.
+- Local app verification: rebuilt/launched ALMG with an isolated 601-record local
+  multilingual index. Confirmed a real local scan, paused at 100 records, restarted
+  backend and app, reopened identical saved progress, then resumed to completion.
+  Report ac4736f8dae24fddb1f11ea1f266e667 contains 200 English, 200 French,
+  200 Spanish and one explicit unknown (insufficient alphabetic text). Per-record
+  rows independently match these totals and retain original source references.
+  Exercised native record details and Next records (10 records per page). Original
+  source-index hashes are unchanged and no training started. Evidence:
+  /tmp/almg-stream-language-qa/{consent-ui.txt,paused-ui.json,restarted-ui.json,
+  completed-ui.json,records-page-ui.txt,record-details-ui.json,next-page-ui.txt,
+  verification.json}.
+- Validation: 365 Python tests, 28 Flutter tests and Flutter analysis pass. Added
+  coverage for full-population counts, reload/resume, transaction failure recovery,
+  provider unavailable/short-text unknowns, source provenance/text omission, bounded
+  revision-bound pagination, changed source/code/consent rejection and language-row
+  rendering without invented hygiene/privacy findings.
+- Remaining: probabilistic language identification does not establish language
+  correctness for all text. Broader extraction, streamed tokenizer/training and
+  contamination/near-duplicate integration, larger-than-RAM acceptance and other
+  dataset criteria remain open. Physical power/Windows blockers stay separate and
+  skipped. Generated reports, fixtures, artifacts, weights and unrelated edits are
+  excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
