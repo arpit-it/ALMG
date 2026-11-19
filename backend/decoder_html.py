@@ -80,7 +80,7 @@ def review(documents):
     return record
 
 
-def prepare(root,documents,confirmed,reviewed):
+def prepare(root,documents,confirmed,reviewed,*,_dataset_id=None):
     if confirmed is not True:raise ValueError('Confirm the exact local HTML extraction review.')
     current=review(documents)
     if not isinstance(reviewed,dict) or reviewed!=current:raise ValueError('The HTML extraction review changed. Reopen it before preparation.')
@@ -90,6 +90,6 @@ def prepare(root,documents,confirmed,reviewed):
                       sources=[{k:v for k,v in source.items() if k not in ('preview','preview_truncated')} for source in current['sources']])
     provenance['revision']=digest(provenance)
     # Keep the reviewed identity and independently hash the preview-free provenance.
-    return datasets.prepare(root,extracted,True,'utf8_bytes',_derivation={
+    return datasets.prepare(root,extracted,True,'utf8_bytes',_dataset_id=_dataset_id,_derivation={
         'version':1,'operation':'extract_local_html','extraction_review_revision':current['revision'],
         'extraction_provenance':provenance,'policy':'original_hashes_preserved_no_training_approval'})

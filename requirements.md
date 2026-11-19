@@ -3472,6 +3472,42 @@ P3-LMF-02 partial progress · reviewed offline HTML text extraction · 2026-11-2
   workflow is delivered. Physical power/Windows blockers remain open and skipped.
   Generated inputs, datasets, exports, weights and unrelated edits are excluded.
 
+P3-LMF-02 partial progress · durable reviewed HTML preparations · 2026-11-20:
+- [ ] P3-LMF-02 remains open. The HTML extraction review now offers explicit
+  “Save HTML preparation draft”, preserving the original bounded inputs and exact
+  extraction review locally without publishing a dataset. Native saved-draft views
+  expose the stored review, implementation status and explicit prepare/open actions.
+  No automatic recovery, collection or training starts. Original HTML is retained
+  in the private draft only; prepared dataset/export contents keep their prior scope.
+- New versioned HTML-draft records bind original inputs, extraction review and
+  implementation hashes. Atomic publication uses the draft's stable dataset ID.
+  If the dataset is published but the final draft record write fails, retry verifies
+  and adopts the existing matching dataset instead of creating another. Completed
+  drafts reopen the same integrity-checked dataset. Changed code, stale reviews or
+  tampered inputs reject processing and preserve existing data. Plain-text drafts
+  and previously published datasets are not rewritten.
+- Local app verification: rebuilt/launched ALMG, selected three HTML fixtures and
+  saved draft b5f55e2ed2db4008a376c88a782bc9d2 from its native extraction review.
+  No dataset existed. Restarted backend/app, reopened identical draft/review and
+  confirmed that no automatic preparation occurred. “Prepare saved HTML inputs”
+  then published dataset b5f55e2ed2db4008a376c88a782bc9d2 without selecting files
+  again. Saved original bytes remain unchanged. Reopened the completed draft and
+  its dataset through native controls; metadata matches exactly and publication
+  count remains one. A separate fresh-process check confirms the prior HTML
+  dataset remains readable unchanged. Evidence: /tmp/almg-html-draft-recovery-qa/
+  {review-ui.txt,saved-draft-ui.json,restarted-draft-ui.json,prepared-ui.json,
+  completed-draft-ui.json,reopened-dataset-ui.json,verification.json}.
+- Validation: 377 Python tests, 29 Flutter tests and Flutter analysis pass. New
+  tests cover original-input preservation, reload, explicit consent, stable identity,
+  idempotent reopen/retry, recovery after publication plus record-write failure,
+  stale review/code rejection, tampered-input rejection and no training side effects.
+- Remaining: streamed training/tokenizer/contamination admission, richer document
+  policies, larger-than-RAM acceptance and other dataset criteria. HTML drafts
+  retain the existing small-input bounds; they are not a large-HTML streaming
+  implementation. Physical power/Windows blockers remain open and skipped.
+  Generated drafts, datasets, fixtures, artifacts, weights and unrelated edits are
+  excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
