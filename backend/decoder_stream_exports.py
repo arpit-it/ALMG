@@ -4,10 +4,11 @@ import json
 from pathlib import Path
 
 if __package__:
-    from . import decoder_stream_indexes as indexes
+    from . import decoder_stream_indexes as indexes, decoder_stream_permissions as permissions
     from .run_manifest import digest,file_digest
 else:
     import decoder_stream_indexes as indexes
+    import decoder_stream_permissions as permissions
     from run_manifest import digest,file_digest
 
 FILES=('manifest.json','records.sqlite3')
@@ -21,11 +22,12 @@ def _review(root,index_id,verify):
             or manifest.get('revision')!=digest({key:value for key,value in manifest.items() if key!='revision'})
             or set(manifest.get('files',{}))!={'records.sqlite3'}):
         raise ValueError('Complete and verify the text index before export.')
-    review={'format':'almg-stream-index-export-v1','schema_version':1,'index_id':index_id,
+    review={'format':'almg-stream-index-export-v2','schema_version':2,'index_id':index_id,
             'index_revision':manifest['revision'],'scope':'private_local_normalized_text_index',
             'includes_normalized_text':True,'includes_original_raw_source':False,
             'includes_saved_audits':False,'includes_training_approvals':False,
             'source_provenance':{key:manifest[key] for key in ('source_id','source_name','source_sha256','source_bytes')},
+            'source_permission_review':permissions.snapshot(root,manifest),
             'files':{name:{'bytes':(folder/name).stat().st_size,
                            'sha256':file_digest(folder/name) if name=='manifest.json' else manifest['files'][name]}
                      for name in FILES},

@@ -3287,6 +3287,40 @@ P3-LMF-02 partial progress · resumable streamed byte-token statistics · 2026-1
   power/Windows blockers remain separate and skipped. Generated reports, fixture
   data, artifacts, weights and unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · streamed source permission history · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed indexes now offer source-bound
+  permission review and confirmed user declarations (created source, recorded
+  permission or needs review), with a required evidence/source note. Append-only
+  versioned records bind source hash, index revision, sequence and prior revision.
+  History is bounded to 32 entries; old declarations and the source/index bytes
+  remain unchanged. Declarations explicitly grant neither verified permission
+  nor training approval. Stale reviews, repeated declarations and tampered history
+  fail closed; existing progress/data are preserved.
+- New version-2 private index export receipts include the complete reviewed source
+  permission history and notes. Adding a declaration invalidates an outstanding
+  export review. Existing saved packages are not rewritten; file payloads remain
+  the same manifest and SQLite index. Export review explicitly discloses inclusion
+  of permission notes. No external collection or rights verification is performed.
+- Local app verification: rebuilt/launched ALMG, opened source permission history
+  for the 2,000-record fixture index, selected a basis, entered a synthetic evidence
+  note and confirmed. Native declaration revision
+  02a6f32952226b3508670e826c1522f5ebe5b5e2a5b91948b5aa8799dc585f1c
+  was reread unchanged in a separate process. Reviewed and completed native private
+  export; export-manifest.json exactly matches the reviewed version-2 receipt and
+  includes the saved declaration. Both exported index files match unchanged source
+  files byte-for-byte. No training started. Evidence:
+  /tmp/almg-stream-permission-qa/{empty-review-ui.json,confirmation-ui.txt,
+  saved-review-ui.json,export-review-ui.json,export-saved-ui.txt,verification.json}.
+- Validation: 362 Python tests, 27 Flutter tests and Flutter analysis pass. Tests
+  cover immutable declaration chaining, exact exported history, source preservation,
+  no approval transfer, stale export rejection, consent/validation/duplicate failures,
+  incomplete indexes and tamper rejection.
+- Remaining: actual permission verification/source-specific collection policies,
+  streamed training/tokenizer and contamination integration, richer extraction,
+  larger-than-RAM acceptance and other dataset criteria. Physical power/Windows
+  blockers remain separate and skipped. Generated declarations, export packages,
+  fixtures, weights and unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

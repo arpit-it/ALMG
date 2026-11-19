@@ -1920,7 +1920,7 @@ class _StudioPageState extends State<StudioPage> {
         content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
           const Text('Save a new private folder with normalized document text in SQLite, its immutable manifest and an export receipt. '
             'This includes original text values and may include personal information. Source names, hashes and first-line locations are preserved. '
-            'The original raw-source file, saved audits and training approvals are excluded. Nothing is uploaded or released.'),
+            'Recorded source permission declarations and notes are included in the receipt. The original raw-source file, saved audits and training approvals are excluded. Nothing is uploaded or released.'),
           SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
         ])),
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
@@ -1957,6 +1957,49 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) {
       if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); }
     }
+  }
+
+  Future<void> _reviewStreamSourcePermissions(String indexId) async {
+    try {
+      final review = await _request('/decoder-stream-indexes/$indexId/source-permissions', null, const Duration(minutes: 10));
+      if (!mounted) return;
+      final add = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Streamed source permission history'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Declarations apply to the original source bytes and are saved separately from the unchanged index. '
+            'They are user assertions, not verified permission or training approval. All recorded notes are included in future private index export receipts.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Add source permission declaration'))],
+      ));
+      if (add != true || !mounted) return;
+      final basis = await showDialog<String>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Choose streamed source basis'), children: [
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'user_created'), child: const Text('I created this source')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'permission_recorded'), child: const Text('I have recorded permission')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'needs_review'), child: const Text('Needs further permission review')),
+        ],
+      ));
+      if (basis == null || !mounted) return;
+      var note = '';
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => StatefulBuilder(builder: (context, update) => AlertDialog(
+        title: const Text('Review streamed source declaration'),
+        content: SizedBox(width: 520, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Text('Source: ${review['source_provenance']['source_name']}\nBasis: $basis\n'
+            'Append an immutable declaration without changing source data. Permission is not verified; no training approval is granted. Notes are included in private exports.'),
+          TextField(autofocus: true, maxLength: 1000, maxLines: 3, onChanged: (value) => update(() => note = value),
+            decoration: const InputDecoration(labelText: 'Streamed source evidence note (required)')),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: note.trim().isEmpty ? null : () => Navigator.pop(context, true), child: const Text('Confirm streamed source declaration'))],
+      )));
+      if (confirmed != true || !mounted) return;
+      await _request('/decoder-stream-indexes/$indexId/source-permissions', {
+        'confirmed': true, 'reviewed': review, 'basis': basis, 'note': note,
+      }, const Duration(minutes: 10));
+      if (mounted) await _reviewStreamSourcePermissions(indexId);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
   Future<void> _showStreamByteStatistics(Map<String, dynamic> record) async {
@@ -2124,6 +2167,7 @@ class _StudioPageState extends State<StudioPage> {
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'records'), child: const Text('Review indexed records')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'audit'), child: const Text('Audit full text index')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'permissions'), child: const Text('Review streamed source permissions')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'byte-statistics'), child: const Text('Analyze byte token distribution')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-byte-statistics'), child: const Text('View saved byte statistics')),
         if (record['status'] == 'complete' && Platform.isMacOS) TextButton(onPressed: () => Navigator.pop(context, 'export'), child: const Text('Review private index export')),
@@ -2142,6 +2186,7 @@ class _StudioPageState extends State<StudioPage> {
     }
     if (action == 'export') await _exportStreamIndex(record['id'] as String);
     if (action == 'audit') await _beginStreamAudit(record);
+    if (action == 'permissions') await _reviewStreamSourcePermissions(record['id'] as String);
     if (action == 'byte-statistics') await _beginStreamByteStatistics(record);
     if (action == 'saved-byte-statistics') await _savedStreamByteStatistics(record['id'] as String);
     if (action == 'audits') await _savedStreamAudits(record['id'] as String);
