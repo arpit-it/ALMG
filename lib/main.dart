@@ -1583,6 +1583,9 @@ class _StudioPageState extends State<StudioPage> {
       title: const Text('Decoder dataset prepared for review'), scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(manifest))),
       actions: [
+        TextButton(onPressed: () { Navigator.pop(context); _auditDecoderDataset(manifest['id'] as String); }, child: const Text('Analyze local text quality')),
+        TextButton(onPressed: () { Navigator.pop(context); _showSavedDecoderAudits(manifest['id'] as String); }, child: const Text('View saved quality audits')),
+
         if (manifest['tokenizer'] != null && !(manifest['findings'] as List).any((finding) =>
             ['tokenizer_limits', 'out_of_training_vocabulary'].contains(finding['kind'])))
           TextButton(onPressed: () {
@@ -1598,6 +1601,43 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _showDecoderAudit(Map<String, dynamic> report) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Decoder dataset quality audit'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Local heuristic findings highlight records for review. Original data and training approvals are preserved. This audit does not start training.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(report)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+    ));
+  }
+
+  Future<void> _auditDecoderDataset(String id) async {
+    try {
+      final report = await _request('/decoder-datasets/$id/audit', {'confirmed': true});
+      if (mounted) await _showDecoderAudit(report);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _showSavedDecoderAudits(String id) async {
+    try {
+      final reports = (await _request('/decoder-datasets/$id/audits'))['audits'] as List;
+      if (!mounted) return;
+      final report = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved dataset quality audits'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved audits yet.')),
+          for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['revision'] as String).substring(0, 8)} · ${report['near_duplicate_pairs']} near-duplicate pairs · ${report['cross_split_pairs']} cross-split pairs')),
+        ],
+      ));
+      if (report != null && mounted) await _showDecoderAudit(report);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _approveDatasetTrial(Map<String, dynamic> dataset) async {

@@ -145,3 +145,76 @@ def list_datasets(root):
                 except ValueError:
                     continue
     return {'datasets': manifests[-20:]}
+
+
+def audit(root, dataset_id, confirmed):
+    """Save a deterministic report-only near-duplicate/partition-overlap audit."""
+    if confirmed is not True:
+        raise ValueError('Confirm the local dataset quality audit.')
+    manifest = read(root, dataset_id)
+    records = [json.loads(line) for line in (Path(root)/'decoder-datasets'/dataset_id/'documents.jsonl').read_text(encoding='utf-8').splitlines()]
+    summaries, shingles, findings = [], [], []
+    for record in records:
+        words = Tokenizer.words(record['text'])
+        source = {'name':record['name'], 'source_sha256':record['source_sha256'],
+                  'group':record['group'], 'split':record['split']}
+        license_status = next((item.get('license','unknown') for item in manifest['sources']
+                               if item['source_sha256']==record['source_sha256']), 'unknown')
+        summaries.append({**source,'word_count':len(words),'distinct_words':len(set(words)), 'license':license_status})
+        shingles.append({tuple(words[i:i+5]) for i in range(len(words)-4)} if len(words)>=12 else set())
+        if len(words)<12:
+            findings.append({'kind':'short_document', 'record':source, 'minimum_words_for_overlap_check':12})
+    near_count = cross_count = 0
+    for left in range(len(records)):
+        for right in range(left+1,len(records)):
+            if not shingles[left] or not shingles[right]:
+                continue
+            similarity = len(shingles[left]&shingles[right])/len(shingles[left]|shingles[right])
+            if similarity < .8:
+                continue
+            cross_split = records[left]['split'] != records[right]['split']
+            near_count += 1
+            cross_count += int(cross_split)
+            affected = [{key:records[index][key] for key in ('name','source_sha256','group','split')} for index in (left,right)]
+            findings.append({'kind':'potential_evaluation_contamination' if cross_split else 'near_duplicate_documents',
+                             'records':affected, 'similarity':round(similarity,6), 'cross_split':cross_split})
+    report = {'schema_version':1,'format':'almg-decoder-data-audit-v1','audit_version':1,
+              'dataset_id':dataset_id,'dataset_manifest_sha256':digest(manifest),'dataset_sha256':manifest['dataset_sha256'],
+              'method':{'name':'word_shingle_jaccard','version':1,'shingle_words':5,'minimum_words':12,'threshold':.8},
+              'policy':'report_only_preserve_existing_approvals', 'records':summaries,'findings':findings,
+              'near_duplicate_pairs':near_count,'cross_split_pairs':cross_count,
+              'implementation_sha256':file_digest(Path(__file__))}
+    report['revision'] = digest(report)
+    directory = Path(root)/'decoder-dataset-audits'/dataset_id
+    directory.mkdir(parents=True,exist_ok=True)
+    destination = directory/(report['revision']+'.json')
+    if destination.exists():
+        if json.loads(destination.read_text(encoding='utf-8')) != report:
+            raise ValueError('Saved dataset audit revision does not match its content.')
+        return report
+    temporary = directory/(uuid.uuid4().hex+'.tmp')
+    try:
+        temporary.write_text(json.dumps(report,ensure_ascii=False,allow_nan=False,indent=2),encoding='utf-8')
+        temporary.replace(destination)
+    finally:
+        temporary.unlink(missing_ok=True)
+    return report
+
+
+def list_audits(root, dataset_id):
+    manifest = read(root,dataset_id)
+    directory = Path(root)/'decoder-dataset-audits'/dataset_id
+    result = []
+    for path in sorted(directory.glob('*.json')) if directory.exists() else []:
+        try:
+            report = json.loads(path.read_text(encoding='utf-8'))
+            payload = {key:value for key,value in report.items() if key!='revision'}
+            if (report.get('format')!='almg-decoder-data-audit-v1' or type(report.get('audit_version')) is not int
+                    or report['audit_version']!=1 or report.get('dataset_id')!=dataset_id
+                    or report.get('dataset_manifest_sha256')!=digest(manifest)
+                    or report.get('revision')!=digest(payload) or path.stem!=report['revision']):
+                continue
+            result.append(report)
+        except (OSError,ValueError,TypeError,AttributeError):
+            continue
+    return result[-20:]

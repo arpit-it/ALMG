@@ -2005,6 +2005,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({"error": str(error)}, 404)
         if self.path == '/decoder-datasets':
             return self.respond(decoder_datasets.list_datasets(ROOT))
+        dataset_parts = self.path.strip('/').split('/')
+        if len(dataset_parts) == 3 and dataset_parts[0] == 'decoder-datasets' and dataset_parts[2] == 'audits':
+            try:
+                return self.respond({'audits': decoder_datasets.list_audits(ROOT, dataset_parts[1])})
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if self.path.startswith('/decoder-datasets/'):
             try:
                 return self.respond(decoder_datasets.read(ROOT, self.path.removeprefix('/decoder-datasets/')))
@@ -2145,6 +2151,8 @@ class Handler(BaseHTTPRequestHandler):
             parts = self.path.strip('/').split('/')
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'pipeline':
                 return self.respond(decoder_trials.pipeline_record(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'audit':
+                return self.respond(decoder_datasets.audit(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-imports' and parts[2] == 'preview':
                 return self.respond(decoder_trials.preview_import(ROOT, parts[1], data.get('confirmed'), data.get('prompt'), data.get('max_new_tokens', 12)))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'export-review':

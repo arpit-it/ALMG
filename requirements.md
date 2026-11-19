@@ -2609,6 +2609,35 @@ P3-LMF-01 architecture acceptance complete · versioned stage contracts and save
   No external collection occurred; generated records/artifacts, downloaded weights
   and unrelated user edits are excluded from this commit.
 
+P3-LMF-02 partial progress · immutable local dataset quality audits · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Added explicit native “Analyze local text quality”
+  and “View saved quality audits” actions for prepared decoder text datasets.
+- Version-1 report-only audits use deterministic five-word shingle Jaccard
+  similarity (threshold 0.8, minimum 12 words). Findings identify both affected
+  source names, original source hashes, normalized groups and saved partitions;
+  cross-split matches are labeled potential evaluation contamination. Short
+  documents are identified separately; record summaries retain license status.
+- Audit receipts bind the dataset/manifest and implementation hashes, are saved
+  outside the original dataset under immutable content revisions, and reopen
+  without rewriting existing datasets or training approvals. No training starts.
+- Local app verification: rebuilt and launched ALMG against an isolated local
+  six-document fixture. The native consent action displayed 15 near-duplicate
+  pairs, including 9 cross-split pairs. Verified all prepared dataset files stayed
+  byte-identical and no decoder trial was created. Restarted ALMG, reopened the
+  saved audit from dataset tools and compared the complete displayed receipt:
+  contents and revision were identical. Evidence:
+  /tmp/almg-audit-qa/{audit-ui.json,restarted-audit-ui.json,before.json}.
+- Verification: 299 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and
+  clean Flutter analysis. New regression cases cover overlap/provenance,
+  deterministic persistence, unrelated/short text, consent, corrupt datasets,
+  tampered receipts and preservation of original data.
+- Remaining: training-time contamination gates (this slice reports only),
+  streaming/incremental/resumable preparation, broader quality/language/PII
+  checks, license review, token distributions, mixing and remaining acceptance
+  verification. Physical power and Windows blockers remain open and skipped.
+  No external collection occurred; generated fixtures/artifacts and unrelated
+  user edits are excluded from the commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
