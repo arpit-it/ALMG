@@ -92,3 +92,43 @@ class RunManifestTest(unittest.TestCase):
             self.assertEqual(released['runtime']['python'], 'recorded-training-runtime')
             self.assertEqual(released['artifact']['name'], 'model.joblib')
             self.assertEqual(released['dataset'], manifest['dataset'])
+
+    def test_approval_revision_binds_settings_dataset_and_goal_and_renewal_has_new_receipt(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            rows, job, _ = self.fixture(Path(temporary))
+            metadata = recipe_contracts.export_metadata(job)
+            receipt = run_manifest.approve(job, rows, metadata)
+            job['training_approval'] = receipt
+            run_manifest.validate_approval(job, rows, metadata)
+            renewed = run_manifest.approve(job, rows, metadata)
+            self.assertEqual(renewed['revision'], receipt['revision'])
+            self.assertNotEqual(renewed['approval_id'], receipt['approval_id'])
+            for change in ('rows', 'target', 'goal', 'receipt'):
+                from copy import deepcopy
+                altered_job, altered_rows = deepcopy(job), deepcopy(rows)
+                if change == 'rows': altered_rows[0]['text'] = 'changed input'
+                if change == 'target': altered_job['target'] = .9
+                if change == 'goal': altered_job['prompt'] = 'changed goal'
+                if change == 'receipt': altered_job['training_approval']['revision'] = 'tampered'
+                with self.subTest(change=change), self.assertRaises(run_manifest.ApprovalChanged):
+                    run_manifest.validate_approval(altered_job, altered_rows, recipe_contracts.export_metadata(altered_job))
+            # Receipts survive a JSON roundtrip; old jobs remain readable without writes.
+            restored = json.loads(json.dumps(job))
+            run_manifest.validate_approval(restored, rows, metadata)
+            del restored['training_approval']
+            run_manifest.validate_approval(restored, rows, metadata)
+            self.assertNotIn('training_approval', restored)
+
+    def test_changed_queued_inputs_return_to_approval_without_invoking_trainer(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            folder = Path(temporary)
+            rows, job, _ = self.fixture(folder)
+            job.update(status='queued', idle=False)
+            job['training_approval'] = run_manifest.approve(job, rows, recipe_contracts.export_metadata(job))
+            rows[0]['text'] = 'changed after approval'
+            with patch.object(studio, 'TRAINING_DATA', {job['id']: rows}), patch.object(studio, 'TRAINING_WORKERS', {job['id']}), patch.object(studio, 'store_job'), patch.object(studio, 'check_training_power'), patch.object(recipe_contracts, 'execute') as execute:
+                studio.run(job)
+                execute.assert_not_called()
+                self.assertEqual(job['status'], 'dataset_ready')
+                self.assertIn('approve training again', job['error'])
+                self.assertEqual(studio.TRAINING_DATA[job['id']], rows)

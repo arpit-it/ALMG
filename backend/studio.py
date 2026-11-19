@@ -1781,6 +1781,7 @@ def run(job):
             if job["status"] not in ("queued", "waiting_idle"):
                 return
             rows = TRAINING_DATA[job["id"]]
+            run_manifest.validate_approval(job, rows, recipe_contracts.export_metadata(job))
             job["resource_check"] = training_resources.check(rows, ROOT)
             job["status"] = "training"
             store_job(job)
@@ -1830,7 +1831,7 @@ def run(job):
         activity(job, "Evaluation complete. Waiting for inference preview and release approval.")
     except TrainingCancelled:
         return
-    except (training_resources.ResourceUnavailable, TrainingWindowInterrupted) as error:
+    except (training_resources.ResourceUnavailable, TrainingWindowInterrupted, run_manifest.ApprovalChanged) as error:
         with LOCK:
             if job["status"] != "cancelled":
                 job.update(status="dataset_ready", error=str(error))
@@ -2719,6 +2720,8 @@ class Handler(BaseHTTPRequestHandler):
                         resources = training_resources.check(TRAINING_DATA.get(job["id"], []), ROOT)
                         POWER_INTERRUPTED_JOBS.discard(job["id"])
                         job.update(status="queued", **parameters, resource_check=resources, error=None)
+                        job['training_approval'] = run_manifest.approve(
+                            job, TRAINING_DATA.get(job['id'], []), recipe_contracts.export_metadata(job))
                         TRAINING_WORKERS.add(job["id"])
                         worker = (run, (job,))
                     elif action == "preview" and status in ("preview_ready", "passed"):

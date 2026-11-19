@@ -20,6 +20,43 @@ def file_digest(path):
     return result.hexdigest()
 
 
+
+class ApprovalChanged(ValueError):
+    """Approved training inputs changed while waiting for execution."""
+
+
+def approval_binding(job, rows, recipe_metadata):
+    return {'job_id': job['id'], 'goal': job.get('prompt'), 'mode': job.get('mode'),
+            'labels': deepcopy(job.get('plan', {}).get('labels', [])),
+            'recipe': deepcopy(recipe_metadata), 'prepared_dataset_sha256': digest(rows),
+            'prepared_rows': len(rows)}
+
+
+def approve(job, rows, recipe_metadata):
+    """Called only by the explicit training-approval route, never on restore."""
+    from datetime import datetime, timezone
+    import uuid
+    binding = approval_binding(job, rows, recipe_metadata)
+    return {'schema_version': 1, 'origin': 'explicit_training_approval',
+            'approval_id': uuid.uuid4().hex, 'confirmed_at': datetime.now(timezone.utc).isoformat(),
+            'revision': digest(binding), 'binding': binding}
+
+
+def validate_approval(job, rows, recipe_metadata):
+    receipt = job.get('training_approval')
+    if receipt is None:
+        return  # Legacy queued fixtures/jobs have no historical receipt to invent.
+    try:
+        if (type(receipt['schema_version']) is not int or receipt['schema_version'] != 1
+                or receipt['origin'] != 'explicit_training_approval'
+                or not isinstance(receipt['approval_id'], str) or len(receipt['approval_id']) != 32
+                or receipt['revision'] != digest(receipt['binding'])
+                or receipt['binding'] != approval_binding(job, rows, recipe_metadata)):
+            raise ValueError('changed')
+    except (KeyError, TypeError, ValueError) as error:
+        raise ApprovalChanged('Approved recipe, settings or dataset changed. Review the prepared dataset and approve training again.') from error
+
+
 def build(job, rows, metrics, model_path, recipe_metadata):
     """Capture the runtime at candidate completion, not later at export time."""
     dependencies = {}
@@ -36,8 +73,10 @@ def build(job, rows, metrics, model_path, recipe_metadata):
     components = {}
     for name in ('studio.py', 'recipe_contracts.py', 'image_recipe.py', 'run_manifest.py'):
         components[name] = {'source_sha256': file_digest(Path(__file__).with_name(name))}
+    approval = deepcopy(job.get('training_approval', {'origin': 'legacy_unrecorded'}))
     return {'schema_version': 1, 'capture': 'candidate_completion', 'job_id': job['id'],
             'recipe': deepcopy(recipe_metadata), 'settings_sha256': digest(recipe_metadata),
+            'approval': approval, 'approval_sha256': digest(approval),
             'dataset': {'rows': len(rows), 'sha256': digest(rows)},
             'partitions': {name: {'rows': len(items), 'sha256': digest(items)}
                            for name, items in partitions.items()},
@@ -75,6 +114,8 @@ def read(folder):
         for field, hash_key in (('recipe', 'settings_sha256'), ('evaluation', 'evaluation_sha256')):
             if digest(manifest[field]) != manifest[hash_key]:
                 raise ValueError('Run manifest metadata does not match its recorded hash.')
+        if 'approval' in manifest and digest(manifest['approval']) != manifest.get('approval_sha256'):
+            raise ValueError('Approval receipt does not match its recorded hash.')
         dataset_path = folder / ('dataset.json' if artifact['name'].startswith('candidate.') else 'dataset.jsonl')
         if dataset_path.suffix == '.json':
             rows = json.loads(dataset_path.read_text(encoding='utf-8'))

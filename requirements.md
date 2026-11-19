@@ -1728,6 +1728,30 @@ P3-LMF-01 partial progress · run reproducibility records · 2026-11-19:
   checkpoint lineage for future LM execution, and complete acceptance verification.
   P3-LMF-01 remains open; physical power/Windows blockers remain independent.
 
+P3-LMF-01 partial progress · training approval revisions · 2026-11-19:
+- Each explicit training approval now captures a unique receipt ID, UTC time
+  and content revision binding the goal, mode, labels, recipe/settings snapshot,
+  prepared row count and prepared-dataset hash. Queued execution validates this
+  binding before invoking a trainer. Changed inputs retain the dataset and return
+  to fresh approval. A renewed approval has a new receipt ID even when its content
+  revision is unchanged. Run records preserve the receipt and its integrity hash.
+- Legacy jobs without a receipt remain readable and do not receive fabricated
+  approval history. New approval through the existing route captures the receipt;
+  no API parameter or historical schema rewrite is required.
+- Local verification: rebuilt/launched ALMG with a fresh isolated image fixture,
+  selected immediate execution and explicitly approved training in the desktop UI.
+  The 45-row run reached preview at pixel accuracy 1.000. Opened the native run
+  record and verified the receipt, revision, prepared-dataset/settings binding and
+  hash; restarted the backend from persisted jobs and reopened the record in ALMG.
+  Receipt and integrity hash matched exactly after restart. No external collection.
+- Verification: 203 Python tests (202 passed, one opt-in Metal test skipped), all
+  16 Flutter tests passed, Flutter analysis clean. Tests cover changed dataset,
+  settings, goal and receipt rejection; renewed approval identity; legacy JSON
+  compatibility; and queued recovery without trainer execution or dataset loss.
+- Remaining: from-scratch decoder registration/construction, explicit choice of
+  approach, full versioned stage interfaces, checkpoint lineage and complete
+  acceptance verification. P3-LMF-01 remains open; hardware blockers stay separate.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
