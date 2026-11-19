@@ -1678,6 +1678,7 @@ class _StudioPageState extends State<StudioPage> {
         content: SizedBox(width: 520, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Goal: ${proposal['goal']}'),
           Text('Recommended approach: ${proposal['approach']}'),
+          Text('Registered recipe: ${proposal['recipe_contract']?['name'] ?? proposal['recipe']}'),
           Text('Planner: ${proposal['planner']?['model'] ?? proposal['planner']?['provider'] ?? 'Unspecified'}'),
           Text(proposal['reason'] as String),
           Text(dataset == null

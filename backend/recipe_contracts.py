@@ -87,6 +87,17 @@ class RecipeRegistry:
             json.dumps(snapshot, allow_nan=False)
         except (TypeError, ValueError) as error:
             raise ValueError('Recipe contract must contain finite JSON values.') from error
+        planning = snapshot.get('planning')
+        if planning is not None:
+            if (not isinstance(planning, dict) or set(planning) != {'workflow', 'approaches', 'scopes'}
+                    or not isinstance(planning['workflow'], str)
+                    or not re.fullmatch(r'[a-z][a-z0-9_]*', planning['workflow'])
+                    or any(not isinstance(planning[key], list) or not planning[key]
+                           or any(not isinstance(value, str) or not value.strip() for value in planning[key])
+                           for key in ('approaches', 'scopes'))
+                    or any(value not in ('from_scratch', 'fine_tuning', 'distillation', 'retrieval')
+                           for value in planning['approaches'])):
+                raise ValueError('Recipe planning capabilities require a workflow, approaches and scopes.')
         if initializer is not None and not callable(initializer):
             raise ValueError('Recipe initializer must be callable.')
         self._contracts[recipe_id] = snapshot
@@ -131,7 +142,13 @@ def recipe_contract(recipe_id):
 
 def recipe_catalog():
     """Discover validated, trusted local registrations in registration order."""
-    return [contract for contract in _REGISTRY.catalog() if contract['status'] != 'initialization_only']
+    return [contract for contract in _REGISTRY.catalog() if contract['status'] in ('available', 'experimental')]
+
+
+def planning_catalog(workflow):
+    """Discover registered capabilities for a workflow without enabling job execution."""
+    return [contract for contract in _REGISTRY.catalog()
+            if contract.get('planning', {}).get('workflow') == workflow]
 
 
 def training_parameters(recipe_id, values, snapshot=None):

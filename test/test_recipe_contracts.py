@@ -377,3 +377,21 @@ class RecipeContractsTest(unittest.TestCase):
         self.assertTrue(metrics['passed'])
         with self.assertRaisesRegex(ValueError, 'No local trainer'):
             recipe_contracts.execute('text_to_image', 'synthetic', rows, {'target': 0.8}, trainers={}, report=lambda message: None)
+
+    def test_trial_planning_catalog_is_validated_and_isolated_from_general_jobs(self):
+        catalog = recipe_contracts.planning_catalog('decoder_trial')
+        self.assertEqual([item['id'] for item in catalog], ['decoder_from_scratch'])
+        self.assertEqual(catalog[0]['planning']['approaches'], ['from_scratch'])
+        catalog[0]['planning']['scopes'].clear()
+        self.assertTrue(recipe_contracts.planning_catalog('decoder_trial')[0]['planning']['scopes'])
+        self.assertEqual({item['id'] for item in recipe_contracts.recipe_catalog()}, {'classifier', 'text_to_image'})
+        registry = recipe_contracts.RecipeRegistry()
+        contract = recipe_contracts.recipe_contract('decoder_from_scratch')
+        for planning in ({}, {'workflow': '../bad', 'approaches': ['from_scratch'], 'scopes': ['local']},
+                         {'workflow': 'trial', 'approaches': ['unknown'], 'scopes': ['local']}):
+            with self.assertRaisesRegex(ValueError, 'planning capabilities'):
+                registry.register({**contract, 'planning': planning})
+        registry.register(contract)
+        with patch.object(recipe_contracts, '_REGISTRY', registry):
+            self.assertEqual(len(recipe_contracts.planning_catalog('decoder_trial')), 1)
+            self.assertEqual(recipe_contracts.recipe_catalog(), [])

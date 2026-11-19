@@ -26,7 +26,7 @@ class PlannerIdentityTest(unittest.TestCase):
             order = []
             def planner(*args):
                 order.append('generation')
-                return {'approach': 'from_scratch', 'reason': 'Bounded local trial'}
+                return {'recipe': 'decoder_from_scratch', 'approach': 'from_scratch', 'reason': 'Bounded local trial'}
             def identity():
                 order.append('identity')
                 return {'provider': 'local_qwen', 'model': 'fixture-model', 'loaded': True, 'verified_weights_revision': 'fixture-revision'}

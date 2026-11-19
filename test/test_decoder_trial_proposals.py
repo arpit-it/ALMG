@@ -12,7 +12,7 @@ def documents():
 class DecoderTrialProposalsTest(unittest.TestCase):
     def propose(self, root, approach='from_scratch'):
         return decoder_trials.propose(root, 'Try a tiny language model with new weights',
-                                     Mock(return_value={'approach': approach, 'reason': 'Use the bounded generated-text trial.'}))
+                                     Mock(return_value={'recipe': 'decoder_from_scratch', 'approach': approach, 'reason': 'Use the bounded generated-text trial.'}))
 
     def test_proposal_is_read_only_until_exact_revision_is_explicitly_confirmed(self):
         with tempfile.TemporaryDirectory() as temporary, patch.object(decoder_trials, '_ACTIVE', set()), patch.object(decoder_trials, '_CANCEL', {}):
@@ -52,7 +52,7 @@ class DecoderTrialProposalsTest(unittest.TestCase):
             with patch.object(decoder_trials, 'specification', return_value={'changed': True}):
                 with self.assertRaises(ValueError):
                     decoder_trials.start(root, True, Mock(), proposal_id=proposal['id'], proposal_revision=proposal['revision'])
-            for result in (None, [], {'approach': 'unknown', 'reason': 'Invalid'}, {'approach': 'from_scratch', 'reason': ''}):
+            for result in (None, [], {'recipe': 'decoder_from_scratch', 'approach': 'unknown', 'reason': 'Invalid'}, {'recipe': 'decoder_from_scratch', 'approach': 'from_scratch', 'reason': ''}):
                 with self.assertRaises(ValueError):
                     decoder_trials.propose(root, 'Trial goal', Mock(return_value=result))
             planner = Mock()
@@ -64,7 +64,7 @@ class DecoderTrialProposalsTest(unittest.TestCase):
     def test_capability_change_during_planning_invalidates_proposal(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
-            with patch.object(decoder_trials, 'specification', side_effect=[{'version': 1}, {'version': 2}]):
+            with patch.object(decoder_trials, 'specification', side_effect=[{**decoder_trials.specification(), 'version': 1}, {**decoder_trials.specification(), 'version': 2}]):
                 with self.assertRaisesRegex(ValueError, 'changed while planning'):
                     self.propose(root)
             self.assertFalse((root / 'decoder-trial-proposals').exists())
@@ -73,7 +73,7 @@ class DecoderTrialProposalsTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary, patch.object(decoder_trials, '_ACTIVE', set()), patch.object(decoder_trials, '_CANCEL', {}):
             root = Path(temporary)
             dataset = decoder_datasets.prepare(root, documents(), True)
-            planner = Mock(return_value={'approach': 'from_scratch', 'reason': 'Use the reviewed splits.'})
+            planner = Mock(return_value={'recipe': 'decoder_from_scratch', 'approach': 'from_scratch', 'reason': 'Use the reviewed splits.'})
             proposal = decoder_trials.propose(root, 'Learn this local corpus', planner, dataset=dataset)
             self.assertEqual(proposal['dataset_summary']['splits'], dataset['splits'])
             self.assertNotIn('amber', str(planner.call_args))
@@ -96,7 +96,25 @@ class DecoderTrialProposalsTest(unittest.TestCase):
             dataset = decoder_datasets.prepare(root, documents(), True)
             def planner(*args):
                 (root/'decoder-datasets'/dataset['id']/'documents.jsonl').write_text('{}')
-                return {'approach': 'from_scratch', 'reason': 'Trial'}
+                return {'recipe': 'decoder_from_scratch', 'approach': 'from_scratch', 'reason': 'Trial'}
             with self.assertRaises(ValueError):
                 decoder_trials.propose(root, 'Learn corpus', planner, dataset=dataset)
             self.assertFalse((root/'decoder-trial-proposals').exists())
+
+    def test_planner_must_select_current_registered_recipe_before_approval(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            for selected in (None, 'classifier', 'unregistered'):
+                with self.assertRaisesRegex(ValueError, 'unavailable decoder trial recipe'):
+                    decoder_trials.propose(root, 'Goal', Mock(return_value={
+                        'recipe': selected, 'approach': 'from_scratch', 'reason': 'Trial'}))
+            with patch.object(decoder_trials.recipe_contracts, 'planning_catalog', return_value=[]):
+                planner = Mock()
+                with self.assertRaisesRegex(ValueError, 'recipe is unavailable'):
+                    decoder_trials.propose(root, 'Goal', planner)
+                planner.assert_not_called()
+            proposal = self.propose(root)
+            self.assertEqual(proposal['recipe_contract']['id'], 'decoder_from_scratch')
+            with patch.object(decoder_trials.recipe_contracts, 'recipe_contract', return_value={'changed': True}):
+                with self.assertRaisesRegex(ValueError, 'proposal changed'):
+                    decoder_trials.start(root, True, Mock(), proposal_id=proposal['id'], proposal_revision=proposal['revision'])

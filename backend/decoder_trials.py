@@ -19,6 +19,7 @@ _CANCEL = {}
 def specification(dataset=None):
     spec = {'recipe': 'decoder_from_scratch', 'recipe_version': 1, 'approach': 'from_scratch',
             'scope': 'generated_local_text_fixture', 'stage_version': 1,
+            'recipe_contract': recipe_contracts.recipe_contract('decoder_from_scratch'),
             'components': {name: run_manifest.file_digest(Path(__file__).with_name(name)) for name in
                            ('decoder_trials.py', 'decoder_training.py', 'decoder_recipe.py', 'decoder_tokenizer.py',
                             'decoder_checkpoint.py', 'decoder_dataset_training.py', 'decoder_bundle.py')}}
@@ -36,14 +37,22 @@ def propose(root, goal, planner, planner_identity=None, dataset=None):
     spec = specification(dataset) if dataset is not None else specification()
     summary = None if dataset is None else {
         key: dataset[key] for key in ('id', 'unique_documents', 'splits', 'tokenizer', 'findings')}
+    catalog = recipe_contracts.planning_catalog('decoder_trial')
+    available = {contract['id']: contract for contract in catalog}
+    if spec['recipe'] not in available:
+        raise ValueError('The registered decoder trial recipe is unavailable.')
     result = planner(
         'Recommend one approach: from_scratch, fine_tuning, distillation, or retrieval. '
         'Only a tiny from_scratch local text trial is executable here, using the selected reviewed dataset when supplied. '
         'The selected dataset summary contains preparation evidence, not document contents. Pretrained adaptation and retrieval execution are unavailable. '
-        'Return approach and a short reason. Do not execute tools or claim that a trial satisfies a general user-model goal.',
-        {'goal': goal.strip(), 'available_trial': spec, 'dataset_summary': summary})
+        'Return recipe (a registered ID), approach and a short reason. Do not execute tools or claim that a trial satisfies a general user-model goal.',
+        {'goal': goal.strip(), 'available_trial': spec, 'dataset_summary': summary, 'registered_recipes': catalog})
     if not isinstance(result, dict):
         raise ValueError('The planner returned an invalid proposal.')
+    selected = result.get('recipe')
+    if not isinstance(selected, str) or selected not in available or selected != spec['recipe']:
+        raise ValueError('The planner selected an unavailable decoder trial recipe.')
+    contract = available[selected]
     approach, reason = result.get('approach'), result.get('reason')
     if approach not in ('from_scratch', 'fine_tuning', 'distillation', 'retrieval'):
         raise ValueError('The planner returned an unsupported approach.')
@@ -55,7 +64,9 @@ def propose(root, goal, planner, planner_identity=None, dataset=None):
         raise ValueError('Available trial capabilities changed while planning. Request a fresh proposal.')
     proposal = {'schema_version': 1, 'id': uuid.uuid4().hex, 'goal': goal.strip(),
                 'approach': approach, 'reason': reason.strip(),
-                'scope': spec.get('scope', 'generated_local_text_fixture'), 'executable': approach == 'from_scratch',
+                'recipe': selected, 'recipe_contract': contract,
+                'scope': spec.get('scope', 'generated_local_text_fixture'),
+                'executable': approach in contract['planning']['approaches'] and spec['scope'] in contract['planning']['scopes'],
                 'dataset_summary': summary,
                 'specification_revision': run_manifest.digest(spec),
                 'planner': planner_identity() if planner_identity is not None else {'provider': 'unspecified'}}

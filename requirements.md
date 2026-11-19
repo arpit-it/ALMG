@@ -2165,6 +2165,38 @@ P3-LMF-01 partial progress · dataset-aware local trial proposals · 2026-11-19:
   P3-LMF-01 stays open; physical power and Windows checks remain independent blocked
   items. No external collection, generated artifacts or weights are committed.
 
+P3-LMF-01 partial progress · registered decoder planning capabilities · 2026-11-19:
+- Added validated workflow/approach/scope metadata and request-time planning
+  discovery to the recipe registry. Decoder metadata now describes the implemented
+  bounded local trial, fresh initialization, Metal runtime, private bundles and
+  revision-bound checkpoint resume. General job discovery remains limited to the
+  existing available classifier/image implementations.
+- Decoder planning now receives the registered contract and must return a valid
+  registered recipe selection. Missing/unknown/wrong-workflow selections fail
+  before any approval or execution. Supported approach/scope metadata determines
+  proposal executability; unsupported approaches remain review-only. Persisted
+  specifications and proposals bind the complete registry contract, so a contract
+  change invalidates stale approval. Native approach review names the recipe.
+- Local app verification: rebuilt/launched macOS ALMG with an isolated deterministic
+  local planner fixture, observed the registered decoder in approach review and
+  verified no trial existed before confirmation. Native confirmation executed real
+  Metal training from new weights (no pretrained student weights): 704 trainable
+  parameters, loss 1.372652 → 0.067308, held-out accuracy 1.000. Saved proposal and
+  execution specification contain identical registered contracts. Reopened saved
+  native history after app restart; the full displayed record remained unchanged.
+  Evidence: /tmp/almg-registry-plan-qa/{planner-input.json,proposal-ui.txt,
+  completed-ui.json,restarted-ui.json}. This is registry plumbing verification,
+  not an additional live-Qwen planning-quality evaluation.
+- Verification: 259 backend tests passed with ALMG_METAL_TESTS=1, including actual
+  Metal runs and existing classifier/image checks; 16 Flutter tests passed;
+  Flutter analysis clean. Added invalid capability metadata, isolated catalog
+  snapshots, absent/unknown selection and stale contract approval coverage.
+- Remaining: general workbench planner routing into the factory, scheduling/idle/
+  power integration, richer data/tokenizers, evaluated release gates and full
+  acceptance verification. P3-LMF-01 remains open. Physical power and Windows
+  verification remain separate blocked criteria; no external collection or
+  generated artifacts/weights are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

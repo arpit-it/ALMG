@@ -13,7 +13,7 @@ class DecoderRecipeTest(unittest.TestCase):
         self.assertEqual(sum(value.size for value in model.parameters.values()), 896)
         self.assertEqual(model.logits([[0, 1, 2]]).shape, (1, 3, 16))
         contract = recipe_contracts.recipe_contract('decoder_from_scratch')
-        self.assertEqual(contract['status'], 'initialization_only')
+        self.assertEqual(contract['status'], 'bounded_trial')
         self.assertNotIn('decoder_from_scratch', studio.TRAINING_RECIPES)
         self.assertNotIn('decoder_from_scratch', {item['id'] for item in recipe_contracts.recipe_catalog()})
 

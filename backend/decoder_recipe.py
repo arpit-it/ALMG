@@ -2,15 +2,17 @@
 import numpy as np
 
 CONTRACT = {
-    'id': 'decoder_from_scratch', 'version': 1, 'name': 'Decoder from scratch (initialization only)',
-    'description': 'Construct a tiny decoder-only Transformer from newly initialized weights. Training is not enabled.',
-    'dataset': {'format': 'Batches of integer token IDs', 'imports': 'Generated local tokens only'},
-    'hardware': {'initialization': 'CPU with NumPy'},
+    'id': 'decoder_from_scratch', 'version': 1, 'name': 'Decoder from scratch (bounded local trial)',
+    'description': 'Train a tiny decoder-only Transformer from newly initialized weights in an explicitly approved bounded local trial.',
+    'dataset': {'format': 'Batches of integer token IDs', 'imports': 'Generated text or separately prepared and reviewed local UTF-8 documents'},
+    'hardware': {'initialization': 'CPU with NumPy', 'training': 'Apple silicon with MLX Metal'},
     'parameters': [{'id': 'seed', 'type': 'integer', 'default': 7}],
     'metrics': {'initialization': ['parameter_count', 'causal_prefix_max_error']},
-    'exports': ['No trained model export; initialization evidence only'],
-    'resume': 'Initialization is deterministic for a configuration and seed.',
-    'status': 'initialization_only', 'capabilities': ['initialize'],
+    'exports': ['Private versioned decoder/tokenizer bundle; no model release'],
+    'resume': 'Explicitly approved restart from a revision-bound step-50 SGD checkpoint.',
+    'status': 'bounded_trial', 'capabilities': ['initialize', 'approved_local_trial'],
+    'planning': {'workflow': 'decoder_trial', 'approaches': ['from_scratch'],
+                 'scopes': ['generated_local_text_fixture', 'reviewed_local_text_trial']},
 }
 
 
