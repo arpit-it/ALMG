@@ -2898,6 +2898,40 @@ P3-LMF-02 partial progress · transparent per-record text-hygiene scores · 2026
   blockers stay open and skipped. No external collection occurred; generated
   fixtures/artifacts, weights and unrelated user edits are excluded from Git.
 
+P3-LMF-02 partial progress · optional local document language identification · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Added explicit “Identify local document languages”
+  and saved-report actions. An optional macOS NaturalLanguage adapter analyzes
+  text locally via stdin without a shell, raw-text argv/logging or a remote
+  service. Unsupported platforms/provider failures remain explicit unknowns and
+  never block preparation, audits or training admission.
+- Version-1 immutable reports bind dataset/manifest, source hashes, groups/splits,
+  adapter/implementation hashes and OS/runtime. Each record retains up to three
+  language candidates/confidences. Identification requires at least 40 alphabetic
+  characters, confidence >=0.8 and margin >=0.2; undetermined, short, ambiguous or
+  unavailable results stay und/unknown with a reason. Reports estimate a dominant
+  document language, not every language in mixed text, and do not change data or
+  approvals. Adapter API reference:
+  https://developer.apple.com/documentation/naturallanguage/nllanguagerecognizer
+- Native verification: rebuilt/launched ALMG and explicitly analyzed three local
+  records with the actual installed recognizer. English was identified as en at
+  0.996317 and Spanish as es at 0.999268; short café text remained unknown with
+  insufficient_alphabetic_text. Provider availability, candidate probabilities
+  and source provenance appeared in the native report. Original dataset files
+  stayed byte-identical and no trial was created. Restarted ALMG and reopened
+  the identical complete report/revision through saved language history. Evidence:
+  /tmp/almg-language-qa/{report-ui.json,restarted-report-ui.json,before.json}.
+- Validation: 326 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. New cases cover consent, provenance, immutable reports,
+  ambiguity/undetermined labels, unsupported platforms/provider timeouts, malformed
+  candidate output, snapshot/receipt corruption and stdin/no-shell invocation.
+- Remaining: streaming beyond RAM/chunk-level resume, license review, dataset
+  mixing/sampling, broader language/quality/PII/contamination coverage and remaining
+  acceptance checks. The native recognizer is optional, probabilistic and tied to
+  the recorded OS version; no cross-platform model dependency was introduced.
+  Physical/Windows blockers remain open and skipped. No external collection or
+  model download occurred; generated fixtures/artifacts, weights and unrelated
+  user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

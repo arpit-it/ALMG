@@ -1583,6 +1583,8 @@ class _StudioPageState extends State<StudioPage> {
       title: const Text('Decoder dataset prepared for review'), scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(manifest))),
       actions: [
+        TextButton(onPressed: () { Navigator.pop(context); _identifyDecoderLanguages(manifest['id'] as String); }, child: const Text('Identify local document languages')),
+        TextButton(onPressed: () { Navigator.pop(context); _savedDecoderLanguages(manifest['id'] as String); }, child: const Text('View saved language reports')),
         TextButton(onPressed: () { Navigator.pop(context); _extendDecoderDataset(manifest); }, child: const Text('Add documents to new version')),
         TextButton(onPressed: () { Navigator.pop(context); _exportDecoderDataset(manifest['id'] as String); }, child: const Text('Review local dataset export')),
         TextButton(onPressed: () { Navigator.pop(context); _auditDecoderDataset(manifest['id'] as String); }, child: const Text('Analyze local text quality')),
@@ -1603,6 +1605,43 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _showDecoderLanguages(Map<String, dynamic> report) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Local document languages'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('${report['identified_records']} identified · ${report['unknown_records']} unknown. Local estimates do not change data or training approval. Short, mixed or unsupported text may remain unknown.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(report)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+    ));
+  }
+
+  Future<void> _identifyDecoderLanguages(String id) async {
+    try {
+      final report = await _request('/decoder-datasets/$id/languages', {'confirmed': true});
+      if (mounted) await _showDecoderLanguages(report);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _savedDecoderLanguages(String id) async {
+    try {
+      final reports = (await _request('/decoder-datasets/$id/languages'))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved language reports'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved language reports.')),
+          for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['revision'] as String).substring(0, 8)} · ${report['identified_records']} identified · ${report['unknown_records']} unknown')),
+        ],
+      ));
+      if (selected != null && mounted) await _showDecoderLanguages(selected);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _extendDecoderDataset(Map<String, dynamic> parent) async {
