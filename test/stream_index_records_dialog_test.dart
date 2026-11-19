@@ -10,6 +10,19 @@ Map<String, dynamic> page(Map<String, dynamic> body) => {
 };
 
 void main() {
+  testWidgets('token-window rows show source offsets and token IDs', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamIndexRecordsDialog(indexId: 'fixture',
+      recordsPath: '/decoder-stream-windows/fixture/records', request: (path, body) async {
+        expect(path, '/decoder-stream-windows/fixture/records');
+        return {'records': [{'first_line': 8, 'split': 'train', 'token_offset': 16,
+          'token_ids': [65, 66, 67], 'text_excerpt': 'Token IDs: [65, 66, 67]'}], 'next_cursor': null};
+      }))));
+    await tester.pumpAndSettle();
+    expect(find.textContaining('token offset 16'), findsOneWidget);
+    expect(find.text('Token IDs: [65, 66, 67]'), findsOneWidget);
+    expect(find.textContaining('potential contact details'), findsNothing);
+  });
+
   testWidgets('overlap findings show pair similarity without language or hygiene claims', (tester) async {
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamIndexRecordsDialog(
       indexId: 'fixture', recordsPath: '/decoder-stream-overlap/fixture/records', request: (path, body) async {

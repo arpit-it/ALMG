@@ -3543,6 +3543,45 @@ P3-LMF-02 partial progress · saved streamed fixed-byte tokenizer artifacts · 2
   Physical power/Windows blockers stay open and skipped. Generated artifacts,
   reports, fixture data, weights and unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · overlap-bound streamed token windows · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Saved streamed byte tokenizers now offer confirmed
+  next-token window preparation, requiring a completed overlap report for the exact
+  same immutable index/revision. Cross-split near-duplicate findings block this
+  preparation before any window files are created. The accepted lexical method
+  and exhaustive pair coverage are checked; skipped short pairs and semantic
+  contamination limits remain explicit. This is not model training admission.
+- Versioned SQLite artifacts store windows of at most 17 byte IDs with stride 16,
+  preserving document boundaries and original splits. Per-record lineage retains
+  source group, line/byte position, raw-line hash, occurrence count and token count.
+  Exact duplicates are not re-expanded. Token IDs encode source text and may contain
+  personal information, as disclosed before confirmation. No training/approval starts.
+- Batches are bounded to 100 records/about one million characters, with atomic
+  record/window/cursor updates. Index, tokenizer and overlap revisions, signatures,
+  runtime and implementation are bound and revalidated before final publication.
+  Saved views support pause/resume and bounded token/source detail pagination.
+- Local app verification: rebuilt/launched ALMG with clean and contaminated local
+  fixtures. Native preparation with three cross-split findings was rejected before
+  creating files. The clean preparation paused at 200 of 401 records; after backend/
+  app restart, identical state reopened and resumed to completion. Artifact
+  0fddce1a8a71436e802059c168fa8099 contains 6,344 train, 764 validation and 702 test
+  windows (7,810 total), with 121,308 target tokens. Every window independently
+  matches its source slice; all document/split boundaries and lineage match source
+  data. Native window detail and Next records review work. Source bindings remain
+  unchanged and no training started. Evidence:
+  /tmp/almg-stream-window-preparation-qa/{blocked-ui.txt,consent-ui.txt,paused-ui.json,
+  restarted-ui.json,completed-ui.json,windows-page-ui.txt,window-details-ui.json,
+  next-page-ui.txt,verification.json}.
+- Validation: 383 Python tests, 30 Flutter tests and Flutter analysis pass. New
+  tests verify exact windows/targets, split/source preservation, reload/resume,
+  nonoverlapping revision-bound pages, cross-split/consent/stale review rejection,
+  rollback after partial writes, code/source change rejection and token-row rendering.
+- Remaining: actual streamed model training/scheduling and its final admission,
+  broader contamination/PII policies, scalable overlap search, richer tokenizers,
+  larger-than-RAM acceptance and other dataset criteria. The lexical gate alone
+  does not establish evaluation cleanliness. Physical power/Windows blockers remain
+  open and skipped. Generated windows, reports, fixtures, artifacts, weights and
+  unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
