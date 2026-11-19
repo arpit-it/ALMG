@@ -16,13 +16,15 @@ def revision(config, tokenizer, training_text, total_steps=100, learning_rate=.0
             'total_steps': total_steps, 'learning_rate': learning_rate}
 
 
-def save(folder, model, tokenizer, expected, completed_steps):
+def save(folder, model, tokenizer, expected, completed_steps, pretraining_stage='pretraining_fixture'):
     if (type(completed_steps) is not int or not 0 <= completed_steps < expected['total_steps']
             or model.config != expected['config'] or tokenizer.fingerprint() != expected['tokenizer_sha256']):
         raise ValueError('Checkpoint model, tokenizer or completed step count is invalid.')
     record = {'kind': 'decoder_sgd_checkpoint', 'schema_version': 1, 'revision': expected,
               'revision_sha256': decoder_bundle.digest(expected), 'completed_steps': completed_steps}
-    return decoder_bundle.save(folder, model, tokenizer, record)
+    if pretraining_stage == 'pretraining_fixture':
+        return decoder_bundle.save(folder, model, tokenizer, record)
+    return decoder_bundle.save(folder, model, tokenizer, record, pretraining_stage=pretraining_stage)
 
 
 def load(folder, expected):

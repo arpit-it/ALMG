@@ -7,21 +7,25 @@ import threading
 import uuid
 
 if __package__:
-    from . import decoder_training, recipe_contracts, run_manifest
+    from . import decoder_dataset_training, decoder_training, recipe_contracts, run_manifest
 else:
-    import decoder_training, recipe_contracts, run_manifest
+    import decoder_dataset_training, decoder_training, recipe_contracts, run_manifest
 
 _LOCK = threading.Lock()
 _ACTIVE = set()
 _CANCEL = {}
 
 
-def specification():
-    return {'recipe': 'decoder_from_scratch', 'recipe_version': 1, 'approach': 'from_scratch',
+def specification(dataset=None):
+    spec = {'recipe': 'decoder_from_scratch', 'recipe_version': 1, 'approach': 'from_scratch',
             'scope': 'generated_local_text_fixture', 'stage_version': 1,
             'components': {name: run_manifest.file_digest(Path(__file__).with_name(name)) for name in
                            ('decoder_trials.py', 'decoder_training.py', 'decoder_recipe.py', 'decoder_tokenizer.py',
-                            'decoder_checkpoint.py', 'decoder_bundle.py')}}
+                            'decoder_checkpoint.py', 'decoder_dataset_training.py', 'decoder_bundle.py')}}
+    if dataset is not None:
+        spec.update(scope='reviewed_local_text_trial', dataset_id=dataset['id'],
+                    dataset_manifest_sha256=run_manifest.digest(dataset))
+    return spec
 
 
 def propose(root, goal, planner, planner_identity=None):
@@ -148,15 +152,23 @@ def execute(root, trial_id):
         with _LOCK:
             record = read(root, trial_id)
             stop_event = _CANCEL[key]
-            if (record.get('specification') != specification()
+            dataset = record.get('dataset')
+            if dataset is not None:
+                decoder_dataset_training.preflight(root, dataset)
+            current_spec = specification(dataset) if dataset is not None else specification()
+            if (record.get('specification') != current_spec
                     or record.get('approval', {}).get('revision') != approval_revision(record)):
                 raise ValueError('Saved decoder trial approval no longer matches this implementation. Approve a new trial.')
             if stop_event.is_set():
                 raise decoder_training.Cancelled('Cancelled before training. Approve resume to continue.')
             record.update(status='running', error=None, artifact_directory=str(folder(root, trial_id) / 'artifacts'))
             write(root, record)
-        result = decoder_training.run(recipe_contracts.initialize_recipe,
-                                      work_directory=folder(root, trial_id) / 'artifacts', stop=stop_event.is_set)
+        if dataset is None:
+            result = decoder_training.run(recipe_contracts.initialize_recipe,
+                                          work_directory=folder(root, trial_id) / 'artifacts', stop=stop_event.is_set)
+        else:
+            result = decoder_dataset_training.run(recipe_contracts.initialize_recipe, root, dataset,
+                work_directory=folder(root, trial_id) / 'artifacts', stop=stop_event.is_set)
         with _LOCK:
             record = read(root, trial_id)
             if stop_event.is_set():
@@ -178,20 +190,30 @@ def execute(root, trial_id):
             _CANCEL.pop(key, None)
 
 
-def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_revision=None):
+def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_revision=None, dataset=None):
     if confirmed is not True:
         raise ValueError('Approve the generated-text decoder trial before starting it.')
     spec = specification()
+    if dataset is not None and (trial_id is not None or proposal_id is not None):
+        raise ValueError('Review local-dataset training separately; a generated-text proposal or existing trial cannot change data scope.')
+    if dataset is not None:
+        dataset = decoder_dataset_training.preflight(root, dataset)[0]
+        spec = specification(dataset)
     with _LOCK:
         if trial_id is None:
             trial_id = uuid.uuid4().hex
             record = {'schema_version': 1, 'id': trial_id, 'created_at': datetime.now(timezone.utc).isoformat()}
             if proposal_id is not None:
                 record['proposal'] = approved_proposal(root, proposal_id, proposal_revision, spec)
+            if dataset is not None:
+                record['dataset'] = dataset
         else:
             record = read(root, trial_id)
             if record.get('status') != 'interrupted' or (str(Path(root)), trial_id) in _ACTIVE:
                 raise ValueError('Only an interrupted decoder trial can be resumed.')
+            if record.get('dataset') is not None:
+                resumed_dataset = decoder_dataset_training.preflight(root, record['dataset'])[0]
+                spec = specification(resumed_dataset)
             if record.get('specification') != spec:
                 raise ValueError('Decoder trial implementation changed. Approve a new trial instead.')
             if (folder(root, trial_id) / 'artifacts' / 'bundle').exists():

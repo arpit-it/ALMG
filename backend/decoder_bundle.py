@@ -16,8 +16,10 @@ else:
     from run_manifest import digest, file_digest
 
 
-def save(destination, model, tokenizer, training):
+def save(destination, model, tokenizer, training, pretraining_stage='pretraining_fixture'):
     """Publish a new complete bundle directory without overwriting existing work."""
+    if pretraining_stage not in ('pretraining_fixture', 'pretraining_local'):
+        raise ValueError('Unsupported decoder pretraining stage.')
     destination = Path(destination)
     if destination.exists():
         raise ValueError('Decoder bundle destination already exists. Choose a new directory.')
@@ -33,13 +35,13 @@ def save(destination, model, tokenizer, training):
         manifest = {
             'format': 'almg-decoder-bundle-v1', 'schema_version': 1,
             'recipe': {'id': 'decoder_from_scratch', 'version': 1},
-            'stages': {'architecture': 1, 'tokenization': 1, 'pretraining_fixture': 1, 'artifact': 1},
+            'stages': {'architecture': 1, 'tokenization': 1, pretraining_stage: 1, 'artifact': 1},
             'config': dict(model.config), 'tokenizer_sha256': tokenizer.fingerprint(),
             'training': deepcopy(training), 'training_sha256': digest(training),
             'runtime': {'python': platform.python_version(), 'system': platform.system(),
                         'machine': platform.machine(), 'numpy': version('numpy')},
             'components': {name: file_digest(Path(__file__).with_name(name)) for name in
-                           ('decoder_recipe.py', 'decoder_tokenizer.py', 'decoder_training.py', 'decoder_checkpoint.py', 'decoder_bundle.py')},
+                           ('decoder_recipe.py', 'decoder_tokenizer.py', 'decoder_training.py', 'decoder_dataset_training.py', 'decoder_checkpoint.py', 'decoder_bundle.py')},
             'files': {name: file_digest(staged / name) for name in ('decoder.json', 'tokenizer.json')},
         }
         (staged / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, allow_nan=False, indent=2), encoding='utf-8')
@@ -62,7 +64,9 @@ def load(folder):
         if (not isinstance(manifest, dict) or manifest.get('format') != 'almg-decoder-bundle-v1'
                 or type(manifest.get('schema_version')) is not int or manifest['schema_version'] != 1
                 or digest(manifest.get('recipe')) != digest({'id': 'decoder_from_scratch', 'version': 1})
-                or digest(manifest.get('stages')) != digest({'architecture': 1, 'tokenization': 1, 'pretraining_fixture': 1, 'artifact': 1})
+                or digest(manifest.get('stages')) not in (
+                    digest({'architecture': 1, 'tokenization': 1, stage: 1, 'artifact': 1})
+                    for stage in ('pretraining_fixture', 'pretraining_local'))
                 or not isinstance(manifest.get('training'), dict)
                 or not isinstance(manifest.get('files'), dict)
                 or set(manifest['files']) != {'decoder.json', 'tokenizer.json'}):

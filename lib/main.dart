@@ -1580,8 +1580,29 @@ class _StudioPageState extends State<StudioPage> {
     await showDialog<void>(context: context, builder: (context) => AlertDialog(
       title: const Text('Decoder dataset prepared for review'), scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(manifest))),
-      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      actions: [
+        if (manifest['tokenizer'] != null && !(manifest['findings'] as List).any((finding) =>
+            ['tokenizer_limits', 'out_of_training_vocabulary'].contains(finding['kind'])))
+          TextButton(onPressed: () {
+            Navigator.pop(context);
+            _approveDatasetTrial(manifest);
+          }, child: const Text('Review bounded decoder training')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+      ],
     ));
+  }
+
+  Future<void> _approveDatasetTrial(Map<String, dynamic> dataset) async {
+    final approved = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Approve local dataset trial'),
+      content: Text('Train a tiny decoder from new weights on ${dataset['unique_documents']} reviewed documents. '
+        'The trial uses the saved train/validation/test splits, 100 training steps, seed 7 and immediate Metal execution. '
+        'Duplicate documents are excluded. Cancellation and checkpoint resume remain available. '
+        'This experimental trial does not release a model.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve training on reviewed dataset'))],
+    ));
+    if (approved == true && mounted) await _startDecoderTrial(dataset: dataset);
   }
 
   Future<void> _prepareDecoderDataset() async {
@@ -1666,11 +1687,12 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
-  Future<void> _startDecoderTrial({String? id, Map<String, dynamic>? proposal}) async {
+  Future<void> _startDecoderTrial({String? id, Map<String, dynamic>? proposal, Map<String, dynamic>? dataset}) async {
     try {
       final created = await _request(id == null ? '/decoder-trials' : '/decoder-trials/$id/resume', {
         'confirmed': true, if (proposal != null) 'proposal_id': proposal['id'],
         if (proposal != null) 'proposal_revision': proposal['revision'],
+        'dataset': ?dataset,
       });
       final trialId = created['id'];
       var record = await _request('/decoder-trials/$trialId');

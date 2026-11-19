@@ -2101,6 +2101,42 @@ P3-LMF-01 partial progress · local decoder text-dataset preparation · 2026-11-
   engineering. P3-LMF-01 remains open; hardware verification blockers stay separate.
   No generated datasets/artifacts or downloaded weights were committed.
 
+P3-LMF-01 partial progress · approved reviewed-dataset decoder training · 2026-11-19:
+- Connected compatible prepared local datasets to a bounded from-scratch decoder
+  trial through a separate explicit confirmation. The approval specification binds
+  the full reviewed manifest, dataset ID, file hashes and implementation revision.
+  Preflight and worker checks reject changed reviews/content, missing tokenizer
+  artifacts, evaluation-vocabulary findings, empty/too-short data or trial-size
+  limits. Generated-text proposals cannot silently expand into local-dataset scope.
+- The local-data stage uses training-only tokenization, document-isolated windows
+  of at most 16 inputs, seed 7, width 8, 100 constant-rate SGD steps and immediate
+  Metal execution. Limits are 64 training and 32 windows per evaluation split.
+  Evaluation reports initial/final loss, separate validation/test next-token
+  accuracy, target 0.8 and pass/fail; trial completion does not release a model.
+- Preserved step-50 checkpoint/cancellation/resume controls and added versioned
+  pretraining_local bundles recording the dataset/review revisions and evaluation.
+  CPU inference is checked against Metal output. Existing fixture bundles remain
+  readable and their default save/checkpoint call contracts are unchanged. Release
+  packaging includes the new lazy-MLX local-data trainer.
+- Local app verification: rebuilt/launched macOS ALMG with isolated prepared-text
+  fixtures. A vocabulary-incompatible dataset showed no training control and
+  created no trial. Reviewed a compatible six-document dataset, observed the
+  explicit scope/step/seed confirmation and verified no training before approval.
+  After native approval the trial completed with validation and held-out accuracy
+  1.000, generated text and a validated pretraining_local bundle bound to that exact
+  dataset. Restarted the backend and reopened the unchanged trial/approval/evaluation
+  from native history. No external collection occurred or existing data was rewritten.
+- Verification: all 255 Python tests passed with ALMG_METAL_TESTS=1, including real
+  local-data training and cancellation/checkpoint resume; all 16 Flutter tests
+  passed; Flutter analysis clean. Tests cover review binding, quality/scope guards,
+  queued data tampering before trainer invocation, valid CPU bundle output and
+  serialized local-data checkpoint recovery.
+- Remaining: main planner routing and data-aware approach proposals, general
+  scheduling/idle/power integration, richer dataset/tokenizer support, evaluated
+  release gates and full acceptance verification. P3-LMF-01 remains open; physical
+  power and Windows verification remain independent blockers. Generated models,
+  datasets and downloaded weights are not committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

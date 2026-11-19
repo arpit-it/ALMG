@@ -2129,7 +2129,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask, planner_identity=inference.loaded_identity))
             if self.path == '/decoder-trials':
                 record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
-                                              proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'))
+                                              proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'), dataset=data.get('dataset'))
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'cancel':
