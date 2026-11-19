@@ -1676,6 +1676,8 @@ class _StudioPageState extends State<StudioPage> {
       title: const Text('Decoder dataset quality audit'), scrollable: true,
       content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
         const Text('Local heuristic findings highlight records for review. Likely contact details are flagged by location without copying matched values; other personal information may remain. Original data and training approvals are preserved. This audit does not filter text or start training.'),
+        if (report['quality_review_records'] != null)
+          Text('Text hygiene review: ${report['quality_review_records']} records below the heuristic threshold. Scores do not assess meaning or factual accuracy.'),
         if ((report['token_distribution'] as Map?)?['available'] == true)
           Text('Saved tokenizer: ${(report['token_distribution'] as Map)['overall']['token_count']} tokens · '
             '${(report['token_distribution'] as Map)['overall']['unknown_tokens']} outside vocabulary'),

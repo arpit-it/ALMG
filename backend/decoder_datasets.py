@@ -216,6 +216,23 @@ def _token_distribution(folder, manifest, records):
             'splits': {part: summarize(split_tokens[part], split_lengths[part]) for part in split_tokens}}
 
 
+def _text_hygiene(text, words):
+    counts = Counter(word.casefold() for word in words)
+    length = min(1.0, len(words) / 32)
+    unique_share = len(counts) / len(words)
+    dominant_share = max(counts.values()) / len(words)
+    repetition = min(1.0, unique_share / .5, (1 - dominant_share) / .5)
+    nonspace = sum(not char.isspace() for char in text)
+    letter_share = sum(char.isalpha() for char in text) / nonspace
+    letters = min(1.0, letter_share / .7)
+    return {'score': round(100 * (.5 * length + .25 * repetition + .25 * letters), 2),
+            'words': len(words), 'unique_casefolded_words': len(counts),
+            'dominant_word_share': round(dominant_share, 6),
+            'letter_share': round(letter_share, 6),
+            'components': {'length': round(length, 6), 'repetition': round(repetition, 6),
+                           'letter_content': round(letters, 6)}}
+
+
 def quality_report(root, dataset_id):
     """Compute overlap findings from verified data without changing stored artifacts."""
     manifest = read(root, dataset_id)
@@ -228,7 +245,12 @@ def quality_report(root, dataset_id):
         findings.extend(_privacy_findings(record['text'], source))
         license_status = next((item.get('license','unknown') for item in manifest['sources']
                                if item['source_sha256']==record['source_sha256']), 'unknown')
-        summaries.append({**source,'word_count':len(words),'distinct_words':len(set(words)), 'license':license_status})
+        hygiene = _text_hygiene(record['text'], words)
+        summaries.append({**source,'word_count':len(words),'distinct_words':len(set(words)),
+                          'license':license_status, 'text_hygiene':hygiene})
+        if hygiene['score'] < 80:
+            findings.append({'kind':'low_text_hygiene', 'record':source, 'metrics':hygiene,
+                             'review_below_score':80})
         shingles.append({tuple(words[i:i+5]) for i in range(len(words)-4)} if len(words)>=12 else set())
         if len(words)<12:
             findings.append({'kind':'short_document', 'record':source, 'minimum_words_for_overlap_check':12})
@@ -246,13 +268,19 @@ def quality_report(root, dataset_id):
             affected = [{key:records[index][key] for key in ('name','source_sha256','group','split')} for index in (left,right)]
             findings.append({'kind':'potential_evaluation_contamination' if cross_split else 'near_duplicate_documents',
                              'records':affected, 'similarity':round(similarity,6), 'cross_split':cross_split})
-    report = {'schema_version':1,'format':'almg-decoder-data-audit-v1','audit_version':3,
+    report = {'schema_version':1,'format':'almg-decoder-data-audit-v1','audit_version':4,
               'dataset_id':dataset_id,'dataset_manifest_sha256':digest(manifest),'dataset_sha256':manifest['dataset_sha256'],
               'method':{'name':'word_shingle_jaccard','version':1,'shingle_words':5,'minimum_words':12,'threshold':.8},
               'privacy_method':{'name':'local_contact_patterns','version':1,
                   'scope':['ascii_email','international_plus_phone','north_american_formatted_phone'],
                   'offsets':'normalized_text_unicode_codepoints','matched_values_included':False,
                   'limitations':'Heuristic review only; other personal information and unrecognized formats may remain.'},
+              'quality_method':{'name':'text_hygiene','version':1,'score_range':[0,100],
+                  'weights':{'length':.5,'repetition':.25,'letter_content':.25},
+                  'length_target_words':32,'unique_share_target':.5,'maximum_dominant_share_target':.5,
+                  'letter_share_target':.7,'review_below_score':80,
+                  'limitations':'Heuristic text hygiene only; not semantic quality, factuality or training suitability.'},
+              'quality_review_records':sum(row['kind']=='low_text_hygiene' for row in findings),
               'token_distribution':_token_distribution(Path(root)/'decoder-datasets'/dataset_id, manifest, records),
               'privacy_matches':sum(row['kind']=='potential_personal_information' for row in findings),
               'policy':'report_only_preserve_existing_approvals', 'records':summaries,'findings':findings,
@@ -292,7 +320,7 @@ def list_audits(root, dataset_id):
             report = json.loads(path.read_text(encoding='utf-8'))
             payload = {key:value for key,value in report.items() if key!='revision'}
             if (report.get('format')!='almg-decoder-data-audit-v1' or type(report.get('audit_version')) is not int
-                    or report['audit_version'] not in (1, 2, 3) or report.get('dataset_id')!=dataset_id
+                    or report['audit_version'] not in (1, 2, 3, 4) or report.get('dataset_id')!=dataset_id
                     or report.get('dataset_manifest_sha256')!=digest(manifest)
                     or report.get('revision')!=digest(payload) or path.stem!=report['revision']):
                 continue

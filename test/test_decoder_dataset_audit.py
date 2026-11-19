@@ -41,8 +41,8 @@ class DatasetAuditTests(unittest.TestCase):
             {'name': 'b', 'text': ' '.join(f'b{i}' for i in range(30))}], True)
         report = datasets.audit(self.root, manifest['id'], True)
         self.assertEqual(report['near_duplicate_pairs'], 0)
-        self.assertEqual([f['kind'] for f in report['findings']], ['short_document'])
-        self.assertEqual(report['findings'][0]['record']['name'], 'short')
+        self.assertEqual([f['record']['name'] for f in report['findings'] if f['kind']=='short_document'], ['short'])
+        self.assertIn('short', [f['record']['name'] for f in report['findings'] if f['kind']=='low_text_hygiene'])
 
     def test_privacy_locations_preserve_provenance_without_copying_contact_values(self):
         documents = [
@@ -54,7 +54,7 @@ class DatasetAuditTests(unittest.TestCase):
         folder = self.root / 'decoder-datasets' / manifest['id']
         before = {p.name: p.read_bytes() for p in folder.iterdir()}
         report = datasets.audit(self.root, manifest['id'], True)
-        self.assertEqual(report['audit_version'], 3)
+        self.assertEqual(report['audit_version'], 4)
         self.assertEqual(report['privacy_matches'], 3)
         findings = [f for f in report['findings'] if f['kind'] == 'potential_personal_information']
         self.assertEqual(sorted(f['category'] for f in findings), ['email_address', 'phone_number', 'phone_number'])
@@ -76,13 +76,13 @@ class DatasetAuditTests(unittest.TestCase):
     def test_legacy_saved_audit_remains_readable_alongside_privacy_revision(self):
         current = datasets.audit(self.root, self.dataset_id, True)
         legacy = dict(current, audit_version=1)
-        for key in ('revision', 'privacy_matches', 'privacy_method', 'token_distribution'):
+        for key in ('revision', 'privacy_matches', 'privacy_method', 'token_distribution', 'quality_method', 'quality_review_records'):
             legacy.pop(key)
         legacy['revision'] = datasets.digest(legacy)
         path = self.root / 'decoder-dataset-audits' / self.dataset_id / (legacy['revision'] + '.json')
         path.write_text(json.dumps(legacy))
         saved = datasets.list_audits(self.root, self.dataset_id)
-        self.assertEqual({row['audit_version'] for row in saved}, {1, 3})
+        self.assertEqual({row['audit_version'] for row in saved}, {1, 4})
         self.assertEqual(json.loads(path.read_text()), legacy)
 
     def test_word_token_distribution_counts_unknowns_without_refitting(self):
@@ -121,12 +121,43 @@ class DatasetAuditTests(unittest.TestCase):
         report = datasets.audit(self.root, dataset['id'], True)
         self.assertFalse(report['token_distribution']['available'])
         legacy = dict(report, audit_version=2)
-        for key in ('revision', 'token_distribution'):
+        for key in ('revision', 'token_distribution', 'quality_method', 'quality_review_records'):
             legacy.pop(key)
         legacy['revision'] = datasets.digest(legacy)
         path = self.root / 'decoder-dataset-audits' / dataset['id'] / (legacy['revision'] + '.json')
         path.write_text(json.dumps(legacy))
-        self.assertEqual({r['audit_version'] for r in datasets.list_audits(self.root, dataset['id'])}, {2,3})
+        self.assertEqual({r['audit_version'] for r in datasets.list_audits(self.root, dataset['id'])}, {2,4})
+
+    def test_transparent_hygiene_scores_identify_affected_records_without_mutation(self):
+        healthy = ' '.join('term' + chr(97+i//26) + chr(97+i%26) for i in range(32))
+        dataset = datasets.prepare(self.root, [
+            {'name':'diverse', 'text':healthy}, {'name':'repeated', 'text':'echo ' * 64},
+            {'name':'short', 'text':'café'}], True, 'utf8_bytes')
+        folder = self.root / 'decoder-datasets' / dataset['id']
+        before = {p.name:p.read_bytes() for p in folder.iterdir()}
+        report = datasets.audit(self.root, dataset['id'], True)
+        metrics = {row['name']:row['text_hygiene'] for row in report['records']}
+        self.assertEqual(metrics['diverse']['score'], 100)
+        self.assertEqual(metrics['repeated']['score'], 75)
+        self.assertLess(metrics['short']['score'], metrics['repeated']['score'])
+        self.assertEqual(metrics['short']['letter_share'], 1)
+        self.assertEqual(report['quality_review_records'], 2)
+        for finding in [f for f in report['findings'] if f['kind']=='low_text_hygiene']:
+            source = next(s for s in dataset['sources'] if s['name']==finding['record']['name'])
+            self.assertEqual(finding['record']['source_sha256'], source['source_sha256'])
+            self.assertEqual(finding['record']['split'], source['split'])
+        self.assertEqual(report['quality_method']['weights'], {'length':.5,'repetition':.25,'letter_content':.25})
+        self.assertEqual(before, {p.name:p.read_bytes() for p in folder.iterdir()})
+        self.assertEqual(datasets.audit(self.root, dataset['id'], True), report)
+        legacy = dict(report, audit_version=3)
+        for key in ('revision','quality_method','quality_review_records'):
+            legacy.pop(key)
+        for row in legacy['records']:
+            row.pop('text_hygiene', None)
+        legacy['findings'] = [f for f in legacy['findings'] if f['kind']!='low_text_hygiene']
+        legacy['revision'] = datasets.digest(legacy)
+        (self.root/'decoder-dataset-audits'/dataset['id']/(legacy['revision']+'.json')).write_text(json.dumps(legacy))
+        self.assertEqual({r['audit_version'] for r in datasets.list_audits(self.root,dataset['id'])}, {3,4})
 
     def privacy_dataset(self):
         return datasets.prepare(self.root, [

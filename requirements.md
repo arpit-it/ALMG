@@ -2869,6 +2869,35 @@ P3-LMF-02 partial progress · saved local preparation and explicit recovery · 2
   blockers remain open and skipped. Generated snapshots/artifacts, downloaded
   weights and unrelated user edits are excluded from this commit.
 
+P3-LMF-02 partial progress · transparent per-record text-hygiene scores · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Version-4 local audits add a bounded 0–100 hygiene
+  score for each affected source record, with word counts, casefolded distinct
+  counts, dominant-word share, Unicode letter share and component contributions.
+  The report declares version-1 method weights (length 0.5, repetition 0.25,
+  letter content 0.25), targets and review threshold 80. Below-threshold findings
+  include source hash, normalized group/split and the supporting measurements.
+- Native audit text summarizes records needing hygiene review and explicitly says
+  scores do not assess meaning or factual accuracy. The method is report-only,
+  not a semantic quality measure or training-suitability gate. It does not filter,
+  rewrite originals or change training approvals. Audit versions 1–3 stay readable.
+- Native verification: rebuilt/launched ALMG with a three-record local fixture,
+  explicitly ran the audit and read scores 100.00 for diverse alphabetic text,
+  75.00 for a repeated word and 26.56 for the short Unicode café record. The native
+  summary identified two records below threshold. Verified original dataset files
+  byte-identical and no trial created. Restarted ALMG and reopened the identical
+  complete saved receipt/revision. Evidence:
+  /tmp/almg-hygiene-qa/{audit-ui.json,summary-ui.txt,restarted-audit-ui.json,before.json}.
+- Validation: 322 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. New coverage verifies expected scoring order/components,
+  Unicode letter handling, affected-record provenance, immutable deterministic
+  reporting and coexistence with earlier saved audit versions.
+- Remaining: streaming beyond RAM/chunk-level resume, language identification,
+  license review, broader quality/PII/contamination policies, dataset mixing/
+  sampling and remaining acceptance checks. Word/letter heuristics are not a
+  substitute for language-specific or human quality review. Physical/Windows
+  blockers stay open and skipped. No external collection occurred; generated
+  fixtures/artifacts, weights and unrelated user edits are excluded from Git.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
