@@ -2497,6 +2497,40 @@ P3-LMF-01 partial progress · approved versioned private decoder export · 2026-
   skipped. Generated exports/private artifacts, downloaded weights and unrelated
   user edits are excluded from this commit.
 
+P3-LMF-01 partial progress · isolated private decoder archive import · 2026-11-19:
+- Added confirmed native ZIP import into a separate immutable decoder-imports
+  namespace with a persistent private inventory and CPU prompt preview. Shared the
+  bounded inference implementation with existing trial previews. Import never creates
+  a training job, resume checkpoint or public release; imported IDs cannot be used
+  with trial training/export APIs. Dataset documents remain excluded, so evaluation
+  claims are explicitly marked not independently re-evaluated and cannot be relabeled
+  as verified through import metadata.
+- Validates the exact four archive members, bounded archive/member sizes, supported
+  compression, regular-file entries, export review/receipt/file hashes and the saved
+  bundle/tokenizer formats before publishing a new copy. Rejects traversal/extra
+  members, symlinks, oversized payloads, corrupt provenance and changed weights.
+  Preview rechecks bundle/provenance integrity and retains at most 20 local receipts.
+  Existing word/byte trial preview behavior remains compatible.
+- Local app verification: rebuilt/launched macOS ALMG with isolated fixtures, chose
+  the actual ZIP saved in the preceding export slice through the native file picker,
+  reviewed and confirmed import, and observed its separate private-only inventory
+  record with an exact archive hash and byte tokenizer. Native “zz” preview matched
+  pre-export output (“a a a a a a ”). Natively attempted a deliberately changed model
+  ZIP and observed hash/provenance rejection with no second or partial import and
+  no change to the valid record. Restarted backend/app, reopened imported-model
+  inventory and verified the full import/preview record was unchanged; no decoder
+  training namespace existed. Evidence: /tmp/almg-import-qa/{imported-ui.json,
+  preview-ui.json,rejected-ui.txt,restarted-ui.json}. No external collection occurred.
+- Verification: 290 backend tests passed with ALMG_METAL_TESTS=1; all 16 Flutter
+  tests passed; Flutter analysis clean. Added strict import/consent, archive safety,
+  separate identities, isolated preview/history, false quality-promotion rejection,
+  artifact/provenance tampering and trial API separation coverage.
+- Remaining: public release/registry and post-training contracts, broader data/
+  tokenizer/model-quality support, physical power/sleep/idle checks and full
+  acceptance. P3-LMF-01 remains open; physical/Windows blockers stay skipped.
+  Generated/private archives, imported models, downloaded weights and unrelated
+  user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

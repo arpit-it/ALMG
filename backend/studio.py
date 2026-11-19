@@ -2010,6 +2010,13 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_datasets.read(ROOT, self.path.removeprefix('/decoder-datasets/')))
             except ValueError as error:
                 return self.respond({'error': str(error)}, 404)
+        if self.path == '/decoder-imports':
+            return self.respond({'imports': decoder_trials.list_imports(ROOT)})
+        if self.path.startswith('/decoder-imports/'):
+            try:
+                return self.respond(decoder_trials.read_import(ROOT, self.path.removeprefix('/decoder-imports/')))
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if self.path == '/decoder-trials':
             return self.respond({'trials': decoder_trials.list_trials(ROOT)})
         if self.path.startswith('/decoder-trials/'):
@@ -2111,7 +2118,7 @@ class Handler(BaseHTTPRequestHandler):
             return self.respond({"error": "Local desktop clients only."}, 403)
         try:
             length = int(self.headers.get("Content-Length", "0"))
-            limit = 20 * 1024 * 1024 if self.path == "/projects/restore" else (1_600_000 if self.path in ("/chats/stream", "/decoder-datasets") else 200_000)
+            limit = 12 * 1024 * 1024 if self.path == "/decoder-imports" else 20 * 1024 * 1024 if self.path == "/projects/restore" else (1_600_000 if self.path in ("/chats/stream", "/decoder-datasets") else 200_000)
             if not 0 < length <= limit:
                 raise ValueError("Invalid request size.")
             data = json.loads(self.rfile.read(length))
@@ -2128,12 +2135,16 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_datasets.prepare(ROOT, data.get('documents'), data.get('confirmed'), data.get('tokenizer_kind', 'words')), 201)
             if self.path == '/decoder-trial-proposals':
                 return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask, planner_identity=inference.loaded_identity, dataset=data.get('dataset')))
+            if self.path == '/decoder-imports':
+                return self.respond(decoder_trials.import_private(ROOT, data.get('confirmed'), data.get('source_name'), data.get('data')), 201)
             if self.path == '/decoder-trials':
                 record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
                                               proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'), dataset=data.get('dataset'),
                                               require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness)
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
+            if len(parts) == 3 and parts[0] == 'decoder-imports' and parts[2] == 'preview':
+                return self.respond(decoder_trials.preview_import(ROOT, parts[1], data.get('confirmed'), data.get('prompt'), data.get('max_new_tokens', 12)))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'export-review':
                 if data.get('confirmed') is not True:
                     raise ValueError('Confirm reviewing this private export and rechecking evaluation.')

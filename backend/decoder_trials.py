@@ -163,19 +163,13 @@ def list_trials(root, limit=20):
     return sorted(records, key=lambda record: record.get('created_at', ''), reverse=True)[:limit]
 
 
-def preview(root, trial_id, confirmed, prompt, max_new_tokens=12, persist=True):
-    """Run bounded CPU inference from a verified private bundle; never release it."""
-    if confirmed is not True:
-        raise ValueError('Confirm local inference on this private decoder trial.')
+def infer_bundle(bundle_path, prompt, max_new_tokens):
+    """Bounded CPU inference shared by trained trials and private imports."""
     if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 4096:
         raise ValueError('Provide a prompt of 1 to 4096 characters from the saved vocabulary.')
     if type(max_new_tokens) is not int or not 1 <= max_new_tokens <= 32:
         raise ValueError('Generate between 1 and 32 new tokens.')
-    with _LOCK:
-        record = read(root, trial_id)
-        if record['status'] != 'complete':
-            raise ValueError('Complete the private decoder trial before previewing it.')
-    model, tokenizer, manifest = decoder_bundle.load(folder(root, trial_id) / 'artifacts' / 'bundle')
+    model, tokenizer, manifest = decoder_bundle.load(bundle_path)
     tokens = tokenizer.encode(prompt.strip())
     if len(tokens) > model.config['context_length']:
         raise ValueError('The prompt exceeds the saved decoder context length.')
@@ -193,7 +187,7 @@ def preview(root, trial_id, confirmed, prompt, max_new_tokens=12, persist=True):
     except FloatingPointError as error:
         raise ValueError('The private decoder produced invalid inference scores.') from error
     result = {'schema_version': 1, 'id': uuid.uuid4().hex,
-              'created_at': datetime.now(timezone.utc).isoformat(), 'trial_id': trial_id,
+              'created_at': datetime.now(timezone.utc).isoformat(),
               'prompt': prompt.strip(), 'completion': tokenizer.decode(generated),
               'text': tokenizer.decode(tokens), 'generated_token_ids': generated,
               'bundle_manifest_sha256': run_manifest.digest(manifest),
@@ -201,6 +195,22 @@ def preview(root, trial_id, confirmed, prompt, max_new_tokens=12, persist=True):
                             'max_new_tokens': max_new_tokens, 'context_policy': 'sliding_window',
                             'source_sha256': run_manifest.file_digest(Path(__file__))},
               'scope': 'Private local trial preview; no model release.'}
+    return result
+
+
+def preview(root, trial_id, confirmed, prompt, max_new_tokens=12, persist=True):
+    if confirmed is not True:
+        raise ValueError('Confirm local inference on this private decoder trial.')
+    if not isinstance(prompt, str) or not 1 <= len(prompt.strip()) <= 4096:
+        raise ValueError('Provide a prompt of 1 to 4096 characters from the saved vocabulary.')
+    if type(max_new_tokens) is not int or not 1 <= max_new_tokens <= 32:
+        raise ValueError('Generate between 1 and 32 new tokens.')
+    with _LOCK:
+        record = read(root, trial_id)
+        if record['status'] != 'complete':
+            raise ValueError('Complete the private decoder trial before previewing it.')
+    result = infer_bundle(folder(root, trial_id)/'artifacts/bundle', prompt, max_new_tokens)
+    result['trial_id'] = trial_id
     if persist:
         with _LOCK:
             saved = read(root, trial_id)
@@ -361,6 +371,128 @@ def export_private(root, trial_id, confirmed, revision):
         record['exports'] = [*record.get('exports', [])[-19:], receipt]
         write(root, record)
     return {**receipt, 'file_name': f'decoder-private-{trial_id[:8]}.zip', 'data': base64.b64encode(data).decode('ascii')}
+
+
+def import_folder(root, import_id):
+    folder(root, import_id)  # Validate identifiers without trusting archive paths.
+    return Path(root)/'decoder-imports'/import_id
+
+
+def read_import(root, import_id, verify=True):
+    try:
+        path = import_folder(root, import_id)
+        record = json.loads((path/'import.json').read_text(encoding='utf-8'))
+        if (type(record.get('schema_version')) is not int or record['schema_version'] != 1
+                or record.get('format') != 'almg-private-decoder-import-v1' or record.get('id') != import_id
+                or record.get('scope') != 'private_cpu_preview_only'
+                or record.get('evaluation_status') != 'not_re_evaluated_dataset_excluded'
+                or not isinstance(record.get('created_at'), str) or not isinstance(record.get('source_name'), str)):
+            raise ValueError('Unsupported private decoder import.')
+        if verify:
+            _, tokenizer, manifest = decoder_bundle.load(path/'bundle')
+            if (run_manifest.digest(manifest) != record['bundle_manifest_sha256']
+                    or tokenizer.artifact()['format'] != record['tokenizer_format']
+                    or record.get('config') != manifest['config']
+                    or run_manifest.file_digest(path/'export-manifest.json') != record['provenance_sha256']):
+                raise ValueError('Imported decoder integrity changed.')
+        return record
+    except (OSError, KeyError, TypeError, AttributeError) as error:
+        raise ValueError('Private imported decoder is unavailable or incomplete.') from error
+
+
+def list_imports(root):
+    directory = Path(root)/'decoder-imports'
+    records = []
+    for path in directory.iterdir() if directory.exists() else []:
+        if re.fullmatch('[a-f0-9]{32}', path.name):
+            try:
+                records.append(read_import(root, path.name, verify=False))
+            except ValueError:
+                continue
+    return sorted(records, key=lambda item:item.get('created_at', ''), reverse=True)[:20]
+
+
+def import_private(root, confirmed, source_name, encoded):
+    if confirmed is not True:
+        raise ValueError('Confirm importing this private decoder for CPU preview.')
+    if not isinstance(source_name, str) or not 1 <= len(source_name) <= 255:
+        raise ValueError('Provide a short archive name.')
+    if not isinstance(encoded, str) or len(encoded) > 12*1024*1024:
+        raise ValueError('Private decoder archives must fit 8 MiB.')
+    import base64
+    import io
+    import stat
+    from tempfile import TemporaryDirectory
+    import zipfile
+    try:
+        data = base64.b64decode(encoded, validate=True)
+        if not 0 < len(data) <= 8*1024*1024:
+            raise ValueError('Private decoder archives must fit 8 MiB.')
+        limits = {'bundle/decoder.json':4*1024*1024, 'bundle/tokenizer.json':128*1024,
+                  'bundle/manifest.json':256*1024, 'export-manifest.json':512*1024}
+        with zipfile.ZipFile(io.BytesIO(data)) as archive:
+            infos = archive.infolist()
+            if len(infos) != len(limits) or {info.filename for info in infos} != set(limits):
+                raise ValueError('Import requires exactly the versioned private decoder ZIP members.')
+            contents = {}
+            for info in infos:
+                if (info.flag_bits & 1 or info.file_size > limits[info.filename]
+                        or info.compress_type not in (zipfile.ZIP_STORED, zipfile.ZIP_DEFLATED)
+                        or stat.S_IFMT(info.external_attr >> 16) not in (0, stat.S_IFREG)):
+                    raise ValueError('Private decoder archive contains unsupported or oversized entries.')
+                with archive.open(info) as stream:
+                    content = stream.read(limits[info.filename]+1)
+                if len(content) != info.file_size or len(content) > limits[info.filename]:
+                    raise ValueError('Private decoder archive entry size mismatch.')
+                contents[info.filename] = content
+        provenance = json.loads(contents['export-manifest.json'])
+        review = provenance['approved_review']
+        if (provenance.get('format') != 'almg-private-decoder-export-v1'
+                or type(provenance.get('schema_version')) is not int or provenance['schema_version'] != 1
+                or review.get('revision') != run_manifest.digest({k:v for k,v in review.items() if k!='revision'})
+                or review.get('files') != {name:hashlib.sha256(content).hexdigest() for name,content in contents.items() if name!='export-manifest.json'}
+                or review.get('evaluation_revision') != run_manifest.digest(provenance['evaluation'])
+                or review.get('preview_revision') != run_manifest.digest(provenance['preview'])):
+            raise ValueError('Private decoder archive provenance or file hashes do not match.')
+        directory = Path(root)/'decoder-imports'
+        directory.mkdir(parents=True, exist_ok=True)
+        import_id = uuid.uuid4().hex
+        with TemporaryDirectory(prefix='.import-', dir=directory) as temporary:
+            staged = Path(temporary)/import_id
+            (staged/'bundle').mkdir(parents=True)
+            for name,content in contents.items():
+                (staged/name).write_bytes(content)
+            _, tokenizer, manifest = decoder_bundle.load(staged/'bundle')
+            if run_manifest.digest(manifest) != review['bundle_manifest_sha256']:
+                raise ValueError('Imported bundle revision does not match its export review.')
+            record = {'schema_version':1, 'format':'almg-private-decoder-import-v1', 'id':import_id,
+                      'created_at':datetime.now(timezone.utc).isoformat(), 'source_name':source_name,
+                      'archive_sha256':hashlib.sha256(data).hexdigest(), 'bundle_manifest_sha256':run_manifest.digest(manifest),
+                      'provenance_sha256':hashlib.sha256(contents['export-manifest.json']).hexdigest(),
+                      'tokenizer_format':tokenizer.artifact()['format'], 'config':manifest['config'],
+                      'scope':'private_cpu_preview_only', 'evaluation_status':'not_re_evaluated_dataset_excluded'}
+            (staged/'import.json').write_text(json.dumps(record, indent=2), encoding='utf-8')
+            staged.rename(directory/import_id)
+        return record
+    except (OSError, KeyError, TypeError, AttributeError, zipfile.BadZipFile, RuntimeError) as error:
+        raise ValueError('The private decoder archive is invalid or incomplete.') from error
+
+
+def preview_import(root, import_id, confirmed, prompt, max_new_tokens=12):
+    if confirmed is not True:
+        raise ValueError('Confirm CPU preview of this imported private decoder.')
+    read_import(root, import_id)
+    result = infer_bundle(import_folder(root, import_id)/'bundle', prompt, max_new_tokens)
+    result['import_id'] = import_id
+    result['scope'] = 'Imported private CPU preview only; no training or release.'
+    with _LOCK:
+        saved = read_import(root, import_id, verify=False)
+        saved['previews'] = [*saved.get('previews', [])[-19:], result]
+        path = import_folder(root, import_id)/'import.json'
+        pending = path.with_suffix('.tmp')
+        pending.write_text(json.dumps(saved, ensure_ascii=False, indent=2), encoding='utf-8')
+        pending.replace(path)
+    return result
 
 
 def recover(root):

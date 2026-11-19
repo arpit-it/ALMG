@@ -1854,7 +1854,7 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
-  Future<void> _previewDecoderTrial(String id) async {
+  Future<void> _previewDecoderTrial(String id, {bool imported = false}) async {
     var prompt = '';
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Preview private decoder'),
@@ -1868,13 +1868,64 @@ class _StudioPageState extends State<StudioPage> {
     ));
     if (confirmed != true || !mounted) return;
     try {
-      final result = await _request('/decoder-trials/$id/preview', {'confirmed': true, 'prompt': prompt, 'max_new_tokens': 12});
+      final result = await _request(imported ? '/decoder-imports/$id/preview' : '/decoder-trials/$id/preview', {'confirmed': true, 'prompt': prompt, 'max_new_tokens': 12});
       if (!mounted) return;
       await showDialog<void>(context: context, builder: (context) => AlertDialog(
         title: const Text('Private decoder preview'), scrollable: true,
         content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(result))),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
       ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _showImportedDecoder(Map<String, dynamic> record) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Imported private decoder'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('File integrity is verified. Dataset documents are excluded, so imported evaluation claims have not been independently rechecked. CPU preview only; training and release are unavailable.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+      ])),
+      actions: [TextButton(onPressed: () { Navigator.pop(context); _previewDecoderTrial(record['id'] as String, imported: true); }, child: const Text('Preview imported decoder')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+    ));
+  }
+
+  Future<void> _importPrivateDecoder() async {
+    try {
+      final file = await openFile(acceptedTypeGroups: [const XTypeGroup(label: 'Private decoder ZIP', extensions: ['zip'])]);
+      if (file == null || !mounted) return;
+      if (await file.length() > 8 * 1024 * 1024) throw const FormatException('Private decoder archives must fit 8 MiB.');
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Import private decoder archive'),
+        content: Text('Verify ${file.name} and save a separate private copy for CPU preview. Dataset documents are not included, so evaluation scores cannot be rechecked. This creates no training run or release.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Import for private preview'))],
+      ));
+      if (confirmed != true || !mounted) return;
+      final record = await _request('/decoder-imports', {'confirmed': true, 'source_name': file.name, 'data': base64Encode(await file.readAsBytes())});
+      if (mounted) await _showImportedDecoder(record);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
+  Future<void> _showImportedDecoders() async {
+    try {
+      final imports = (await _request('/decoder-imports'))['imports'] as List;
+      if (!mounted) return;
+      final id = await showDialog<String>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Imported private decoders'), children: [
+          if (imports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No private bundles imported yet.')),
+          for (final record in imports) SimpleDialogOption(onPressed: () => Navigator.pop(context, record['id'] as String),
+            child: Text('${record['source_name']} · ${(record['id'] as String).substring(0, 8)}')),
+        ],
+      ));
+      if (id == null || !mounted) return;
+      final record = await _request('/decoder-imports/$id');
+      if (mounted) await _showImportedDecoder(record);
     } catch (error) {
       if (mounted) setState(() => _error = error.toString());
     }
@@ -1989,18 +2040,20 @@ class _StudioPageState extends State<StudioPage> {
             _showSavedDecoderDatasets();
           }, child: const Text('View prepared decoder datasets')),
 
-          const Text('Optional CPU check constructs a tiny decoder from new weights. No downloads; language-model training is not enabled.'),
+          TextButton(onPressed: () { Navigator.pop(context); _importPrivateDecoder(); }, child: const Text('Import private decoder bundle')),
+          TextButton(onPressed: () { Navigator.pop(context); _showImportedDecoders(); }, child: const Text('View imported private decoders')),
+          const Text('Optional CPU initialization check uses fresh weights without downloads.'),
           TextButton(onPressed: () {
             Navigator.pop(context);
             _checkDecoderInitialization();
           }, child: const Text('Check decoder initialization')),
           if (Platform.isMacOS) ...[
-            const Text('Optional Apple silicon check trains every tiny decoder weight on generated tokens. User-dataset pretraining and export are not enabled.'),
+            const Text('Optional Apple silicon diagnostic trains a tiny decoder on generated tokens.'),
             TextButton(onPressed: () {
               Navigator.pop(context);
               _checkDecoderTraining();
             }, child: const Text('Check from-scratch decoder training')),
-            const Text('Saved trials keep their approval receipt, checkpoint and trained bundle locally. They use fixed generated text; general pretraining and release remain unavailable.'),
+            const Text('Saved trials keep their approval receipt, checkpoint and trained bundle locally. Reviewed local data uses a separate approval. General pretraining and public release remain unavailable.'),
             TextButton(onPressed: () {
               Navigator.pop(context);
               _startDecoderTrial();
