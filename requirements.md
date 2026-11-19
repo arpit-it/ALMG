@@ -3194,6 +3194,36 @@ P3-LMF-02 partial progress · private streamed-index export · 2026-11-20:
   Physical power and Windows blockers remain separate and skipped. Generated
   packages, fixtures, weights and unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · optional data-provider boundary · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Added a versioned optional provider contract with
+  review/collect/resume operations, immutable source identity/hash/byte metadata,
+  source permission declarations, 64 KiB transfer bounds and checkpoint binding
+  requirements. Its local metadata validator rejects missing/extra fields,
+  credential fields, invalid hashes, unsupported permission bases and bad lengths.
+  A valid source review preserves provenance and explicitly grants no collection
+  consent, verified source permission or training approval.
+- Native “Optional dataset providers” reports no connected adapters and exposes
+  the versioned requirements on demand. ADAP is an example only, not an installed
+  integration or dependency. Existing app consent/source restrictions must apply
+  to any future adapter; this change performs no external collection or ingestion.
+- Local app verification: rebuilt/launched ALMG against an isolated local fixture,
+  opened Training recipe details → Optional dataset providers, observed the
+  disconnected-provider message and expanded the contract. Captured native JSON
+  exactly matches the backend definition and revision
+  82ef8ec561f11f132389940a04e4181f417df87a8c45c1ed62da21928f1b5e39.
+  A synthetic local source review preserves every source field without authorizing
+  collection. Evidence: /tmp/almg-provider-qa/{availability-ui.txt,contract-ui.txt,
+  contract-ui.json,source-review-fixture.json}.
+- Validation: 356 Python tests, 25 Flutter tests and Flutter analysis pass. Contract
+  tests verify stable version/revision, independent returned values, provenance
+  binding, no authorization side effects and invalid/credential metadata rejection.
+- Remaining: actual optional adapter implementations and consent-bound collection/
+  resume enforcement require separate integration work; contract definitions do
+  not establish those capabilities. Streamed tokenizer/training/contamination
+  integration, larger-than-RAM acceptance and other dataset-engineering criteria
+  remain open. Physical power and Windows blockers remain separate and skipped.
+  No generated fixtures, artifacts, weights or unrelated edits are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

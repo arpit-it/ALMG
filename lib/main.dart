@@ -1897,6 +1897,27 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _showDatasetProviders() async {
+    try {
+      final contract = await _request('/decoder-provider-contract');
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Optional dataset providers'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('No external data provider is connected. Local dataset preparation remains available. '
+            'Future optional connections must preserve source permissions and provenance, and require the app’s collection consent. '
+            'ADAP is an example of a possible adapter; no ADAP connection is included.'),
+          ExpansionTile(title: const Text('View versioned provider requirements'), children: [
+            SelectableText(const JsonEncoder.withIndent('  ').convert(contract)),
+          ]),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
+  }
+
   Future<void> _exportStreamIndex(String indexId) async {
     var overlay = false;
     try {
@@ -2664,6 +2685,7 @@ class _StudioPageState extends State<StudioPage> {
           }, child: const Text('Prepare local decoder text dataset')),
           TextButton(onPressed: () { Navigator.pop(context); _prepareDecoderDataset(saveDraft: true); }, child: const Text('Save local preparation draft')),
           TextButton(onPressed: () { Navigator.pop(context); _showSavedPreparations(); }, child: const Text('View saved preparation drafts')),
+          TextButton(onPressed: () { Navigator.pop(context); _showDatasetProviders(); }, child: const Text('Optional dataset providers')),
           if (Platform.isMacOS) TextButton(onPressed: () { Navigator.pop(context); _uploadStreamedSource(); }, child: const Text('Store a large local source in chunks')),
           if (Platform.isMacOS) TextButton(onPressed: () { Navigator.pop(context); _savedStreamedSources(); }, child: const Text('View saved streamed sources')),
           TextButton(onPressed: () {
