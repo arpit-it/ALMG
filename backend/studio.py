@@ -2125,7 +2125,7 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == "/runtime/power-event":
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
             if self.path == '/decoder-datasets':
-                return self.respond(decoder_datasets.prepare(ROOT, data.get('documents'), data.get('confirmed')), 201)
+                return self.respond(decoder_datasets.prepare(ROOT, data.get('documents'), data.get('confirmed'), data.get('tokenizer_kind', 'words')), 201)
             if self.path == '/decoder-trial-proposals':
                 return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask, planner_identity=inference.loaded_identity, dataset=data.get('dataset')))
             if self.path == '/decoder-trials':

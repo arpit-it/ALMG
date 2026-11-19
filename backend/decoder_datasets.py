@@ -7,14 +7,17 @@ from tempfile import TemporaryDirectory
 import uuid
 
 if __package__:
-    from .decoder_tokenizer import Tokenizer
+    from .decoder_tokenizer import Tokenizer, ByteTokenizer
     from .run_manifest import digest, file_digest
 else:
-    from decoder_tokenizer import Tokenizer
+    from decoder_tokenizer import Tokenizer, ByteTokenizer
     from run_manifest import digest, file_digest
 
 
-def prepare(root, documents, confirmed):
+def prepare(root, documents, confirmed, tokenizer_kind="words"):
+    if not isinstance(tokenizer_kind, str) or tokenizer_kind not in ('words', 'utf8_bytes'):
+        raise ValueError('Choose word or UTF-8 byte tokenization.')
+    tokenizer_type = ByteTokenizer if tokenizer_kind == 'utf8_bytes' else Tokenizer
     if confirmed is not True:
         raise ValueError('Confirm local decoder dataset preparation first.')
     if not isinstance(documents, list) or not 3 <= len(documents) <= 16:
@@ -66,7 +69,7 @@ def prepare(root, documents, confirmed):
                 source['split'] = part
     tokenizer = None
     try:
-        tokenizer = Tokenizer.fit([row['text'] for row in records if row['split'] == 'train'])
+        tokenizer = tokenizer_type.fit([row['text'] for row in records if row['split'] == 'train'])
         for row in records:
             try:
                 tokenizer.encode(row['text'])
@@ -122,8 +125,9 @@ def read(root, dataset_id):
             raise ValueError('Decoder dataset partition metadata does not match its content.')
         if 'tokenizer.json' in manifest['files']:
             tokenizer = Tokenizer.restore(json.loads((folder / 'tokenizer.json').read_text(encoding='utf-8')))
-            fitted = Tokenizer.fit([row['text'] for row in records if row['split'] == 'train'])
-            if tokenizer.fingerprint() != manifest['tokenizer']['sha256'] or tokenizer.fingerprint() != fitted.fingerprint():
+            fitted = type(tokenizer).fit([row['text'] for row in records if row['split'] == 'train'])
+            if (tokenizer.artifact()['format'] != manifest['tokenizer']['format']
+                    or tokenizer.fingerprint() != manifest['tokenizer']['sha256'] or tokenizer.fingerprint() != fitted.fingerprint()):
                 raise ValueError('Decoder tokenizer does not match the training partition.')
         return manifest
     except (OSError, KeyError, TypeError, AttributeError) as error:

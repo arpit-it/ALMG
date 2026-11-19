@@ -58,6 +58,8 @@ class Tokenizer:
 
     @classmethod
     def restore(cls, artifact):
+        if isinstance(artifact, dict) and artifact.get('format') == 'almg-utf8-byte-tokenizer-v1':
+            return ByteTokenizer.restore(artifact)
         if (not isinstance(artifact, dict) or set(artifact) != {'format', 'schema_version', 'normalization', 'whitespace', 'vocabulary'}
                 or artifact.get('format') != 'almg-whitespace-tokenizer-v1'
                 or type(artifact.get('schema_version')) is not int or artifact['schema_version'] != 1
@@ -68,3 +70,60 @@ class Tokenizer:
     def fingerprint(self):
         return hashlib.sha256(json.dumps(self.artifact(), sort_keys=True, ensure_ascii=False,
                                         separators=(',', ':')).encode('utf-8')).hexdigest()
+
+
+class ByteTokenizer(Tokenizer):
+    """Fixed UTF-8 byte alphabet; only training provenance is fitted."""
+    def __init__(self, training_sha256):
+        import re
+        if not isinstance(training_sha256, str) or not re.fullmatch('[a-f0-9]{64}', training_sha256):
+            raise ValueError('Byte tokenizer requires a training-document revision.')
+        self.training_sha256 = training_sha256
+
+    @property
+    def vocabulary(self):
+        return [f'<0x{value:02x}>' for value in range(256)]
+
+    @classmethod
+    def fit(cls, training_documents):
+        if not isinstance(training_documents, list) or not 1 <= len(training_documents) <= 256:
+            raise ValueError('Provide 1 to 256 training documents for this local tokenizer.')
+        normalized = []
+        for text in training_documents:
+            if not isinstance(text, str):
+                raise ValueError('Byte tokenization requires UTF-8 text.')
+            text = unicodedata.normalize('NFC', text)
+            cls('0'*64).encode(text)
+            normalized.append(text)
+        revision = hashlib.sha256(json.dumps(normalized, ensure_ascii=False, separators=(',', ':')).encode('utf-8')).hexdigest()
+        return cls(revision)
+
+    def encode(self, text):
+        if not isinstance(text, str) or not 1 <= len(text) <= 65536:
+            raise ValueError('Provide bounded UTF-8 text for byte tokenization.')
+        tokens = list(unicodedata.normalize('NFC', text).encode('utf-8'))
+        if not 1 <= len(tokens) <= 4096:
+            raise ValueError('Byte tokenization supports 1 to 4096 encoded bytes per document.')
+        return tokens
+
+    def decode(self, tokens):
+        if (not isinstance(tokens, list) or not 1 <= len(tokens) <= 4096
+                or any(type(token) is not int or not 0 <= token <= 255 for token in tokens)):
+            raise ValueError('Provide 1 to 4096 integer byte token IDs.')
+        return bytes(tokens).decode('utf-8', errors='replace')
+
+    def artifact(self):
+        return {'format': 'almg-utf8-byte-tokenizer-v1', 'schema_version': 1,
+                'normalization': 'NFC', 'encoding': 'utf-8', 'decoding_errors': 'replace',
+                'training_documents_sha256': self.training_sha256}
+
+    @classmethod
+    def restore(cls, artifact):
+        if (not isinstance(artifact, dict)
+                or set(artifact) != {'format', 'schema_version', 'normalization', 'encoding', 'decoding_errors', 'training_documents_sha256'}
+                or artifact.get('format') != 'almg-utf8-byte-tokenizer-v1'
+                or type(artifact.get('schema_version')) is not int or artifact['schema_version'] != 1
+                or artifact.get('normalization') != 'NFC' or artifact.get('encoding') != 'utf-8'
+                or artifact.get('decoding_errors') != 'replace'):
+            raise ValueError('Unsupported byte tokenizer artifact.')
+        return cls(artifact['training_documents_sha256'])

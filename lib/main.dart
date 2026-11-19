@@ -1661,7 +1661,15 @@ class _StudioPageState extends State<StudioPage> {
         utf8.decode(bytes); // Validate without replacing the original bytes used for provenance.
         documents.add({'name': file.name, 'data': base64Encode(bytes)});
       }
-      final manifest = await _request('/decoder-datasets', {'confirmed': true, 'documents': documents});
+      if (!mounted) return;
+      final tokenizerKind = await showDialog<String>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Choose local tokenizer'), children: [
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'words'), child: const Text('Words · training vocabulary only (existing format)')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 'utf8_bytes'), child: const Text('UTF-8 bytes · fixed alphabet, supports unseen words')),
+        ],
+      ));
+      if (tokenizerKind == null || !mounted) return;
+      final manifest = await _request('/decoder-datasets', {'confirmed': true, 'documents': documents, 'tokenizer_kind': tokenizerKind});
       if (mounted) {
         setState(() => _error = null);
         await _showDecoderDataset(manifest);
@@ -1793,7 +1801,7 @@ class _StudioPageState extends State<StudioPage> {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Preview private decoder'),
       content: SizedBox(width: 520, child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Use words from the saved training vocabulary and fit the model context. Generate 12 tokens locally on CPU with greedy decoding. This does not release a model.'),
+        const Text('Use the saved tokenizer and fit the model context. Generate 12 tokens locally on CPU with greedy decoding. This does not release a model.'),
         TextField(autofocus: true, maxLength: 4096, decoration: const InputDecoration(labelText: 'Prompt'),
           onChanged: (value) => prompt = value),
       ])),
