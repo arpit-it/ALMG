@@ -12,12 +12,20 @@ def run(initialize):
     if not mx.metal.is_available():
         raise ValueError('Metal GPU access is unavailable for the local decoder training check.')
     import numpy as np
-    model = initialize('decoder_from_scratch', {'vocab_size': 4, 'seed': 7})
+    if __package__:
+        from .decoder_tokenizer import Tokenizer
+    else:
+        from decoder_tokenizer import Tokenizer
+    words = ['amber', 'birch', 'cedar', 'dune']
+    training_text = [' '.join(words[(offset + index) % 4] for index in range(8)) for offset in range(4)]
+    held_out_text = [' '.join(words[(offset + index) % 4] for index in range(12)) for offset in range(4)]
+    tokenizer = Tokenizer.fit(training_text)
+    model = initialize('decoder_from_scratch', {'vocab_size': len(tokenizer.vocabulary), 'seed': 7})
     with mx.stream(mx.gpu):
         parameters = {name: mx.array(value) for name, value in model.parameters.items()}
         original = {name: mx.array(value) for name, value in parameters.items()}
-        train = mx.array([[(offset + index) % 4 for index in range(8)] for offset in range(4)])
-        held_out = mx.array([[(offset + index) % 4 for index in range(12)] for offset in range(4)])
+        train = mx.array([tokenizer.encode(text) for text in training_text])
+        held_out = mx.array([tokenizer.encode(text) for text in held_out_text])
 
         def norm(values):
             return (values - mx.mean(values, axis=-1, keepdims=True)) / mx.sqrt(mx.var(values, axis=-1, keepdims=True) + 1e-5)
@@ -63,12 +71,20 @@ def run(initialize):
             artifact = Path(folder) / 'decoder.json'
             model.save(artifact)
             restored = type(model).load(artifact)
+            import json
+            tokenizer_path = Path(folder) / 'tokenizer.json'
+            tokenizer_path.write_text(json.dumps(tokenizer.artifact(), ensure_ascii=False), encoding='utf-8')
+            restored_tokenizer = Tokenizer.restore(json.loads(tokenizer_path.read_text(encoding='utf-8')))
+            token_roundtrip = (restored_tokenizer.encode(held_out_text[0]) == tokenizer.encode(held_out_text[0])
+                               and restored_tokenizer.fingerprint() == tokenizer.fingerprint())
+            generated_text = restored_tokenizer.decode(generated)
+
             reload_error = float(np.max(np.abs(model.logits(np.array(held_out)[:, :-1]) - restored.logits(np.array(held_out)[:, :-1]))))
             artifact_bytes = artifact.stat().st_size
         if not (finite and final < initial * .1 and accuracy >= .95 and causal_error < 1e-6
-                and len(changed) == len(parameters) and matches and cpu_error < 1e-5 and reload_error < 1e-7):
+                and len(changed) == len(parameters) and matches and cpu_error < 1e-5 and reload_error < 1e-7 and token_roundtrip):
             raise ValueError('Decoder training failed loss, held-out, causality, full-parameter or generation verification.')
-    return {'passed': True, 'scope': 'Generated-token training fixture only; user-dataset pretraining and export remain unavailable.',
+    return {'passed': True, 'scope': 'Generated local-text training fixture only; user-dataset pretraining and export remain unavailable.',
             'recipe': 'decoder_from_scratch', 'recipe_version': 1, 'stage': 'pretraining_fixture', 'stage_version': 1,
             'weight_origin': 'newly_initialized', 'pretrained_weights_loaded': False,
             'device': 'Metal GPU', 'config': model.config, 'steps': 100, 'learning_rate': .05,
@@ -79,4 +95,8 @@ def run(initialize):
             'causal_prefix_max_error': causal_error, 'generated_tokens': generated,
             'generation_matches_fixture': matches, 'cpu_inference_max_error': cpu_error,
             'artifact_format': 'almg-decoder-v1', 'artifact_bytes': artifact_bytes,
-            'artifact_reload_max_error': reload_error, 'temporary_artifact_removed': True}
+            'artifact_reload_max_error': reload_error, 'temporary_artifact_removed': True, 'generated_text': generated_text,
+            'tokenizer': {'format': tokenizer.artifact()['format'], 'stage_version': 1,
+                          'vocabulary_size': len(tokenizer.vocabulary), 'sha256': tokenizer.fingerprint(),
+                          'fit_source': 'training_documents_only', 'training_documents': len(training_text),
+                          'held_out_documents': len(held_out_text), 'artifact_roundtrip': token_roundtrip}}

@@ -1857,6 +1857,34 @@ P3-LMF-01 partial progress · decoder artifact roundtrip · 2026-11-19:
   evaluated release integration and complete stage/manifest contracts. P3-LMF-01
   stays open; physical power and Windows verification remain separate blockers.
 
+P3-LMF-01 partial progress · versioned decoder tokenization stage · 2026-11-19:
+- Added a bounded local whitespace tokenizer with fit/encode/decode and version-1
+  artifact/restore interfaces, NFC normalization, stable sorted vocabulary and
+  canonical fingerprint. Vocabulary is fitted only from training documents;
+  evaluation text cannot expand it. Unknown words fail explicitly. Bounds cover
+  documents, text length, word length, token count and vocabulary growth.
+- The optional decoder training check now starts from generated local text,
+  derives model vocabulary size from the tokenizer, encodes training/held-out
+  documents separately, decodes generated output and verifies tokenizer artifact
+  roundtrip alongside the model artifact. The release package includes this stage.
+  This is a small pipeline foundation, not completion of the broader Tokenizer
+  Engine or user-dataset training workflow.
+- Local app verification: rebuilt/launched macOS ALMG with isolated fixtures,
+  opened recipe details and explicitly ran the from-scratch decoder check. Native
+  result displayed almg-whitespace-tokenizer-v1, four vocabulary words, training-only
+  fit source, four training/four held-out documents, successful artifact roundtrip
+  and fingerprint d7b780d3c1821f388225872edabb569787a93ca34d22b937528fd45f77416233.
+  Generated text was amber birch cedar dune repeated three times; held-out accuracy
+  remained 1.000. All data and temporary artifacts were local; no external collection.
+- Verification: all 218 Python tests passed with ALMG_METAL_TESTS=1, including
+  actual text-to-decoder training; all 16 Flutter tests passed. New tests cover
+  deterministic vocabulary, held-out rejection without refitting, NFC/whitespace
+  normalization, artifact restoration, invalid versions and input bounds.
+- Remaining: planner-enabled workflow and explicit approach selection, user
+  document/dataset integration, full tokenizer capabilities, persistent approved
+  training/checkpoint lifecycle and evaluated release/manifest integration.
+  P3-LMF-01 remains open; blocked power/Windows verification stays separate.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

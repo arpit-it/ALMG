@@ -43,3 +43,6 @@ class DecoderTrainingTest(unittest.TestCase):
         self.assertEqual(result['artifact_reload_max_error'], 0)
         self.assertEqual(result['artifact_format'], 'almg-decoder-v1')
         self.assertTrue(result['temporary_artifact_removed'])
+        self.assertTrue(result['tokenizer']['artifact_roundtrip'])
+        self.assertEqual(result['tokenizer']['fit_source'], 'training_documents_only')
+        self.assertEqual(result['generated_text'], 'amber birch cedar dune amber birch cedar dune amber birch cedar dune')
