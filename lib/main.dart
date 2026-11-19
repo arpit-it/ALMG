@@ -1895,17 +1895,96 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
-  Future<void> _showStreamedSource(Map<String, dynamic> source) async {
+  Future<void> _showStreamIndex(Map<String, dynamic> record) async {
     final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: Text('Local source · ${source['status']}'), scrollable: true,
+      title: Text('Streamed text index · ${record['status']}'), scrollable: true,
       content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
-        const Text('Original source storage only. Streaming text preparation and training from this source are not yet enabled. Reopening an upload requires the same file hash.'),
-        SelectableText(const JsonEncoder.withIndent('  ').convert(source)),
+        const Text('Line-based normalized text and exact-duplicate index. Source bytes are preserved. Training and large-index quality/evaluation integration are not yet enabled.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
-        if (source['status'] == 'uploading') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume local source upload'))],
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume text indexing'))],
     ));
-    if (resume == true && mounted) await _uploadStreamedSource(existing: source);
+    if (resume == true && mounted) await _runStreamIndex(record);
+  }
+
+  Future<void> _savedStreamIndexes(String sourceId) async {
+    try {
+      final indexes = (await _request('/decoder-streams/$sourceId/indexes'))['indexes'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved streamed text indexes'), children: [
+          if (indexes.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved text indexes.')),
+          for (final index in indexes) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(index as Map)),
+            child: Text('${(index['id'] as String).substring(0, 8)} · ${index['status']} · ${index['lines']} lines · ${index['unique_records']} unique')),
+        ],
+      ));
+      if (selected != null && mounted) await _showStreamIndex(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _beginStreamIndex(Map<String, dynamic> source) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Prepare line-based text index?'),
+      content: const Text('Treat each UTF-8 line as a document, normalize Unicode/whitespace and deduplicate exact normalized lines. '
+        'Stable hash buckets assign train/validation/test splits (80/10/10). Empty lines are counted. '
+        'Invalid UTF-8, oversized lines or unsupported word limits stop the current batch while preserving earlier progress. '
+        'This creates an index for review and does not start training.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm line-based preparation'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final record = await _request('/decoder-streams/${source['id']}/indexes', {'confirmed': true}, const Duration(minutes: 10));
+      if (mounted) await _runStreamIndex(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _runStreamIndex(Map<String, dynamic> initial) async {
+    var record = initial;
+    var pause = false;
+    StateSetter? refresh;
+    var overlay = true;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: StatefulBuilder(builder: (context, update) {
+        refresh = update;
+        return AlertDialog(title: const Text('Preparing streamed text'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: (record['offset'] as num) / (record['source_bytes'] as num)),
+          Text('${record['lines']} lines · ${record['unique_records']} unique records'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause text indexing'))]);
+      }))));
+    try {
+      while (!pause && record['status'] != 'complete') {
+        record = await _request('/decoder-stream-indexes/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        if (!mounted) return;
+        refresh?.call(() {});
+      }
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await _showStreamIndex(record);
+    } catch (error) {
+      refresh = null;
+      if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); }
+    }
+  }
+
+  Future<void> _showStreamedSource(Map<String, dynamic> source) async {
+    final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
+      title: Text('Local source · ${source['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        const Text('Original source is preserved. Line-based index preparation is available; training from large indexes is not yet enabled. Reopening an upload requires the same file hash.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(source)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+        TextButton(onPressed: () => Navigator.pop(context, 'saved'), child: const Text('View saved text indexes')),
+        if (source['status'] == 'stored_not_prepared') TextButton(onPressed: () => Navigator.pop(context, 'prepare'), child: const Text('Prepare streamed text index')),
+        if (source['status'] == 'uploading') TextButton(onPressed: () => Navigator.pop(context, 'upload'), child: const Text('Resume local source upload'))],
+    ));
+    if (!mounted) return;
+    if (action == 'upload') await _uploadStreamedSource(existing: source);
+    if (action == 'prepare') await _beginStreamIndex(source);
+    if (action == 'saved') await _savedStreamIndexes(source['id'] as String);
   }
 
   Future<void> _savedStreamedSources() async {

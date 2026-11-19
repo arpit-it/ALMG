@@ -3043,6 +3043,47 @@ P3-LMF-02 partial progress · resumable bounded-chunk original source storage ·
   Physical/Windows blockers stay open and skipped. No external collection occurred;
   generated large sources/uploads, weights and unrelated edits are excluded from Git.
 
+P3-LMF-02 partial progress · transactional streamed text normalization/indexing · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Verified stored sources now offer explicit line-based
+  index preparation and saved-index review. Each UTF-8 line is a document (64 KiB
+  including line ending); preparation strips an initial BOM, normalizes NFC and
+  whitespace, applies existing bounded word validation, counts empty lines and
+  deduplicates normalized content by SHA-256. Hash buckets assign stable
+  train/validation/test partitions. Method, runtime, source hash and first raw-line
+  hashes/byte offsets are retained for provenance; duplicate occurrences are counted.
+- SQLite stores text and processing state on disk with a 2 MiB page cache and
+  file-backed temporary storage. Processing uses bounded line reads and steps
+  limited by line/byte budgets. Each batch updates offsets/counts/documents in one
+  transaction; connections close after each operation. Pause occurs between batches.
+  Invalid UTF-8, unsupported lines or source/implementation changes stop safely
+  without losing earlier checkpoints. Completed publication binds the immutable
+  SQLite checksum and a version-1 manifest revision; interrupted publication can
+  resume without reinserting rows or incrementing duplicate counts again.
+- Native verification: rebuilt/launched ALMG, selected the verified 67,108,864-byte
+  source and explicitly confirmed the line policy. Paused index
+  7c72d600ff9e492f9371f977f2e18ab0 after 2,020,000 lines/56,560,212 committed bytes.
+  Restarted both app and backend, reopened the identical checkpoint (no automatic
+  work), and explicitly resumed. Completed at 2,396,737 lines, three unique records
+  and 2,396,734 duplicates, matching an independent bounded line scan. Compared all
+  normalized texts/occurrences and first-line raw hashes/offsets, verified source
+  hash unchanged and the published SQLite/manifest integrity through the normal
+  reader. No small prepared dataset or training trial was created. Evidence:
+  /tmp/almg-stream-index-qa/{confirmation-ui.txt,paused-index-ui.json,
+  restarted-index-ui.json,complete-index-ui.json,reference.json}, plus the index's
+  records.sqlite3/manifest.json under jobs/decoder-stream-indexes/.
+- Validation: 342 Python tests with ALMG_METAL_TESTS=1, 20 Flutter tests and clean
+  Flutter analysis. New cases verify bounded step continuation, Unicode/BOM and
+  whitespace normalization, deduplication/provenance, invalid-input rollback,
+  oversized lines, consent, source/code changes, interrupted publication recovery,
+  immutable complete reads and manifest tampering rejection.
+- Remaining: training/tokenizer/evaluation/quality/PII/permission/export integration
+  for large indexes, verification using sources larger than host RAM, optional
+  external provider contracts and remaining acceptance coverage. The index is
+  explicitly not trainable yet; 64 MiB verification does not establish beyond-RAM
+  acceptance. Physical/Windows blockers remain open and skipped. No external
+  collection occurred; generated sources/indexes, weights and unrelated edits are
+  excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
