@@ -2134,6 +2134,12 @@ class Handler(BaseHTTPRequestHandler):
                                               require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness)
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
+            if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'export-review':
+                if data.get('confirmed') is not True:
+                    raise ValueError('Confirm reviewing this private export and rechecking evaluation.')
+                return self.respond(decoder_trials.export_review(ROOT, parts[1]))
+            if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'export':
+                return self.respond(decoder_trials.export_private(ROOT, parts[1], data.get('confirmed'), data.get('revision')))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'evaluate':
                 return self.respond(decoder_trials.evaluate(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'preview':

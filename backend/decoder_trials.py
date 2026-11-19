@@ -1,6 +1,7 @@
 """Durable explicitly approved generated-text decoder trials, separate from jobs."""
 from datetime import datetime, timezone
 import json
+import hashlib
 from pathlib import Path
 import re
 import threading
@@ -162,7 +163,7 @@ def list_trials(root, limit=20):
     return sorted(records, key=lambda record: record.get('created_at', ''), reverse=True)[:limit]
 
 
-def preview(root, trial_id, confirmed, prompt, max_new_tokens=12):
+def preview(root, trial_id, confirmed, prompt, max_new_tokens=12, persist=True):
     """Run bounded CPU inference from a verified private bundle; never release it."""
     if confirmed is not True:
         raise ValueError('Confirm local inference on this private decoder trial.')
@@ -200,14 +201,15 @@ def preview(root, trial_id, confirmed, prompt, max_new_tokens=12):
                             'max_new_tokens': max_new_tokens, 'context_policy': 'sliding_window',
                             'source_sha256': run_manifest.file_digest(Path(__file__))},
               'scope': 'Private local trial preview; no model release.'}
-    with _LOCK:
-        saved = read(root, trial_id)
-        saved['previews'] = [*saved.get('previews', [])[-19:], result]
-        write(root, saved)
+    if persist:
+        with _LOCK:
+            saved = read(root, trial_id)
+            saved['previews'] = [*saved.get('previews', [])[-19:], result]
+            write(root, saved)
     return result
 
 
-def evaluate(root, trial_id, confirmed):
+def evaluate(root, trial_id, confirmed, persist=True):
     """Recompute a versioned private evaluation from verified held-out documents."""
     if confirmed is not True:
         raise ValueError('Confirm re-evaluation of this saved private decoder.')
@@ -265,11 +267,100 @@ def evaluate(root, trial_id, confirmed):
               'target_next_token_accuracy': .8, 'initial_train_loss_reference': initial,
               'metrics': metrics, 'passed': bool(passed),
               'scope': 'Private held-out re-evaluation; no model release.'}
+    if persist:
+        with _LOCK:
+            record = read(root, trial_id)
+            record['evaluations'] = [*record.get('evaluations', [])[-19:], result]
+            write(root, record)
+    return result
+
+
+def export_material(root, trial_id):
+    """Build a review of exact immutable files after fresh independent evaluation."""
+    fresh = evaluate(root, trial_id, True, persist=False)
+    if fresh['passed'] is not True:
+        raise ValueError('The saved decoder does not meet its evaluation target; private export is unavailable.')
     with _LOCK:
         record = read(root, trial_id)
-        record['evaluations'] = [*record.get('evaluations', [])[-19:], result]
+        evaluations, previews = record.get('evaluations', []), record.get('previews', [])
+        if not evaluations or not previews:
+            raise ValueError('Save a passing independent evaluation and a private preview before export.')
+        evaluation, preview_record = evaluations[-1], previews[-1]
+    if (evaluation.get('passed') is not True or type(evaluation.get('evaluation_version')) is not int or evaluation['evaluation_version'] != 1
+            or evaluation.get('target_next_token_accuracy') != fresh['target_next_token_accuracy']
+            or run_manifest.digest(evaluation.get('metrics')) != run_manifest.digest(fresh['metrics'])
+            or any(evaluation.get(key) != fresh[key] for key in (
+                'bundle_manifest_sha256', 'dataset_manifest_sha256', 'dataset_sha256', 'tokenizer_sha256'))
+            or preview_record.get('bundle_manifest_sha256') != fresh['bundle_manifest_sha256']
+            or preview_record.get('trial_id') != trial_id or not preview_record.get('generated_token_ids')):
+        raise ValueError('Evaluation or preview no longer matches this bundle. Re-evaluate and preview again.')
+    inference = preview_record.get('inference')
+    if (not isinstance(inference, dict) or type(inference.get('version')) is not int or inference['version'] != 1):
+        raise ValueError('A versioned private preview is required before export.')
+    repeated_preview = preview(root, trial_id, True, preview_record.get('prompt'), inference.get('max_new_tokens'), persist=False)
+    if any(preview_record.get(key) != repeated_preview[key] for key in ('generated_token_ids', 'completion', 'text', 'bundle_manifest_sha256')):
+        raise ValueError('The saved preview does not reproduce against this bundle. Preview again.')
+    bundle_path = folder(root, trial_id) / 'artifacts' / 'bundle'
+    contents = {f'bundle/{name}': (bundle_path/name).read_bytes()
+                for name in ('decoder.json', 'tokenizer.json', 'manifest.json')}
+    manifest = json.loads(contents['bundle/manifest.json'])
+    if (run_manifest.digest(manifest) != fresh['bundle_manifest_sha256']
+            or any(hashlib.sha256(contents['bundle/'+name]).hexdigest() != expected
+                   for name, expected in manifest['files'].items())):
+        raise ValueError('Bundle files changed while reviewing export.')
+    review = {'schema_version': 1, 'format': 'almg-private-decoder-export-v1', 'trial_id': trial_id,
+              'scope': 'Private experimental bundle only; no model release or dataset documents.',
+              'bundle_manifest_sha256': fresh['bundle_manifest_sha256'],
+              'dataset_manifest_sha256': fresh['dataset_manifest_sha256'],
+              'evaluation_revision': run_manifest.digest(evaluation), 'preview_revision': run_manifest.digest(preview_record),
+              'files': {name: hashlib.sha256(data).hexdigest() for name, data in contents.items()},
+              'receipts': ['evaluation', 'preview'], 'evaluation_verified': True,
+              'implementation_sha256': run_manifest.file_digest(Path(__file__))}
+    review['revision'] = run_manifest.digest(review)
+    return review, contents, evaluation, preview_record
+
+
+def export_review(root, trial_id):
+    return export_material(root, trial_id)[0]
+
+
+def export_private(root, trial_id, confirmed, revision):
+    if confirmed is not True:
+        raise ValueError('Confirm saving this private decoder export.')
+    review, contents, evaluation, preview_record = export_material(root, trial_id)
+    if revision != review['revision']:
+        raise ValueError('The export review changed. Review the current bundle and receipts again.')
+    import base64
+    import hashlib
+    import io
+    from tempfile import TemporaryDirectory
+    import zipfile
+    export_id = uuid.uuid4().hex
+    timestamp = datetime.now(timezone.utc).isoformat()
+    manifest = {'format': review['format'], 'schema_version': 1, 'export_id': export_id,
+                'created_at': timestamp, 'approved_review': review,
+                'evaluation': evaluation, 'preview': preview_record}
+    output = io.BytesIO()
+    with zipfile.ZipFile(output, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+        for name, data in contents.items():
+            archive.writestr(name, data)
+        archive.writestr('export-manifest.json', json.dumps(manifest, ensure_ascii=False, allow_nan=False, indent=2))
+    data = output.getvalue()
+    receipt = {'id': export_id, 'format': review['format'], 'created_at': timestamp,
+               'review_revision': revision, 'archive_sha256': hashlib.sha256(data).hexdigest(), 'bytes': len(data)}
+    directory = Path(root)/'decoder-exports'
+    directory.mkdir(parents=True, exist_ok=True)
+    with TemporaryDirectory(prefix='.export-', dir=directory) as temporary:
+        staged = Path(temporary)/export_id
+        staged.mkdir()
+        (staged/'bundle.zip').write_bytes(data)
+        (staged/'receipt.json').write_text(json.dumps(receipt, indent=2), encoding='utf-8')
+        staged.rename(directory/export_id)
+    with _LOCK:
+        record = read(root, trial_id)
+        record['exports'] = [*record.get('exports', [])[-19:], receipt]
         write(root, record)
-    return result
+    return {**receipt, 'file_name': f'decoder-private-{trial_id[:8]}.zip', 'data': base64.b64encode(data).decode('ascii')}
 
 
 def recover(root):

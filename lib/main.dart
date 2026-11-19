@@ -1785,6 +1785,10 @@ class _StudioPageState extends State<StudioPage> {
         }, child: const Text('Cancel saved decoder trial')),
         if (record['status'] == 'complete' && record['dataset'] is Map) TextButton(onPressed: () {
           Navigator.pop(context);
+          _exportPrivateDecoder(record['id'] as String);
+        }, child: const Text('Review private decoder export')),
+        if (record['status'] == 'complete' && record['dataset'] is Map) TextButton(onPressed: () {
+          Navigator.pop(context);
           _evaluateDecoderTrial(record['id'] as String);
         }, child: const Text('Re-evaluate saved decoder')),
         if (record['status'] == 'complete') TextButton(onPressed: () {
@@ -1798,6 +1802,35 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _exportPrivateDecoder(String id) async {
+    try {
+      final review = await _request('/decoder-trials/$id/export-review', {'confirmed': true});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Review private decoder export'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Save weights, tokenizer, versioned provenance and evaluation/preview receipts as a private ZIP. Preview receipts include your prompt. Dataset documents are excluded. This does not release a model. Evaluation and file hashes are checked again before saving.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
+        ])),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Save private decoder bundle'))],
+      ));
+      if (confirmed != true || !mounted) return;
+      final destination = await getSaveLocation(suggestedName: 'decoder-private-${id.substring(0, 8)}.zip',
+        acceptedTypeGroups: [const XTypeGroup(label: 'Private decoder ZIP', extensions: ['zip'])]);
+      if (destination == null || !mounted) return;
+      final result = await _request('/decoder-trials/$id/export', {'confirmed': true, 'revision': review['revision']});
+      await XFile.fromData(base64Decode(result['data'] as String), mimeType: 'application/zip', name: result['file_name'] as String).saveTo(destination.path);
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Private decoder bundle saved'), content: Text(destination.path),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))],
+      ));
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _evaluateDecoderTrial(String id) async {

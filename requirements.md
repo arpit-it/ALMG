@@ -2463,6 +2463,40 @@ P3-LMF-01 partial progress · versioned saved-decoder re-evaluation · 2026-11-1
   stay skipped. Generated/private artifacts, downloaded weights and unrelated user
   edits are excluded from this commit.
 
+P3-LMF-01 partial progress · approved versioned private decoder export · 2026-11-19:
+- Added a two-phase private export review and native local Save workflow for
+  reviewed-local-data decoders. Requires saved independent passing evaluation and
+  preview receipts bound to the exact bundle/dataset. Fresh CPU evaluation and
+  preview reproduction verify those receipts before review and again before write;
+  forged/stale metrics, preview output, file hashes or approval revisions fail closed.
+  Review binds exact files, receipt revisions and export implementation digest.
+- Version-1 ZIP contains fixed model/tokenizer/bundle-manifest members plus an
+  export manifest carrying provenance, approved review and quality receipts. Dataset
+  documents are excluded; native review explicitly discloses preview prompt content.
+  Artifacts publish into new immutable export directories with archive-hash receipts
+  and bounded trial history. Existing bundle bytes, approvals and private trial status
+  stay unchanged. No public registry/release or external transfer is enabled.
+- Local app verification: rebuilt/launched macOS ALMG against isolated copies of
+  the previously evaluated actual Metal-trained models. Natively reviewed the passing
+  model's exact export, verified no archive before approval, approved and selected
+  /tmp/almg-export-qa through the native Save dialog. The app saved a 49,160-byte
+  ZIP; inspected its exact four members, verified hashes/review/receipt binding,
+  extracted it and loaded the byte-tokenized bundle successfully. Natively attempted
+  the below-target model and observed rejection before export; only the authorized
+  passing-model archive existed. Restarted backend/app and reopened native history;
+  the full export ledger and saved archive hash were unchanged, with private status
+  retained. Evidence: /tmp/almg-export-qa/{review-ui.json,saved-ui.txt,rejected-ui.txt,
+  restarted-ui.json,decoder-private-0ee2f1bd.zip}. No external collection occurred.
+- Verification: 287 backend tests passed with ALMG_METAL_TESTS=1; 16 Flutter tests
+  passed; Flutter analysis clean. New tests cover explicit/exact approval, independently
+  reproduced gates, stale/altered receipts, bundle tampering, fixed archive members,
+  post-extraction bundle validation, no dataset documents and immutable source files.
+- Remaining: public release/import/registry and post-training contracts, broader
+  data/tokenizer/model-quality work, physical power/sleep/idle checks and full
+  acceptance. P3-LMF-01 remains open; independent physical/Windows blockers stay
+  skipped. Generated exports/private artifacts, downloaded weights and unrelated
+  user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
