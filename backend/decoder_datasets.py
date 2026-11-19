@@ -20,7 +20,7 @@ else:
     from run_manifest import digest, file_digest
 
 
-def prepare(root, documents, confirmed, tokenizer_kind="words", *, _derivation=None, _dataset_id=None):
+def prepare(root, documents, confirmed, tokenizer_kind="words", *, _derivation=None, _dataset_id=None, _mixing=None):
     if not isinstance(tokenizer_kind, str) or tokenizer_kind not in ('words', 'utf8_bytes'):
         raise ValueError('Choose word or UTF-8 byte tokenization.')
     tokenizer_type = ByteTokenizer if tokenizer_kind == 'utf8_bytes' else Tokenizer
@@ -99,6 +99,8 @@ def prepare(root, documents, confirmed, tokenizer_kind="words", *, _derivation=N
                     'vocabulary_size': len(tokenizer.vocabulary)}}
     if _derivation is not None:
         manifest['derivation'] = _derivation
+    if _mixing is not None:
+        manifest['mixing'] = _mixing
     with TemporaryDirectory(prefix='.prepare-', dir=directory) as temporary:
         staged = Path(temporary) / 'dataset'
         staged.mkdir()
@@ -133,6 +135,15 @@ def read(root, dataset_id):
                 or len({row['group'] for row in records}) != len(records)
                 or manifest['splits'] != {part: sum(row['split'] == part for row in records) for part in ('train', 'validation', 'test')}):
             raise ValueError('Decoder dataset partition metadata does not match its content.')
+        mixing = manifest.get('mixing')
+        if mixing is not None:
+            if (not isinstance(mixing, dict) or set(mixing) != {'version','unit','application','group_weights'}
+                    or type(mixing.get('version')) is not int or mixing['version'] != 1
+                    or mixing.get('unit') != 'document_windows' or mixing.get('application') != 'training_split_only'
+                    or not isinstance(mixing.get('group_weights'), dict)
+                    or set(mixing['group_weights']) != {row['group'] for row in records}
+                    or any(type(weight) is not int or not 1 <= weight <= 16 for weight in mixing['group_weights'].values())):
+                raise ValueError('Unsupported dataset mixing weights or policy.')
         if 'tokenizer.json' in manifest['files']:
             tokenizer = Tokenizer.restore(json.loads((folder / 'tokenizer.json').read_text(encoding='utf-8')))
             fitted = type(tokenizer).fit([row['text'] for row in records if row['split'] == 'train'])
@@ -446,3 +457,43 @@ def extend_dataset(root, dataset_id, confirmed, reviewed, documents):
                               for row in rows]}
     tokenizer_kind = 'utf8_bytes' if (parent.get('tokenizer') or {}).get('format') == 'almg-utf8-byte-tokenizer-v1' else 'words'
     return prepare(root, inherited + documents, True, tokenizer_kind, _derivation=derivation)
+
+
+def mix_datasets(root, selections, confirmed):
+    """Create a reviewed mixture; integer weights affect only training windows."""
+    if confirmed is not True:
+        raise ValueError('Confirm the selected datasets and sampling weights.')
+    if not isinstance(selections, list) or not 2 <= len(selections) <= 4:
+        raise ValueError('Select two to four prepared datasets to mix.')
+    documents, parents, lineage, weights, seen = [], [], [], {}, set()
+    use_bytes = False
+    for selection in selections:
+        if not isinstance(selection, dict) or type(selection.get('weight')) is not int or not 1 <= selection['weight'] <= 4:
+            raise ValueError('Each selected dataset needs an integer sampling weight from 1 to 4.')
+        reviewed = selection.get('dataset')
+        if not isinstance(reviewed, dict):
+            raise ValueError('Review each selected dataset before mixing.')
+        parent = read(root, reviewed.get('id'))
+        if digest(parent) != digest(reviewed) or parent['id'] in seen:
+            raise ValueError('A selected dataset review changed or repeats the same dataset ID.')
+        if 'mixing' in parent:
+            raise ValueError('Mix source datasets directly; nested weighted mixtures are not supported in this bounded trial.')
+        seen.add(parent['id'])
+        weight = selection['weight']
+        parents.append({'dataset_id':parent['id'],'manifest_sha256':digest(parent),'weight':weight})
+        use_bytes |= (parent.get('tokenizer') or {}).get('format') == 'almg-utf8-byte-tokenizer-v1'
+        rows = [json.loads(line) for line in (Path(root)/'decoder-datasets'/parent['id']/'documents.jsonl').read_text(encoding='utf-8').splitlines()]
+        for index, row in enumerate(rows):
+            name = f"{parent['id'][:8]}-{index}-{row['name']}"[:255]
+            documents.append({'name':name,'text':row['text']})
+            weights[row['group']] = weights.get(row['group'],0) + weight
+            lineage.append({'name':name,'derived_source_sha256':hashlib.sha256(row['text'].encode('utf-8')).hexdigest(),
+                            'parent_dataset_id':parent['id'],'parent_group':row['group'],'parent_split':row['split'],
+                            'parent_sources':[source for source in parent['sources'] if source['normalized_sha256']==row['group']]})
+    if len(documents) > 16:
+        raise ValueError('The bounded mixture supports at most 16 inherited documents before deduplication.')
+    mixing = {'version':1,'unit':'document_windows','application':'training_split_only','group_weights':weights}
+    derivation = {'version':1,'operation':'mix_local_datasets','parents':parents,'sources':lineage,
+                  'partition_policy':'global_exact_deduplication_recompute_splits_require_new_review',
+                  'duplicate_weight_policy':'sum_selected_parent_weights_per_normalized_group'}
+    return prepare(root,documents,True,'utf8_bytes' if use_bytes else 'words',_derivation=derivation,_mixing=mixing)

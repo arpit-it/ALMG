@@ -35,7 +35,10 @@ def preflight(root, reviewed):
             raise ValueError('Each training/evaluation document needs at least two tokens.')
         for start in range(0, len(tokens) - 1, 16):
             window = tokens[start:start + 17]
-            batches[row['split']].append(window)
+            copies = manifest.get('mixing', {}).get('group_weights', {}).get(row['group'], 1) if row['split'] == 'train' else 1
+            batches[row['split']].extend([window] * copies)
+            if len(batches[row['split']]) > (64 if row['split'] == 'train' else 32):
+                raise ValueError('This small trial supports at most 64 training and 32 windows per evaluation split. Prepare a smaller dataset.')
     if not all(batches.values()) or len(batches['train']) > 64 or any(len(batches[part]) > 32 for part in ('validation', 'test')):
         raise ValueError('This small trial supports at most 64 training and 32 windows per evaluation split. Prepare a smaller dataset.')
     return manifest, tokenizer, records, batches
@@ -62,6 +65,8 @@ def run(initialize, root, dataset, work_directory, stop=None):
     train_text = [row['text'] for row in records if row['split'] == 'train']
     expected = decoder_checkpoint.revision(model.config, tokenizer, train_text)
     expected.update(training_mode='reviewed_local_text', dataset_revision=manifest['dataset_sha256'])
+    if 'mixing' in manifest:
+        expected['sampling_revision'] = decoder_bundle.digest(manifest['mixing'])
     checkpoint = workspace / 'step-50'
     reused = checkpoint.exists()
     with mx.stream(mx.gpu):
@@ -135,6 +140,8 @@ def run(initialize, root, dataset, work_directory, stop=None):
               'dataset_sha256': manifest['dataset_sha256'], 'review_sha256': decoder_bundle.digest(manifest),
               'seed': 7, 'steps': 100, 'learning_rate': .05, 'weight_origin': 'newly_initialized',
               'device': 'Metal GPU', 'mlx_version': decoder_bundle.version('mlx'), 'evaluation': metrics}
+    if 'mixing' in manifest:
+        record['sampling'] = {**manifest['mixing'], 'windows': {part: len(windows) for part, windows in batches.items()}}
     boundary()
     decoder_bundle.save(workspace / 'bundle', model, tokenizer, record, pretraining_stage='pretraining_local')
     decoder_bundle.load(workspace / 'bundle')
@@ -143,4 +150,5 @@ def run(initialize, root, dataset, work_directory, stop=None):
             'metrics': metrics, 'generated_text': tokenizer.decode(generated), 'trainable_parameters': sum(v.size for v in model.parameters.values()),
             'checkpoint': {'completed_steps': 50, 'reused_existing_checkpoint': reused},
             'bundle_format': 'almg-decoder-bundle-v1', 'stage': 'pretraining_local', 'stage_version': 1,
-            'cpu_inference_max_error': cpu_error}
+            'cpu_inference_max_error': cpu_error,
+            **({'sampling':record['sampling']} if 'sampling' in record else {})}

@@ -1583,6 +1583,7 @@ class _StudioPageState extends State<StudioPage> {
       title: const Text('Decoder dataset prepared for review'), scrollable: true,
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(manifest))),
       actions: [
+        TextButton(onPressed: () { Navigator.pop(context); _mixDecoderDatasets(manifest); }, child: const Text('Mix with another local dataset')),
         TextButton(onPressed: () { Navigator.pop(context); _identifyDecoderLanguages(manifest['id'] as String); }, child: const Text('Identify local document languages')),
         TextButton(onPressed: () { Navigator.pop(context); _savedDecoderLanguages(manifest['id'] as String); }, child: const Text('View saved language reports')),
         TextButton(onPressed: () { Navigator.pop(context); _extendDecoderDataset(manifest); }, child: const Text('Add documents to new version')),
@@ -1605,6 +1606,37 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _mixDecoderDatasets(Map<String, dynamic> parent) async {
+    try {
+      final datasets = (await _request('/decoder-datasets'))['datasets'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Select a second local dataset'), children: [
+          for (final dataset in datasets)
+            if (dataset['id'] != parent['id']) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(dataset as Map)),
+              child: Text('${(dataset['id'] as String).substring(0, 8)} · ${dataset['unique_documents']} documents')),
+        ],
+      ));
+      if (selected == null || !mounted) return;
+      final weight = await showDialog<int>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Review local dataset mixture'), children: [
+          Padding(padding: const EdgeInsets.all(16), child: Text('Combine ${parent['unique_documents']} and ${selected['unique_documents']} saved records into a new version. '
+            'Shared records are deduplicated and their weights added. Weights repeat training windows only; evaluation is unweighted. '
+            'Splits and tokenizer are rebuilt; UTF-8 bytes are used if either parent uses them. Review the new version before training. Parents stay unchanged.')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 1), child: const Text('Confirm equal mixture (1:1)')),
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, 2), child: const Text('Confirm selected dataset emphasis (1:2)')),
+        ],
+      ));
+      if (weight == null || !mounted) return;
+      final result = await _request('/decoder-dataset-mixtures', {'confirmed': true, 'selections': [
+        {'dataset': parent, 'weight': 1}, {'dataset': selected, 'weight': weight},
+      ]});
+      if (mounted) await _showDecoderDataset(result);
+    } catch (error) {
+      if (mounted) setState(() => _error = error.toString());
+    }
   }
 
   Future<void> _showDecoderLanguages(Map<String, dynamic> report) async {

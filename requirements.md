@@ -2932,6 +2932,44 @@ P3-LMF-02 partial progress · optional local document language identification ·
   model download occurred; generated fixtures/artifacts, weights and unrelated
   user edits are excluded from this commit.
 
+P3-LMF-02 partial progress · reviewed local dataset mixing and training weights · 2026-11-19:
+- [ ] P3-LMF-02 remains open. Prepared datasets now offer a second-parent selector
+  and explicit equal (1:1) or selected-parent emphasis (1:2) review. The bounded
+  backend contract accepts two to four distinct, unchanged reviewed parents with
+  integer weights 1–4 and at most 16 inherited records before global exact
+  deduplication. It preserves parent files, publishes a fresh reviewed version,
+  refits the chosen tokenizer kind and recomputes global groups/splits. Parent
+  source hashes/licenses/splits and selection weights are retained in derivation.
+- Version-1 mixing metadata declares document-window units and training-only
+  application. Shared normalized groups sum their selected-parent contributions.
+  The trial repeats training windows by those weights; validation/test windows
+  remain unweighted. Existing contamination and 64-training/32-evaluation-window
+  limits still apply. Invalid/missing/boolean weights and unsupported policies
+  reject admission; nested weighted mixtures are explicitly unsupported rather
+  than silently losing their weights. Existing datasets default to weight one.
+- Saved training results/bundles include effective weights and window counts;
+  checkpoint revisions bind the sampling contract as well as data/tokenizer/code.
+  No training starts merely by creating a mixture, and approvals do not transfer.
+- Native verification: rebuilt/launched ALMG, reviewed two six-record local parents
+  and confirmed a 1:2 mixture. Twelve inherited inputs globally deduplicated to
+  six groups with effective weight three. Verified 12 training windows versus one
+  validation and one test window, unchanged parents and no trial before separate
+  approval. Explicit training completed on real Metal: final loss 0.0675263,
+  validation/held-out accuracy 1.000. Trial 1c648e7af62b4452ba4d8d20fd1444c0 persisted
+  sampling in its result/bundle and bound its checkpoint sampling revision.
+  Restarted ALMG and reopened the identical mixture manifest/lineage. Evidence:
+  /tmp/almg-mixing-qa/{review-ui.txt,mixture-ui.json,trial-ui.json,
+  restarted-mixture-ui.json,parents-before.json}.
+- Validation: 330 Python tests with ALMG_METAL_TESTS=1, 19 Flutter tests and clean
+  Flutter analysis. New tests cover global deduplication/provenance, training-only
+  contributions, unchanged evaluation, stale reviews/consent, kind selection,
+  invalid contracts, exact window cap and rejection beyond the cap.
+- Remaining: streaming beyond RAM/chunk-level resume, license review, broader
+  language/quality/PII/contamination coverage and remaining acceptance checks.
+  Physical/Windows blockers remain open and skipped. No external collection
+  occurred; generated mixtures/checkpoints, weights and unrelated edits are not
+  included in this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

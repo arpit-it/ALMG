@@ -2151,6 +2151,8 @@ class Handler(BaseHTTPRequestHandler):
                 return
             if self.path == "/runtime/power-event":
                 return self.respond(record_power_event(data.get("event"), data.get("event_id")))
+            if self.path == '/decoder-dataset-mixtures':
+                return self.respond(decoder_datasets.mix_datasets(ROOT, data.get('selections'), data.get('confirmed')))
             if self.path == '/decoder-preparations':
                 return self.respond(decoder_preparations.create(ROOT, data.get('documents'), data.get('confirmed'), data.get('tokenizer_kind', 'words')))
             if self.path == '/decoder-datasets':
