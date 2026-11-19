@@ -2531,6 +2531,40 @@ P3-LMF-01 partial progress · isolated private decoder archive import · 2026-11
   Generated/private archives, imported models, downloaded weights and unrelated
   user edits are excluded from this commit.
 
+P3-LMF-01 partial progress · private decoder inventory in Model Library · 2026-11-19:
+- Added a separate private_imports collection to the existing models API, preserving
+  the candidate/release models list. Private rows verify bundle/provenance integrity
+  and remain explicitly private CPU previews with unverified evaluation claims.
+  Missing/corrupt bundles remain unavailable with re-import guidance; they do not
+  become candidates/releases or training jobs. Model Library search/navigation now
+  includes these rows while retaining existing classifier/image handling.
+- Added a dedicated private preview page with tokenizer/context guidance, explicit
+  local generation, saved preview history, integrity errors and disabled inference
+  until the import loads successfully. No training/release controls are exposed.
+  Added a reusable desktop JSON client with explicit UTF-8 byte Content-Length,
+  verified by a real loopback HTTP test, for the library's new POST preview path.
+- Local app verification: rebuilt/launched macOS ALMG using an isolated copy of an
+  imported actual trained bundle. Opened Model Library directly from Dashboard,
+  observed private/unverified labels, opened its preview page and generated expected
+  “a a a a a a ” output from “zz”; history persisted. Changed only the isolated model
+  file and observed the open page reject inference without adding history. A cold
+  native library load showed the corrupt entry as unavailable and disabled. Restored
+  exact bytes, restarted backend/app, opened the model from Library again and
+  verified healthy access plus unchanged saved preview history and private scope.
+  Native verification caught request framing during development; the corrected
+  build and actual-wire regression test passed before commit. Evidence:
+  /tmp/almg-private-library-qa/{library-ui.txt,preview-ui.txt,
+  integrity-error-ui.txt,unavailable-ui.txt,restarted-ui.txt}.
+- Verification: 292 backend tests passed with ALMG_METAL_TESTS=1; all 19 Flutter
+  tests passed; Flutter analysis clean. Added private inventory/legacy API compatibility,
+  corrupt-row handling, preview-only UI, initial integrity failure disabling inference,
+  confirmed request scope/history and actual UTF-8 authorization/body framing coverage.
+- Remaining: public release/registry and post-training contracts, broader data/
+  tokenizer/model-quality support, physical power/sleep/idle checks and full
+  acceptance. P3-LMF-01 remains open; physical/Windows blockers remain skipped.
+  No external collection occurred. Imported/generated models, downloaded weights
+  and unrelated user edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

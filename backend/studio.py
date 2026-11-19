@@ -2040,7 +2040,7 @@ class Handler(BaseHTTPRequestHandler):
                     if job["status"] == "passed" or (
                         job["status"] == "preview_ready" and job["id"] in CANDIDATES)
                 ]
-            return self.respond({"models": models})
+            return self.respond({"models": models, "private_imports": decoder_trials.library_imports(ROOT)})
         if route.path == "/jobs":
             project_id = parse_qs(route.query).get("project_id", [None])[0]
             with LOCK:

@@ -14,6 +14,8 @@ import 'chat.dart';
 import 'catalog_selection.dart';
 import 'indicator_filter.dart';
 import 'project_settings.dart';
+import 'private_decoder_page.dart';
+import 'local_backend_client.dart';
 
 /// Starts the Flutter desktop application.
 void main() {
@@ -461,29 +463,17 @@ class ModelLibraryPage extends StatefulWidget {
 }
 
 class _ModelLibraryPageState extends State<ModelLibraryPage> {
-  final _client = HttpClient()..connectionTimeout = const Duration(seconds: 4);
-  late Future<List<dynamic>> _models = _load();
+  final _backend = LocalBackendClient();
+  late Future<Map<String, dynamic>> _models = _load();
   String _query = '';
 
-  Future<List<dynamic>> _load() async {
-    final request = await _client.getUrl(
-      Uri.parse('http://127.0.0.1:$backendPort/models'),
-    );
-    request.headers.set('X-Model-Studio', 'desktop');
-    final response = await request.close().timeout(const Duration(seconds: 8));
-    final data =
-        jsonDecode(await response.transform(utf8.decoder).join()) as Map;
-    if (response.statusCode != 200) {
-      throw FormatException(
-        data['error']?.toString() ?? 'Could not load models.',
-      );
-    }
-    return data['models'] as List;
-  }
+  Future<Map<String, dynamic>> _request(String path, [Map<String, dynamic>? body]) => _backend.request(path, body);
+
+  Future<Map<String, dynamic>> _load() => _request('/models');
 
   @override
   void dispose() {
-    _client.close(force: true);
+    _backend.close();
     super.dispose();
   }
 
@@ -499,7 +489,7 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
         ),
       ],
     ),
-    body: FutureBuilder<List<dynamic>>(
+    body: FutureBuilder<Map<String, dynamic>>(
       future: _models,
       builder: (context, snapshot) {
         if (snapshot.hasError) {
@@ -512,10 +502,13 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
         if (!snapshot.hasData) {
           return const Center(child: CircularProgressIndicator());
         }
-        final allModels = snapshot.data!.cast<Map>();
+        final allModels = [
+          ...(snapshot.data!['models'] as List? ?? const []).cast<Map>(),
+          ...(snapshot.data!['private_imports'] as List? ?? const []).cast<Map>(),
+        ];
         if (allModels.isEmpty) {
           return const Center(
-            child: Text('Trained candidates and releases will appear here.'),
+            child: Text('Trained candidates, releases and imported private decoders will appear here.'),
           );
         }
         final query = _query.trim().toLowerCase();
@@ -546,19 +539,23 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
                       itemCount: models.length,
                       itemBuilder: (context, index) {
                         final model = models[index];
+                        final privateImport = model['kind'] == 'private_decoder_import';
                         final missing =
                             (model['missing_files'] as List?) ?? const [];
                         final availability = missing.isEmpty
                             ? ''
-                            : '\nMissing local files: ${missing.join(', ')}';
+                            : privateImport ? '\nUnavailable: ${missing.join(' ')}' : '\nMissing local files: ${missing.join(', ')}';
                         final created = model['created_at'] as num?;
                         final date = created == null
                             ? ''
                             : ' · ${MaterialLocalizations.of(context).formatCompactDate(DateTime.fromMillisecondsSinceEpoch((created * 1000).round()))}';
                         final recipe = switch (model['recipe']) {
                           'text_to_image' => 'Text to image',
+                          'decoder_from_scratch' => 'Private decoder',
                           _ => 'Text classifier',
                         };
+                        final stateLabel = privateImport ? 'Private CPU preview · evaluation claims unverified'
+                            : model['status'] == 'passed' ? 'Released' : 'Candidate';
                         return ListTile(
                           leading: const Icon(Icons.memory),
                           title: Text(
@@ -567,18 +564,20 @@ class _ModelLibraryPageState extends State<ModelLibraryPage> {
                             overflow: TextOverflow.ellipsis,
                           ),
                           subtitle: Text(
-                            "${model['project']} · $recipe · ${model['status'] == 'passed' ? 'Released' : 'Candidate'}$date$availability",
+                            "${model['project']} · $recipe · $stateLabel$date$availability",
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: missing.isNotEmpty
                               ? null
                               : () => Navigator.of(context).push(
                                   MaterialPageRoute<void>(
-                                    builder: (_) => StudioPage(
-                                      initialModel: model['id'] as String,
-                                    ),
+                                    builder: (_) => privateImport
+                                        ? PrivateDecoderPage(importId: model['id'] as String, name: model['name'] as String, request: _request)
+                                        : StudioPage(initialModel: model['id'] as String),
                                   ),
-                                ),
+                                ).then((_) {
+                                  if (mounted) setState(() => _models = _load());
+                                }),
                         );
                       },
                     ),

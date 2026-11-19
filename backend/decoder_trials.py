@@ -412,6 +412,26 @@ def list_imports(root):
     return sorted(records, key=lambda item:item.get('created_at', ''), reverse=True)[:20]
 
 
+def library_imports(root):
+    """Expose private inventory separately from released/candidate training models."""
+    rows = []
+    for record in list_imports(root):
+        missing = []
+        try:
+            read_import(root, record['id'])
+        except ValueError:
+            missing = ['Private bundle integrity check failed; import the original archive again.']
+        try:
+            created = datetime.fromisoformat(record['created_at']).timestamp()
+        except ValueError:
+            created = None
+        rows.append({'id':record['id'], 'name':record['source_name'], 'project':'Private imports',
+                     'recipe':'decoder_from_scratch', 'kind':'private_decoder_import', 'status':'private_import',
+                     'scope':'private_cpu_preview_only', 'evaluation_status':'not_re_evaluated_dataset_excluded',
+                     'missing_files':missing, 'created_at':created})
+    return rows
+
+
 def import_private(root, confirmed, source_name, encoded):
     if confirmed is not True:
         raise ValueError('Confirm importing this private decoder for CPU preview.')
