@@ -7,9 +7,9 @@ import threading
 import uuid
 
 if __package__:
-    from . import decoder_dataset_training, decoder_training, recipe_contracts, run_manifest
+    from . import decoder_dataset_training, decoder_training, recipe_contracts, run_manifest, training_resources
 else:
-    import decoder_dataset_training, decoder_training, recipe_contracts, run_manifest
+    import decoder_dataset_training, decoder_training, recipe_contracts, run_manifest, training_resources
 
 _LOCK = threading.Lock()
 _ACTIVE = set()
@@ -38,9 +38,10 @@ def specification(dataset=None):
     spec = {'recipe': 'decoder_from_scratch', 'recipe_version': 1, 'approach': 'from_scratch',
             'scope': 'generated_local_text_fixture', 'stage_version': 1,
             'recipe_contract': recipe_contracts.recipe_contract('decoder_from_scratch'),
+            'resource_budget': {'version': 1, 'encoded_data_bytes': 128000},
             'components': {name: run_manifest.file_digest(Path(__file__).with_name(name)) for name in
                            ('decoder_trials.py', 'decoder_training.py', 'decoder_recipe.py', 'decoder_tokenizer.py',
-                            'decoder_checkpoint.py', 'decoder_dataset_training.py', 'decoder_bundle.py')}}
+                            'decoder_checkpoint.py', 'decoder_dataset_training.py', 'decoder_bundle.py', 'training_resources.py')}}
     if dataset is not None:
         spec.update(scope='reviewed_local_text_trial', dataset_id=dataset['id'],
                     dataset_manifest_sha256=run_manifest.digest(dataset))
@@ -184,6 +185,13 @@ def cancel(root, trial_id, confirmed):
     return record
 
 
+def record_resources(root, record, phase):
+    """Use the full bounded import budget, also for smaller generated fixtures."""
+    evidence = training_resources.check_size(record['specification']['resource_budget']['encoded_data_bytes'], Path(root))
+    record['resource_checks'] = [*record.get('resource_checks', [])[-19:], {
+        'phase': phase, 'checked_at': datetime.now(timezone.utc).isoformat(), **evidence}]
+
+
 def execute(root, trial_id):
     key = (str(Path(root)), trial_id)
     try:
@@ -199,6 +207,7 @@ def execute(root, trial_id):
                 raise ValueError('Saved decoder trial approval no longer matches this implementation. Approve a new trial.')
             if stop_event.is_set():
                 raise decoder_training.Cancelled('Cancelled before training. Approve resume to continue.')
+            record_resources(root, record, 'execution')
             record.update(status='running', error=None, artifact_directory=str(folder(root, trial_id) / 'artifacts'))
             write(root, record)
         def stop():
@@ -230,6 +239,8 @@ def execute(root, trial_id):
                 record['interruption_reason'] = 'user_cancelled'
             elif isinstance(error, ReadinessPaused):
                 record['interruption_reason'] = 'readiness_changed'
+            elif isinstance(error, training_resources.ResourceUnavailable):
+                record['interruption_reason'] = 'resources_unavailable'
             write(root, record)
     finally:
         with _LOCK:
@@ -313,6 +324,9 @@ def start(root, confirmed, submit, trial_id=None, proposal_id=None, proposal_rev
             guarded = True
         if guarded and not callable(readiness):
             raise ValueError('A local readiness probe is required for guarded training.')
+        resource_record = {'specification': spec, 'resource_checks': list(record.get('resource_checks', []))}
+        record_resources(root, resource_record, 'admission')
+        record['resource_checks'] = resource_record['resource_checks']
         if record.get('approval') is not None:
             record.setdefault('previous_approvals', []).append(record['approval'])
         record.update(status='waiting_idle' if guarded else 'queued', error=None, cancel_requested=False, interruption_reason=None, specification=spec,

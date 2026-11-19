@@ -2298,6 +2298,40 @@ P3-LMF-01 partial progress · guarded idle/AC decoder execution · 2026-11-19:
   blocked criteria; no external collection, generated artifacts or weights are
   committed, and unrelated user edits are preserved.
 
+P3-LMF-01 partial progress · decoder memory/disk admission and worker checks · 2026-11-19:
+- Connected bounded decoder approvals to the existing local memory/disk reserve
+  checks. Added a validated byte-budget entry point shared with classifier/image
+  checks, retaining their existing reserve calculations. Decoder specification
+  records a versioned conservative 128000-byte import budget and resource-checker
+  source revision; approval binds that budget. Minimum estimates are 256 MiB plus
+  eight times the data budget for memory and 64 MiB plus four times for disk.
+- Admission rejects low/unknown resources before persisting a new trial or queueing
+  work. Worker entry rechecks after queue/idle waiting and before model construction;
+  loss interrupts with resources_unavailable and requires explicit approval to
+  resume. Completed checkpoints and prior records remain intact on failure. Saved
+  trials retain bounded timestamped admission/execution resource evidence, including
+  available values and estimated reserves. These are estimates, not peak guarantees.
+- Local app verification: rebuilt/launched macOS ALMG with an isolated seeded
+  conversation and synthetic low-memory/disk fixtures. Native low-memory approval
+  failed without creating a trial. Restored real resource probes, opted into idle
+  waiting and verified saved admission evidence with no model artifacts. Simulated
+  disk loss before readiness admission; the native linked trial showed resource
+  interruption before model initialization. Restored actual memory/disk probes and
+  approved resume natively: real Metal training completed with held-out accuracy
+  1.000 and recorded admission/admission/execution checks. Restarted backend/app,
+  reopened the linked result and verified its full record was unchanged. Evidence:
+  /tmp/almg-resource-qa/{low-memory-ui.txt,waiting-ui.json,low-disk-ui.json,
+  completed-ui.json,restarted-ui.json}. Resource faults/readiness were synthetic;
+  no external collection or disruptive physical resource stress was performed.
+- Verification: 272 backend tests passed with ALMG_METAL_TESTS=1; all 16 Flutter
+  tests passed; Flutter analysis clean. New tests cover low memory/disk, unavailable
+  probes, loss after waiting, checkpoint preservation, failed resume preserving the
+  prior record, successful resource evidence and approval-bound budget validation.
+- Remaining: resource monitoring during optimization, physical power/sleep/idle
+  verification, richer data/tokenizers, evaluated release gates and full acceptance.
+  P3-LMF-01 stays open; independent physical/Windows blockers remain skipped.
+  Generated artifacts, downloaded weights and unrelated user changes are excluded.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
