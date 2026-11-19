@@ -3393,6 +3393,47 @@ P3-LMF-02 partial progress · resumable streamed near-duplicate diagnostics · 2
   blockers remain open and skipped. Generated reports, fixtures, artifacts, weights
   and unrelated edits are excluded from this commit.
 
+P3-LMF-02 partial progress · resumable contact-filtered streamed versions · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed original streamed indexes now offer
+  confirmed contact-pattern filtering into a separate immutable index. Detected
+  spans are replaced with [CONTACT_REDACTED]; Unicode/whitespace normalization,
+  global exact deduplication and fresh hash-based splits apply to the derived
+  text. Original source/index bytes stay unchanged. Existing bounded token/word
+  constraints still apply; this is heuristic filtering, not comprehensive PII removal.
+- Processing uses transactional batches of at most 100 parent records/about one
+  million characters, with restart-safe progress. The derived SQLite lineage table
+  binds every parent group to its derived group, original split, source line/byte
+  location, raw-line hash, occurrences and replacement count. Parent permission
+  declarations are retained as a snapshot in the derivation; notes are not filtered.
+  No audits, training approvals or evaluation-cleanliness claims transfer. Repeated
+  filtering of an already filtered version is rejected. Changed source/code and
+  failed batches preserve committed progress.
+- Reuses the existing immutable index envelope with additive derivation/lineage
+  metadata, leaving legacy indexes untouched. Existing readers, record review,
+  audit and private export remain usable; the backend routes derived preparations
+  to their own worker. No existing unfinished index implementation hash changes.
+- Local app verification: rebuilt/launched ALMG with an isolated 2,000-record
+  original index. Confirmed filtering, paused after 200 records, restarted backend
+  and app, reopened identical state and resumed the same child
+  b8eeccc3a0ec4825aafb253f6e6c10cd to completion. It replaced 667 spans in 667
+  records, retained all 2,000 records and lineage entries, and has zero remaining
+  matches under the current contact patterns. All lineage source fields match the
+  original records. Native record review and private export succeeded; restoring
+  the exported manifest/SQLite in isolation preserved its complete lineage and
+  integrity. Parent hashes are unchanged; no training started. Evidence:
+  /tmp/almg-stream-contact-filter-qa/{consent-ui.txt,paused-ui.json,restarted-ui.json,
+  completed-ui.json,record-review-ui.txt,export-review-ui.json,export-saved-ui.txt,
+  verification.json}.
+- Validation: 371 Python tests, 29 Flutter tests and Flutter analysis pass. New
+  tests cover reload/resume, collision deduplication and occurrence conservation,
+  source/permission lineage, export integrity, rollback after partial batch writes,
+  source/code changes, consent/stale reviews, and original preservation.
+- Remaining: broader PII policies, streamed pre-training contamination admission,
+  tokenizer/training integration, richer extraction, larger-than-RAM acceptance
+  and other dataset criteria. Physical power/Windows blockers remain open and
+  skipped. Generated filtered datasets, fixtures, export packages, weights and
+  unrelated edits are excluded from this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

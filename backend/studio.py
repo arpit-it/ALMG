@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -61,6 +61,7 @@ else:
     import decoder_stream_permissions
     import decoder_stream_languages
     import decoder_stream_overlap
+    import decoder_stream_redactions
     import chat_history
     import inference
     import image_recipe
@@ -2252,6 +2253,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_stream_exports.chunk(ROOT, parts[1], data.get('confirmed'), data.get('review'), data.get('file_name'), data.get('offset'), data.get('limit', 65536)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'export-seal':
                 return self.respond(decoder_stream_exports.seal(ROOT, parts[1], data.get('confirmed'), data.get('review')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'redact':
+                return self.respond(decoder_stream_redactions.begin(ROOT, parts[1], data.get('confirmed'), data.get('reviewed')))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'overlap':
                 return self.respond(decoder_stream_overlap.begin(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-stream-overlap' and parts[2] == 'step':
@@ -2279,6 +2282,8 @@ class Handler(BaseHTTPRequestHandler):
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'records':
                 return self.respond(decoder_stream_indexes.record_page(ROOT, parts[1], data.get('confirmed'), data.get('cursor'), data.get('split', 'all'), data.get('limit', 10)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'step':
+                if decoder_stream_indexes.read(ROOT, parts[1]).get('derivation', {}).get('operation') == 'contact_pattern_filter':
+                    return self.respond(decoder_stream_redactions.step(ROOT, parts[1], data.get('confirmed')))
                 return self.respond(decoder_stream_indexes.step(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'chunk':
                 return self.respond(decoder_streams.append(ROOT, parts[1], data.get('offset'), data.get('data'), data.get('confirmed')))

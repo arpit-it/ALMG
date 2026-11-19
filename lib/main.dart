@@ -2320,6 +2320,23 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _beginStreamRedaction(Map<String, dynamic> parent) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Create contact-filtered text index?'),
+      content: Text('Process all ${parent['unique_records']} unique records with the current contact patterns and replace detected spans with [CONTACT_REDACTED]. '
+        'Create a new index with exact deduplication and fresh hash-based splits. Keep the original index and per-record lineage. '
+        'Parent permission declarations are retained as a snapshot; notes are not filtered. Other personal information may remain. '
+        'The result needs a new review and does not inherit audits, training approval or evaluation cleanliness.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm filtered index'))],
+    ));
+    if (confirmed != true || !mounted) return;
+    try {
+      final record = await _request('/decoder-stream-indexes/${parent['id']}/redact', {'confirmed': true, 'reviewed': parent}, const Duration(minutes: 10));
+      if (mounted) await _runStreamIndex(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _showStreamIndex(Map<String, dynamic> record) async {
     final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: Text('Streamed text index · ${record['status']}'), scrollable: true,
@@ -2330,6 +2347,7 @@ class _StudioPageState extends State<StudioPage> {
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'records'), child: const Text('Review indexed records')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'audit'), child: const Text('Audit full text index')),
+        if (record['status'] == 'complete' && (record['derivation'] as Map?)?['operation'] != 'contact_pattern_filter') TextButton(onPressed: () => Navigator.pop(context, 'redact'), child: const Text('Create contact-filtered index')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'permissions'), child: const Text('Review streamed source permissions')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'languages'), child: const Text('Identify streamed record languages')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'overlap'), child: const Text('Analyze streamed record overlap')),
@@ -2353,6 +2371,7 @@ class _StudioPageState extends State<StudioPage> {
     }
     if (action == 'export') await _exportStreamIndex(record['id'] as String);
     if (action == 'audit') await _beginStreamAudit(record);
+    if (action == 'redact') await _beginStreamRedaction(record);
     if (action == 'permissions') await _reviewStreamSourcePermissions(record['id'] as String);
     if (action == 'languages') await _beginStreamLanguages(record);
     if (action == 'overlap') await _beginStreamOverlap(record);
@@ -2397,16 +2416,20 @@ class _StudioPageState extends State<StudioPage> {
 
   Future<void> _runStreamIndex(Map<String, dynamic> initial) async {
     var record = initial;
+    final isRedaction = (initial['derivation'] as Map?)?['operation'] == 'contact_pattern_filter';
     var pause = false;
     StateSetter? refresh;
     var overlay = true;
     unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
       child: StatefulBuilder(builder: (context, update) {
         refresh = update;
-        return AlertDialog(title: const Text('Preparing streamed text'), content: Column(mainAxisSize: MainAxisSize.min, children: [
-          LinearProgressIndicator(value: (record['offset'] as num) / (record['source_bytes'] as num)),
-          Text('${record['lines']} lines · ${record['unique_records']} unique records'),
-        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause text indexing'))]);
+        return AlertDialog(title: Text(isRedaction ? 'Filtering streamed contacts' : 'Preparing streamed text'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: isRedaction
+            ? ((record['total_parent_records'] as num) == 0 ? 0 : (record['processed_parent_records'] as num) / (record['total_parent_records'] as num))
+            : (record['offset'] as num) / (record['source_bytes'] as num)),
+          Text(isRedaction ? '${record['processed_parent_records']} / ${record['total_parent_records']} records · ${record['filtered_records']} filtered'
+            : '${record['lines']} lines · ${record['unique_records']} unique records'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: Text(isRedaction ? 'Pause contact filtering' : 'Pause text indexing'))]);
       }))));
     try {
       while (!pause && record['status'] != 'complete') {
