@@ -50,7 +50,7 @@ class IterativeStreamBPETests(unittest.TestCase):
             self.assertFalse(record['model_training_enabled'])
             self.assertEqual(fits.step(root,record['id'],True),record)
 
-    def test_maximum_sixteen_merges_matches_the_existing_oracle(self):
+    def test_legacy_sixteen_merges_matches_the_existing_oracle(self):
         with TemporaryDirectory() as temporary:
             root=Path(temporary);index=fixture(root)
             record=finish(root,fits.begin(root,index['id'],True,fits.review(root,index['id'],272)))
@@ -85,9 +85,55 @@ class IterativeStreamBPETests(unittest.TestCase):
     def test_invalid_caps_and_large_requested_cap_stops_when_no_pairs_remain(self):
         with TemporaryDirectory() as temporary:
             root=Path(temporary);index=fixture(root,True)
-            for cap in (True,255,273,512):
+            for cap in (True,255,513,1024):
                 with self.assertRaises(ValueError):fits.review(root,index['id'],cap)
-            for cap in (256,272):
+            for cap in (256,272,320,512):
                 record=finish(root,fits.begin(root,index['id'],True,fits.review(root,index['id'],cap)))
                 self.assertEqual(record['merges'],[]);self.assertEqual(record['vocabulary_size'],256)
                 self.assertEqual(record['completed_passes'],1)
+
+    def test_versioned_320_and_512_budgets_match_oracle_and_reload_export(self):
+        import random
+        import zipfile
+        import io
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            prefix=''.join(random.Random(7).choices('abcdefghijklmnopqrstuvwxyz0123456789',k=600))
+            prefix=' '.join(prefix[j:j+8] for j in range(0,len(prefix),8))
+            texts=[prefix+' café 世界 tail'+str(i) for i in range(8)]
+            raw=('\n'.join(texts)+'\n').encode();source=streams.create(root,'larger.txt',len(raw),hashlib.sha256(raw).hexdigest(),True)
+            streams.append(root,source['id'],0,base64.b64encode(raw).decode(),True);streams.seal(root,source['id'],True)
+            index=indexes.begin(root,source['id'],True)
+            while index['status']!='complete':index=indexes.step(root,index['id'],True)
+            with indexes._connect(indexes._folder(root,index['id'])/'records.sqlite3',True) as db:
+                train=[text for text, in db.execute('SELECT text FROM documents WHERE split=? ORDER BY group_sha256',('train',))]
+            before={p:p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            for cap in (320,512):
+                review=fits.review(root,index['id'],cap);self.assertEqual(review['schema_version'],2);self.assertEqual(review['maximum_learned_merges'],256)
+                record=fits.begin(root,index['id'],True,review)
+                while record['completed_passes']<17:record=fits.step(root,record['id'],True)
+                importlib.reload(fits);self.assertEqual(fits.read(root,record['id']),record)
+                record=finish(root,record);self.assertEqual(record['vocabulary_size'],cap)
+                self.assertEqual(record['merges'],ByteBPE.fit(train,cap).merges)
+                self.assertEqual(record['completed_passes'],cap-256)
+                self.assertEqual(record['format'],'almg-stream-iterative-bpe-fit-v2')
+                artifact=json.loads((fits._folder(root,record['id'])/'artifacts'/'tokenizer.json').read_text())
+                self.assertEqual(artifact['maximum_learned_merges'],256);self.assertEqual(artifact['schema_version'],2)
+                codec=fits.StreamByteBPE.restore(artifact)
+                for text in texts+['unseen café 世界 🚀','banana '*9000]:self.assertEqual(codec.decode(codec.encode(text)),text)
+                export=fits.export(root,record['id'],True,record)
+                with zipfile.ZipFile(io.BytesIO(base64.b64decode(export['data']))) as archive:
+                    self.assertEqual(json.loads(archive.read('tokenizer.json')),artifact)
+                forged={**artifact,'format':'almg-stream-iterative-byte-bpe-v1','schema_version':1,'maximum_learned_merges':16}
+                with self.assertRaises(ValueError):fits.StreamByteBPE.restore(forged)
+                with self.assertRaises(ValueError):fits.begin(root,index['id'],True,{**review,'vocabulary_cap':260})
+            self.assertTrue(all(p.read_bytes()==raw for p,raw in before.items()))
+
+    def test_legacy_codec_contract_remains_byte_identical_and_rejects_relabeling(self):
+        base=ByteBPE.fit(['banana banana'],260)
+        codec=fits.StreamByteBPE(base.merges,'f'*64,260,3)
+        artifact={'format':'almg-stream-iterative-byte-bpe-v1','schema_version':1,'base':{**base.artifact(),'training_documents_sha256':'f'*64},
+                  'training_binding':{'method':'ordered_unique_training_group_chain_v1','initial_sha256':fits.digest([]),'chain_sha256':'f'*64,'records':3},
+                  'maximum_record_utf8_bytes':65536,'maximum_learned_merges':16}
+        self.assertEqual(codec.artifact(),artifact);self.assertEqual(fits.StreamByteBPE.restore(artifact).artifact(),artifact)
+        with self.assertRaises(ValueError):fits.StreamByteBPE.restore({**artifact,'schema_version':2})

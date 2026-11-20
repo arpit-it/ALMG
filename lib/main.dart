@@ -2775,7 +2775,7 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _beginStreamTokenizerEvaluation(Map<String, dynamic> experiment) async {
-    final kind = experiment['format'] == 'almg-stream-iterative-bpe-fit-v1' ? 'iterative'
+    final kind = const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(experiment['format']) ? 'iterative'
       : experiment['format'] == 'almg-stream-bpe-fit-v1' ? 'one_merge' : null;
     final path = kind == null ? '/decoder-stream-tokenizer-experiments/${experiment['id']}/evaluations'
       : '/decoder-stream-fitted-tokenizers/$kind/${experiment['id']}/evaluations';
@@ -2901,14 +2901,20 @@ class _StudioPageState extends State<StudioPage> {
   Future<void> _beginWholeStreamBPE(String indexId, {bool iterative = false}) async {
     try {
       final kind = iterative ? 'iterative-byte-bpe' : 'whole-byte-bpe';
-      final review = await _request('/decoder-stream-indexes/$indexId/$kind-review', {'vocabulary_cap': iterative ? 260 : 257});
+      final cap = iterative ? await showDialog<int>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Choose whole-split byte-BPE vocabulary budget'), children: [
+          const Padding(padding: EdgeInsets.all(16), child: Text('Every merge scans the complete training split. Larger budgets take more passes; fitting stops early if no pair occurs twice. The default remains 260 IDs.')),
+          for (final size in [260, 256, 272, 320, 512]) SimpleDialogOption(onPressed: () => Navigator.pop(context, size), child: Text('$size IDs maximum · ${size - 256} merges')),
+        ])) : 257;
+      if (cap == null || !mounted) return;
+      final review = await _request('/decoder-stream-indexes/$indexId/$kind-review', {'vocabulary_cap': cap});
       if (!mounted) return;
       final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-        title: Text(iterative ? 'Fit four byte-BPE merges on the full training split?' : 'Fit one byte-BPE merge on the full training split?'), scrollable: true,
+        title: Text(iterative ? 'Fit up to ${cap - 256} byte-BPE merges on the full training split?' : 'Fit one byte-BPE merge on the full training split?'), scrollable: true,
         content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Count adjacent byte pairs in all ${review['population_split_counts']['train']} unique training records. Held-out records and duplicate occurrence weights are excluded from fitting.'),
           Text(iterative
-            ? 'Fit up to four merges for 260 IDs. Each pass re-encodes all saved training records with the learned prefix and recounts global pairs. Records up to 64 KiB are kept whole; progress is saved between batches and passes. This does not approve model training or establish model compatibility. Learned tokens and permission notes may be private.'
+            ? 'Fit up to ${cap - 256} merges for $cap IDs. Each pass re-encodes all saved training records with the learned prefix and recounts global pairs. Records up to 64 KiB are kept whole; progress is saved between batches and passes. This does not approve model training or establish model compatibility. Learned tokens and permission notes may be private.'
             : 'This initial whole-split baseline learns at most one merge, for 256 or 257 IDs. It supports whole records up to 64 KiB, uses disk-backed counters, saves progress and requires explicit resume after restart. This does not approve model training or establish model compatibility. Learned tokens and permission notes may be private.'),
           SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
         ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
@@ -2920,12 +2926,12 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _showWholeStreamBPE(Map<String, dynamic> record) async {
-    final iterative = record['format'] == 'almg-stream-iterative-bpe-fit-v1';
+    final iterative = const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(record['format']);
     final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Whole-split byte BPE · ${record['status']}'), scrollable: true,
       content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('${record['processed_records']} / ${record['total_records']} training records counted'),
-        Text(iterative ? 'Full training split only · ${record['completed_passes']} passes completed · ${(record['merges'] as List).length} merges learned. This bounded iterative fit supports up to 16 merges. Model training remains disabled.' : 'Full saved training split only. This baseline learns at most one merge, not a larger-vocabulary BPE fit. Model training remains disabled.'),
+        Text(iterative ? 'Full training split only · ${record['completed_passes']} passes completed · ${(record['merges'] as List).length} merges learned. The reviewed budget is ${record['review']['vocabulary_cap']} IDs (at most ${(record['review']['vocabulary_cap'] as num) - 256} merges); actual vocabulary can be smaller. Model training remains disabled.' : 'Full saved training split only. This baseline learns at most one merge, not a larger-vocabulary BPE fit. Model training remains disabled.'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
         if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _exportWholeStreamBPE(record); }, child: const Text('Export private whole-split tokenizer')),
@@ -2936,7 +2942,7 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _runWholeStreamBPE(Map<String, dynamic> initial) async {
-    final iterative = initial['format'] == 'almg-stream-iterative-bpe-fit-v1';
+    final iterative = const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(initial['format']);
     final route = iterative ? 'decoder-stream-iterative-bpe-fits' : 'decoder-stream-bpe-fits';
     var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
     unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
@@ -2977,7 +2983,7 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _exportWholeStreamBPE(Map<String, dynamic> record) async {
-    final route = record['format'] == 'almg-stream-iterative-bpe-fit-v1' ? 'decoder-stream-iterative-bpe-fits' : 'decoder-stream-bpe-fits';
+    final route = const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(record['format']) ? 'decoder-stream-iterative-bpe-fits' : 'decoder-stream-bpe-fits';
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Export private whole-split tokenizer?'),
       content: const Text('Save codec and fitting/provenance manifest only. Learned tokens and permission notes may be private. Source documents, pair-count database, weights and model-training approvals are excluded.'),

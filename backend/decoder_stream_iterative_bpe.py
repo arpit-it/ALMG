@@ -1,4 +1,4 @@
-"""Resumable whole-training-split byte BPE baseline with up to sixteen learned merges."""
+"""Resumable whole-training-split byte BPE fitting with versioned budgets up to 256 learned merges."""
 import base64
 from collections import Counter
 from datetime import datetime,timezone
@@ -32,8 +32,8 @@ MAX_BATCH_BYTES=1024*1024
 
 class StreamByteBPE(ByteBPE):
     def __init__(self,merges,chain,cap,records):
-        if type(cap) is not int or not 256<=cap<=272 or type(records) is not int or records<1:
-            raise ValueError('Whole-split BPE baseline requires cap 256 to 272 and a nonempty training population.')
+        if type(cap) is not int or not 256<=cap<=512 or type(records) is not int or records<1:
+            raise ValueError('Whole-split BPE baseline requires cap 256 to 512 and a nonempty training population.')
         super().__init__(merges,chain,cap);self.training_records=records
 
     @staticmethod
@@ -52,10 +52,11 @@ class StreamByteBPE(ByteBPE):
         return data.decode('utf-8')
 
     def artifact(self):
-        return {'format':'almg-stream-iterative-byte-bpe-v1','schema_version':1,'base':super().artifact(),
+        version=2 if self.vocabulary_size>272 else 1
+        return {'format':f'almg-stream-iterative-byte-bpe-v{version}','schema_version':version,'base':super().artifact(),
                 'training_binding':{'method':'ordered_unique_training_group_chain_v1','initial_sha256':digest([]),
                                     'chain_sha256':self.training_sha256,'records':self.training_records},
-                'maximum_record_utf8_bytes':65536,'maximum_learned_merges':16}
+                'maximum_record_utf8_bytes':65536,'maximum_learned_merges':256 if version==2 else 16}
 
     @classmethod
     def restore(cls,artifact):
@@ -91,7 +92,8 @@ def _binding(root,index_id,full):
 
 def _state(connection):
     record=json.loads(connection.execute('SELECT value FROM state WHERE id=1').fetchone()[0])
-    if (record.get('format')!='almg-stream-iterative-bpe-fit-v1' or type(record.get('schema_version')) is not int or record['schema_version']!=1
+    version=2 if record['review']['vocabulary_cap']>272 else 1
+    if (record.get('format')!=f'almg-stream-iterative-bpe-fit-v{version}' or type(record.get('schema_version')) is not int or record['schema_version']!=version
             or record.get('status') not in ('counting','awaiting_publication')
             or record.get('model_training_enabled') is not False or record.get('release_approved') is not False
             or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})):
@@ -105,17 +107,18 @@ def _write(connection,record):
 
 
 def review(root,index_id,cap=260):
-    if type(cap) is not int or not 256<=cap<=272:raise ValueError('This whole-split baseline supports vocabulary cap 256 to 272 only.')
+    if type(cap) is not int or not 256<=cap<=512:raise ValueError('This whole-split baseline supports vocabulary cap 256 to 512 only.')
     try:index,signatures,permission=_binding(root,index_id,True)
     except (OSError,sqlite3.Error) as error:raise ValueError('Restore the verified original source/index before whole-split fitting.') from error
     if not index['split_counts']['train']:raise ValueError('The saved index requires a nonempty training split.')
-    result={'format':'almg-stream-iterative-bpe-fit-review-v1','schema_version':1,'index_id':index_id,'index_revision':index['revision'],
+    version=2 if cap>272 else 1
+    result={'format':f'almg-stream-iterative-bpe-fit-review-v{version}','schema_version':version,'index_id':index_id,'index_revision':index['revision'],
             'source_provenance':{k:index[k] for k in ('source_id','source_name','source_sha256','source_bytes')},
             'source_signatures':signatures,'source_permission_review':permission,'vocabulary_cap':cap,
             'population_split_counts':index['split_counts'],'implementation_sha256':_implementation(),
             'scope':'all_unique_training_records_only_no_heldouts_no_occurrence_expansion',
             'algorithm':'reencode_saved_training_records_after_each_global_merge_minimum_frequency_2_lexicographic_ties',
-            'maximum_learned_merges':16,'maximum_record_utf8_bytes':65536,'model_training_enabled':False}
+            'maximum_learned_merges':256 if version==2 else 16,'maximum_record_utf8_bytes':65536,'model_training_enabled':False}
     result['revision']=digest(result);return result
 
 
@@ -123,7 +126,8 @@ def begin(root,index_id,confirmed,reviewed):
     if confirmed is not True:raise ValueError('Confirm the reviewed whole-training-split byte BPE baseline.')
     if not isinstance(reviewed,dict) or reviewed!=review(root,index_id,reviewed.get('vocabulary_cap')):raise ValueError('The whole-split fitting review changed.')
     if shutil.disk_usage(root).free<64*1024*1024:raise ValueError('Whole-split BPE fitting needs 64 MiB of free scratch space for bounded disk counters.')
-    record={'format':'almg-stream-iterative-bpe-fit-v1','schema_version':1,'id':uuid.uuid4().hex,'status':'counting',
+    version=reviewed['schema_version']
+    record={'format':f'almg-stream-iterative-bpe-fit-v{version}','schema_version':version,'id':uuid.uuid4().hex,'status':'counting',
             'review':reviewed,'processed_records':0,'training_bytes':0,'last_group':'','training_chain_sha256':digest([]),
             'total_records':reviewed['population_split_counts']['train'],'implementation_sha256':_implementation(),
             'merges':[],'merge_history':[],'completed_passes':0,'pass_chain_sha256':digest([]),'pass_bytes':0,

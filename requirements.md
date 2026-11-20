@@ -4652,6 +4652,52 @@ P3-LMF-03 partial progress · learned-vocabulary masked optimizer diagnostic · 
   hardware/Windows/larger-than-RAM blockers stay open and skipped. No external
   collection, downloads, generated artifacts/weights in Git or push occurred.
 
+P3-LMF-03 partial progress · versioned full-split byte-BPE budgets through 512 IDs · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Whole-training-split iterative byte BPE now accepts
+  reviewed vocabulary caps from 256 to 512. Native fitting offers 260 (existing
+  default), 256, 272, 320 and 512-ID budgets, explaining the complete-split pass
+  cost and early stop when no pair occurs twice. Consent displays the selected
+  cap and merge count; changing the approved budget invalidates its review.
+- Caps above 272 use separate v2 fitting/review/codec contracts with at most 256
+  learned merges. Caps through 272 retain the v1 contract and sixteen-merge policy;
+  legacy codec artifacts round-trip without rewriting. Schema/budget relabeling
+  is rejected. The 64 KiB record limit, 4 KiB piece limit, unique-training-only
+  population, frequency-2/lexicographic merge rule, disk-backed counters and
+  transactional batch/pass recovery remain enforced. Training/release stay disabled.
+- Native fit inventory, explicit resume, full-index comparison and private export
+  recognize both versions. Local app verification rebuilt/launched macOS on port
+  28851, reopened the unchanged legacy 260-ID fit, selected 512-ID consent and
+  cancelled without creating a fit, then completed 320-ID fit
+  bafdac8a01b14bed83b0461ed6c37544 with 64 merges/passes over 30 training records.
+- Maximum-budget fit 15989af1852a44ddb1a0e020ffc83f62 paused after six completed
+  passes at 24/30 records in its current pass. Restarting backend and app restored
+  the exact saved record, selected 512-ID cap and cursor; explicit native resume
+  completed all 256 passes/merges with 512 actual IDs. A second backend/app
+  restart reopened the identical completed v2 record and unchanged artifact files.
+- Native full-index comparison 7ac41036f95c460c8244436c538dcef2 round-tripped all
+  40 records losslessly (30 train, 7 validation, 3 test) without refitting. This
+  lossless check does not clear contamination or approve pretraining. Native export
+  saved a private ZIP in the isolated QA directory; independent inspection found
+  exactly tokenizer.json and manifest.json matching the saved v2 codec/report.
+- Independent verification reconstructed every one of the 256 merge choices and
+  frequencies from the complete training-only population, verified its ordered
+  group chain, confirmed the 320-ID fit matches the first 64 choices and checked
+  encode/decode on every split. All 27 pre-existing source/index/fit/comparison/
+  window/diagnostic fixture files stayed byte-identical. Evidence remains outside
+  Git in /tmp/almg-stream-bpe-budget-native-qa/verification.json, native *-ui.json/
+  *-ui.txt, private ZIP, fingerprints and build/restart/test logs.
+- Validation: 479 Python tests with Metal checks and warnings as errors, 36 Flutter
+  tests, clean Flutter analysis/diff checks and successful native rebuilds. Added
+  cases compare actual 320/512-ID fits to the deterministic BPE oracle, resume
+  after seventeen passes, validate maximum-budget export/reload and multilingual/
+  long-record round trips, reject invalid caps and changed review/version labels,
+  preserve v1 codec bytes and verify early stopping below the requested budget.
+- Remaining: full-split character-BPE/Unigram, approved durable streamed training
+  and checkpoint/model persistence for full-split codecs, and broader acceptance.
+  Budgets beyond 512 remain outside the supported model/codec profile. Independent
+  physical/Windows/larger-than-RAM blockers remain open and skipped without polling.
+  No external collection, downloads, generated artifacts/weights in Git or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
