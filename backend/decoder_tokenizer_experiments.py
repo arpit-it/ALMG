@@ -1,4 +1,4 @@
-"""Approved bounded BPE fitting and split comparison; no pretraining integration."""
+"""Approved bounded tokenizer fitting and split comparison; no pretraining integration."""
 import base64
 from datetime import datetime,timezone
 import io
@@ -13,11 +13,13 @@ if __package__:
     from . import decoder_datasets as datasets
     from .decoder_bpe import ByteBPE
     from .decoder_character_bpe import CharacterBPE
+    from .decoder_unigram import UnigramTokenizer
     from .run_manifest import digest,file_digest
 else:
     import decoder_datasets as datasets
     from decoder_bpe import ByteBPE
     from decoder_character_bpe import CharacterBPE
+    from decoder_unigram import UnigramTokenizer
     from run_manifest import digest,file_digest
 
 
@@ -27,13 +29,13 @@ def _folder(root,identifier):
 
 
 def train(root,dataset_id,confirmed,reviewed,config):
-    if confirmed is not True:raise ValueError('Confirm BPE fitting on the reviewed training split; model training stays disabled.')
-    if not isinstance(config,dict) or set(config) not in ({'vocabulary_cap'},{'vocabulary_cap','algorithm'}):raise ValueError('Choose a supported BPE algorithm and vocabulary cap.')
+    if confirmed is not True:raise ValueError('Confirm tokenizer fitting on the reviewed training split; model training stays disabled.')
+    if not isinstance(config,dict) or set(config) not in ({'vocabulary_cap'},{'vocabulary_cap','algorithm'}):raise ValueError('Choose a supported tokenizer algorithm and vocabulary cap.')
     algorithm=config.get('algorithm','byte_level_bpe')
-    if algorithm not in ('byte_level_bpe','character_bpe'):raise ValueError('Unsupported BPE algorithm.')
+    if algorithm not in ('byte_level_bpe','character_bpe','unigram'):raise ValueError('Unsupported tokenizer algorithm.')
     minimum=256 if algorithm=='byte_level_bpe' else 32
     if type(config['vocabulary_cap']) is not int or not minimum<=config['vocabulary_cap']<=512:raise ValueError('The vocabulary cap is outside this algorithm’s supported range.')
-    tokenizer_type=ByteBPE if algorithm=='byte_level_bpe' else CharacterBPE
+    tokenizer_type={'byte_level_bpe':ByteBPE,'character_bpe':CharacterBPE,'unigram':UnigramTokenizer}[algorithm]
     dataset=datasets.read(root,dataset_id)
     if not isinstance(reviewed,dict) or reviewed!=dataset:raise ValueError('The dataset review changed. Reopen it before fitting.')
     rows=[json.loads(line) for line in (Path(root)/'decoder-datasets'/dataset_id/'documents.jsonl').read_text(encoding='utf-8').splitlines()]
@@ -53,12 +55,14 @@ def train(root,dataset_id,confirmed,reviewed,config):
             bpe_tokens+=len(tokens);encoded_documents+=1;encoded_bytes+=len(encoded);encoded_characters+=len(text)
         comparison[split]={'documents':len(selected),'documents_encoded':encoded_documents,'nfc_characters':characters,
                            'baseline_byte_tokens':byte_tokens,'encoded_baseline_byte_tokens':encoded_bytes,
-                           'bpe_tokens':bpe_tokens if encoded_documents else None,
+                           'token_count':bpe_tokens if encoded_documents else None,
                            'tokens_per_nfc_character':bpe_tokens/encoded_characters if encoded_characters else None,
-                           'byte_to_bpe_token_ratio':encoded_bytes/bpe_tokens if bpe_tokens else None,
+                           'byte_to_token_ratio':encoded_bytes/bpe_tokens if bpe_tokens else None,
                            'uncovered_character_count':uncovered,'covered_character_fraction':(characters-uncovered)/characters if characters else None,
                            'unknown_tokens':None if uncovered else 0,'round_trip_verified':encoded_documents==len(selected),
                            'comparison_scope':'encodable_documents_only','used_for_fitting':split=='train'}
+        if algorithm!='unigram':
+            comparison[split].update(bpe_tokens=comparison[split]['token_count'],byte_to_bpe_token_ratio=comparison[split]['byte_to_token_ratio'])
     if datasets.read(root,dataset_id)!=dataset:raise ValueError('Dataset changed during BPE fitting; no artifact published.')
     identifier=uuid.uuid4().hex
     manifest={'format':'almg-tokenizer-experiment-v1','schema_version':1,'id':identifier,
@@ -69,9 +73,9 @@ def train(root,dataset_id,confirmed,reviewed,config):
               'approval':{'version':1,'confirmed_at':datetime.now(timezone.utc).isoformat(),
                           'dataset_manifest_sha256':digest(dataset),'config_sha256':digest(config),'scope':'tokenizer_fitting_only'},
               'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in
-                  ('decoder_tokenizer_experiments.py','decoder_bpe.py','decoder_character_bpe.py','decoder_datasets.py')}),
+                  ('decoder_tokenizer_experiments.py','decoder_bpe.py','decoder_character_bpe.py','decoder_unigram.py','decoder_datasets.py')}),
               'tokenizer_sha256':digest(artifact),'files':{},'model_training_enabled':False,'release_approved':False,
-              'limitations':'Bounded tokenizer experiment only. Learned tokens may encode private training phrases. Character BPE rejects uncovered characters without refitting. Special tokens, Unigram and model integration are unavailable.'}
+              'limitations':'Bounded tokenizer experiment only. Learned tokens may encode private training phrases. Character BPE rejects uncovered characters without refitting. Special tokens and model integration are unavailable. Unigram uses bounded fixed-candidate EM without vocabulary pruning or sampling.'}
     parent=Path(root)/'decoder-tokenizer-experiments';parent.mkdir(parents=True,exist_ok=True)
     with TemporaryDirectory(prefix='.bpe-',dir=parent) as temporary:
         staged=Path(temporary)/'experiment';staged.mkdir()
@@ -86,8 +90,9 @@ def read(root,identifier):
     try:
         if any((folder/name).stat().st_size>256000 for name in ('manifest.json','tokenizer.json')):raise ValueError('Tokenizer experiment exceeds its bound.')
         manifest=json.loads((folder/'manifest.json').read_text(encoding='utf-8'));artifact=json.loads((folder/'tokenizer.json').read_text(encoding='utf-8'))
-        tokenizer_type=CharacterBPE if artifact.get('format')=='almg-character-bpe-tokenizer-v1' else ByteBPE
-        algorithm='character_bpe' if tokenizer_type is CharacterBPE else 'byte_level_bpe'
+        algorithm={'almg-byte-bpe-tokenizer-v1':'byte_level_bpe','almg-character-bpe-tokenizer-v1':'character_bpe','almg-unigram-tokenizer-v1':'unigram'}.get(artifact.get('format'))
+        if algorithm is None:raise ValueError('Unsupported tokenizer experiment format.')
+        tokenizer_type={'byte_level_bpe':ByteBPE,'character_bpe':CharacterBPE,'unigram':UnigramTokenizer}[algorithm]
         model=tokenizer_type.restore(artifact)
         if (manifest.get('format')!='almg-tokenizer-experiment-v1' or type(manifest.get('schema_version')) is not int
                 or manifest['schema_version']!=1 or manifest.get('id')!=identifier
@@ -97,6 +102,7 @@ def read(root,identifier):
                 or manifest.get('training_documents_sha256')!=model.training_sha256
                 or manifest.get('algorithm')!=algorithm or type(manifest.get('vocabulary_size')) is not int
                 or digest(manifest.get('config')) not in (digest({'vocabulary_cap':model.vocabulary_size}),digest({'vocabulary_cap':model.vocabulary_size,'algorithm':algorithm}))
+                or (algorithm=='unigram' and len(model.history)!=6)
                 or manifest.get('model_training_enabled') is not False or manifest.get('release_approved') is not False):
             raise ValueError('Tokenizer experiment integrity check failed.')
         return manifest

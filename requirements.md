@@ -4049,6 +4049,53 @@ P3-LMF-03 partial progress · character BPE with explicit coverage gaps · 2026-
   skipped without unchanged polling. No downloads, weight/training-artifact changes,
   generated artifact commits or push; unrelated user edits preserved.
 
+P3-LMF-03 partial progress · bounded Unigram EM tokenizer experiments · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Approved tokenizer experiments now include a
+  fixed-candidate Unigram language-model tokenizer. It retains all training NFC
+  codepoints, selects frequent training substrings up to eight characters without
+  crossing words/documents, fits normalized positive piece probabilities with five
+  log-space forward/backward EM updates, and encodes using deterministic Viterbi.
+  The fixed-vocabulary likelihood/EM formulation follows
+  [Kudo 2018](https://aclanthology.org/P18-1007/); this bounded implementation does
+  not claim SentencePiece artifact compatibility, vocabulary pruning or sampling.
+- Fitting is training-split only, capped at sixteen documents / 4096 bytes per
+  sample and 32–512 vocabulary entries. Saved artifacts include vocabulary,
+  probabilities, normalization/method configuration, training revision and measured
+  likelihood history; invalid probability/vocabulary/method records reject on load.
+  Uncovered held-out characters retain explicit coverage gaps and cannot refit the
+  alphabet. Comparisons now provide algorithm-neutral token/efficiency fields,
+  retaining legacy BPE fields/readability. Model pretraining remains disabled.
+- Local app verification: rebuilt native macOS ALMG on fixture port 28839. Cancel
+  created no Unigram artifact; explicit 128-cap approval produced experiment
+  8099a5828f104eb9a8ef8231afd2bc17 with 94 vocabulary entries from three training
+  records. Marginal training log likelihood increased across five updates from
+  -471.361505402112 to -219.69165278079112; probabilities were finite, positive
+  and normalized. Training text round-tripped (661 byte tokens / 125 Unigram
+  tokens). Held-out records remained unencodable with 56/112 uncovered characters
+  and unavailable efficiency ratios. These synthetic results do not prove general
+  compression, tokenizer quality or model-training readiness.
+- Native private export restored vocabulary/probabilities and round-tripped a
+  novel combination of supported multilingual text. Independent checks reproduced
+  training-only fitting, likelihood evidence, coverage and token counts. All seven
+  dataset/legacy-BPE files stayed byte-identical. Backend/app restart reopened the
+  new Unigram and both legacy BPE experiment manifests exactly, without refitting.
+  No model trial/training ran. Evidence: /tmp/almg-unigram-native-qa/
+  (fitting-consent-ui.txt, experiment-ui.json, comparison-ui.txt, export-consent-ui.txt,
+  reopened-experiment-ui.json, legacy-byte-ui.json, legacy-character-ui.json,
+  verification.json and build/restart/test logs). Generated artifacts stay out of Git.
+- Verification: 420 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed; Flutter analysis and diff checks passed. Tests compare forward/backward
+  probabilities and expected counts against manually enumerated segmentations,
+  check Viterbi output, deterministic EM/monotonic likelihood, normalized weights,
+  Unicode/unknown handling, training-split isolation, invalid artifacts and export.
+- Remaining: configurable special/unknown tokens, larger/streamed fitting,
+  generated-model compatibility and tokenizer configuration saved with a model stay
+  open. Prior hardware/Windows/scratch-space criteria stayed open and were skipped
+  without unchanged polling. Completed isolated QA backends from this session were
+  closed to release memory; current app and every artifact file were preserved.
+  No downloads, weight modifications, generated artifact commits or push; unrelated
+  user edits preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
