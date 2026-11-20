@@ -38,10 +38,10 @@ def review(root,window_id,confirmed,reviewed,precision='float32',device='metal')
     if profile['system']!='Darwin' or profile['machine']!='arm64' or not profile['metal_available']:reasons.append('Apple silicon with available MLX Metal is required.')
     if not hardware._fits(profile,estimates):reasons.append('Available memory, free disk or Metal working-set recommendation does not cover the trial reserves.')
     reasons.extend(profile['errors'])
-    report={'format':'almg-stream-training-feasibility-v2','schema_version':2,'scope':'manual_stream_sgd20_trial_only_not_full_epoch',
+    report={'format':'almg-stream-training-feasibility-v3','schema_version':3,'scope':'manual_stream_sgd20_trial_only_not_full_epoch',
             'training_review_sha256':digest(current),'windows_id':window_id,'windows_revision':record['revision'],
-            'precision':precision,'device':device,'hardware':profile,'estimates':estimates,'calibration':calibrated,'feasible':not reasons,'blockers':reasons,
-            'training_approved':False,'release_approved':False,'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_stream_training_feasibility.py','decoder_stream_training_calibration.py')})}
+            'precision':precision,'device':device,'hardware':profile,'estimates':estimates,'calibration':calibrated,'duration_estimate':calibrated['duration_estimate'],'feasible':not reasons,'blockers':reasons,
+            'training_approved':False,'release_approved':False,'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_stream_training_feasibility.py','decoder_stream_training_calibration.py','decoder_stream_duration.py')})}
     report['revision']=digest(report)
     return report
 
@@ -51,7 +51,7 @@ def begin(root,window_id,confirmed,reviewed,approved):
     if not isinstance(approved,dict):raise ValueError('Review streamed-training hardware feasibility before approval.')
     fresh=review(root,window_id,True,reviewed,approved.get('precision'),approved.get('device'))
     if (approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'}) or approved.get('feasible') is not True
-            or any(approved.get(key)!=fresh[key] for key in ('format','schema_version','scope','training_review_sha256','windows_id','windows_revision','precision','device','estimates','calibration','implementation_sha256'))):raise ValueError('Streamed-training feasibility changed; review it again.')
+            or any(approved.get(key)!=fresh[key] for key in ('format','schema_version','scope','training_review_sha256','windows_id','windows_revision','precision','device','estimates','calibration','duration_estimate','implementation_sha256'))):raise ValueError('Streamed-training feasibility changed; review it again.')
     if not fresh['feasible']:raise training_resources.ResourceUnavailable('Streamed trial blocked: '+' '.join(fresh['blockers']))
     state=training.begin(root,window_id,True,reviewed)
     try:_save_profile(root,state,approved,fresh)
@@ -91,7 +91,7 @@ def read_profile(root,run_id,confirmed):
     if manifest['training']['approval_sha256']!=record['approval_sha256'] or manifest['training']['completed_steps']!=0:raise ValueError('Hardware-profile checkpoint receipt changed.')
     for key in ('approved_feasibility','execution_feasibility'):
         report=record[key]
-        version={'almg-stream-training-feasibility-v1':1,'almg-stream-training-feasibility-v2':2}.get(report.get('format'))
+        version={'almg-stream-training-feasibility-v1':1,'almg-stream-training-feasibility-v2':2,'almg-stream-training-feasibility-v3':3}.get(report.get('format'))
         if (version is None or report.get('schema_version')!=version
                 or report.get('revision')!=digest({k:v for k,v in report.items() if k!='revision'}) or report.get('feasible') is not True
                 or report.get('training_review_sha256')!=record['training_review_sha256'] or report.get('windows_id')!=state['windows_id']

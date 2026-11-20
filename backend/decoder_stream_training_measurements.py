@@ -8,9 +8,11 @@ from tempfile import NamedTemporaryFile
 from time import perf_counter
 if __package__:
     from . import decoder_stream_training as training
+    from . import decoder_stream_duration as duration
     from .run_manifest import digest,file_digest
 else:
     import decoder_stream_training as training
+    import decoder_stream_duration as duration
     from run_manifest import digest,file_digest
 
 
@@ -79,6 +81,7 @@ def read(root,run_id,confirmed):
     records.sort(key=lambda record:record['completed_steps'])
     nonfinal=[r['measurements']['request_work_seconds'] for r in records if not r['measurements']['includes_final_heldout_evaluation']]
     remaining=(20-state['completed_steps'])//5
-    return {'records':records,'completed_steps':state['completed_steps'],
+    prior=records[-1]['execution_admission'].get('duration_estimate') if records else None
+    return {'records':records,'completed_steps':state['completed_steps'],'duration_estimate':duration.estimate(records,state['completed_steps'],prior),
             'estimated_remaining_update_checkpoint_seconds':max(nonfinal)*remaining if nonfinal else None,
             'remaining_chunks':remaining,'duration_policy':'Largest observed same-run nonfinal chunk request work multiplied by remaining chunks. Includes admission and worker startup; excludes lock queue, measurement publication, final held-out evaluation and manual pauses. Hardware/load changes can invalidate comparison. Not a full-training duration prediction or guarantee.'}

@@ -170,6 +170,7 @@ void main() {
         if (path.endsWith('/training-review')) return {'binding': 'reviewed'};
         if (path.endsWith('/training-feasibility')) {
           return {'feasible': true, 'estimates': <String, dynamic>{}, 'blockers': <String>[],
+            'duration_estimate': {'estimated_twenty_update_request_work_seconds': 6.0},
             'calibration': {'compatible_chunk_count': 1, 'observed_metal_peak_bytes': 200, 'observed_process_peak_rss_bytes': 500}};
         }
         if (path.endsWith('/hardware-profile')) {
@@ -178,7 +179,8 @@ void main() {
         }
         if (path.endsWith('/measurements')) {
           expect(body['confirmed'], true);
-          return {'records': [{'completed_steps': 5}], 'estimated_remaining_update_checkpoint_seconds': 3.0, 'remaining_chunks': 3};
+          return {'records': [{'completed_steps': 5}], 'estimated_remaining_update_checkpoint_seconds': 3.0, 'remaining_chunks': 3,
+            'duration_estimate': {'estimated_remaining_request_work_seconds': 4.0}};
         }
         if (path.endsWith('/training-begin')) {
           starts++;
@@ -199,6 +201,7 @@ void main() {
     await tester.ensureVisible(find.text('Approve manual streamed trial'));
     await tester.tap(find.text('Approve manual streamed trial')); await tester.pumpAndSettle();
     expect(find.textContaining('Measured calibration: 1 compatible training chunks'), findsOneWidget);
+    expect(find.text('Estimated twenty-update request work including final evaluation: 6.00 seconds.'), findsOneWidget);
     await tester.tap(find.text('Cancel')); await tester.pumpAndSettle(); expect(starts, 0);
     await tester.tap(find.text('Approve manual streamed trial')); await tester.pumpAndSettle();
     await tester.tap(find.text('Approve twenty-step trial')); await tester.pumpAndSettle();
@@ -215,6 +218,7 @@ void main() {
     await tester.tap(find.text('View continuation measurements')); await tester.pumpAndSettle();
     expect(find.text('Saved measured chunks: 1'), findsOneWidget);
     expect(find.text('Estimated remaining update/checkpoint work: 3.0 seconds · 3 chunks.'), findsOneWidget);
+    expect(find.text('Estimated remaining request work including final evaluation: 4.00 seconds.'), findsOneWidget);
   });
 
   testWidgets('batch inspector allows retry after a binding failure', (tester) async {

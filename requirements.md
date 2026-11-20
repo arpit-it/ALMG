@@ -5817,6 +5817,47 @@ P3-LMF-05 partial progress · compatible streamed measurements raise admission r
   open and skipped. No generated/private artifacts, weights or unrelated edits
   are committed.
 
+P3-LMF-05 partial progress · stage-specific bounded trial work estimate including evaluation · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Compatible measured streamed-trial request times
+  now form separate maxima for the 5/10/15/20-update stages. The final stage
+  includes complete held-out evaluation, so it is not extrapolated from a normal
+  training chunk. A complete twenty-update work estimate is available only when
+  compatible observations cover all four stages; missing/invalid timings leave
+  it unavailable. Calculated duration remains explicitly an estimate.
+- Approval displays that bounded work estimate, and continuation history can use
+  the saved admission-stage model plus measured current-run timings to estimate
+  remaining stages, including final evaluation. The estimate includes admission,
+  worker startup, updates and checkpoint IO; excludes initial model initialization,
+  lock queue, measurement publication and manual pauses. It is not a wall-clock
+  deadline or full-epoch forecast, and hardware/load/history changes can invalidate
+  it. Stage maxima use measurements rather than earlier predicted durations.
+- Feasibility v3 retains the duration model with saved approval/execution snapshots.
+  Readers continue to accept v1/v2 history without rewriting records. Existing
+  checkpoint/receipt formats and original training implementation hashes remain
+  unchanged; evidence/code compatibility and stale-approval checks remain active.
+- Native verification: rebuilt macOS ALMG on Apple M4 Max, observed no complete
+  estimate before compatible final-stage data, then completed twenty updates in
+  measured baseline 40321cf2422248d7b3b6128da3c0eb92. Its four stage costs
+  produced 2.010453831986524 seconds of bounded request work including final
+  evaluation, visibly shown before approving new run 2651570e0c3c44f2b86721d282477390.
+  At five updates the new run showed remaining work from the 10/15/20 stages.
+  An older v2 profile reopened unchanged. After app/backend restart, saved
+  measurements and the v3 profile reopened with exact equality; resumed to ten
+  updates and verified a remaining-work estimate of
+  1.0955124989850447 seconds from the 15/20 stages, including evaluation.
+  All 268 pre-existing fixture file hashes remained unchanged.
+- Verification: 556 Python tests passed with actual Metal and warnings as errors;
+  49 Flutter tests passed; analysis and diff checks clean. Added tests cover
+  per-stage maxima, final-evaluation inclusion, missing/invalid evidence, completed
+  work, borrowing saved admission stages and a real measured trial feeding a new
+  approval estimate. Widget tests verify both displayed estimates. Evidence:
+  /tmp/almg-stream-duration-native-qa/verification.json and native/test/build logs.
+- Remaining: broader training/full-epoch feasibility and duration forecasting,
+  supported-recipe CPU fallback verification and Windows/CUDA host verification.
+  The bounded manual recipe does not establish general training capacity.
+  Unchanged hardware/user-action blockers stay open and skipped. No generated
+  artifacts, private data, weights or unrelated edits are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

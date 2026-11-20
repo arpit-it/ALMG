@@ -138,7 +138,10 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
             Text('Measured calibration: ${feasibility['calibration']['compatible_chunk_count']} compatible training chunks · '
               'Metal peak ${feasibility['calibration']['observed_metal_peak_bytes']} bytes · process RSS ${feasibility['calibration']['observed_process_peak_rss_bytes']} bytes. '
               'Measurements can only raise reserves. CPU/GPU unified memory can overlap; the admission sum is conservative.'),
-          const Text('Float32 Metal only. Calculated reserves and compatible prior measurements cover this bounded twenty-step trial, not a full epoch. No total duration prediction is available. Resources are checked again before initialization and each continuation.'),
+          if (feasibility['duration_estimate']?['estimated_twenty_update_request_work_seconds'] != null)
+            Text('Estimated twenty-update request work including final evaluation: ${(feasibility['duration_estimate']['estimated_twenty_update_request_work_seconds'] as num).toStringAsFixed(2)} seconds.')
+          else const Text('Complete-work estimate unavailable until compatible measurements cover all four stages, including final evaluation.'),
+          const Text('Float32 Metal only. Work estimates include admission, worker startup, updates, checkpoint IO and final evaluation; exclude initial model initialization, queue time and manual pauses. Historical load/hardware can change. No wall-clock deadline or full-epoch prediction. Resources are checked before initialization and continuation.'),
           for (final reason in feasibility['blockers'] as List) Text(reason as String),
           ExpansionTile(title: const Text('View streamed-training feasibility record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(feasibility))]),
         ])),
@@ -175,6 +178,8 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
               title: const Text('Streamed-trial chunk measurements'), scrollable: true,
               content: SizedBox(width: 660, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Text('Saved measured chunks: ${(result['records'] as List).length}'),
+                if (result['duration_estimate']?['estimated_remaining_request_work_seconds'] != null)
+                  Text('Estimated remaining request work including final evaluation: ${(result['duration_estimate']['estimated_remaining_request_work_seconds'] as num).toStringAsFixed(2)} seconds.'),
                 if (result['estimated_remaining_update_checkpoint_seconds'] == null) const Text('No measured nonfinal chunk is available for a remaining-work estimate.')
                 else Text('Estimated remaining update/checkpoint work: ${result['estimated_remaining_update_checkpoint_seconds']} seconds · ${result['remaining_chunks']} chunks.'),
                 const Text('Estimate uses the largest observed nonfinal chunk in this run, including admission and worker startup. It excludes final held-out evaluation, queue time and manual pauses; hardware/load changes can invalidate comparison. '
