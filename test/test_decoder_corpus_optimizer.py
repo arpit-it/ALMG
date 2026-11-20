@@ -35,7 +35,7 @@ class CorpusOptimizerTest(unittest.TestCase):
                 profile['available_memory_bytes'] = 1
                 with self.assertRaises(ValueError): training.run(root, True, source, saved, settings, approved)
             self.assertFalse((root/'decoder-corpus-optimizer-runs').exists())
-            for values in ({'compute_precision': 'mixed_float16', 'loss_scale': 128.0}, {'sequence_length': 4}):
+            for values in ({'compute_precision': 'mixed_float16', 'loss_scale': 1.0}, {'sequence_length': 4}):
                 with self.assertRaises(ValueError): training.configuration({**settings, **values}, 8)
             changed = deepcopy(saved); changed['review']['sequence_length'] = 4
             with self.assertRaises(ValueError): training.review(root, source, changed, settings)
@@ -85,7 +85,7 @@ class CorpusOptimizerTest(unittest.TestCase):
                     approved = training.review(root, source, saved, c)
                     self.assertTrue(approved['feasible'])
                     record = training.run(root, True, source, saved, c, approved); results.append(record)
-                    self.assertEqual(record['schema_version'], 2)
+                    self.assertEqual(record['schema_version'], 3)
                     self.assertLessEqual(record['full_batch_gradient_max_error'], 1e-5)
                     self.assertLessEqual(record['checkpoint_parameter_max_error'], 1e-7)
                     self.assertLessEqual(record['checkpoint_optimizer_max_error'], 1e-7)
@@ -101,4 +101,37 @@ class CorpusOptimizerTest(unittest.TestCase):
                 record = deepcopy(results[-1]); record['step_log'][0]['target_tokens'] += 1
                 record['revision'] = training.digest({k:v for k,v in record.items() if k != 'revision'})
                 (training._folder(root, record['id'])/'record.json').write_text(json.dumps(record))
+                with self.assertRaises(ValueError): training.read(root, record['id'])
+
+    @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS') == '1', 'Requires mixed FP16 Metal computation')
+    def test_mixed_precision_corpus_unscales_accumulates_restores_fp32_masters(self):
+        import numpy as np
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary); source, saved, settings = corpus(root)
+            before = {path: path.read_bytes() for path in root.rglob('*') if path.is_file()}
+            for kind in ('sgd', 'adamw'):
+                c = {**settings, 'optimizer': kind, 'weight_decay': .01 if kind == 'adamw' else 0., 'batch_size': 2,
+                     'gradient_accumulation_steps': 2, 'compute_precision': 'mixed_float16', 'loss_scale': 128.0}
+                approved = training.review(root, source, saved, c)
+                fp32 = training.review(root, source, saved, {**c, 'compute_precision': 'float32', 'loss_scale': 1.0})
+                self.assertEqual(approved['estimates']['required_available_memory_bytes'], fp32['estimates']['required_available_memory_bytes'])
+                record = training.run(root, True, source, saved, c, approved)
+                self.assertLess(record['final_losses']['train'], record['initial_losses']['train'])
+                self.assertEqual(record['compute_precision'], 'mixed_float16'); self.assertEqual(record['loss_scale'], 128)
+                self.assertLessEqual(record['full_batch_gradient_max_error'], 1e-3)
+                self.assertLessEqual(record['initial_precision_loss_difference'], .05)
+                self.assertLessEqual(record['compute_fp32_logits_max_error'], .05)
+                self.assertLessEqual(record['causal_prefix_max_error'], 1e-5)
+                self.assertLessEqual(record['cpu_metal_max_error'], 1e-5)
+                self.assertLessEqual(record['checkpoint_parameter_max_error'], 1e-7)
+                self.assertLessEqual(record['checkpoint_optimizer_max_error'], 1e-7)
+                self.assertEqual(record['scheduler_completed_steps'], 20)
+                folder = training._folder(root, record['id'])
+                model, state = training.optimizer.restore(folder/'step-10', c, approved['revision'])
+                self.assertTrue(all(value.dtype == np.float32 for value in model.parameters.values()))
+                self.assertTrue(all(value.dtype == np.float32 for part in ('m', 'v') for value in state[part].values()))
+                self.assertEqual(training.read(root, record['id']), record)
+                self.assertTrue(all(path.read_bytes() == data for path, data in before.items()))
+                changed = deepcopy(record); changed['loss_scale'] = 1.; changed['revision'] = training.digest({k:v for k,v in changed.items() if k != 'revision'})
+                (folder/'record.json').write_text(json.dumps(changed))
                 with self.assertRaises(ValueError): training.read(root, record['id'])

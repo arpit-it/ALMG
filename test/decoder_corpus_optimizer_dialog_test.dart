@@ -50,4 +50,20 @@ void main() {
     expect(settings.last['batch_size'], 2); expect(settings.last['gradient_accumulation_steps'], 2);
   });
 
+  testWidgets('corpus precision selection clears approval and submits fixed loss scaling', (tester) async {
+    final settings = <Map<String, dynamic>>[];
+    await tester.pumpWidget(MaterialApp(home: DecoderCorpusOptimizerDialog(initialized: const {'id': 'init', 'plan_id': 'plan'}, corpus: const {'id': 'corpus', 'review': {'sequence_length': 8}}, request: (path, body) async {
+      settings.add(Map<String, dynamic>.from(body['settings'] as Map));
+      return {'feasible': true, 'estimates': {}, 'blockers': []};
+    })));
+    await tester.tap(find.text('Review corpus training resources')); await tester.pumpAndSettle();
+    expect(find.text('Confirm train and save corpus model'), findsOneWidget);
+    await tester.ensureVisible(find.text('Corpus FP32 compute')); await tester.tap(find.text('Corpus FP32 compute')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Corpus mixed FP16 compute').last); await tester.pumpAndSettle();
+    expect(find.text('Confirm train and save corpus model'), findsNothing);
+    await tester.tap(find.text('Review corpus training resources')); await tester.pumpAndSettle();
+    expect(settings.last['compute_precision'], 'mixed_float16'); expect(settings.last['loss_scale'], 128.0);
+    expect(find.text('Confirm train and save corpus model'), findsOneWidget);
+  });
+
 }

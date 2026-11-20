@@ -7062,6 +7062,57 @@ P3-LMF-06 partial progress · token-weighted corpus gradient accumulation · 202
   broader quality evaluation and profiled 50M–100M training. Unchanged independent
   hardware/user-action blockers remain open and skipped.
 
+P3-LMF-06 partial progress · bounded mixed FP16 corpus training · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Reviewed-corpus optimizer controls now select FP32 or
+  bounded mixed FP16 computation. Changing precision invalidates approval. Version-3
+  reviews/results bind selected precision and fixed loss scale (128 mixed / 1 FP32),
+  while retaining conservative FP32 memory reserves. No memory-saving or isolated
+  peak claim is made. Existing v1/v2 records remain readable without rewriting.
+- Mixed matrix products use the established bounded FP16 implementation with FP32
+  normalization/softmax/loss and master weights/gradients/optimizer moments. Scaled
+  gradients must be finite FP32, are unscaled before token-weighted accumulation,
+  then clipped and applied once per optimizer update. Accumulated/full gradients
+  must agree within mixed tolerance 1e-3 (FP32 retains 1e-5). Initial selected loss
+  is checked against FP32 within .05 and future tokens cannot affect the causal
+  prefix. Final selected/FP32 logits must agree within .05; FP32 Metal/CPU inference
+  retains tolerance 1e-5. Checkpointed weights/moments retain tolerance 1e-7.
+- Saved precision metadata/checks are validated on read, including fixed scaling,
+  FP32 master-state declarations and precision-specific accumulation tolerance.
+  Reported train/validation/test losses explicitly evaluate the saved FP32 master
+  model; independent continuation and cancellation remain unavailable on this path.
+- Native verification: rebuilt/launched ALMG with retained permission-reviewed local
+  corpus and fresh 704-parameter initialization. Reopened all four v1/v2 records
+  exactly, compared FP32/mixed SGD resource reviews (same calculated reserve), and
+  confirmed closing review created no output. Explicitly completed mixed FP16,
+  batch-two/two-microbatch SGD 2af62133aea74f7fad00666cf39e80ba and AdamW
+  f15c14ccde1049ba928ecaa17ae53f40. Both restored step ten and finished optimizer/
+  scheduler step twenty, matching uninterrupted final weights/moments with 0.0 error.
+- Initial precision-loss difference was 8.3446503e-6 and causal-prefix error 0.0.
+  Maximum full/accumulated gradient differences were .0004660785 (SGD) /
+  .0002848357 (AdamW); final selected/FP32 logit differences .0000991970 /
+  .0003766716. FP32 Metal/CPU errors were 2.91e-8 / 5.58e-8. Train loss
+  1.3801190426 decreased to 1.2491794805 / .7765709044; validation/test losses
+  also decreased. Reloaded private models generated corpus words through their own
+  CPU runtime/tokenizer. These toy-corpus checks establish bounded engineering,
+  not general mixed-precision stability, language quality or release acceptance.
+- After app/backend restart all six v1/v2/v3 records, precision metadata, checkpoint
+  states and generated text reopened exactly without further training. All 177
+  original fixture files retained their hashes. Evidence:
+  /tmp/almg-corpus-mixed-native-qa/verification.json, fp32-review-ui.json,
+  mixed-review-ui.json, sgd-trained-ui.json, adamw-trained-ui.json and restarted
+  native captures. No external collection occurred; generated artifacts and weights
+  remain outside Git.
+- Validation: 622 Python tests passed with warnings as errors and Metal enabled,
+  74 Flutter tests passed, analysis clean. New real mixed SGD/AdamW coverage checks
+  unscaled masked accumulation, decreasing master-model loss, FP32 checkpoint
+  weights/moments, restored counters, precision/causal/CPU compatibility, unchanged
+  sources and rejection of changed saved scaling. UI tests verify precision changes
+  clear approval and submit fixed scaling. Incorrect settings are rejected.
+- Remaining: independently approved corpus checkpoint continuation/cancellation,
+  durable OS/process interruption, larger budgets/resource profiling, broader quality
+  evaluation and profiled 50M–100M training. Unchanged independent hardware/user-
+  action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

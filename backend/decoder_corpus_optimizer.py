@@ -1,4 +1,4 @@
-"""Bounded FP32 corpus training over explicitly saved, reviewed input snapshots."""
+"""Bounded FP32/mixed FP16 corpus training over saved, reviewed input snapshots."""
 from datetime import datetime, timezone
 import json
 import math
@@ -9,14 +9,14 @@ import numpy as np
 if __package__:
     from . import decoder_corpus_inputs as inputs, decoder_optimizer_fixture as optimizer
     from . import decoder_architecture_feasibility as hardware, decoder_architecture_backward as backward
-    from . import decoder_optimizer_measurements as measurements, decoder_optimizer_estimates as estimates
+    from . import decoder_optimizer_measurements as measurements, decoder_optimizer_estimates as estimates, decoder_mixed_precision as mixed
     from .planned_decoder import PlannedDecoder
     from .decoder_tokenizer import Tokenizer
     from .run_manifest import digest, file_digest
 else:
     import decoder_corpus_inputs as inputs, decoder_optimizer_fixture as optimizer
     import decoder_architecture_feasibility as hardware, decoder_architecture_backward as backward
-    import decoder_optimizer_measurements as measurements, decoder_optimizer_estimates as estimates
+    import decoder_optimizer_measurements as measurements, decoder_optimizer_estimates as estimates, decoder_mixed_precision as mixed
     from planned_decoder import PlannedDecoder
     from decoder_tokenizer import Tokenizer
     from run_manifest import digest, file_digest
@@ -24,8 +24,8 @@ else:
 
 def configuration(settings, length):
     c = optimizer.configuration(settings)
-    if c['schema_version'] != 5 or c['sequence_length'] != length or c['compute_precision'] != 'float32':
-        raise ValueError('Corpus training currently requires version-5 FP32 settings and the saved sequence length.')
+    if c['schema_version'] != 5 or c['sequence_length'] != length:
+        raise ValueError('Corpus training currently requires version-5 precision settings and the saved sequence length.')
     return c
 
 
@@ -80,6 +80,8 @@ def review(root, initialized, reviewed_inputs, settings):
                    required_free_disk_bytes=reserve['required_free_disk_bytes'] + max(2 * 1024 ** 2, current['actual_weight_bytes'] * 128),
                    assumptions='Conservative FP32 model/runtime reserves plus corpus snapshots and CPU optimizer moments; shared process observations are not isolated peaks.',
                    optimizer_updates=c['steps'], checkpoint_step=c['steps'] // 2,
+                   compute_precision=c['compute_precision'], loss_scale=c['loss_scale'], master_parameter_dtype='float32',
+                   precision_scope='Conservative FP32 reserves retained; mixed FP16 matrix products do not establish memory savings.',
                    effective_batch_rows=c['batch_size'], gradient_accumulation_steps=c['gradient_accumulation_steps'],
                    gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if c['gradient_accumulation_steps'] > 1 else 0)
     reasons = list(profile['errors'])
@@ -93,14 +95,14 @@ def review(root, initialized, reviewed_inputs, settings):
         reasons.append('Corpus gradients require Apple silicon with MLX Metal.')
     if not hardware._fits(profile, reserve):
         reasons.append('Current memory/disk does not cover corpus optimizer reserves.')
-    result = {'format': 'almg-corpus-optimizer-review-v2', 'schema_version': 2,
+    result = {'format': 'almg-corpus-optimizer-review-v3', 'schema_version': 3,
               'source': saved['review']['source'], 'corpus_id': saved['id'], 'corpus_revision': saved['revision'],
               'config': c, 'model_config': current['config'], 'runtime': estimates.runtime(profile),
               'splits': saved['review']['splits'], 'estimates': reserve, 'hardware': profile,
               'feasible': not reasons, 'blockers': reasons, 'training_approved': False, 'release_approved': False,
               'implementation_sha256': digest({name: file_digest(Path(__file__).with_name(name)) for name in
                   ('decoder_corpus_optimizer.py', 'decoder_corpus_inputs.py', 'decoder_optimizer_fixture.py',
-                   'decoder_architecture_backward.py', 'planned_decoder.py', 'decoder_tokenizer.py')})}
+                   'decoder_architecture_backward.py', 'decoder_mixed_precision.py', 'planned_decoder.py', 'decoder_tokenizer.py')})}
     result['revision'] = digest(result)
     return result
 
@@ -147,7 +149,19 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
         return result
     initial_losses = cpu_scores(initial_parameters)
     with mx.stream(mx.gpu):
-        logits, loss, gradient = backward.metal_functions(model.config, mx)
+        fp32_logits, fp32_loss, fp32_gradient = backward.metal_functions(model.config, mx)
+        precision = c['compute_precision']; scale = c['loss_scale']
+        logits, loss, gradient = mixed.functions(model.config, mx, scale) if precision == 'mixed_float16' else (fp32_logits, fp32_loss, fp32_gradient)
+        gradient_tolerance = 1e-3 if precision == 'mixed_float16' else 1e-5
+        _, first_batch = batch_arrays(windows['train'], 0, c['batch_size'])
+        initial_master = {name: mx.array(value) for name, value in initial_parameters.items()}
+        initial_compute_loss = float(loss(initial_master, *[mx.array(value) for value in first_batch]).item())
+        initial_fp32_loss = float(fp32_loss(initial_master, *[mx.array(value) for value in first_batch]).item())
+        altered = first_batch[0].copy(); cut = max(1, altered.shape[1] // 2)
+        altered[:, cut:] = (altered[:, cut:] + 1) % model.config['vocab_size']
+        causal_error = float(mx.max(mx.abs(logits(initial_master, mx.array(first_batch[0]))[:, :cut] - logits(initial_master, mx.array(altered))[:, :cut])).item())
+        if not math.isfinite(initial_compute_loss) or abs(initial_compute_loss - initial_fp32_loss) > .05 or causal_error > 1e-5:
+            raise ValueError('Corpus precision failed initial FP32 loss or causal-prefix checks; no completed run published.')
         gradient_error = 0.0
         def optimize(values, state, end):
             nonlocal gradient_error
@@ -157,7 +171,7 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
                 parameters = {name: mx.array(value) for name, value in values.items()}
                 def gradients_for(batch):
                     grads = gradient(parameters, *[mx.array(value) for value in batch]); mx.eval(grads)
-                    return {name: np.array(value) for name, value in grads.items()}
+                    return mixed.unscale({name: np.array(value) for name, value in grads.items()}, scale)
                 full = gradients_for(arrays)
                 if c['gradient_accumulation_steps'] > 1:
                     pieces = [(gradients_for([array[index:index + 1] for array in arrays]), int(arrays[2][index].sum()))
@@ -165,7 +179,7 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
                     gradients = optimizer.accumulate(pieces)
                     error = max(float(np.max(np.abs(full[name] - gradients[name]))) for name in full)
                     gradient_error = max(gradient_error, error)
-                    if error > 1e-5:
+                    if error > gradient_tolerance:
                         raise ValueError('Token-weighted corpus accumulation differs from the full effective batch; checkpoints retained.')
                 else:
                     gradients = full
@@ -185,11 +199,13 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
         moment_error = max([0.] + [float(np.max(np.abs(state[kind][name] - reference_state[kind][name]))) for kind in ('m', 'v') for name in state[kind]])
         probe = windows['test'][0]['inputs']
         cpu = PlannedDecoder(model.config); cpu.parameters = values
-        gpu_scores = logits({name: mx.array(value) for name, value in values.items()}, mx.array([probe]))
+        master = {name: mx.array(value) for name, value in values.items()}
+        gpu_scores = fp32_logits(master, mx.array([probe]))
+        compute_error = float(mx.max(mx.abs(gpu_scores - logits(master, mx.array([probe])))).item())
         cpu_error = float(np.max(np.abs(cpu.logits([probe]) - np.array(gpu_scores))))
     final_losses = cpu_scores(values)
     if (not all(math.isfinite(value) for value in [*initial_losses.values(), *final_losses.values()])
-            or final_losses['train'] >= initial_losses['train'] or parameter_error > 1e-7 or moment_error > 1e-7 or cpu_error > 1e-5):
+            or final_losses['train'] >= initial_losses['train'] or parameter_error > 1e-7 or moment_error > 1e-7 or cpu_error > 1e-5 or not math.isfinite(compute_error) or compute_error > .05):
         raise ValueError('Corpus training failed loss/checkpoint/CPU checks. Saved checkpoints are retained for inspection.')
     model.parameters = values; model.save(folder / 'trained-model.json')
     (folder / 'tokenizer.json').write_text(json.dumps(tokenizer.artifact(), ensure_ascii=False), encoding='utf-8')
@@ -201,19 +217,25 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
     observed = observer.finish()
     observed['scope'] = 'bounded_corpus_optimizer_in_shared_backend'
     observed['limitations'] += ' Corpus scope: starts after admission/snapshot validation and includes model loading, both training trajectories, checkpoint restore, all split evaluations and tokenizer-backed CPU generation.'
-    record = {'format': 'almg-corpus-optimizer-run-v2', 'schema_version': 2, 'id': identifier,
+    record = {'format': 'almg-corpus-optimizer-run-v3', 'schema_version': 3, 'id': identifier,
               'created_at': datetime.now(timezone.utc).isoformat(), 'review': approved, 'admission': current,
               'initial_losses': initial_losses, 'final_losses': final_losses,
               'completed_steps': state['step'], 'scheduler_completed_steps': state['step'],
               'checkpoint_restored_steps': midpoint, 'checkpoint_parameter_max_error': parameter_error,
               'checkpoint_optimizer_max_error': moment_error, 'cpu_metal_max_error': cpu_error,
               'effective_batch_rows': c['batch_size'], 'gradient_accumulation_steps': c['gradient_accumulation_steps'],
-              'full_batch_gradient_max_error': gradient_error, 'full_batch_gradient_tolerance': 1e-5,
+              'full_batch_gradient_max_error': gradient_error, 'full_batch_gradient_tolerance': gradient_tolerance,
+              'compute_precision': precision, 'loss_scale': scale, 'master_parameter_dtype': 'float32',
+              'master_gradient_dtype': 'float32', 'optimizer_state_dtype': 'float32',
+              'initial_compute_loss': initial_compute_loss, 'initial_fp32_reference_loss': initial_fp32_loss,
+              'initial_precision_loss_difference': abs(initial_compute_loss - initial_fp32_loss),
+              'causal_prefix_max_error': causal_error, 'compute_fp32_logits_max_error': compute_error,
+              'split_loss_runtime': 'numpy_cpu_fp32_master_parameters_float64_reduction',
               'step_log': first + last, 'generated_token_ids': generated, 'generated_text': text,
               'inference_runtime': 'planned_decoder_numpy_cpu', 'pretrained_student_weights_loaded': False,
               'training_approved': True, 'release_approved': False, 'source_initialization_modified': False,
               'workflow_measurements': observed,
-              'limitations': 'Small reviewed text corpus, FP32 SGD/AdamW, one/two effective rows and one/two token-weighted microbatches only. Held-out losses are diagnostics; no quality/release gate. Both comparison trajectories execute. Independent continuation, fresh-run cancellation, and mixed precision on this corpus path remain unexposed.',
+              'limitations': 'Small reviewed text corpus, FP32 or bounded mixed FP16 SGD/AdamW, FP32 masters, one/two effective rows and one/two token-weighted microbatches only. Held-out losses are diagnostics; no quality/release gate. Both comparison trajectories execute. Independent continuation and fresh-run cancellation on this corpus path remain unexposed. Fixed-scale mixed precision is validated only for bounded corpus fixtures; split losses use the saved FP32 master model, not a general quality or memory-savings claim.',
               'files': {str(path.relative_to(folder)): file_digest(path) for path in folder.rglob('*') if path.is_file()}}
     record['revision'] = digest(record)
     (folder / 'record.json').write_text(json.dumps(record, allow_nan=False, indent=2))
@@ -227,7 +249,7 @@ def read(root, identifier):
     record = json.loads((folder / 'record.json').read_text()); approved = record['review']; c = configuration(approved['config'], approved['config']['sequence_length'])
     midpoint = c['steps'] // 2
     expected = {'trained-model.json', 'tokenizer.json', *[f'step-{midpoint}/{name}' for name in ('model.json', 'optimizer.json', 'checkpoint.json')]}
-    if ((record.get('format'), record.get('schema_version')) not in (('almg-corpus-optimizer-run-v1', 1), ('almg-corpus-optimizer-run-v2', 2)) or record.get('id') != identifier
+    if ((record.get('format'), record.get('schema_version')) not in (('almg-corpus-optimizer-run-v1', 1), ('almg-corpus-optimizer-run-v2', 2), ('almg-corpus-optimizer-run-v3', 3)) or record.get('id') != identifier
             or record.get('revision') != digest({k: v for k, v in record.items() if k != 'revision'})
             or set(record.get('files', {})) != expected or any((folder / name).stat().st_size > 16 * 1024 ** 2 or file_digest(folder / name) != sha for name, sha in record['files'].items())
             or approved.get('revision') != digest({k: v for k, v in approved.items() if k != 'revision'})
@@ -238,14 +260,23 @@ def read(root, identifier):
     saved = inputs.read(root, approved['corpus_id'])
     if saved['revision'] != approved['corpus_revision'] or tokenizer.fingerprint() != saved['review']['tokenizer_sha256']:
         raise ValueError('Corpus/tokenizer lineage changed.')
+    if record['schema_version'] < 3 and c['compute_precision'] != 'float32':
+        raise ValueError('Legacy corpus runs require their original FP32 computation.')
+    if record['schema_version'] == 3:
+        checks = {'initial_precision_loss_difference': .05, 'causal_prefix_max_error': 1e-5, 'compute_fp32_logits_max_error': .05}
+        if (record.get('compute_precision') != c['compute_precision'] or record.get('loss_scale') != c['loss_scale']
+                or any(record.get(key) != 'float32' for key in ('master_parameter_dtype', 'master_gradient_dtype', 'optimizer_state_dtype'))
+                or any(type(record.get(key)) not in (int, float) or not math.isfinite(record[key]) or not 0 <= record[key] <= bound for key, bound in checks.items())):
+            raise ValueError('Invalid saved corpus precision checks.')
     if record['schema_version'] == 1:
         if c['batch_size'] != 1 or c['gradient_accumulation_steps'] != 1:
             raise ValueError('Legacy corpus runs require their original single-row configuration.')
     else:
         error = record.get('full_batch_gradient_max_error')
+        tolerance = 1e-3 if c['compute_precision'] == 'mixed_float16' else 1e-5
         if (record.get('effective_batch_rows') != c['batch_size'] or record.get('gradient_accumulation_steps') != c['gradient_accumulation_steps']
                 or c['batch_size'] % c['gradient_accumulation_steps'] or type(error) not in (float, int)
-                or not math.isfinite(error) or not 0 <= error <= 1e-5 or record.get('full_batch_gradient_tolerance') != 1e-5
+                or not math.isfinite(error) or not 0 <= error <= tolerance or record.get('full_batch_gradient_tolerance') != tolerance
                 or len(record.get('step_log', [])) != c['steps']):
             raise ValueError('Invalid saved corpus accumulation state.')
         windows = json.loads((Path(root) / 'decoder-corpus-inputs' / saved['id'] / 'windows.json').read_text())['train']
