@@ -130,3 +130,34 @@ class DecoderOptimizerFixtureTests(unittest.TestCase):
                 self.assertTrue(all(value.dtype==np.float32 for kind in ('m','v') for value in state[kind].values()))
                 self.assertEqual(state['step'],5);self.assertEqual(fixture.read(root,report['id']),report)
                 with self.assertRaises(ValueError):fixture.restore(folder/'step-5',{**c,'loss_scale':64},report['review']['revision'])
+
+    def test_v4_dimensions_reject_invalid_bounds_and_incompatible_plans_before_writes(self):
+        settings={**fixture.DEFAULT,'schema_version':4,'gradient_accumulation_steps':1,'compute_precision':'float32','loss_scale':1.,'batch_size':1,'sequence_length':4}
+        self.assertEqual(fixture.configuration(settings),settings)
+        for key,value in [('batch_size',True),('batch_size',3),('sequence_length',True),('sequence_length',5)]:
+            with self.assertRaises(ValueError):fixture.configuration({**settings,key:value})
+        with self.assertRaises(ValueError):fixture.configuration({**settings,'schema_version':3})
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);plan=plans.save(root,True,plans.review({**plans.DEFAULT,'batch_size':1,'context_length':4}));source=initializations.run(root,plan['id'],True,plan)
+            before={p:p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            for changed in ({'batch_size':2},{'sequence_length':8},{'gradient_accumulation_steps':2}):
+                c={**settings,**changed};review=fixture.review(root,plan['id'],source,c)
+                self.assertFalse(review['feasible'])
+                with self.assertRaises(ValueError):fixture.run(root,plan['id'],True,source,c,review)
+            self.assertEqual(before,{p:p.read_bytes() for p in root.rglob('*') if p.is_file()})
+
+    @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS')=='1','Requires configurable Metal training dimensions')
+    def test_v4_executes_selected_dimensions_and_binds_checkpoint_to_them(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);plan,source=self.source(root)
+            for precision in ('float32','mixed_float16'):
+                c={**fixture.DEFAULT,'schema_version':4,'gradient_accumulation_steps':1,'compute_precision':precision,'loss_scale':128. if precision=='mixed_float16' else 1.,'batch_size':1,'sequence_length':4}
+                approved=fixture.review(root,plan['id'],source,c)
+                self.assertEqual(approved['estimates']['effective_batch_rows'],1);self.assertEqual(approved['estimates']['sequence_length'],4);self.assertEqual(approved['estimates']['target_tokens_per_update'],4)
+                report=fixture.run(root,plan['id'],True,source,c,approved)
+                self.assertEqual(report['effective_batch_rows'],1);self.assertEqual(report['sequence_length'],4);self.assertEqual(report['target_tokens_per_update'],4)
+                self.assertTrue(all(entry['target_tokens']==4 and entry['microbatches']==1 for entry in report['step_log']))
+                self.assertLess(report['final_train_loss'],report['initial_train_loss']);self.assertEqual(report['checkpoint_parameter_max_error'],0.)
+                self.assertEqual(fixture.read(root,report['id']),report)
+                with self.assertRaises(ValueError):fixture.restore(fixture._folder(root,report['id'])/'step-5',{**c,'sequence_length':8},report['review']['revision'])
+                with self.assertRaises(ValueError):fixture.run(root,plan['id'],True,source,{**c,'sequence_length':8},approved)

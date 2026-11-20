@@ -11,12 +11,14 @@ class DecoderOptimizerFixtureDialog extends StatefulWidget {
 class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureDialog> {
   String _optimizer = 'sgd';
   int _accumulation = 1;
+  int _batch = 2;
+  int _length = 8;
   String _precision = 'float32';
   final _rate = TextEditingController(text: '0.01');
   Map<String, dynamic>? _review;
   bool _busy = false;
   String? _error;
-  Map<String, dynamic> get _settings => {'schema_version': 3, 'compute_precision': _precision, 'loss_scale': _precision == 'mixed_float16' ? 128.0 : 1.0, 'gradient_accumulation_steps': _accumulation, 'optimizer': _optimizer, 'learning_rate': double.tryParse(_rate.text),
+  Map<String, dynamic> get _settings => {'schema_version': 4, 'batch_size': _batch, 'sequence_length': _length, 'compute_precision': _precision, 'loss_scale': _precision == 'mixed_float16' ? 128.0 : 1.0, 'gradient_accumulation_steps': _accumulation, 'optimizer': _optimizer, 'learning_rate': double.tryParse(_rate.text),
     'schedule': 'warmup_cosine', 'warmup_steps': 2, 'steps': 10, 'gradient_clip_norm': 1.0, 'weight_decay': _optimizer == 'adamw' ? 0.01 : 0.0};
   String get _path => '/decoder-architecture-plans/${widget.initialized['plan_id']}';
   @override void dispose() { _rate.dispose(); super.dispose(); }
@@ -62,6 +64,11 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
       const Text('Mixed FP16 uses FP16 matrix products, FP32 normalization/softmax/loss and FP32 master weights/moments. Fixed loss scaling at 128 is checked for nonfinite gradients. Conservative FP32 reserves remain; memory savings are not promised.'),
       DropdownButton<int>(value: _accumulation, items: const [DropdownMenuItem(value: 1, child: Text('1 microbatch per update')), DropdownMenuItem(value: 2, child: Text('2 microbatches per update'))],
         onChanged: _busy ? null : (value) => setState(() { _accumulation = value!; _review = null; })),
+      DropdownButton<int>(value: _batch, items: const [DropdownMenuItem(value: 1, child: Text('Batch size 1')), DropdownMenuItem(value: 2, child: Text('Batch size 2'))],
+        onChanged: _busy ? null : (value) => setState(() { _batch = value!; _review = null; })),
+      DropdownButton<int>(value: _length, items: const [DropdownMenuItem(value: 4, child: Text('Sequence length 4')), DropdownMenuItem(value: 8, child: Text('Sequence length 8'))],
+        onChanged: _busy ? null : (value) => setState(() { _length = value!; _review = null; })),
+      const Text('Selected batch and sequence must fit the initialized plan. Two-way accumulation requires batch size 2. Resource review retains conservative reserves for the full initialized plan.'),
       const Text('Accumulation averages gradients by real target-token count, then clips and updates once. Optimizer/scheduler counters and checkpoint steps count updates, not microbatches.'),
       TextField(controller: _rate, enabled: !_busy, decoration: const InputDecoration(labelText: 'Learning rate (0 to 0.1, exclusive zero)'), onChanged: (_) => setState(() => _review = null)),
       const Text('Metal gradients with FP32 master/NumPy optimizer state; two warmup steps, cosine decay and global gradient clipping at 1.0. This fixture supports at most 16,384 parameters. Cancellation and independent checkpoint continuation are not exposed yet.'),
@@ -69,7 +76,7 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
       if (_error != null) Text(_error!),
       if (_review != null) ...[
         Text(_review!['feasible'] == true ? 'Resources cover calculated optimizer fixture reserves.' : 'Optimizer fixture cannot start.'),
-        Text('Calculated optimizer-state bytes: ${_review!['estimates']['optimizer_state_bytes']} · accumulation buffer: ${_review!['estimates']['gradient_accumulation_buffer_bytes']} · memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes.'),
+        Text('Batch rows: ${_review!['estimates']['effective_batch_rows']} · sequence length: ${_review!['estimates']['sequence_length']} · targets per update: ${_review!['estimates']['target_tokens_per_update']}. Calculated optimizer-state bytes: ${_review!['estimates']['optimizer_state_bytes']} · accumulation buffer: ${_review!['estimates']['gradient_accumulation_buffer_bytes']} · memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes.'),
         for (final reason in _review!['blockers'] as List) Text(reason as String),
         ExpansionTile(title: const Text('View optimizer feasibility record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],

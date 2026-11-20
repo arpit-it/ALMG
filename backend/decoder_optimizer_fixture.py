@@ -19,12 +19,14 @@ DEFAULT={'schema_version':1,'optimizer':'sgd','learning_rate':.01,'schedule':'wa
 
 def configuration(values):
     if not isinstance(values,dict):raise ValueError('Provide every versioned optimizer fixture setting.')
-    keys=set(DEFAULT)|({'gradient_accumulation_steps'} if values.get('schema_version') in (2,3) else set())
-    if values.get('schema_version')==3:keys|={'compute_precision','loss_scale'}
+    keys=set(DEFAULT)|({'gradient_accumulation_steps'} if values.get('schema_version') in (2,3,4) else set())
+    if values.get('schema_version') in (3,4):keys|={'compute_precision','loss_scale'}
+    if values.get('schema_version')==4:keys|={'batch_size','sequence_length'}
     if set(values)!=keys:raise ValueError('Provide every versioned optimizer fixture setting.')
     c=dict(values)
-    if type(c['schema_version']) is not int or c['schema_version'] not in (1,2,3) or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose supported versioned SGD or AdamW with warmup/cosine scheduling.')
+    if type(c['schema_version']) is not int or c['schema_version'] not in (1,2,3,4) or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose supported versioned SGD or AdamW with warmup/cosine scheduling.')
     if type(c.get('gradient_accumulation_steps',1)) is not int or c.get('gradient_accumulation_steps',1) not in (1,2):raise ValueError('Choose one or two microbatches per optimizer update.')
+    if c['schema_version']==4 and (type(c['batch_size']) is not int or c['batch_size'] not in (1,2) or type(c['sequence_length']) is not int or c['sequence_length'] not in (4,8)):raise ValueError('Choose a bounded batch of one/two rows and sequence length four/eight.')
     if c.get('compute_precision','float32') not in ('float32','mixed_float16'):raise ValueError('Only FP32 or bounded mixed FP16 computation is supported.')
     scale=c.get('loss_scale',1.0);expected=128.0 if c.get('compute_precision')=='mixed_float16' else 1.0
     if type(scale) not in (int,float) or not math.isfinite(scale) or scale!=expected:raise ValueError('Use loss scale 128 for mixed FP16 or 1 for FP32.')
@@ -113,12 +115,13 @@ def review(root,plan_id,initialized,settings):
     profile=hardware.hardware(root);estimates=hardware.estimate(current['config'],json_bytes);moments=current['actual_weight_bytes']*(2 if c['optimizer']=='adamw' else 0)
     estimates.update(optimizer_state_bytes=moments,optimizer_location='numpy_cpu_float32',required_available_memory_bytes=estimates['required_available_memory_bytes']+moments*4,
                      required_free_disk_bytes=estimates['required_free_disk_bytes']+max(2*1024**2,current['actual_weight_bytes']*128))
-    effective_rows=min(2,current['config']['batch_size']);accumulation=c.get('gradient_accumulation_steps',1)
-    estimates.update(effective_batch_rows=effective_rows,microbatch_rows=effective_rows//accumulation if effective_rows%accumulation==0 else None,gradient_accumulation_steps=accumulation,gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if accumulation>1 else 0)
+    effective_rows=c.get('batch_size',min(2,current['config']['batch_size']));length=c.get('sequence_length',min(8,current['config']['context_length']));accumulation=c.get('gradient_accumulation_steps',1)
+    estimates.update(sequence_length=length,target_tokens_per_update=effective_rows*length,effective_batch_rows=effective_rows,microbatch_rows=effective_rows//accumulation if effective_rows%accumulation==0 else None,gradient_accumulation_steps=accumulation,gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if accumulation>1 else 0)
     estimates['required_available_memory_bytes']+=current['actual_weight_bytes']*2 if accumulation>1 else 0
     estimates.update(compute_precision=c.get('compute_precision','float32'),master_parameter_dtype='float32',optimizer_state_dtype='float32',loss_scale=c.get('loss_scale',1.0),precision_scope='FP32 conservative reserves are retained; mixed FP16 matrix products do not imply measured memory savings.')
     reasons=list(profile['errors'])
-    if effective_rows%accumulation:reasons.append('Two-way accumulation requires at least two effective rows; initialize a compatible batch-size plan.')
+    if effective_rows>current['config']['batch_size'] or length>current['config']['context_length']:reasons.append('Selected batch/sequence exceeds the initialized plan; select a smaller training configuration.')
+    if effective_rows%accumulation:reasons.append('Two-way accumulation requires two effective rows; select batch size two and a compatible initialized plan.')
     if profile['system']!='Darwin' or profile['machine']!='arm64' or not profile['metal_available']:reasons.append('Apple silicon with MLX Metal is required for gradients; the optimizer uses FP32 NumPy arrays.')
     if not hardware._fits(profile,estimates):reasons.append('Current memory/disk does not cover optimizer fixture reserves.')
     record={'format':'almg-optimizer-fixture-review-v1','schema_version':1,'source':{'plan_id':plan_id,'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
@@ -146,7 +149,7 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
     if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Optimizer fixture is blocked by hardware/resources.')
     import mlx.core as mx
     model=PlannedDecoder.load(initializations._folder(root,plan_id)/initialized['id']/'model.json');c=current['config'];source={name:value.copy() for name,value in model.parameters.items()};shape=model.config
-    rows=min(2,shape['batch_size']);length=min(8,shape['context_length']);sequence=np.arange(rows*(length+1)).reshape(rows,length+1)%shape['vocab_size'];x=sequence[:,:-1];y=sequence[:,1:];mask=np.ones_like(y,dtype=np.float32)
+    rows=c.get('batch_size',min(2,shape['batch_size']));length=c.get('sequence_length',min(8,shape['context_length']));sequence=np.arange(rows*(length+1)).reshape(rows,length+1)%shape['vocab_size'];x=sequence[:,:-1];y=sequence[:,1:];mask=np.ones_like(y,dtype=np.float32)
     identifier=uuid.uuid4().hex;directory=_folder(root,identifier);directory.mkdir(parents=True)
     with mx.stream(mx.gpu):
         fp32_logits,fp32_loss,fp32_gradient=backward.metal_functions(shape,mx);scale=c.get('loss_scale',1.0);precision=c.get('compute_precision','float32')
@@ -191,7 +194,7 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
     if initializations.read(root,plan_id,initialized['id'])!=initialized or file_digest(initializations._folder(root,plan_id)/initialized['id']/'model.json')!=current['source']['model_sha256']:raise ValueError('Source initialization changed during optimizer training; retained artifacts need review.')
     record={'format':'almg-decoder-optimizer-fixture-v1','schema_version':1,'id':identifier,'created_at':datetime.now(timezone.utc).isoformat(),'review':current,'approved_review':approved,
         'initial_train_loss':initial,'final_train_loss':final,'initial_validation_loss':validation_initial,'final_validation_loss':validation_final,
-        'compute_precision':precision,'master_parameter_dtype':'float32','master_gradient_dtype':'float32','optimizer_state_dtype':'float32','loss_scale':scale,'initial_fp32_reference_loss':reference_loss,'initial_precision_loss_difference':abs(initial-reference_loss),'causal_prefix_max_error':causal_error,'full_batch_gradient_tolerance':gradient_tolerance,'optimizer':c,'gradient_accumulation_steps':accumulation,'effective_batch_rows':rows,'microbatch_rows':rows//accumulation,'full_batch_gradient_max_error':gradient_error,'microbatch_backward_calls_in_recorded_trajectory':c['steps']*accumulation,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':first+last,'checkpoint_restored_steps':5,'checkpoint_optimizer_max_error':moment_error,'checkpoint_parameter_max_error':resume_error,
+        'compute_precision':precision,'master_parameter_dtype':'float32','master_gradient_dtype':'float32','optimizer_state_dtype':'float32','loss_scale':scale,'initial_fp32_reference_loss':reference_loss,'initial_precision_loss_difference':abs(initial-reference_loss),'causal_prefix_max_error':causal_error,'full_batch_gradient_tolerance':gradient_tolerance,'optimizer':c,'gradient_accumulation_steps':accumulation,'effective_batch_rows':rows,'sequence_length':length,'target_tokens_per_update':int(mask.sum()),'microbatch_rows':rows//accumulation,'full_batch_gradient_max_error':gradient_error,'microbatch_backward_calls_in_recorded_trajectory':c['steps']*accumulation,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':first+last,'checkpoint_restored_steps':5,'checkpoint_optimizer_max_error':moment_error,'checkpoint_parameter_max_error':resume_error,
         'generated_token_ids':generated,'inference_runtime':'planned_decoder_numpy_cpu','pretrained_student_weights_loaded':False,'updated_weights_saved':True,'initialization_modified':False,'training_approved':True,'release_approved':False,
         'limitations':'Generated token-ID smoke fixture only; no text corpus/tokenizer, full-epoch training, general model quality, large-model or general mixed-precision claim. Mixed FP16 is validated only for this bounded fixture with fixed loss scaling. Cancellation and independent checkpoint continuation are not yet exposed.',
         'files':{str(path.relative_to(directory)):file_digest(path) for path in directory.rglob('*') if path.is_file()}}

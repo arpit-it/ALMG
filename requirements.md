@@ -6487,6 +6487,47 @@ P3-LMF-06 partial progress · bounded mixed FP16 training · 2026-11-20:
   or large-model training. Unchanged hardware/user-action blockers remain open
   and skipped; P3-LMF-01 is already complete for its recorded architecture scope.
 
+P3-LMF-06 partial progress · bounded configurable batch and sequence · 2026-11-20:
+- [ ] P3-LMF-06 remains open. Version-4 optimizer settings explicitly select a
+  batch of one/two rows and sequence length four/eight, bounded by the initialized
+  plan. Review reports selected rows, sequence length and real targets per update.
+  Unsupported settings and selections beyond the plan cannot start. Two-way
+  accumulation requires two selected rows. Full-plan conservative memory reserves
+  remain; selecting smaller dimensions does not claim measured memory savings.
+- Both app controls invalidate previous review, and selected dimensions are bound
+  to approval, checkpoint configuration and saved run records. The Metal training
+  path actually uses the selected tensor dimensions, with target counts recorded
+  in every optimizer update. Version-1/2/3 settings preserve their original implicit
+  dimensions and remain readable without rewriting old records/checkpoints.
+- Native verification: rebuilt and ran ALMG on this Mac with the isolated local
+  8704-parameter two-layer initialization and external collection disabled.
+  Reopened all six copied v1/v2/v3 records before writes. In the app, batch one
+  with two-way accumulation displayed a blocker, omitted the train action and
+  created no optimizer record. Changed to one microbatch and explicitly reviewed/
+  trained batch one / sequence four using mixed FP16 SGD record
+  8c9f93bf34b4426bb22cc392007feeae. Loss fell 4.818500518798828 →
+  4.669388771057129; each update used four real targets and one microbatch.
+  Then selected batch two / sequence eight with two-way accumulation for mixed
+  FP16 AdamW record a562511f287244adadc036213d06af41. Loss fell
+  4.852474212646484 → 3.687514066696167; each update used sixteen targets and
+  two microbatches. Both completed ten optimizer/scheduler updates, restored the
+  step-five checkpoint and matched uninterrupted final weights/moments exactly.
+- After app/backend restart all eight v1/v2/v3/v4 records reopened exactly,
+  including checkpoint restoration and trained-model CPU generation. All forty
+  optimizer files, three source files and 95 prior artifact files retained their
+  hashes. Evidence: /tmp/almg-dimensions-native-qa/verification.json and native
+  captures. Generated datasets, checkpoints and weights remain outside Git.
+- Validation: 593 Python tests passed with warnings as errors and Metal enabled,
+  61 Flutter tests passed, and analysis was clean. New tests cover strict versioned
+  dimension bounds, incompatible plan/accumulation rejection before writes, actual
+  FP32 and mixed FP16 execution at one row/four tokens, saved target counts, changed
+  dimension approval/checkpoint rejection and both app controls resetting review.
+- Remaining: approved text-corpus/tokenizer integration, independent continuation
+  and cancellation, larger batch/sequence/step budgets, general interruption and
+  resource monitoring, and profiled 50M–100M training. These bounded synthetic runs
+  do not establish corpus quality or large-model feasibility. Unchanged hardware/
+  user-action blockers stay open and skipped while independent work continues.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
