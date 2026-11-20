@@ -6959,6 +6959,59 @@ P3-LMF-06 partial progress · reviewed corpus input snapshots · 2026-11-21:
   already complete for its recorded architecture scope. Unchanged blocked items
   remain open and skipped.
 
+P3-LMF-06 partial progress · approved reviewed-corpus optimizer training · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Saved corpus-input snapshots now offer a separate
+  optimizer resource review and explicit training confirmation. Bounded FP32 SGD
+  or AdamW runs use the saved four/eight-token document windows, one row/microbatch
+  per update and ten/twenty updates. Settings retain version-5 scheduling, clipping,
+  fixed seed from the fresh initialization and optimizer-state contracts. Every
+  training window must be visited at least once; snapshots/configuration/source
+  hashes and implementation/runtime bindings are rechecked before execution.
+- Corpus admission adds snapshot storage/load and optimizer moments to conservative
+  model reserves and rechecks current hardware availability. Training runs on the
+  existing serial GPU worker. Every update records its deterministic corpus window
+  index and real masked target count. All saved train/validation/test windows are
+  scored separately using target-token-weighted loss. A midpoint model plus moments
+  and scheduler counter is saved/restored; continued execution must exactly match a
+  separately executed uninterrupted trajectory. Failed checks retain any checkpoint
+  for inspection instead of publishing a completed record.
+- Private version-1 results retain trained weights, tokenizer, midpoint checkpoint,
+  approval/admission/configuration and source lineage, loss diagnostics, update logs
+  and explicitly shared-process time/memory observations. CPU inference must match
+  Metal within tolerance; saved model/tokenizer reload must reproduce generated
+  text. History validates every artifact hash, corpus/tokenizer binding, checkpoint
+  state and CPU generation. Original input snapshots, datasets and fresh weights
+  are preserved; no supervisor weights initialize the student and release stays off.
+- Native verification: rebuilt/launched ALMG against isolated local fixtures and
+  reopened saved corpus ec05cf95ac73467f87d33a0317a3bda3 for a fresh 704-parameter
+  model. Closing resource review created no training output. Explicitly trained
+  twenty-update SGD run f0a8d481e17b4ff0b22b70501a351b2b and AdamW run
+  7008809d52314cdbbe4a79760cc0df5e. Train loss 1.3801190426 decreased to
+  1.2617147935 (SGD) / 0.7957110165 (AdamW); validation 1.4003016328 decreased to
+  1.3241882882 / 0.8205200584; test 1.3769487855 decreased to 1.2886807562 /
+  0.8194744578. Both restored update ten, finished optimizer/scheduler update twenty
+  and matched uninterrupted weights and moments with 0.0 error. CPU/Metal errors
+  were 1.24e-8 / 9.24e-8. Saved CPU models generated eleven corpus words using
+  their own tokenizers; these toy-corpus results establish engineering only.
+- Both native histories reopened exactly before and after app/backend restart,
+  revalidating checkpoint state and CPU-generated text without further training.
+  All 149 original fixture files retained their hashes. Evidence:
+  /tmp/almg-corpus-training-native-qa/verification.json, sgd-review-ui.json,
+  sgd-trained-ui.json, adamw-trained-ui.json, sgd-restarted-ui.json and
+  adamw-restarted-ui.json. No external collection occurred. Generated datasets,
+  input snapshots, checkpoints, tokenizer artifacts and weights remain outside Git.
+- Validation: 620 Python tests passed with warnings as errors and Metal enabled,
+  72 Flutter tests passed, analysis clean. New coverage exercises actual SGD/AdamW
+  corpus updates, checkpoint/optimizer/scheduler restoration and exact comparison,
+  reloaded tokenizer-backed CPU generation, source preservation, corrupted artifacts,
+  resource/consent/stale-review rejection, settings invalidation and saved results.
+- Remaining: independent corpus-checkpoint continuation/cancellation, corpus mixed
+  precision/accumulation and batch controls, durable OS/process interruption, larger
+  budgets, broader quality evaluation and profiled 50M–100M training. Existing
+  synthetic optimizer paths retain their richer controls and unchanged formats.
+  P3-LMF-01 is already complete for its recorded architecture scope. Unchanged
+  hardware/user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

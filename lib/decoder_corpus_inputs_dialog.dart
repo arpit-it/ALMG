@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'decoder_corpus_optimizer_dialog.dart';
 import 'package:flutter/material.dart';
 
 class DecoderCorpusInputsDialog extends StatefulWidget {
@@ -42,7 +43,9 @@ class _DecoderCorpusInputsDialogState extends State<DecoderCorpusInputsDialog> {
   Future<void> _show(Map<String, dynamic> record) => showDialog<void>(context: context, builder: (context) => AlertDialog(
     title: const Text('Saved text corpus inputs'), scrollable: true,
     content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(record))),
-    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    actions: [
+      TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusOptimizerDialog(initialized: widget.initialized, corpus: record, request: widget.request)), child: const Text('Review corpus optimizer training')),
+      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   Future<void> _save() => _perform(() async {
     final result = await widget.request('$_path/corpus-input-save', {..._body, 'confirmed': true, 'reviewed_inputs': _review});
     if (mounted) await _show(result);
@@ -62,7 +65,7 @@ class _DecoderCorpusInputsDialogState extends State<DecoderCorpusInputsDialog> {
   });
   @override Widget build(BuildContext context) => AlertDialog(title: const Text('Review text corpus inputs'), scrollable: true,
     content: SizedBox(width: 640, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Select a prepared local dataset with reviewed source permissions. Check its tokenizer against this fresh initialization and save private input windows. Saving does not start or approve training. The configurable optimizer does not consume these inputs yet.'),
+      const Text('Select a prepared local dataset with reviewed source permissions. Check its tokenizer against this fresh initialization and save private input windows. Saving does not start or approve training. Training these inputs requires a separate optimizer review and confirmation from the saved record.'),
       Text(_dataset == null ? 'No local text dataset selected.' : 'Selected dataset: ${_dataset!['id']}'),
       TextButton(onPressed: _busy ? null : _select, child: const Text('Choose prepared text dataset')),
       DropdownButton<int>(value: _length, items: const [DropdownMenuItem(value: 4, child: Text('Corpus sequence length 4')), DropdownMenuItem(value: 8, child: Text('Corpus sequence length 8'))],
