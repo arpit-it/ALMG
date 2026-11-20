@@ -43,6 +43,7 @@ if __package__:
     from . import decoder_architecture_feasibility, decoder_architecture_backward, decoder_architecture_initializations, decoder_architecture_plans, decoder_stream_imports, decoder_stream_archives, decoder_stream_evaluations, decoder_stream_previews, decoder_stream_training, decoder_stream_persistence, decoder_stream_unigram, decoder_stream_unigram_candidates, decoder_stream_character_bpe, decoder_stream_learned_optimization, decoder_stream_learned_windows, decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
     from . import decoder_stream_training_feasibility
     from . import decoder_stream_training_measurements
+    from . import decoder_trial_feasibility
     from . import classifier_feasibility
     from . import image_feasibility
     from . import image_resource_trials
@@ -80,6 +81,7 @@ else:
     import decoder_stream_training
     import decoder_stream_training_feasibility
     import decoder_stream_training_measurements
+    import decoder_trial_feasibility
     import classifier_feasibility
     import image_feasibility
     import image_resource_trials
@@ -2380,10 +2382,14 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond(decoder_stream_imports.preview(ROOT, stream_import_parts[1], data.get('confirmed'), data.get('prompt'), data.get('max_new_tokens', 12)))
             if self.path == '/decoder-imports':
                 return self.respond(decoder_trials.import_private(ROOT, data.get('confirmed'), data.get('source_name'), data.get('data')), 201)
+            if self.path == '/decoder-trials/feasibility':
+                return self.respond(decoder_trial_feasibility.review(ROOT))
             if self.path == '/decoder-trials':
-                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
+                start = decoder_trials.start if data.get('dataset') is not None else decoder_trial_feasibility.start
+                extra = {} if data.get('dataset') is not None else {'approved': data.get('reviewed_feasibility')}
+                record = start(ROOT, data.get('confirmed'), inference.WORKER.submit,
                                               proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'), dataset=data.get('dataset'),
-                                              require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness, post_training=data.get('post_training'))
+                                              require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness, post_training=data.get('post_training'), **extra)
                 return self.respond({'id': record['id']}, 202)
             parts = self.path.strip('/').split('/')
             if len(parts) == 3 and parts[0] == 'decoder-jsonl-preparations' and parts[2] == 'prepare':

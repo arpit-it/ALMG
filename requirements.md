@@ -6171,6 +6171,43 @@ P3-LMF-05 partial progress · bounded planned-decoder diagnostic time estimate �
   feasibility and suitable Windows/CUDA hardware verification. Unchanged hardware/
   user-action blockers remain open and skipped.
 
+P3-LMF-05 partial progress · feasibility before saved generated-decoder trial approval · 2026-11-20:
+- [ ] P3-LMF-05 remains open. New generated-text saved decoder trials now show
+  a hardware feasibility report before the app requests explicit training approval.
+  The read-only review requires Apple silicon/MLX Metal and checks current memory,
+  disk and Metal working-set recommendation against calculated FP32 budgets for
+  the exact existing four-word, width-8 fixture (704 parameters / 2816 weight bytes).
+  It includes gradients, conservative parallel-trajectory/activation buffers and
+  checkpoint storage. These are calculated reserves, not peaks or duration claims.
+- Fresh admission runs before trial creation and again at worker submission. The
+  reviewed approval and submission admission profiles are saved in the trial
+  record before its optimizer worker runs. Existing memory/disk checks still run
+  before and during fitting. Public legacy requests without a reviewed report
+  still receive fresh admission, labeled as not reviewed before approval. Local
+  reviewed-dataset trials and resumes retain their separate existing workflow.
+  Training/checkpoint/bundle schemas and source-pinned specifications are unchanged;
+  the new hardware metadata is optional for older records.
+- Native verification: rebuilt and ran ALMG with an isolated generated-text
+  fixture. Cancelled feasibility created no trial. Explicit approval of calculated
+  269547520-byte memory / 67710976-byte disk reserves completed actual Metal
+  training in trial 928fcc4293f244198c3eb7f4024c59a8. Loss fell from
+  1.3726524114608765 to 0.0673074871301651; checkpoint resume matched uninterrupted
+  training within 8.940696716308594e-08, generated tokens matched the contrived
+  fixture, and no pretrained student weights were loaded. The exact reviewed
+  hardware profile survived completion and app/backend restart. All seven trial
+  files and 23 prior artifact files retained their hashes. Local evidence:
+  /tmp/almg-generated-feasibility-native-qa/verification.json and native UI records;
+  generated weights and evidence stay outside Git.
+- Validation: 574 Python tests passed with warnings as errors and Metal enabled,
+  56 Flutter tests passed, and analysis was clean. Tests cover no model allocation
+  during review, parameter accounting, consent/stale-review/unsupported-device/
+  low-memory/disk blocking before submission, profile persistence before an actual
+  training worker, FP32 checkpoint equivalence and visible approval blocking.
+- Remaining: dedicated preapproval profiles for reviewed local data and resumed
+  trials, total wall-time estimates, broader neural/full-epoch feasibility and
+  suitable Windows/CUDA hardware verification. Unchanged hardware/user-action
+  blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
