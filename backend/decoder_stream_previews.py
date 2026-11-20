@@ -23,7 +23,7 @@ def _validated(root,run_id,revision):
     return state
 
 
-def preview(root,run_id,confirmed,reviewed_revision,prompt,max_new_tokens=12):
+def preview(root,run_id,confirmed,reviewed_revision,prompt,max_new_tokens=12,persist=True):
     if confirmed is not True:raise ValueError('Confirm local inference and saving this private prompt/output.')
     if not isinstance(prompt,str) or not 1<=len(prompt)<=4096:raise ValueError('Provide an exact prompt of 1 to 4096 characters.')
     if type(max_new_tokens) is not int or not 1<=max_new_tokens<=32:raise ValueError('Generate 1 to 32 new token IDs.')
@@ -57,6 +57,7 @@ def preview(root,run_id,confirmed,reviewed_revision,prompt,max_new_tokens=12):
     result['revision']=digest(result)
     serialized=json.dumps(result,ensure_ascii=False,allow_nan=False,indent=2)
     if len(serialized.encode('utf-8'))>1024*1024:raise ValueError('Private preview exceeds its saved record limit.')
+    if persist is False:return result
     parent=_folder(root,run_id);parent.mkdir(parents=True,exist_ok=True);temporary=parent/(result['id']+'.tmp')
     try:
         temporary.write_text(serialized,encoding='utf-8')

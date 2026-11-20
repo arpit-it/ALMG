@@ -23,7 +23,7 @@ def _validated(root,run_id,revision):
     return state
 
 
-def evaluate(root,run_id,confirmed,reviewed_revision):
+def evaluate(root,run_id,confirmed,reviewed_revision,persist=True):
     if confirmed is not True:raise ValueError('Confirm full held-out CPU evaluation and saving a private report.')
     state=_validated(root,run_id,reviewed_revision)
     training_resources.check_size(65536,Path(root))
@@ -57,6 +57,7 @@ def evaluate(root,run_id,confirmed,reviewed_revision):
     if file_digest(bundle/'manifest.json')!=state['checkpoint_manifest_sha256']:raise ValueError('Checkpoint changed during CPU evaluation.')
     record['revision']=digest(record);serialized=json.dumps(record,ensure_ascii=False,allow_nan=False,indent=2)
     if len(serialized.encode('utf-8'))>256000:raise ValueError('CPU evaluation report exceeds its record limit.')
+    if persist is False:return record
     parent=_folder(root,run_id);parent.mkdir(parents=True,exist_ok=True);temporary=parent/(record['id']+'.tmp')
     try:
         temporary.write_text(serialized,encoding='utf-8');temporary.replace(parent/(record['id']+'.json'))

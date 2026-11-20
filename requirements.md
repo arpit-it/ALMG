@@ -5175,6 +5175,57 @@ P3-LMF-03 partial progress · independent saved-stream CPU evaluation · 2026-11
   P3-LMF-01 is already complete. Unchanged physical power, Windows and oversized-
   fixture blockers remain open and skipped; unrelated edits and weights are preserved.
 
+P3-LMF-03 partial progress · reviewed private streamed-checkpoint ZIP export · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed streamed trials now offer “Export private
+  streamed model”. A separate native review explains that weights, exact tokenizer
+  pieces and saved prompt/output may be private. A saved passing independent CPU
+  evaluation and saved preview are mandatory; fresh read-only CPU evaluation and
+  preview reproduction must match those receipts. The existing 80% target is kept.
+  Failing models, missing receipts, stale reviews and changed checkpoint/source
+  bindings cannot export. Neither passing evaluation nor export grants release.
+- The versioned private streamed archive contains exactly decoder.json,
+  tokenizer.json and manifest.json under bundle/, plus evaluation.json,
+  preview.json and export-manifest.json. Reviewed file hashes bind the exact
+  checkpoint and receipts; raw source documents, indexes, databases, other
+  checkpoints and unrelated history are excluded. The archive is limited to
+  8 MiB, stores an immutable SHA-256 receipt and ZIP atomically outside Git, and
+  is returned only after explicit destination approval. Canceling the native
+  destination picker creates no archive. Existing evaluation/preview APIs retain
+  their default persistence; export review uses an internal read-only option.
+- Local app verification: rebuilt and ran ALMG on this Mac with fixture backend
+  port 28861. The original below-target Unigram trial was refused with “80%
+  evaluation target; private export is unavailable”. A separate local, deliberately
+  simple pipeline fixture used 121 short repetitive records, a complete 256-ID
+  whole-split byte codec and real 20-step Metal training. Trial 897f8817 achieved
+  validation 590/610 targets (96.72%) and test 1003/1039 (96.54%) in independent
+  CPU evaluation. This contrived fixture verifies the gate/export mechanism,
+  not useful language modeling or semantic generalization; release stayed false.
+- In the native app, reviewed that passing trial's exact archive contents, canceled
+  the save picker without creating an export, then approved the local QA directory
+  and saved private-stream-decoder-897f8817.zip. The 52,315-byte download matched
+  its persisted receipt, all five reviewed payload hashes and the versioned export
+  envelope. Archive ID
+  06587ce4ad4040ac886a42046e00b7ce has SHA-256
+  2686ecb41cefcaf81049eefdc7f480139efa7df38318e9520cc39b386a9223f2.
+  Reloading its exported tokenization-v4 bundle preserved exact codec artifacts
+  and CPU outputs. Legacy bounded-trial import correctly rejected this new format;
+  streamed-archive import remains explicitly unavailable in the UI.
+- After complete app/backend restart, the native export review reproduced exactly,
+  and the ZIP, receipt, destination copy and all 154 prior stream/source/model/
+  checkpoint/preview/report files remained byte-identical. 517 Python tests passed
+  with real Metal fixture training and warnings as errors; 43 Flutter tests passed;
+  Flutter analysis and diff checks were clean. Tests cover consent, failing quality,
+  missing receipts, read-only review, stale approval, destination cancellation,
+  reviewed hashes and exact reloadable contents. Evidence is under
+  /tmp/almg-stream-export-native-qa/ (native review/save captures, verification.json,
+  ZIP, restart checks and test/build logs); generated artifacts are outside Git.
+- Remaining: isolated streamed-archive import/restart/inference verification,
+  production-scale training, broader tokenizer acceptance and scheduling. The
+  original short trials still fail the quality gate and remain ineligible for
+  export. P3-LMF-01 is already complete; unchanged physical power, Windows and
+  oversized-fixture blockers stay open and skipped. Unrelated edits and weights
+  are preserved; no external collection, pretrained downloads or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
