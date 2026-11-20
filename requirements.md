@@ -4698,6 +4698,65 @@ P3-LMF-03 partial progress · versioned full-split byte-BPE budgets through 512 
   physical/Windows/larger-than-RAM blockers remain open and skipped without polling.
   No external collection, downloads, generated artifacts/weights in Git or push.
 
+P3-LMF-03 partial progress · resumable full-training-split character BPE · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed streamed indexes now offer separately
+  reviewed full-training-split character BPE with vocabulary caps 32–512 (native
+  choices 128 default, 32, 64, 256, 512). A first disk-backed pass counts the entire
+  unique training-record NFC alphabet; it freezes sorted character IDs before
+  counting any merge pairs. Held-out records and duplicate occurrence weights do
+  not contribute. An alphabet exceeding the approved cap rejects that batch
+  without publishing or losing earlier committed progress; a larger cap needs a
+  new exact review. This does not approve model training or release.
+- The separate v1 fitter/codec namespace supports whole records up to 64 KiB,
+  pieces up to 4 KiB and up to 511 merges within the selected cap. Global pairs
+  use minimum frequency two and lexicographic token-ID ties. Bounded source batches
+  (100 records/about 1 MiB by default), alphabet/pair counters, cursor and pass
+  transitions commit atomically in SQLite. Ordered training group-chain/byte totals,
+  original source/index signatures, permission review and implementation binding
+  are checked across alphabet discovery, merge passes and publication. Explicit
+  resume handles interrupted discovery, counting and publication without refitting
+  from held-outs. Early pair exhaustion may yield fewer IDs than requested.
+- Full-index comparison now accepts this completed codec as a distinct
+  character_bpe kind, retaining explicit uncovered-character counts and encoding
+  failures instead of unknown substitution or alphabet expansion. Saved comparison
+  and private codec/manifest export preserve source bindings. Existing byte-BPE
+  kinds and completed artifacts remain readable. Streamed character model-window,
+  optimizer and training admission stay unavailable in both UI and backend.
+- Native verification: rebuilt/launched macOS on port 28852, reopened the existing
+  512-ID byte-BPE fit, observed a 32-ID character alphabet rejection with no
+  artifact publication, and cancelled 64-ID consent without creating another fit.
+  Character fit 3293d6da28424a78b35bba018cbf872e paused in alphabet discovery at
+  3/31 training records. Restarting backend and app restored the exact record;
+  native resume froze 40 characters and completed 24 merges for 64 actual IDs,
+  using all 31 unique training records / 25,763 UTF-8 bytes including a >4 KiB record.
+  QA-only one-record steps/response latency made the discovery pause deterministic;
+  production batching is unchanged.
+- Native comparison 0c063256e41144fd93ad7d15c9223451 scanned all 42 records:
+  train 31/31, validation 7/8, test 3/3 lossless, zero unsupported records. The
+  held-out-only Ω remained outside the alphabet and produced exactly one uncovered
+  character/encoding failure; all_records_lossless stayed false. Coverage comparison
+  does not clear contamination or establish model quality. Native private ZIP
+  export contained exactly the matching codec and provenance manifest. A second
+  backend/app restart reopened the identical completed record/artifacts.
+- Independent verification reconstructed the complete training-only alphabet,
+  every count and all 24 merge ranks/frequencies, verified the ordered group chain,
+  multilingual/long-record round trips and strict held-out rejection. All 38 prior
+  source/index/byte-fit/comparison/window/diagnostic fixture files stayed byte-identical.
+  Evidence remains outside Git at /tmp/almg-stream-character-bpe-native-qa/verification.json,
+  *-ui.json/*-ui.txt, private ZIP, fingerprints and build/restart/test logs.
+- Validation: 484 Python tests with Metal checks and warnings as errors, 36 Flutter
+  tests, clean Flutter analysis/diff checks and successful native rebuilds. Added
+  cases cover discovery and merge-phase recovery, complete alphabet counts, a rare
+  training-only character, independent global pair choices, duplicate handling,
+  >4 KiB Unicode round trips, held-out coverage failures, vocabulary/review guards,
+  alphabet and pair transaction rollback, publication recovery, permission changes,
+  export and blocked character-window admission.
+- Remaining: full-split Unigram, streamed character-codec model admission and
+  durable approved streamed training/checkpoint/model persistence, plus broader
+  acceptance. Independent physical/Windows/larger-than-RAM blockers remain open
+  and skipped without polling. No external collection, downloads, generated
+  artifacts/weights in Git or push; unrelated edits and prior artifacts preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

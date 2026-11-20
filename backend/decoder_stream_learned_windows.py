@@ -47,6 +47,8 @@ def _state(connection):
 
 def _sources(root,comparison_id,overlap_id,full=True):
     comparison=comparisons.read(root,comparison_id)
+    if comparison['fit_kind'] not in ('one_merge','iterative'):
+        raise ValueError('Learned streamed windows currently require a reviewed whole-split byte-BPE codec; character-BPE admission remains unavailable.')
     if comparison['status']!='complete' or comparison.get('all_records_lossless') is not True:
         raise ValueError('Complete a lossless full-index comparison before preparing learned-tokenizer windows.')
     fitted,index,codec,signatures=comparisons._binding(root,comparison['fit_id'],comparison['fit_kind'],full)

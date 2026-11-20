@@ -2775,8 +2775,7 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _beginStreamTokenizerEvaluation(Map<String, dynamic> experiment) async {
-    final kind = const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(experiment['format']) ? 'iterative'
-      : experiment['format'] == 'almg-stream-bpe-fit-v1' ? 'one_merge' : null;
+    final kind = _wholeStreamFitKind(experiment);
     final path = kind == null ? '/decoder-stream-tokenizer-experiments/${experiment['id']}/evaluations'
       : '/decoder-stream-fitted-tokenizers/$kind/${experiment['id']}/evaluations';
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
@@ -2846,7 +2845,7 @@ class _StudioPageState extends State<StudioPage> {
           Text('${entry.key}: ${entry.value['lossless_records']}/${entry.value['records']} lossless · ${entry.value['unsupported_records']} unsupported · ${entry.value['lossy_records']} lossy · ${entry.value['encoding_failures']} encoding failures'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
-        if (record['status'] == 'complete' && record['format'] == 'almg-stream-fitted-tokenizer-evaluation-v1') ...[
+        if (record['status'] == 'complete' && record['format'] == 'almg-stream-fitted-tokenizer-evaluation-v1' && record['fit_kind'] != 'character_bpe') ...[
           TextButton(onPressed: () { Navigator.pop(context, false); _beginLearnedWindows(record); }, child: const Text('Prepare learned-tokenizer windows')),
           TextButton(onPressed: () { Navigator.pop(context, false); _savedLearnedWindows(record); }, child: const Text('View learned-tokenizer windows')),
         ],
@@ -2898,22 +2897,36 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
-  Future<void> _beginWholeStreamBPE(String indexId, {bool iterative = false}) async {
+  String? _wholeStreamFitKind(Map<String, dynamic> record) {
+    if (record['format'] == 'almg-stream-character-bpe-fit-v1') return 'character_bpe';
+    if (const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(record['format'])) return 'iterative';
+    return record['format'] == 'almg-stream-bpe-fit-v1' ? 'one_merge' : null;
+  }
+
+  String _wholeStreamFitRoute(Map<String, dynamic> record) => switch (_wholeStreamFitKind(record)) {
+    'character_bpe' => 'decoder-stream-character-bpe-fits',
+    'iterative' => 'decoder-stream-iterative-bpe-fits',
+    _ => 'decoder-stream-bpe-fits',
+  };
+
+  Future<void> _beginWholeStreamBPE(String indexId, {bool iterative = false, bool character = false}) async {
     try {
-      final kind = iterative ? 'iterative-byte-bpe' : 'whole-byte-bpe';
-      final cap = iterative ? await showDialog<int>(context: context, builder: (context) => SimpleDialog(
-        title: const Text('Choose whole-split byte-BPE vocabulary budget'), children: [
-          const Padding(padding: EdgeInsets.all(16), child: Text('Every merge scans the complete training split. Larger budgets take more passes; fitting stops early if no pair occurs twice. The default remains 260 IDs.')),
-          for (final size in [260, 256, 272, 320, 512]) SimpleDialogOption(onPressed: () => Navigator.pop(context, size), child: Text('$size IDs maximum · ${size - 256} merges')),
+      final kind = character ? 'character-bpe' : iterative ? 'iterative-byte-bpe' : 'whole-byte-bpe';
+      final cap = character || iterative ? await showDialog<int>(context: context, builder: (context) => SimpleDialog(
+        title: Text(character ? 'Choose whole-split character-BPE budget' : 'Choose whole-split byte-BPE vocabulary budget'), children: [
+          Padding(padding: const EdgeInsets.all(16), child: Text(character ? 'Discover the entire training alphabet before merging. Each merge scans the full training split. The cap must cover all training characters; held-out characters never expand it.' : 'Every merge scans the complete training split. Larger budgets take more passes; fitting stops early if no pair occurs twice. The default remains 260 IDs.')),
+          for (final size in (character ? [128, 32, 64, 256, 512] : [260, 256, 272, 320, 512])) SimpleDialogOption(onPressed: () => Navigator.pop(context, size), child: Text(character ? '$size character IDs maximum' : '$size IDs maximum · ${size - 256} merges')),
         ])) : 257;
       if (cap == null || !mounted) return;
       final review = await _request('/decoder-stream-indexes/$indexId/$kind-review', {'vocabulary_cap': cap});
       if (!mounted) return;
       final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-        title: Text(iterative ? 'Fit up to ${cap - 256} byte-BPE merges on the full training split?' : 'Fit one byte-BPE merge on the full training split?'), scrollable: true,
+        title: Text(character ? 'Fit character BPE on the full training split?' : iterative ? 'Fit up to ${cap - 256} byte-BPE merges on the full training split?' : 'Fit one byte-BPE merge on the full training split?'), scrollable: true,
         content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('Count adjacent byte pairs in all ${review['population_split_counts']['train']} unique training records. Held-out records and duplicate occurrence weights are excluded from fitting.'),
-          Text(iterative
+          Text(character
+            ? 'Discover and freeze the complete unique training-record NFC alphabet, then fit character BPE up to $cap IDs. An alphabet exceeding the cap fails explicitly. Pair counts and progress are saved transactionally between batches/passes; records up to 64 KiB stay whole. Held-out characters are rejected without refitting. Learned tokens may encode private text. No model training, compatibility approval or release starts.'
+            : iterative
             ? 'Fit up to ${cap - 256} merges for $cap IDs. Each pass re-encodes all saved training records with the learned prefix and recounts global pairs. Records up to 64 KiB are kept whole; progress is saved between batches and passes. This does not approve model training or establish model compatibility. Learned tokens and permission notes may be private.'
             : 'This initial whole-split baseline learns at most one merge, for 256 or 257 IDs. It supports whole records up to 64 KiB, uses disk-backed counters, saves progress and requires explicit resume after restart. This does not approve model training or establish model compatibility. Learned tokens and permission notes may be private.'),
           SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
@@ -2926,32 +2939,36 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _showWholeStreamBPE(Map<String, dynamic> record) async {
-    final iterative = const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(record['format']);
+    final character = _wholeStreamFitKind(record) == 'character_bpe';
+    final iterative = character || _wholeStreamFitKind(record) == 'iterative';
     final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: Text('Whole-split byte BPE · ${record['status']}'), scrollable: true,
+      title: Text(character ? 'Whole-split character BPE · ${record['status']}' : 'Whole-split byte BPE · ${record['status']}'), scrollable: true,
       content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('${record['processed_records']} / ${record['total_records']} training records counted'),
-        Text(iterative ? 'Full training split only · ${record['completed_passes']} passes completed · ${(record['merges'] as List).length} merges learned. The reviewed budget is ${record['review']['vocabulary_cap']} IDs (at most ${(record['review']['vocabulary_cap'] as num) - 256} merges); actual vocabulary can be smaller. Model training remains disabled.' : 'Full saved training split only. This baseline learns at most one merge, not a larger-vocabulary BPE fit. Model training remains disabled.'),
+        if (character) Text('Phase: ${record['status'] == 'alphabet' ? 'Discovering training alphabet' : 'Frozen training alphabet'} · ${(record['alphabet'] as List).length} characters. Unseen held-out characters are rejected. Streamed model admission remains unavailable.'),
+        Text(iterative ? 'Full training split only · ${record['completed_passes']} passes completed · ${(record['merges'] as List).length} merges learned. The reviewed budget is ${record['review']['vocabulary_cap']} IDs (at most ${(record['review']['vocabulary_cap'] as num) - (character ? (record['alphabet'] as List).length : 256)} merges); actual vocabulary can be smaller. Model training remains disabled.' : 'Full saved training split only. This baseline learns at most one merge, not a larger-vocabulary BPE fit. Model training remains disabled.'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
         if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _exportWholeStreamBPE(record); }, child: const Text('Export private whole-split tokenizer')),
         if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _beginStreamTokenizerEvaluation(record); }, child: const Text('Compare fitted tokenizer across full index')),
-        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _savedStreamTokenizerEvaluations(record['id'] as String, fitKind: iterative ? 'iterative' : 'one_merge'); }, child: const Text('View fitted-tokenizer comparisons')),
+        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _savedStreamTokenizerEvaluations(record['id'] as String, fitKind: _wholeStreamFitKind(record)); }, child: const Text('View fitted-tokenizer comparisons')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume whole-split BPE fitting'))]));
     if (resume == true && mounted) await _runWholeStreamBPE(record);
   }
 
   Future<void> _runWholeStreamBPE(Map<String, dynamic> initial) async {
-    final iterative = const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(initial['format']);
-    final route = iterative ? 'decoder-stream-iterative-bpe-fits' : 'decoder-stream-bpe-fits';
+    final character = _wholeStreamFitKind(initial) == 'character_bpe';
+    final iterative = character || _wholeStreamFitKind(initial) == 'iterative';
+    final route = _wholeStreamFitRoute(initial);
     var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
     unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
       child: StatefulBuilder(builder: (context, update) {
         refresh = update;
-        return AlertDialog(title: const Text('Fitting whole-training-split byte BPE'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+        return AlertDialog(title: Text(character ? 'Fitting whole-training-split character BPE' : 'Fitting whole-training-split byte BPE'), content: Column(mainAxisSize: MainAxisSize.min, children: [
           LinearProgressIndicator(value: (record['total_records'] as num) == 0 ? 0 : (record['processed_records'] as num) / (record['total_records'] as num)),
           Text('${record['processed_records']} / ${record['total_records']} training records counted'),
-          if (iterative) Text('Pass ${(record['completed_passes'] as num) + 1} · ${(record['merges'] as List).length} merges learned'),
+          if (character && record['status'] == 'alphabet') const Text('Discovering full training alphabet'),
+          if (iterative && record['status'] != 'alphabet') Text('Pass ${(record['completed_passes'] as num) + 1} · ${(record['merges'] as List).length} merges learned'),
         ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause whole-split BPE fitting'))]);
       }))));
     try {
@@ -2967,13 +2984,13 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { refresh = null; if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); } }
   }
 
-  Future<void> _savedWholeStreamBPE(String indexId, {bool iterative = false}) async {
+  Future<void> _savedWholeStreamBPE(String indexId, {bool iterative = false, bool character = false}) async {
     try {
-      final kind = iterative ? 'iterative-byte-bpe' : 'whole-byte-bpe';
+      final kind = character ? 'character-bpe' : iterative ? 'iterative-byte-bpe' : 'whole-byte-bpe';
       final fits = (await _request('/decoder-stream-indexes/$indexId/$kind-fits'))['fits'] as List;
       if (!mounted) return;
       final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
-        title: const Text('Saved whole-split byte BPE fits'), children: [
+        title: Text(character ? 'Saved whole-split character BPE fits' : 'Saved whole-split byte BPE fits'), children: [
           if (fits.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No whole-split fits saved.')),
           for (final fit in fits) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(fit as Map)),
             child: Text('${(fit['id'] as String).substring(0, 8)} · ${fit['status']} · ${fit['processed_records']}/${fit['total_records']} records')),
@@ -2983,7 +3000,7 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _exportWholeStreamBPE(Map<String, dynamic> record) async {
-    final route = const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(record['format']) ? 'decoder-stream-iterative-bpe-fits' : 'decoder-stream-bpe-fits';
+    final route = _wholeStreamFitRoute(record);
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Export private whole-split tokenizer?'),
       content: const Text('Save codec and fitting/provenance manifest only. Learned tokens and permission notes may be private. Source documents, pair-count database, weights and model-training approvals are excluded.'),
@@ -2991,7 +3008,7 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Choose whole-split tokenizer ZIP destination'))]));
     if (confirmed != true || !mounted) return;
     try {
-      final destination = await getSaveLocation(suggestedName: 'whole-split-byte-bpe-${(record['id'] as String).substring(0, 8)}.zip',
+      final destination = await getSaveLocation(suggestedName: 'whole-split-${_wholeStreamFitKind(record) == 'character_bpe' ? 'character' : 'byte'}-bpe-${(record['id'] as String).substring(0, 8)}.zip',
         acceptedTypeGroups: [const XTypeGroup(label: 'Private tokenizer ZIP', extensions: ['zip'])]);
       if (destination == null || !mounted) return;
       final result = await _request('/$route/${record['id']}/export', {'confirmed': true, 'reviewed': record});
@@ -3022,6 +3039,8 @@ class _StudioPageState extends State<StudioPage> {
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'tokenizers'), child: const Text('View saved streamed tokenizers')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'fit-sample'), child: const Text('Fit tokenizer on streamed sample')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'whole-byte-bpe'), child: const Text('Fit byte BPE on full training split')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'character-bpe'), child: const Text('Fit character BPE on full training split')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-character-bpe'), child: const Text('View whole-split character BPE fits')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'iterative-byte-bpe'), child: const Text('Fit iterative byte BPE on full training split')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-iterative-byte-bpe'), child: const Text('View iterative byte BPE fits')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-whole-byte-bpe'), child: const Text('View whole-split byte BPE fits')),
@@ -3054,6 +3073,8 @@ class _StudioPageState extends State<StudioPage> {
     if (action == 'tokenizers') await _savedStreamTokenizers(record['id'] as String);
     if (action == 'fit-sample') await _fitStreamTokenizerSample(record['id'] as String);
     if (action == 'whole-byte-bpe') await _beginWholeStreamBPE(record['id'] as String);
+    if (action == 'character-bpe') await _beginWholeStreamBPE(record['id'] as String, character: true);
+    if (action == 'saved-character-bpe') await _savedWholeStreamBPE(record['id'] as String, character: true);
     if (action == 'iterative-byte-bpe') await _beginWholeStreamBPE(record['id'] as String, iterative: true);
     if (action == 'saved-iterative-byte-bpe') await _savedWholeStreamBPE(record['id'] as String, iterative: true);
     if (action == 'saved-whole-byte-bpe') await _savedWholeStreamBPE(record['id'] as String);

@@ -10,7 +10,7 @@ import uuid
 
 if __package__:
     from . import decoder_stream_indexes as indexes, decoder_streams as streams, decoder_stream_permissions as permissions
-    from . import decoder_stream_bpe, decoder_stream_iterative_bpe
+    from . import decoder_stream_bpe, decoder_stream_iterative_bpe, decoder_stream_character_bpe
     from .run_manifest import digest, file_digest
 else:
     import decoder_stream_indexes as indexes
@@ -18,6 +18,7 @@ else:
     import decoder_stream_permissions as permissions
     import decoder_stream_bpe
     import decoder_stream_iterative_bpe
+    import decoder_stream_character_bpe
     from run_manifest import digest, file_digest
 
 _LOCK = threading.RLock()
@@ -34,7 +35,7 @@ def _folder(root,identifier):
 def _implementation():
     return digest({'code':{name:file_digest(Path(__file__).with_name(name)) for name in
         ('decoder_stream_fitted_tokenizer_evaluations.py','decoder_stream_bpe.py','decoder_stream_iterative_bpe.py',
-         'decoder_bpe.py','decoder_stream_indexes.py','decoder_stream_permissions.py','run_manifest.py')},
+         'decoder_bpe.py','decoder_stream_character_bpe.py','decoder_character_bpe.py','decoder_stream_indexes.py','decoder_stream_permissions.py','run_manifest.py')},
         'python':platform.python_version(),'unicode':unicodedata.unidata_version,'sqlite':sqlite3.sqlite_version})
 
 
@@ -42,9 +43,9 @@ def _signature(path):return {**indexes._signature(path),'ctime_ns':path.stat().s
 
 
 def _worker(kind):
-    if not isinstance(kind,str) or kind not in ('one_merge','iterative'):
-        raise ValueError('Choose a one_merge or iterative whole-split BPE fit.')
-    return decoder_stream_bpe if kind=='one_merge' else decoder_stream_iterative_bpe
+    if not isinstance(kind,str) or kind not in ('one_merge','iterative','character_bpe'):
+        raise ValueError('Choose a one_merge, iterative or character_bpe whole-split fit.')
+    return {'one_merge':decoder_stream_bpe,'iterative':decoder_stream_iterative_bpe,'character_bpe':decoder_stream_character_bpe}[kind]
 
 
 def _binding(root,fit_id,kind,full):
@@ -66,7 +67,8 @@ def _binding(root,fit_id,kind,full):
     permission=permissions.snapshot(root,index)
     if permission!=experiment['review']['source_permission_review']:
         raise ValueError('Source permissions changed from the completed fitting review. Preserve the fit and review its current source scope.')
-    model=worker.StreamByteBPE.restore(json.loads((artifact_folder/'tokenizer.json').read_text(encoding='utf-8')))
+    codec=worker.StreamCharacterBPE if kind=='character_bpe' else worker.StreamByteBPE
+    model=codec.restore(json.loads((artifact_folder/'tokenizer.json').read_text(encoding='utf-8')))
     if signatures!={key:_signature(path) for key,path in paths.items()}:
         raise ValueError('Source or fitted codec changed during comparison verification.')
     return experiment,index,model,signatures
@@ -92,7 +94,7 @@ def read(root,identifier):
                 or record['schema_version']!=1 or record.get('id')!=identifier
                 or record.get('status') not in ('scanning','complete')
                 or record.get('model_training_enabled') is not False or record.get('release_approved') is not False
-                or record.get('fit_kind') not in ('one_merge','iterative')
+                or record.get('fit_kind') not in ('one_merge','iterative','character_bpe')
                 or record.get('tokenizer_refitted') is not False
                 or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})):
             raise ValueError('Full-index tokenizer comparison integrity check failed.')
