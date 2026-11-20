@@ -7,6 +7,7 @@ import platform
 import re
 import shutil
 import subprocess
+import warnings
 if __package__:
     from . import image_recipe,recipe_contracts,training_resources
     from .run_manifest import digest,file_digest
@@ -18,6 +19,13 @@ else:
 def review(root,job,rows,parameters):
     if job.get('recipe')!='text_to_image':raise ValueError('Choose the CPU image recipe.')
     settings=recipe_contracts.training_parameters('text_to_image',parameters,job.get('recipe_contract'))
+    # Resource dimensions are meaningful only for the exact prepared-image contract.
+    try:
+        with warnings.catch_warnings():
+            warnings.simplefilter('error',image_recipe.Image.DecompressionBombWarning)
+            recipe_contracts.validate_dataset('text_to_image',job.get('mode'),rows)
+    except (image_recipe.Image.DecompressionBombWarning,image_recipe.Image.DecompressionBombError) as error:
+        raise ValueError('A valid prepared 48x48 RGB PNG is required; oversized image headers are not supported.') from error
     variant=recipe_contracts.execution_variant('text_to_image',job.get('mode'));encoded=len(json.dumps(rows,ensure_ascii=False).encode('utf-8'))
     count=sum(row.get('split')=='train' for row in rows);pixels=image_recipe.SIZE**2
     if variant=='local shapes':

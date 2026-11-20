@@ -5937,6 +5937,43 @@ P3-LMF-05 partial progress · CPU image recipe feasibility and retained evidence
   host verification. Unchanged hardware/user-action blockers remain open and skipped.
   No generated/private artifacts, weights or unrelated edits are committed.
 
+P3-LMF-05 partial progress · prepared-image validation before feasibility and native caption coverage · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Image feasibility now invokes the existing prepared
+  dataset contract before calculating resource budgets. Caption inputs must be
+  bounded 48x48 RGB PNGs with training/held-out splits; shape inputs must retain
+  required shape/position and color coverage. Invalid bytes, dimensions/modes or
+  missing coverage reject before approval rather than reaching a trainer after
+  a misleading resource-fit report. Pillow oversized-header warnings/errors are
+  normalized to the same actionable prepared-image error, without full allocation.
+  Shared recipe validation and stored model/checkpoint formats remain unchanged.
+- Native verification: rebuilt macOS ALMG with isolated generated local PNGs and
+  external image reads explicitly disabled. The app rejected a 49x48 prepared
+  caption fixture before approval; no candidate was created and its prepared
+  dataset file remained unchanged. A separate valid 15-image fixture (12 training,
+  3 held-out) exercised the caption-ridge CPU path without collection/downloads.
+  Opened the feasibility report, cancelled, reopened and explicitly approved CPU
+  image fitting with idle waiting off. Report calculated a
+  1152-byte Gram layout, 117504 model scalars,
+  940032 float64 layout bytes and 274919440 bytes memory reserve.
+  Candidate bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb completed with held-out pixel similarity
+  0.901801924473493 on this contrived local fixture, not a semantic image-quality claim.
+  The actual run reproducibility dialog retained the exact approved report and
+  fresh admission/execution snapshots. After app/backend restart, its full manifest
+  reopened with exact equality; all 15 caption and previous CPU/image artifact hash
+  checks matched. This verifies the prepared caption algorithm locally, not live
+  Commons discovery, permissions or download behavior; those controls are unchanged.
+- Verification: 561 Python tests passed with actual Metal regressions and warnings
+  as errors; 51 Flutter tests passed; analysis and diff checks clean. Tests cover
+  valid encoded caption fixtures plus wrong dimensions, grayscale, malformed
+  base64, an oversized header and missing local-shape training coverage, with no
+  preflight artifact writes. Evidence:
+  /tmp/almg-caption-preflight-native-qa/verification.json, native-verified.log,
+  invalid-caption-ui.txt, recovery.log and final test/build logs.
+- Remaining: measured CPU classifier/image calibration and duration, broader
+  neural/full-epoch feasibility and Windows/CUDA host verification. Unchanged
+  hardware/user-action blockers remain open and skipped. No generated/private
+  artifacts, weights or unrelated edits are included in the commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
