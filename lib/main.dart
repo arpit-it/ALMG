@@ -2692,6 +2692,81 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _fitStreamTokenizerSample(String indexId) async {
+    final algorithm = await showDialog<String>(context: context, builder: (context) => SimpleDialog(
+      title: const Text('Choose sampled tokenizer fit'), children: [
+        for (final choice in ['byte_level_bpe', 'character_bpe', 'unigram'])
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, choice),
+            child: Text('${_tokenizerAlgorithmLabel(choice)} · cap ${choice == 'byte_level_bpe' ? 320 : 128}')),
+        SimpleDialogOption(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      ]));
+    if (algorithm == null || !mounted) return;
+    try {
+      final review = await _request('/decoder-stream-indexes/$indexId/tokenizer-sample-review',
+        {'config': {'algorithm': algorithm, 'vocabulary_cap': algorithm == 'byte_level_bpe' ? 320 : 128}});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Approve streamed tokenizer sample?'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Fit only the reviewed training sample: up to 16 whole training records and compare up to 8 per held-out split. Records are selected by normalized hash; oversized records are excluded, never truncated. Duplicate occurrence weights are not expanded.'),
+          for (final split in ['train', 'validation', 'test'])
+            Text('$split: ${review['sample_split_counts'][split]} sampled / ${review['population_split_counts'][split]} saved records'),
+          const Text('This is a bounded sample fit, not a complete or representative corpus fit. Comparison results apply only to the sample. No full-corpus contamination clearance or model training approval is granted. Learned pieces may reveal training phrases.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
+        ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve sample-only tokenizer fitting'))]));
+      if (confirmed != true || !mounted) return;
+      final record = await _request('/decoder-stream-indexes/$indexId/tokenizer-experiments', {'confirmed': true, 'reviewed': review});
+      if (mounted) await _showStreamTokenizerExperiment(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _showStreamTokenizerExperiment(Map<String, dynamic> record) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Streamed tokenizer sample fitted'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${_tokenizerAlgorithmLabel(record['algorithm'] as String)} · ${record['vocabulary_size']} IDs'),
+        const Text('Training sample only was fitted. Counts and efficiency describe the reviewed sample, not the full index. Model training remains disabled.'),
+        for (final split in ['train', 'validation', 'test'])
+          Text('$split sample: ${record['comparison'][split]['documents_lossless']}/${record['comparison'][split]['documents']} lossless records · ${record['comparison'][split]['token_count'] ?? 'unavailable'} tokens'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+      ])), actions: [TextButton(onPressed: () { Navigator.pop(context); _exportStreamTokenizerExperiment(record); }, child: const Text('Export private sampled tokenizer')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+  }
+
+  Future<void> _savedStreamTokenizerExperiments(String indexId) async {
+    try {
+      final experiments = (await _request('/decoder-stream-indexes/$indexId/tokenizer-experiments'))['experiments'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Streamed tokenizer experiments'), children: [
+          if (experiments.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No sampled tokenizers saved.')),
+          for (final record in experiments) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(record as Map)),
+            child: Text('${(record['id'] as String).substring(0, 8)} · ${_tokenizerAlgorithmLabel(record['algorithm'] as String)} · ${record['vocabulary_size']} IDs')),
+        ]));
+      if (selected != null && mounted) await _showStreamTokenizerExperiment(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _exportStreamTokenizerExperiment(Map<String, dynamic> record) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Export private sampled tokenizer?'),
+      content: const Text('Save the codec and sample/provenance/permission manifest in a private ZIP. Learned pieces can reveal training phrases and permission notes may be private. Source documents, weights and model-training approvals are excluded.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Choose sampled tokenizer ZIP destination'))]));
+    if (confirmed != true || !mounted) return;
+    try {
+      final destination = await getSaveLocation(suggestedName: 'stream-tokenizer-sample-${(record['id'] as String).substring(0, 8)}.zip',
+        acceptedTypeGroups: [const XTypeGroup(label: 'Private tokenizer ZIP', extensions: ['zip'])]);
+      if (destination == null || !mounted) return;
+      final result = await _request('/decoder-stream-tokenizer-experiments/${record['id']}/export', {'confirmed': true, 'reviewed': record});
+      await XFile.fromData(base64Decode(result['data'] as String), mimeType: 'application/zip', name: result['name'] as String).saveTo(destination.path);
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(title: const Text('Sampled tokenizer ZIP saved'), content: Text(destination.path),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _showStreamIndex(Map<String, dynamic> record) async {
     final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: Text('Streamed text index · ${record['status']}'), scrollable: true,
@@ -2710,6 +2785,8 @@ class _StudioPageState extends State<StudioPage> {
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-languages'), child: const Text('View saved streamed language reports')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'byte-statistics'), child: const Text('Analyze byte token distribution')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'tokenizers'), child: const Text('View saved streamed tokenizers')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'fit-sample'), child: const Text('Fit tokenizer on streamed sample')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'sample-experiments'), child: const Text('View streamed tokenizer experiments')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'windows'), child: const Text('View saved streamed token windows')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-byte-statistics'), child: const Text('View saved byte statistics')),
         if (record['status'] == 'complete' && Platform.isMacOS) TextButton(onPressed: () => Navigator.pop(context, 'export'), child: const Text('Review private index export')),
@@ -2736,6 +2813,8 @@ class _StudioPageState extends State<StudioPage> {
     if (action == 'saved-languages') await _savedStreamLanguages(record['id'] as String);
     if (action == 'byte-statistics') await _beginStreamByteStatistics(record);
     if (action == 'tokenizers') await _savedStreamTokenizers(record['id'] as String);
+    if (action == 'fit-sample') await _fitStreamTokenizerSample(record['id'] as String);
+    if (action == 'sample-experiments') await _savedStreamTokenizerExperiments(record['id'] as String);
     if (action == 'windows') await _savedStreamWindows(record['id'] as String);
     if (action == 'saved-byte-statistics') await _savedStreamByteStatistics(record['id'] as String);
     if (action == 'audits') await _savedStreamAudits(record['id'] as String);

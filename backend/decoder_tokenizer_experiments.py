@@ -42,17 +42,7 @@ def _config(config):
     return algorithm,cap,labels,policy
 
 
-def train(root,dataset_id,confirmed,reviewed,config):
-    if confirmed is not True:raise ValueError('Confirm tokenizer fitting on the reviewed training split; model training stays disabled.')
-    algorithm,cap,labels,policy=_config(config)
-    tokenizer_type={'byte_level_bpe':ByteBPE,'character_bpe':CharacterBPE,'unigram':UnigramTokenizer}[algorithm]
-    dataset=datasets.read(root,dataset_id)
-    if not isinstance(reviewed,dict) or reviewed!=dataset:raise ValueError('The dataset review changed. Reopen it before fitting.')
-    rows=[json.loads(line) for line in (Path(root)/'decoder-datasets'/dataset_id/'documents.jsonl').read_text(encoding='utf-8').splitlines()]
-    training=[row['text'] for row in rows if row['split']=='train']
-    model=tokenizer_type.fit(training,cap-len(labels))
-    if labels:model=SpecialTokenizer(model,labels,policy)
-    artifact=model.artifact()
+def compare(rows,model,algorithm):
     comparison={}
     for split in ('train','validation','test'):
         selected=[row for row in rows if row['split']==split]
@@ -83,6 +73,21 @@ def train(root,dataset_id,confirmed,reviewed,config):
                            'comparison_scope':'lossless_only_efficiency_all_encoded_token_counts','used_for_fitting':split=='train'}
         if algorithm!='unigram':
             comparison[split].update(bpe_tokens=comparison[split]['token_count'],byte_to_bpe_token_ratio=comparison[split]['byte_to_token_ratio'])
+    return comparison
+
+
+def train(root,dataset_id,confirmed,reviewed,config):
+    if confirmed is not True:raise ValueError('Confirm tokenizer fitting on the reviewed training split; model training stays disabled.')
+    algorithm,cap,labels,policy=_config(config)
+    tokenizer_type={'byte_level_bpe':ByteBPE,'character_bpe':CharacterBPE,'unigram':UnigramTokenizer}[algorithm]
+    dataset=datasets.read(root,dataset_id)
+    if not isinstance(reviewed,dict) or reviewed!=dataset:raise ValueError('The dataset review changed. Reopen it before fitting.')
+    rows=[json.loads(line) for line in (Path(root)/'decoder-datasets'/dataset_id/'documents.jsonl').read_text(encoding='utf-8').splitlines()]
+    training=[row['text'] for row in rows if row['split']=='train']
+    model=tokenizer_type.fit(training,cap-len(labels))
+    if labels:model=SpecialTokenizer(model,labels,policy)
+    artifact=model.artifact()
+    comparison=compare(rows,model,algorithm)
     if datasets.read(root,dataset_id)!=dataset:raise ValueError('Dataset changed during BPE fitting; no artifact published.')
     identifier=uuid.uuid4().hex
     manifest={'format':'almg-tokenizer-experiment-v1','schema_version':1,'id':identifier,

@@ -4237,6 +4237,60 @@ P3-LMF-03 partial progress · reviewed tokenizer adoption and model persistence 
   polling. No external collection, downloads, generated artifact commits or push;
   unrelated user edits and all existing training artifacts/weights are preserved.
 
+P3-LMF-03 partial progress · reviewed fitting samples from streamed indexes · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed streamed indexes now offer “Fit tokenizer
+  on streamed sample” and saved experiment inventory. Byte-BPE, character-BPE and
+  Unigram use the existing configurable fitting engine; the native presets are
+  caps 320/128/128 respectively. API configuration also supports existing explicit
+  control-token definitions/unknown policies. Shared split comparison logic retains
+  all existing small-dataset experiment formats and lossless/lossy accounting.
+- A versioned pre-fit review selects at most 16 whole training records and 8 each
+  validation/test, ordered by normalized group hash within the original saved
+  splits. It excludes records over 4096 UTF-8 bytes without modifying/truncating
+  them. Duplicate occurrence weights are not expanded. SQLite uses the existing
+  bounded cache; selected text is at most 128 KiB. Fitting uses training samples
+  only; held-out samples are comparison inputs only. This is explicitly a biased,
+  bounded sample, not a complete/representative corpus fit or evaluation clearance.
+- Exact sample metadata preserves normalized group, original first line/byte offset,
+  raw-line hash, occurrences and byte size. Review/approval bind index revision,
+  verified original source bytes, source permission snapshot, full configuration,
+  training-text hash and implementation digests. Original/index signatures and
+  hashes are rechecked; stale permission/source/scope changes reject publication.
+  Missing source files return an actionable restore/verify error. Failed atomic
+  publication removes temporary work without changing originals.
+- Saved version-1 sample artifacts contain the codec, exact sample/provenance review,
+  fitting-only approval and sample-scoped comparisons. Model training/release remain
+  disabled, and the new namespace does not admit these samples into full streamed
+  model training. Private ZIP export requires a separate review/confirmation and
+  includes only manifest/codec, with explicit learned-phrase/permission-note warning.
+- Local app verification: rebuilt native macOS ALMG on isolated fixture port 28843.
+  Opened the legacy fixed-byte tokenizer unchanged. Cancelled sample consent before
+  fitting, then explicitly approved byte BPE on index
+  ae5cb4ba27df462b9da27e64e3652bae (401 records; split populations 326/39/36).
+  Exact sample counts were 16/8/8. Experiment 4f2d79f0db9b419d963852f83253b6ba
+  fitted 320 IDs; all sampled records passed NFC round trips, with 702/715/728 tokens
+  and sample byte/token ratios 6.9002849002849 / 3.4293706293706294 /
+  3.258241758241758. These numbers do not describe the unsampled records.
+- Backend/app restart reopened the exact saved manifest. A repeat native fit with
+  final recovery handling created 493e22e5cba747eeab014a67d2e2fbe6 and produced the
+  same tokenizer hash/comparisons. Native Save exported its private ZIP; standalone
+  codec restore round-tripped unseen “café 世界 🚀” Unicode text. All six original
+  source/index/legacy-tokenizer files stayed byte-identical; no model trial existed.
+  Evidence: /tmp/almg-stream-tokenizer-sample-native-qa/ contains native consent,
+  sample/reopened/final experiment JSON, legacy tokenizer JSON, export consent/save
+  evidence, ZIP, verification.json, build/restart and verification logs.
+- Verification: 442 Python tests passed with ALMG_METAL_TESTS=1; 34 Flutter tests
+  passed, analysis/diff checks passed. Added tests cover training-only fitting against
+  an independent codec fit, bounded whole-record selection/oversized exclusion,
+  all three codecs/control policies, raw provenance, permissions/source invalidation,
+  missing-source recovery, interrupted/concurrent publication, export/tamper/reload,
+  no model authorization and preserved existing artifacts.
+- Remaining: full-corpus streamed fitting, incremental/resumable learned-tokenizer
+  fitting and full-population learned-tokenizer comparison/admission remain open.
+  Larger-than-RAM and independent hardware/Windows/scratch-space blockers were not
+  re-polled. No external collection, downloads, weight changes, generated artifact
+  commits or push; unrelated user edits and prior artifacts are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
