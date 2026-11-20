@@ -163,4 +163,23 @@ void main() {
     await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
   });
 
+  testWidgets('interruption history exposes midpoint recovery with fresh approval and no completed-run action', (tester) async {
+    final paths=<String>[];
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
+      paths.add(path);
+      return {'records':[{'id':'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','schema_version':5,'status':'interruption_checkpoint','cancellation_phase':'checkpointed_training','completed_steps':20,'review':{'config':{'steps':40,'optimizer':'sgd'}},'initial_losses':{'train':2,'validation':2,'test':2},'final_losses':{'train':1,'validation':1.5,'test':1.6},'generated_text':'amber birch'}]};
+    })));
+    await tester.tap(find.text('Saved interruption checkpoints'));await tester.pumpAndSettle();
+    expect(paths.single,'/decoder-architecture-plans/plan/corpus-optimizer-interruptions');
+    await tester.tap(find.textContaining('aaaaaaaa ·'));await tester.pumpAndSettle();
+    expect(find.textContaining('Saved interruption checkpoint at update 20 of 40'),findsOneWidget);
+    expect(find.text('Review corpus checkpoint continuation'),findsNothing);
+    await tester.tap(find.text('Review retained corpus recorded training resume'));await tester.pumpAndSettle();
+    expect(find.text('Review recorded training resume resources'),findsOneWidget);
+    expect(find.text('Confirm resume retained corpus recorded training'),findsNothing);
+    expect(paths.length,1);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
 }

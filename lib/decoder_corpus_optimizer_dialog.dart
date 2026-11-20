@@ -46,6 +46,7 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
   Future<void> _show(Map<String, dynamic> record) => showDialog<void>(context: context, builder: (context) => AlertDialog(
     title: const Text('Saved corpus optimizer run'), scrollable: true,
     content: SizedBox(width: 650, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (record['status'] == 'interruption_checkpoint') Text('Saved interruption checkpoint at update ${record['completed_steps']} of ${record['review']['config']['steps']}. Restore this durable midpoint after the originating worker stopped. Later uncheckpointed work will be replayed; no completed comparison or release claim.'),
       if (record['status'] == 'canceled') Text('Fresh corpus run canceled in ${record['cancellation_phase']} at update ${record['completed_steps']}. Reference updates: ${record['reference_completed_steps']} · recorded training updates: ${record['recorded_training_updates']}. Private model, FP32 state and counter retained; no completed reference or quality claim.'),
       if (record['training_steps_carried'] != null) Text('Retained training updates: ${record['training_steps_carried']} · new training updates executed: ${record['training_updates_executed']} · reference updates executed: ${record['reference_updates_executed']}. Completed reference reused.')
       else if (record['reference_steps_carried'] != null) Text('Retained reference updates: ${record['reference_steps_carried']} · new reference updates executed: ${record['reference_updates_executed']}. Each recorded training trajectory starts from the original fresh initialization.'),
@@ -63,9 +64,9 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
       else const Text('Workflow time and memory observations share the backend process; these are not isolated training peaks.'),
       SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
     ])), actions: [
-      if (record['id'] is String && record['status'] != 'canceled') TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusContinuationDialog(sourceId: record['id'] as String, request: widget.request)), child: const Text('Review corpus checkpoint continuation')),
+      if (record['id'] is String && (record['status'] ?? 'completed') == 'completed') TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusContinuationDialog(sourceId: record['id'] as String, request: widget.request)), child: const Text('Review corpus checkpoint continuation')),
       if (record['id'] is String && record['status'] == 'canceled' && record['cancellation_phase'] == 'reference_verification') TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusOptimizerDialog(initialized: widget.initialized, corpus: widget.corpus, request: widget.request, referenceResumeId: record['id'] as String)), child: const Text('Review retained corpus reference resume')),
-      if (record['id'] is String && record['status'] == 'canceled' && record['cancellation_phase'] == 'checkpointed_training') TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusOptimizerDialog(initialized: widget.initialized, corpus: widget.corpus, request: widget.request, trainingResumeId: record['id'] as String)), child: const Text('Review retained corpus recorded training resume')),
+      if (record['id'] is String && (record['status'] == 'canceled' || record['status'] == 'interruption_checkpoint') && record['cancellation_phase'] == 'checkpointed_training') TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusOptimizerDialog(initialized: widget.initialized, corpus: widget.corpus, request: widget.request, trainingResumeId: record['id'] as String)), child: const Text('Review retained corpus recorded training resume')),
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   Future<void> _train() => _perform(() async {
     final random=Random.secure();final token=List.generate(16,(_)=>random.nextInt(256).toRadixString(16).padLeft(2,'0')).join();
@@ -81,12 +82,12 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
     try { await widget.request('$_path/corpus-optimizer-cancel',{'confirmed':true,'reviewed_feasibility':_review,'request_id':token}); }
     catch(error) { if(mounted)setState(() { _cancelPending=false;_error='$error'; }); }
   }
-  Future<void> _history() => _perform(() async {
-    final result = await widget.request('$_path/corpus-optimizer-history', {'reviewed': widget.initialized, 'corpus': widget.corpus});
+  Future<void> _history({bool interruptions = false}) => _perform(() async {
+    final result = await widget.request('$_path/${interruptions ? 'corpus-optimizer-interruptions' : 'corpus-optimizer-history'}', {'reviewed': widget.initialized, 'corpus': widget.corpus});
     if (!mounted) return;
     setState(() => _busy = false);
     final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
-      title: const Text('Saved corpus optimizer runs'), children: [
+      title: Text(interruptions ? 'Saved interruption checkpoints' : 'Saved corpus optimizer runs'), children: [
         if ((result['records'] as List).isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No corpus optimizer runs saved.')),
         for (final record in result['records'] as List) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(record as Map)),
           child: Text('${(record['id'] as String).substring(0, 8)} · ${record['status'] ?? 'completed'} · ${record['review']['config']['optimizer']} · step ${record['completed_steps']}')),
@@ -110,7 +111,7 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
         onChanged: _busy ? null : (value) => setState(() { _batch = value!; _review = null; })),
       DropdownButton<int>(value: _accumulation, items: const [DropdownMenuItem(value: 1, child: Text('1 corpus microbatch per update')), DropdownMenuItem(value: 2, child: Text('2 corpus microbatches per update'))],
         onChanged: _busy ? null : (value) => setState(() { _accumulation = value!; _review = null; })),
-      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. Saved midpoint continuation requires separate approval; Cancel stops at optimizer-update boundaries in either phase, retaining the active model/state and any completed reference/checkpoint. Reference-phase partial resume requires separate approval; recorded-training partial resume requires its own approval. Reported split losses evaluate the saved FP32 master model.'),
+      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. Saved midpoint continuation requires separate approval; Cancel stops at optimizer-update boundaries in either phase, retaining the active model/state and any completed reference/checkpoint. Reference-phase partial resume requires separate approval; recorded-training partial resume requires its own approval. Fresh isolated runs retain a flushed midpoint checkpoint for recovery after worker interruption through Saved interruption checkpoints. Later uncheckpointed work must be replayed; physical power-loss recovery remains unverified. Reported split losses evaluate the saved FP32 master model.'),
       ],
       if (_busy) const LinearProgressIndicator(),
       if(_running && _cancelPending)const Text('Cancellation requested. Waiting for a safe phase update boundary and retained result.'),
@@ -135,6 +136,7 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
       ],
     ])), actions: [
       if(_running)TextButton(onPressed:_cancelPending ? null : _cancel,child:const Text('Cancel fresh corpus run')),
+      TextButton(onPressed: _busy ? null : () => _history(interruptions: true), child: const Text('Saved interruption checkpoints')),
       TextButton(onPressed: _busy ? null : _history, child: const Text('Saved corpus optimizer runs')),
       TextButton(onPressed: _busy ? null : _load, child: Text(_resume ? 'Review $_resumeLabel resume resources' : 'Review corpus training resources')),
       if (_review?['feasible'] == true) TextButton(onPressed: _busy ? null : _train, child: Text(_resume ? 'Confirm resume retained corpus $_resumeLabel' : 'Confirm train and save corpus model')),

@@ -129,6 +129,9 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
                    precision_scope='Conservative FP32 reserves retained; mixed FP16 matrix products do not establish memory savings.',
                    effective_batch_rows=c['batch_size'], gradient_accumulation_steps=c['gradient_accumulation_steps'],
                    gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if c['gradient_accumulation_steps'] > 1 else 0)
+    reserve['interruption_checkpoint_extra_disk_bytes']=max(2*1024**2,current['actual_weight_bytes']*256)
+    reserve['required_free_disk_bytes']+=reserve['interruption_checkpoint_extra_disk_bytes']
+    reserve['required_available_memory_bytes']+=current['actual_weight_bytes']*8
     reasons = list(profile['errors'])
     if len(windows['train']) > c['steps'] * c['batch_size']:
         reasons.append('Choose enough optimizer updates to visit every saved training window at least once.')
@@ -147,7 +150,7 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
               'splits': saved['review']['splits'], 'estimates': reserve, 'hardware': profile,
               'feasible': not reasons, 'blockers': reasons, 'training_approved': False, 'release_approved': False,
               'implementation_sha256': digest({name: file_digest(Path(__file__).with_name(name)) for name in
-                  ('decoder_corpus_optimizer.py', 'decoder_corpus_inputs.py', 'decoder_optimizer_fixture.py', 'decoder_corpus_feedback.py', 'decoder_corpus_isolated.py', 'decoder_corpus_worker.py', 'decoder_corpus_run_cancellations.py', 'decoder_corpus_reference_resume.py', 'decoder_corpus_training_resume.py', 'decoder_corpus_phase_feedback.py',
+                  ('decoder_corpus_optimizer.py', 'decoder_corpus_inputs.py', 'decoder_optimizer_fixture.py', 'decoder_corpus_feedback.py', 'decoder_corpus_isolated.py', 'decoder_corpus_worker.py', 'decoder_corpus_run_cancellations.py', 'decoder_corpus_reference_resume.py', 'decoder_corpus_training_resume.py', 'decoder_corpus_phase_feedback.py', 'decoder_corpus_interruptions.py',
                    'decoder_architecture_backward.py', 'decoder_mixed_precision.py', 'planned_decoder.py', 'decoder_tokenizer.py')})}
     reserve['calculated_memory_reserve_bytes']=reserve['required_available_memory_bytes']
     memory,work=feedback.feedback(history(root,initialized,reviewed_inputs),result) if execution_mode=='fresh_process' else (None,None)
@@ -162,7 +165,9 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
 def _folder(root, identifier):
     if not isinstance(identifier, str) or not re.fullmatch('[a-f0-9]{32}', identifier):
         raise ValueError('Select a saved corpus optimizer run.')
-    return Path(root) / 'decoder-corpus-optimizer-runs' / identifier
+    folder=Path(root)/'decoder-corpus-optimizer-runs'/identifier
+    checkpoint=Path(root)/'decoder-corpus-interruption-checkpoints'/identifier
+    return checkpoint if not folder.exists() and (checkpoint/'record.json').exists() else folder
 
 
 def _generated(model, tokenizer):
@@ -243,6 +248,10 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
             if state['step']==midpoint:
                 model.parameters=values
                 optimizer.checkpoint(folder/f'step-{midpoint}',model,state,c,approved['revision'])
+                if parent is None and execution_mode=='fresh_process':
+                    if __package__:from . import decoder_corpus_interruptions
+                    else:import decoder_corpus_interruptions
+                    decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,values,state,reference,reference_state,reference_log,first,request_id)
                 restored,state=optimizer.restore(folder/f'step-{midpoint}',c,approved['revision'])
                 values=restored.parameters
             elif training_resume_id is not None:
@@ -318,7 +327,7 @@ def read(root, identifier, _seen=None):
     if __package__:from . import decoder_corpus_training_resume
     else:import decoder_corpus_training_resume
     decoder_corpus_training_resume.lineage(root,record,seen)
-    if record.get('format')=='almg-corpus-optimizer-run-v4':return run_cancellation.read(root,folder,record)
+    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5'):return run_cancellation.read(root,folder,record)
     approved = record['review']; c = configuration(approved['config'], approved['config']['sequence_length'])
     midpoint = c['steps'] // 2
     expected = {'trained-model.json', 'tokenizer.json', *[f'step-{midpoint}/{name}' for name in ('model.json', 'optimizer.json', 'checkpoint.json')]}

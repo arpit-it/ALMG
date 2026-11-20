@@ -7631,6 +7631,64 @@ P3-LMF-06 partial progress · reviewed forty-update corpus budget · 2026-11-21:
   Unchanged independent hardware/user-action blockers remain open and skipped;
   P3-LMF-01 remains complete for its recorded architecture scope.
 
+P3-LMF-06 partial progress · durable fresh-worker midpoint recovery · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Fresh isolated corpus workers now publish an immutable
+  version-5 interruption-checkpoint record after the ordinary midpoint checkpoint is
+  saved and before post-midpoint training begins. It retains the midpoint FP32 model,
+  optimizer/scheduler counter, tokenizer, training log, complete reference model/moments
+  and reference log, frozen approval/source bindings and originating worker/run IDs.
+  Data files are flushed before the manifest is atomically published last; directory
+  entries are flushed afterward. Partial/failed publication is not discoverable, and
+  original pending/completed/canceled run files are preserved. Extra disk and memory
+  reserves are included in resource admission. Legacy result formats stay unchanged.
+- Added native “Saved interruption checkpoints” discovery. A checkpoint is offered
+  only after its originating POSIX worker has stopped and no originating terminal
+  record exists; active and completed/canceled origins are excluded. Non-POSIX hosts
+  do not perform process probes. New resource review and explicit approval restore
+  the saved midpoint and execute the original remaining updates in a new private run,
+  reusing the complete reference without retraining. Later uncheckpointed work is
+  replayed, and the UI states that scope. Checkpoints are distinct retained artifacts,
+  with no fabricated cancellation receipts or completed-training/release claim.
+- Native verification used the rebuilt ALMG app and offline fixture backend on port
+  28917. Two explicitly approved forty-update fixture workers (FP32 SGD and mixed FP16
+  AdamW, 704 parameters, two effective rows/two microbatches) were terminated with
+  SIGKILL only after their update-20 snapshots had published and post-midpoint work
+  was active. The test verified each owned child PID, parent backend and command before
+  termination. The app reported the expected worker failure and exposed both intact
+  midpoint snapshots. An initial test selector matched explanatory text instead of
+  the button; the exact-label selector was corrected, preserving the first snapshot
+  and diagnostics rather than rerunning or discarding its artifacts.
+- After app/backend restart, both saved checkpoints required new resource review/
+  confirmation and completed exactly twenty remaining training updates to update 40,
+  with zero reference optimizer updates, zero final weight/moment error against the
+  retained reference and matching reloaded CPU generation. Each recovered output also
+  completed independently approved midpoint continuation from update 20 to 40 with
+  zero reference weight difference. No cancellation receipt was created for either
+  interrupted source. Recovery creates separate models and leaves its source immutable.
+- A final app/backend restart reopened the latest twenty ordinary corpus records,
+  both interruption sources and both recovered midpoint continuations exactly.
+  Backend readers verified all 60 corpus/checkpoint/continuation records. All 523
+  retained files remained byte-identical, including all original 477 and all 503 files
+  present after interruption. Evidence: /tmp/almg-corpus-interruption-native-qa/
+  verification.json, interrupt-first-selector-attempt.log, selector-issue.txt,
+  interrupt-corrected.log, expected-interruption UI captures, recover.log, restart.log
+  and raw checkpoint/review/recovered/continuation captures. No external collection
+  occurred; generated checkpoints, models, receipts and QA files remain outside Git.
+- Validation: final 648 Python tests passed with warnings as errors and Metal enabled;
+  all 85 Flutter tests passed and analysis was clean. Real worker-termination tests
+  verify both optimizers, active/terminal exclusion, explicit confirmation, original
+  bytes, checkpoint integrity, no cancellation receipt and exact recovered state.
+  Tests also cover failed flush publication without a manifest and the non-POSIX
+  no-signal guard. UI tests expose the saved midpoint with separate approval and
+  exclude the ordinary completed-run continuation action for an incomplete checkpoint.
+- Remaining: recovery before the fresh recorded-training midpoint, newer-than-midpoint
+  periodic checkpoints, arbitrary interruption points/resumed-worker lifecycle,
+  physical OS/power-loss verification, larger model/sequence/batch/budget support,
+  profiling and quality/50M–100M acceptance. This verifies bounded fresh-worker process
+  interruption after successful midpoint publication only. Unchanged independent
+  hardware/user-action blockers remain open and skipped; P3-LMF-01 remains complete
+  for its recorded architecture scope.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

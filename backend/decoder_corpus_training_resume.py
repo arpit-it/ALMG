@@ -8,9 +8,8 @@ else:
 
 
 def snapshot(record):
-    if (record.get('status')!='canceled' or record.get('cancellation_phase')!='checkpointed_training'
-            or record.get('format')!='almg-corpus-optimizer-run-v4'):
-        raise ValueError('Select a fresh corpus run canceled during recorded training.')
+    if ((record.get('format'),record.get('status')) not in (('almg-corpus-optimizer-run-v4','canceled'),('almg-corpus-optimizer-run-v5','interruption_checkpoint')) or record.get('cancellation_phase')!='checkpointed_training'):
+        raise ValueError('Select retained recorded training or a durable interrupted midpoint.')
     depth=record.get('training_resume_depth',record.get('reference_resume_depth',0))
     if type(depth) is not int or not 0<=depth<=16:raise ValueError('Invalid recorded-training ancestry depth.')
     return {'record_id':record['id'],'record_revision':record['revision'],'files':record['files'],
@@ -19,6 +18,10 @@ def snapshot(record):
 
 def source(root,identifier):
     parent=training.read(root,identifier);binding=snapshot(parent)
+    if parent.get('status')=='interruption_checkpoint':
+        if __package__:from . import decoder_corpus_interruptions
+        else:import decoder_corpus_interruptions
+        decoder_corpus_interruptions.require_recoverable(root,parent)
     if binding['lineage_depth']>=16:raise ValueError('Recorded training resume supports at most sixteen ancestors.')
     origin=parent['review']['source']
     initialized=training.hardware.initializations.read(root,origin['plan_id'],origin['initialization_id'])

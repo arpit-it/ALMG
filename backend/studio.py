@@ -2414,6 +2414,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond(decoder_corpus_optimizer.run_cancellation.request(ROOT,reviewed,data.get('request_id'),data.get('confirmed')))
                 if architecture_parts[2] == 'corpus-optimizer-train':
                     return self.respond(inference.WORKER.submit(decoder_corpus_isolated.run,ROOT,data.get('confirmed'),data.get('reviewed'),data.get('corpus'),data.get('settings'),data.get('reviewed_feasibility'),data.get('request_id')).result())
+                if architecture_parts[2] == 'corpus-optimizer-interruptions':
+                    if __package__:from . import decoder_corpus_interruptions
+                    else:import decoder_corpus_interruptions
+                    return self.respond({'records':decoder_corpus_interruptions.history(ROOT,data.get('reviewed'),data.get('corpus'))})
                 if architecture_parts[2] == 'corpus-optimizer-history':
                     return self.respond({'records':decoder_corpus_optimizer.history(ROOT,data.get('reviewed'),data.get('corpus'))})
                 if architecture_parts[2] == 'corpus-input-datasets':

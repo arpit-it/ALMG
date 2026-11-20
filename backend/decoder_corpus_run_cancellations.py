@@ -2,6 +2,7 @@
 from datetime import datetime, timezone
 import json
 import math
+import os
 from pathlib import Path
 import re
 from tempfile import NamedTemporaryFile
@@ -77,9 +78,9 @@ def _save_state(path,state):
     path.write_text(json.dumps({'step':state['step'],**{kind:{name:value.tolist() for name,value in state[kind].items()} for kind in ('m','v')}},allow_nan=False))
 
 
-def save(root,folder,identifier,initialized,corpus,approved,current,model,tokenizer,windows,initial,event,reference,reference_state,reference_log,first,observer,token):
+def save(root,folder,identifier,initialized,corpus,approved,current,model,tokenizer,windows,initial,event,reference,reference_state,reference_log,first,observer,token,checkpoint_owner=None):
     training=_training();c=current['config'];training._source(root,initialized,corpus)
-    if not requested(root,approved,token):raise ValueError('Missing confirmed fresh-run cancellation.')
+    if checkpoint_owner is None and not requested(root,approved,token):raise ValueError('Missing confirmed fresh-run cancellation.')
     model.parameters=event.values;final=training.split_losses(model,windows)
     if not all(math.isfinite(value) for value in [*initial.values(),*final.values()]):raise ValueError('Canceled corpus state has nonfinite losses; artifacts require review.')
     model.save(folder/'trained-model.json');_save_state(folder/'optimizer.json',event.state)
@@ -111,7 +112,20 @@ def save(root,folder,identifier,initialized,corpus,approved,current,model,tokeni
     if __package__:from . import decoder_corpus_training_resume
     else:import decoder_corpus_training_resume
     record.update(decoder_corpus_training_resume.metadata(approved,record['completed_steps']))
-    record['revision']=digest(record);temporary=folder/'.canceled.tmp';temporary.write_text(json.dumps(record,allow_nan=False,indent=2));temporary.replace(folder/'record.json')
+    if checkpoint_owner is not None:
+        if __package__:from . import decoder_corpus_interruptions as interruptions
+        else:import decoder_corpus_interruptions as interruptions
+        record.update(checkpoint_owner,format='almg-corpus-optimizer-run-v5',schema_version=5,status='interruption_checkpoint',checkpoint_origin='fresh_worker_midpoint')
+        record['workflow_measurements']={'measured':False,'isolated_trial_peak_measured':False,'scope':'durable_midpoint_snapshot_only'}
+        record['limitations']='Durable midpoint only. Originating worker may still be active. After interruption, separate approval can restore this counter; later uncheckpointed work must be replayed. No completed comparison, isolated measurement or release claim. Physical power-loss recovery is unverified.'
+        interruptions.validate(root,folder,record)
+        interruptions.flush_files(folder)
+    record['revision']=digest(record);temporary=folder/'.canceled.tmp'
+    with temporary.open('w') as stream:
+        json.dump(record,stream,allow_nan=False,indent=2)
+        if checkpoint_owner is not None:stream.flush();os.fsync(stream.fileno())
+    temporary.replace(folder/'record.json')
+    if checkpoint_owner is not None:interruptions.flush_directories(folder)
     return read(root,folder,record)
 
 
@@ -130,12 +144,17 @@ def read(root,folder,record):
     expected={'trained-model.json','optimizer.json','tokenizer.json'}
     if phase=='checkpointed_training':expected|={'reference-model.json','reference-optimizer.json'}
     if record.get('checkpoint_restored_steps')==midpoint:expected|={f'step-{midpoint}/{name}' for name in ('model.json','optimizer.json','checkpoint.json')}
-    if (record.get('format')!='almg-corpus-optimizer-run-v4' or record.get('id')!=folder.name or record.get('schema_version')!=4 or record.get('status')!='canceled'
+    checkpoint=record.get('format')=='almg-corpus-optimizer-run-v5'
+    if checkpoint:
+        if __package__:from . import decoder_corpus_interruptions
+        else:import decoder_corpus_interruptions
+        decoder_corpus_interruptions.validate(root,folder,record)
+    if ((record.get('format'),record.get('schema_version'),record.get('status')) not in (('almg-corpus-optimizer-run-v4',4,'canceled'),('almg-corpus-optimizer-run-v5',5,'interruption_checkpoint')) or record.get('id')!=folder.name
             or phase not in ('reference_verification','checkpointed_training') or type(step) is not int or not 0<=step<c['steps']
             or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'}) or approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'})
             or set(record['files'])!=expected or any((folder/name).stat().st_size>16*1024**2 or file_digest(folder/name)!=sha for name,sha in record['files'].items())
             or record['scheduler_completed_steps']!=step or record.get('reference_verified') is not False or record.get('release_approved') is not False
-            or not requested(root,approved,record.get('request_id'))):raise ValueError('Canceled fresh corpus artifact or receipt binding changed.')
+            or (not checkpoint and not requested(root,approved,record.get('request_id')))):raise ValueError('Canceled fresh corpus artifact or receipt binding changed.')
     corpus=training.inputs.read(root,approved['corpus_id'])
     if corpus['revision']!=approved['corpus_revision']:raise ValueError('Canceled corpus input snapshot changed.')
     model=training.PlannedDecoder.load(folder/'trained-model.json');_state(folder,'optimizer.json',model,c,step)
