@@ -2846,7 +2846,7 @@ class _StudioPageState extends State<StudioPage> {
           Text('${entry.key}: ${entry.value['lossless_records']}/${entry.value['records']} lossless · ${entry.value['unsupported_records']} unsupported · ${entry.value['lossy_records']} lossy · ${entry.value['encoding_failures']} encoding failures'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
-        if (record['status'] == 'complete' && record['format'] == 'almg-stream-fitted-tokenizer-evaluation-v1') ...[
+        if (record['status'] == 'complete' && record['format'] == 'almg-stream-fitted-tokenizer-evaluation-v1' && record['fit_kind'] != 'unigram') ...[
           TextButton(onPressed: () { Navigator.pop(context, false); _beginLearnedWindows(record); }, child: const Text('Prepare learned-tokenizer windows')),
           TextButton(onPressed: () { Navigator.pop(context, false); _savedLearnedWindows(record); }, child: const Text('View learned-tokenizer windows')),
         ],
@@ -2931,6 +2931,8 @@ class _StudioPageState extends State<StudioPage> {
         if (record['initializer'] != null) Text('${(record['initializer']['alphabet'] as List).length} characters · ${record['initializer']['candidate_vocabulary_size']} candidate IDs · ${record['initializer']['distinct_training_substrings']} distinct substrings'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _beginWholeUnigram(record); }, child: const Text('Fit full-split Unigram')),
+        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _savedWholeUnigram(record['id'] as String); }, child: const Text('View full-split Unigram fits')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume Unigram candidates'))]));
     if (resume == true && mounted) await _runUnigramCandidates(record);
   }
@@ -2972,13 +2974,89 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _beginWholeUnigram(Map<String, dynamic> candidate) async {
+    try {
+      final reviewed = await _request('/decoder-stream-unigram-candidates/${candidate['id']}/fit-review', {});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Fit five full-split Unigram EM updates?'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Use the frozen candidate vocabulary and every unique training record for five probability updates, checked through six full likelihood passes. '
+            'Held-outs never fit or expand the alphabet. Save resumable counters and probability state between bounded batches. '
+            'The candidate set is fixed; pruning and sampling are unavailable. Learned pieces may encode private text. No student-model training or release is approved.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(reviewed)),
+        ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm five Unigram EM updates'))]));
+      if (confirmed != true || !mounted) return;
+      final record = await _request('/decoder-stream-unigram-candidates/${candidate['id']}/fits', {'confirmed': true, 'reviewed': reviewed});
+      if (mounted) await _runWholeUnigram(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _showWholeUnigram(Map<String, dynamic> record) async {
+    final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Full-split Unigram · ${record['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${record['processed_records']} / ${record['total_records']} training records · ${record['completed_passes']}/6 checked passes · ${record['em_updates']}/5 EM updates'),
+        const Text('Fixed candidates; no pruning or sampling. Held-out characters are rejected without refitting. Student-model training and release remain disabled.'),
+        Text('Training log-likelihood history: ${record['history']}'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+      ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] == 'complete') ...[
+          TextButton(onPressed: () { Navigator.pop(context, false); _beginStreamTokenizerEvaluation(record); }, child: const Text('Compare fitted tokenizer across full index')),
+          TextButton(onPressed: () { Navigator.pop(context, false); _savedStreamTokenizerEvaluations(record['id'] as String, fitKind: 'unigram'); }, child: const Text('View fitted-tokenizer comparisons')),
+          TextButton(onPressed: () { Navigator.pop(context, false); _exportWholeStreamBPE(record); }, child: const Text('Export private full-split Unigram')),
+        ],
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume full-split Unigram'))]));
+    if (resume == true && mounted) await _runWholeUnigram(record);
+  }
+
+  Future<void> _runWholeUnigram(Map<String, dynamic> initial) async {
+    var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: StatefulBuilder(builder: (context, update) {
+        refresh = update;
+        return AlertDialog(title: const Text('Fitting full-split Unigram'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: (record['processed_records'] as num) / (record['total_records'] as num)),
+          Text('${record['processed_records']} / ${record['total_records']} training records'),
+          Text('Pass ${(record['completed_passes'] as num) + 1}/6 · ${record['em_updates']}/5 updates'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause full-split Unigram'))]);
+      }))));
+    try {
+      while (!pause && record['status'] != 'complete') {
+        record = await _request('/decoder-stream-unigram-fits/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        if (!mounted) return;
+        refresh?.call(() {});
+      }
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false; await _showWholeUnigram(record);
+    } catch (error) { refresh = null; if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); } }
+  }
+
+  Future<void> _savedWholeUnigram(String candidateId) async {
+    try {
+      final fits = (await _request('/decoder-stream-unigram-candidates/$candidateId/fits'))['fits'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved full-split Unigram fits'), children: [
+          if (fits.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved full-split Unigram fits.')),
+          for (final fit in fits) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(fit as Map)),
+            child: Text('${(fit['id'] as String).substring(0, 8)} · ${fit['status']} · ${fit['completed_passes']}/6 passes')),
+        ]));
+      if (selected != null && mounted) await _showWholeUnigram(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   String? _wholeStreamFitKind(Map<String, dynamic> record) {
+    if (record['format'] == 'almg-stream-unigram-fit-v1') return 'unigram';
     if (record['format'] == 'almg-stream-character-bpe-fit-v1') return 'character_bpe';
     if (const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(record['format'])) return 'iterative';
     return record['format'] == 'almg-stream-bpe-fit-v1' ? 'one_merge' : null;
   }
 
   String _wholeStreamFitRoute(Map<String, dynamic> record) => switch (_wholeStreamFitKind(record)) {
+    'unigram' => 'decoder-stream-unigram-fits',
     'character_bpe' => 'decoder-stream-character-bpe-fits',
     'iterative' => 'decoder-stream-iterative-bpe-fits',
     _ => 'decoder-stream-bpe-fits',
@@ -3076,6 +3154,7 @@ class _StudioPageState extends State<StudioPage> {
 
   Future<void> _exportWholeStreamBPE(Map<String, dynamic> record) async {
     final route = _wholeStreamFitRoute(record);
+    final family = _wholeStreamFitKind(record) == 'unigram' ? 'unigram' : _wholeStreamFitKind(record) == 'character_bpe' ? 'character-bpe' : 'byte-bpe';
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Export private whole-split tokenizer?'),
       content: const Text('Save codec and fitting/provenance manifest only. Learned tokens and permission notes may be private. Source documents, pair-count database, weights and model-training approvals are excluded.'),
@@ -3083,7 +3162,7 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Choose whole-split tokenizer ZIP destination'))]));
     if (confirmed != true || !mounted) return;
     try {
-      final destination = await getSaveLocation(suggestedName: 'whole-split-${_wholeStreamFitKind(record) == 'character_bpe' ? 'character' : 'byte'}-bpe-${(record['id'] as String).substring(0, 8)}.zip',
+      final destination = await getSaveLocation(suggestedName: 'whole-split-$family-${(record['id'] as String).substring(0, 8)}.zip',
         acceptedTypeGroups: [const XTypeGroup(label: 'Private tokenizer ZIP', extensions: ['zip'])]);
       if (destination == null || !mounted) return;
       final result = await _request('/$route/${record['id']}/export', {'confirmed': true, 'reviewed': record});

@@ -4870,6 +4870,64 @@ P3-LMF-03 partial progress · resumable full-training-split Unigram candidate in
   collection, downloads, generated artifacts/weights in Git or push; unrelated
   edits and prior artifacts are preserved.
 
+P3-LMF-03 partial progress · resumable full-training-split Unigram EM and trained codec · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed candidate inventories now offer separately
+  confirmed five-update full-split Unigram EM. The fixed training-only alphabet,
+  piece IDs and initializer hash are preserved without pruning, sampling, held-out
+  fitting or alphabet expansion. Six complete expectation/likelihood passes verify
+  initial probabilities and each of five updates, using smoothing 1e-12 and strict
+  finite/count/mass checks. A likelihood decrease beyond 1e-6 prevents publication.
+  This trains a tokenizer only; student-model training and release stay disabled.
+- The separate v1 fitter saves current probabilities, bounded expected-count
+  vectors, likelihood, cursor, pass bytes/group chain and update history together
+  in SQLite transactions. Batches process at most 100 records/about 1 MiB by default;
+  forward/backward buffers belong to one record up to 64 KiB rather than the full
+  corpus. Each pass must reproduce the frozen candidate training population and
+  byte/group-chain totals. Candidate/source/index/permission signatures and code
+  binding are rechecked before and after batches and at publication. Interrupted
+  transactions preserve earlier progress; publication resumes from sealed state.
+- Completed artifacts wrap the strict Unigram codec with full-split training and
+  initializer bindings, five verified updates, six monotonic likelihood values,
+  positive normalized probabilities, whole-record Viterbi encoding/decoding and
+  strict uncovered-character rejection. Native saved fits, full-index comparison
+  (distinct unigram kind) and private codec/manifest ZIP export are integrated.
+  Candidate inventories remain explicitly untrained. Unigram model-window,
+  optimizer and student-training admission remain unavailable in both UI/backend.
+- Native verification rebuilt/launched macOS on port 28855 and cancelled EM consent
+  without creating a fit. Fit d1bf650b04f040dfa535517c453f02ff paused with partial
+  expected counts and likelihood at 9/326 records in its first pass. Restarting
+  backend/app restored the exact saved record. Explicit native resume completed
+  all six passes and five updates over the same 326 unique training records,
+  retaining 64 pieces. QA-only one-record steps/response latency made pause
+  deterministic; production batching is unchanged.
+- Observed checked training log-likelihood history was
+  [-164388.1851618082, -104835.31180334378, -102469.32388814804,
+   -102431.1749368286, -102426.53942110574, -102425.64839593705]. Native comparison
+  534f95ccb54440d0a3160034497f4d80 round-tripped all 401 records losslessly without
+  refitting (326 train, 39 validation, 36 test). Lossless tokenization does not
+  clear contamination or establish student-model quality. Native private export
+  contained exactly matching tokenizer.json and manifest.json. A second backend/
+  app restart reopened the identical completed codec, probabilities and history.
+- Independent full-training EM recomputation matched every saved probability
+  within 1e-12 and every likelihood within 1e-6, with exact frozen piece IDs/group
+  chain and per-split encoded-token totals. All 56 prior source/index/candidate/
+  tokenizer/comparison/window/diagnostic fixture files stayed byte-identical. No
+  student model or trial was saved. Evidence remains outside Git at
+  /tmp/almg-stream-unigram-native-qa/verification.json, *-ui.json/*-ui.txt, private
+  ZIP, fingerprints and native build/restart/test logs.
+- Validation: 498 Python tests with Metal checks and warnings as errors, 37 Flutter
+  tests, clean Flutter analysis/diff checks and successful native builds. New tests
+  compare all updates with the existing Unigram oracle, recover partial expectations,
+  verify whole-record Unicode round trips/export/comparison, reject likelihood
+  decreases/nonfinite statistics, guard consent/reviews/permissions/source rewrites,
+  recover transaction/publication failure and keep model-input admission blocked.
+- Remaining: full-split Unigram model-input/optimizer admission, durable approved
+  streamed student training/checkpoint/model persistence and broader acceptance.
+  Vocabulary pruning and subword sampling remain unsupported by the documented
+  fixed-candidate Unigram implementation. Independent physical/Windows/larger-than-
+  RAM blockers stay open and skipped. No external collection, downloads, generated
+  artifacts/weights in Git or push; unrelated edits and prior artifacts preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
