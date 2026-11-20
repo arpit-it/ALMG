@@ -145,6 +145,22 @@ void main() {
     expect(find.text('Stream model/tokenizer persistence verified'), findsOneWidget);
   });
 
+  testWidgets('blocked streamed feasibility offers no training approval', (tester) async {
+    var starts = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(
+      reviewed: const {'id': 'stream'}, routePrefix: 'decoder-stream-learned-windows', allowPersistence: true,
+      request: (path, body) async {
+        if (path.endsWith('/training-review')) return {'binding': 'reviewed'};
+        if (path.endsWith('/training-feasibility')) return {'feasible': false, 'estimates': <String, dynamic>{}, 'blockers': ['Not enough trial memory']};
+        if (path.endsWith('/training-begin')) starts++;
+        return {'rows': 1, 'real_target_tokens': 2, 'sequence_lengths': [2]};
+      }))));
+    await tester.pumpAndSettle(); await tester.ensureVisible(find.text('Approve manual streamed trial'));
+    await tester.tap(find.text('Approve manual streamed trial')); await tester.pumpAndSettle();
+    expect(find.text('Not enough trial memory'), findsOneWidget);
+    expect(find.text('Approve twenty-step trial'), findsNothing); expect(starts, 0);
+  });
+
   testWidgets('manual streamed trial requires approval and advances only on continuation', (tester) async {
     var starts = 0;
     var steps = 0;
@@ -152,10 +168,12 @@ void main() {
       reviewed: const {'id': 'stream'}, routePrefix: 'decoder-stream-learned-windows', allowPersistence: true,
       request: (path, body) async {
         if (path.endsWith('/training-review')) return {'binding': 'reviewed'};
+        if (path.endsWith('/training-feasibility')) return {'feasible': true, 'estimates': <String, dynamic>{}, 'blockers': <String>[]};
         if (path.endsWith('/training-begin')) {
           starts++;
           expect(body['reviewed'], {'binding': 'reviewed'});
           expect(body['confirmed'], true);
+          expect(body['reviewed_feasibility']['feasible'], true);
           return {'id': 'trial', 'revision': 'zero', 'completed_steps': 0, 'status': 'paused'};
         }
         if (path.endsWith('/step')) {

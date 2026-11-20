@@ -5619,6 +5619,44 @@ P3-LMF-05 partial progress · measured diagnostic calibration feeds admission ·
   blockers remain open and skipped. No generated/private artifacts, weights or
   unrelated user edits are committed.
 
+P3-LMF-05 partial progress · feasibility before bounded streamed-training approval · 2026-11-20:
+- [ ] P3-LMF-05 remains open. The existing manual twenty-step streamed SGD trial
+  now displays a model-specific hardware feasibility report before approval.
+  Read-only preflight binds the exact saved windows/tokenizer/training review,
+  detects local Apple silicon/MLX Metal and memory/disk, and calculates FP32
+  parameters, gradients, activation layout, zero SGD moment storage, existing
+  source/index/window storage and five-checkpoint disk budget without constructing
+  a model or copying/materializing a dataset. Estimates and measurement limits
+  are explicit; this bounded trial is not full-epoch feasibility.
+- HTTP training initialization requires the reviewed feasible report and rechecks
+  its bindings and live resources before calling the original training engine.
+  Missing/stale approval, unsupported precision/device and inadequate resources
+  cannot initialize through this route. Blocked reports hide the approval action;
+  cancelling leaves no trial. Existing checkpoint/receipt formats and training
+  implementation hashes are unchanged so saved trials remain readable/resumable.
+- Native verification: rebuilt and ran local macOS ALMG on Apple M4 Max with
+  the existing Unigram stream fixture. The app showed 1664 parameters,
+  6656 parameter bytes, 268959744 bytes of memory reserve and
+  88912384 bytes of additional disk reserve, including
+  21803520 bytes for five checkpoints and 1502462 bytes of
+  existing source/index/window storage. Cancel created no trial. Explicit approval
+  initialized run 40ac701d379e462a9d673f65e67191f1 and reached a paused five-step checkpoint.
+  After app/backend restart it reopened with exact state equality and resumed
+  to ten updates. The older completed Unigram trial reopened unchanged; all
+  193 pre-existing fixture file hashes remained unchanged.
+- Verification: 545 Python tests passed with real Metal and warnings as errors;
+  49 Flutter tests passed; analysis and diff checks clean. Tests verify calculated
+  parameter bytes against the actual decoder, read-only preflight, consent/stale/
+  unsupported and changed-resource rejection before initialization, and hiding
+  approval for a blocked report. Evidence:
+  /tmp/almg-stream-feasibility-native-qa/verification.json and native/test/build logs.
+- Remaining: save hardware approval profiles with streamed experiment records,
+  measured streamed-training calibration and duration prediction, feasibility for
+  broader/full-epoch training and per-continuation integration, supported-recipe
+  CPU fallback verification and Windows/CUDA verification on suitable hardware.
+  Unchanged hardware/user-action blockers remain open and skipped. No generated
+  artifacts, private data, weights or unrelated user edits are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

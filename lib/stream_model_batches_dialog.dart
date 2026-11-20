@@ -121,19 +121,28 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
   Future<void> _beginTraining() async {
     try {
       final review = await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/training-review', {});
+      final feasibility = await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/training-feasibility', {'confirmed': true, 'reviewed': review});
       if (!mounted) return;
       final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
         title: const Text('Approve a manual streamed trial?'), scrollable: true,
-        content: const Text('Approve exactly 20 SGD updates, learning rate 0.05, seed 7, width 8 and context 16, using this reviewed tokenizer and source. '
+        content: SizedBox(width: 660, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          const Text('Approve exactly 20 SGD updates, learning rate 0.05, seed 7, width 8 and context 16, using this reviewed tokenizer and source. '
           'Each manual continuation runs five updates now on four successive training windows per update, cycling from the first window. '
           'Every five updates saves a private model/tokenizer checkpoint. Closing pauses at that boundary; reopen saved trials to resume. '
           'The final checkpoint evaluates all saved validation/test windows. This short trial establishes no usable model quality or release. '
           'This is manual execution, without idle or power scheduling. Private weights and tokenizer pieces remain local.'),
+          Text(feasibility['feasible'] == true ? 'Hardware feasibility: current resources cover calculated trial reserves.' : 'Hardware feasibility: this trial cannot start.'),
+          Text('Calculated parameters: ${feasibility['estimates']['parameter_count']} · memory reserve ${feasibility['estimates']['required_available_memory_bytes']} bytes · '
+            'additional disk reserve ${feasibility['estimates']['required_free_disk_bytes']} bytes.'),
+          const Text('Float32 Metal only. Estimates cover this bounded twenty-step trial, not a full epoch. Peak memory and training duration are not measured or predicted. Resources are checked again before initialization.'),
+          for (final reason in feasibility['blockers'] as List) Text(reason as String),
+          ExpansionTile(title: const Text('View streamed-training feasibility record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(feasibility))]),
+        ])),
         actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve twenty-step trial'))]));
+          if (feasibility['feasible'] == true) TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve twenty-step trial'))]));
       if (confirmed != true || !mounted) return;
       setState(() => _loading = true);
-      final run = await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/training-begin', {'confirmed': true, 'reviewed': review});
+      final run = await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/training-begin', {'confirmed': true, 'reviewed': review, 'reviewed_feasibility': feasibility});
       if (!mounted) return;
       setState(() => _loading = false);
       await _showTraining(run);
