@@ -58,6 +58,12 @@ class Tokenizer:
 
     @classmethod
     def restore(cls, artifact):
+        if isinstance(artifact, dict) and artifact.get('format') == 'almg-reviewed-model-tokenizer-v1':
+            if __package__:
+                from .decoder_model_tokenizer import ModelTokenizer
+            else:
+                from decoder_model_tokenizer import ModelTokenizer
+            return ModelTokenizer.restore(artifact)
         if isinstance(artifact, dict) and artifact.get('format') == 'almg-utf8-byte-tokenizer-v1':
             return ByteTokenizer.restore(artifact)
         if (not isinstance(artifact, dict) or set(artifact) != {'format', 'schema_version', 'normalization', 'whitespace', 'vocabulary'}

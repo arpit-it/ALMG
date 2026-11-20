@@ -163,7 +163,26 @@ def read(root, dataset_id):
                 raise ValueError('Unsupported dataset mixing weights or policy.')
         if 'tokenizer.json' in manifest['files']:
             tokenizer = Tokenizer.restore(json.loads((folder / 'tokenizer.json').read_text(encoding='utf-8')))
-            fitted = type(tokenizer).fit([row['text'] for row in records if row['split'] == 'train'])
+            texts = [row['text'] for row in records if row['split'] == 'train']
+            if tokenizer.artifact()['format'] == 'almg-reviewed-model-tokenizer-v1':
+                tokenizer.validate_training_documents(texts)
+                selection = tokenizer.selection
+                approval = manifest.get('tokenizer_selection')
+                if (not isinstance(approval, dict) or type(approval.get('version')) is not int or approval['version'] != 1
+                        or approval.get('scope') != 'dataset_tokenizer_selection_only'
+                        or approval.get('model_training_approved') is not False
+                        or selection['approval_sha256'] != digest(approval)
+                        or approval.get('parent_manifest_sha256') != selection['parent_manifest_sha256']
+                        or approval.get('experiment_revision') != selection['experiment_revision']
+                        or any(approval.get(key) != value for key, value in selection.items() if key != 'approval_sha256')
+                        or manifest['tokenizer'].get('vocabulary_size') != len(tokenizer.vocabulary)):
+                    raise ValueError('Model tokenizer selection approval does not match this dataset.')
+                for row in records:
+                    if tokenizer.decode(tokenizer.encode(row['text'])) != tokenizer.codec.normalized(row['text'])[0]:
+                        raise ValueError('Model tokenizer dataset requires lossless inputs.')
+                fitted = tokenizer
+            else:
+                fitted = type(tokenizer).fit(texts)
             if (tokenizer.artifact()['format'] != manifest['tokenizer']['format']
                     or tokenizer.fingerprint() != manifest['tokenizer']['sha256'] or tokenizer.fingerprint() != fitted.fingerprint()):
                 raise ValueError('Decoder tokenizer does not match the training partition.')
@@ -214,7 +233,7 @@ def _token_distribution(folder, manifest, records):
     split_tokens = {part: [] for part in ('train', 'validation', 'test')}
     split_lengths = {part: [] for part in split_tokens}
     for row in records:
-        if isinstance(tokenizer, ByteTokenizer):
+        if isinstance(tokenizer, ByteTokenizer) or tokenizer.artifact()['format'] == 'almg-reviewed-model-tokenizer-v1':
             try:
                 tokens = tokenizer.encode(row['text'])
             except ValueError:

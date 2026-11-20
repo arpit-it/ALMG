@@ -1673,8 +1673,28 @@ class _StudioPageState extends State<StudioPage> {
         SelectableText(const JsonEncoder.withIndent('  ').convert(experiment)),
       ])),
       actions: [TextButton(onPressed: () { Navigator.pop(context); _reviewTokenizerCompatibility(experiment); }, child: const Text('Review model compatibility')),
+        TextButton(onPressed: () { Navigator.pop(context); _adoptTokenizerExperiment(experiment); }, child: const Text('Use tokenizer in new dataset version')),
         TextButton(onPressed: () { Navigator.pop(context); _exportTokenizerExperiment(experiment); }, child: const Text('Export private tokenizer experiment')),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+  }
+
+  Future<void> _adoptTokenizerExperiment(Map<String, dynamic> experiment) async {
+    try {
+      final dataset = await _request('/decoder-datasets/${experiment['dataset_id']}');
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Select tokenizer for a new dataset version?'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Use ${experiment['vocabulary_size']} tokenizer IDs including special tokens. All saved splits must encode losslessly and fit the decoder vocabulary limit. Incompatible selection is rejected.'),
+          const Text('Creates a new dataset version with the fitted tokenizer. Original documents, splits and source permissions are preserved. This selection does not start or approve model training; review the new dataset and approve its trial separately.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(dataset)),
+        ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm tokenizer selection'))]));
+      if (confirmed != true || !mounted) return;
+      final selected = await _request('/decoder-tokenizer-experiments/${experiment['id']}/adopt',
+        {'confirmed': true, 'reviewed': experiment, 'dataset': dataset});
+      if (mounted) await _showDecoderDataset(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
   Future<void> _reviewTokenizerCompatibility(Map<String, dynamic> experiment) async {

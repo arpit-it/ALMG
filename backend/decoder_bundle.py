@@ -16,6 +16,14 @@ else:
     from run_manifest import digest, file_digest
 
 
+
+def pipeline_for(tokenizer_format):
+    pipeline = deepcopy(PIPELINE)
+    if tokenizer_format == 'almg-reviewed-model-tokenizer-v1':
+        pipeline['stages']['tokenization'] = {'version':2, 'interface':'almg-reviewed-model-tokenizer-v1', 'status':'reviewed_bounded_local'}
+    return pipeline
+
+
 def save(destination, model, tokenizer, training, pretraining_stage='pretraining_fixture'):
     """Publish a new complete bundle directory without overwriting existing work."""
     if pretraining_stage not in ('pretraining_fixture', 'pretraining_local'):
@@ -35,14 +43,14 @@ def save(destination, model, tokenizer, training, pretraining_stage='pretraining
         manifest = {
             'format': 'almg-decoder-bundle-v1', 'schema_version': 1,
             'recipe': {'id': 'decoder_from_scratch', 'version': 1},
-            'pipeline': deepcopy(PIPELINE), 'post_training': {'version':1, 'mode':'none'},
-            'stages': {'architecture': 1, 'tokenization': 1, pretraining_stage: 1, 'artifact': 1},
+            'pipeline': pipeline_for(tokenizer.artifact()['format']), 'post_training': {'version':1, 'mode':'none'},
+            'stages': {'architecture': 1, 'tokenization': 2 if tokenizer.artifact()['format'] == 'almg-reviewed-model-tokenizer-v1' else 1, pretraining_stage: 1, 'artifact': 1},
             'config': dict(model.config), 'tokenizer_sha256': tokenizer.fingerprint(),
             'training': deepcopy(training), 'training_sha256': digest(training),
             'runtime': {'python': platform.python_version(), 'system': platform.system(),
                         'machine': platform.machine(), 'numpy': version('numpy')},
             'components': {name: file_digest(Path(__file__).with_name(name)) for name in
-                           ('decoder_recipe.py', 'decoder_tokenizer.py', 'decoder_training.py', 'decoder_dataset_training.py', 'decoder_checkpoint.py', 'decoder_bundle.py')},
+                           ('decoder_recipe.py', 'decoder_tokenizer.py', 'decoder_training.py', 'decoder_dataset_training.py', 'decoder_checkpoint.py', 'decoder_bundle.py', 'decoder_model_tokenizer.py', 'decoder_tokenizer_adoptions.py', 'decoder_bpe.py', 'decoder_character_bpe.py', 'decoder_unigram.py', 'decoder_special_tokens.py')},
             'files': {name: file_digest(staged / name) for name in ('decoder.json', 'tokenizer.json')},
         }
         (staged / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, allow_nan=False, indent=2), encoding='utf-8')
@@ -66,8 +74,8 @@ def load(folder):
                 or type(manifest.get('schema_version')) is not int or manifest['schema_version'] != 1
                 or digest(manifest.get('recipe')) != digest({'id': 'decoder_from_scratch', 'version': 1})
                 or digest(manifest.get('stages')) not in (
-                    digest({'architecture': 1, 'tokenization': 1, stage: 1, 'artifact': 1})
-                    for stage in ('pretraining_fixture', 'pretraining_local'))
+                    digest({'architecture': 1, 'tokenization': tokenization, stage: 1, 'artifact': 1})
+                    for stage in ('pretraining_fixture', 'pretraining_local') for tokenization in (1,2))
                 or not isinstance(manifest.get('training'), dict)
                 or not isinstance(manifest.get('files'), dict)
                 or set(manifest['files']) != {'decoder.json', 'tokenizer.json'}):
@@ -88,6 +96,11 @@ def load(folder):
         if len(data) > 128 * 1024:
             raise ValueError('Decoder tokenizer artifact is too large.')
         tokenizer = Tokenizer.restore(json.loads(data))
+        expected_version = 2 if tokenizer.artifact()['format'] == 'almg-reviewed-model-tokenizer-v1' else 1
+        if manifest['stages']['tokenization'] != expected_version:
+            raise ValueError('Decoder bundle tokenization version does not match its artifact.')
+        if expected_version == 2 and digest(manifest.get('pipeline')) != digest(pipeline_for(tokenizer.artifact()['format'])):
+            raise ValueError('Reviewed model tokenizer pipeline contract does not match.')
         if (model.config != manifest['config'] or model.config['vocab_size'] != len(tokenizer.vocabulary)
                 or tokenizer.fingerprint() != manifest['tokenizer_sha256']):
             raise ValueError('Decoder bundle model/tokenizer configuration mismatch.')

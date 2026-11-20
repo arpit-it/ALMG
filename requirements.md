@@ -4184,6 +4184,59 @@ P3-LMF-03 partial progress · source-bound model compatibility review · 2026-11
   P3-LMF-01 is already complete. No external collection, downloads, generated
   artifact commits or push; unrelated user edits and all saved artifacts preserved.
 
+P3-LMF-03 partial progress · reviewed tokenizer adoption and model persistence · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Saved experiments now offer confirmed “Use tokenizer
+  in new dataset version.” Selection rejects oversized vocabularies, stale reviews,
+  changed inputs and any split that cannot encode losslessly, including explicit
+  lossy UNK replacement. It validates the codec against a deterministic training-
+  split-only refit before atomic publication. Failed/stale publication removes
+  temporary work and preserves existing datasets and experiments.
+- New immutable datasets copy documents byte-for-byte and preserve splits, sources,
+  permissions, mixture weights and prior derivation. A versioned model-use wrapper
+  stores exact codec/merges or probabilities, control IDs, selection approval and
+  original dataset/experiment revisions. Dataset readers verify that binding and
+  lossless inputs; source-permission versions remain compatible. Selection grants
+  no training approval. The existing separate bounded-trial confirmation binds
+  the new dataset and starts fresh weights only after normal preflight/resource gates.
+- Model bundles, step-50 checkpoints and saved trial contracts now record tokenization
+  version 2 for the reviewed wrapper and include tokenizer implementation digests.
+  Core restore accepts this explicit model wrapper, not bare experimental artifacts.
+  Legacy version-1 word/byte bundles and datasets remain readable. Model input
+  rejects uncovered text even when the experimental codec was configured to replace
+  unknowns. Generated invalid UTF-8 bytes use an explicit preview-only replacement
+  policy; reviewed training/evaluation inputs must remain lossless.
+- Local app verification: rebuilt native macOS ALMG on isolated fixture port 28842.
+  Cancel created no version. Native selection rejected a 320-ID byte-BPE artifact
+  and a 98-ID Unigram artifact with lossy heldouts before any model trial. Confirmed
+  character-BPE selection created dataset f3dfa6aa363445d4b455ec3774364c28 with
+  60 actual IDs (PAD 57 / BOS 58 / EOS 59), preserving original records/splits.
+  Separate native training approval created trial 9b739bf134284b928af8eaf536324e90
+  and completed 100 real Metal SGD steps from fresh weights; step-50 checkpoint and
+  final bundle restored the exact dataset tokenizer hash and model vocabulary 60.
+- Native pipeline inspection showed tokenization version 2. Backend/app restart
+  reopened identical dataset/trial/pipeline records; native CPU preview generated
+  12 tokens from the saved model for local prompt “orchard.” All 16 original files
+  and all checkpoint/model artifacts remained unchanged across restart/preview.
+  CPU/Metal maximum inference error was 2.5625318134103736e-07. Loss fell from
+  4.1098761558532715 to 2.5369575023651123, but validation/test accuracies were
+  0.42105263157894735 / 0.1: the 0.8 quality target failed and remains recorded as
+  false. This verifies persistence/execution, not acceptable model quality or release.
+- Evidence: /tmp/almg-tokenizer-adoption-native-qa/ contains selection/training
+  consent, native rejection reports, adopted-dataset-ui.json, trial-ui.json,
+  pipeline-ui.json, restarted-{dataset,trial,pipeline,preview}-ui.json,
+  verification.json and native build/restart logs. Generated weights stay there.
+- Verification: 436 Python tests passed with ALMG_METAL_TESTS=1, including actual
+  adopted-Unigram Metal training; 34 Flutter tests passed and analysis/diff checks
+  passed. Added tests cover all three codecs in model/checkpoint bundles, exact
+  selection/provenance and source-permission preservation, separate approval,
+  oversized/lossy rejection, atomic failure/concurrent changes, tampered policies/
+  approvals/training provenance, version mismatch and explicit byte preview behavior.
+- Remaining: larger/streamed tokenizer fitting is not implemented or verified; this
+  bounded integration does not complete that scope. Existing dataset/hardware/
+  Windows/scratch-space blockers stay open and were skipped without unchanged
+  polling. No external collection, downloads, generated artifact commits or push;
+  unrelated user edits and all existing training artifacts/weights are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

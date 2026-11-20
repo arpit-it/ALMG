@@ -43,10 +43,13 @@ def specification(dataset=None):
             'resource_budget': {'version': 1, 'encoded_data_bytes': 128000},
             'components': {name: run_manifest.file_digest(Path(__file__).with_name(name)) for name in
                            ('decoder_trials.py', 'decoder_training.py', 'decoder_recipe.py', 'decoder_tokenizer.py',
-                            'decoder_checkpoint.py', 'decoder_dataset_training.py', 'decoder_datasets.py', 'decoder_bundle.py', 'training_resources.py')}}
+                            'decoder_checkpoint.py', 'decoder_dataset_training.py', 'decoder_datasets.py', 'decoder_bundle.py', 'training_resources.py',
+                            'decoder_model_tokenizer.py', 'decoder_tokenizer_adoptions.py', 'decoder_tokenizer_compatibility.py',
+                            'decoder_bpe.py', 'decoder_character_bpe.py', 'decoder_unigram.py', 'decoder_special_tokens.py')}}
     if dataset is not None:
         spec.update(scope='reviewed_local_text_trial', dataset_id=dataset['id'],
                     dataset_manifest_sha256=run_manifest.digest(dataset))
+        spec['recipe_contract']['pipeline'] = decoder_bundle.pipeline_for((dataset.get('tokenizer') or {}).get('format'))
     return spec
 
 
