@@ -43,6 +43,22 @@ void main() {
     expect(calls.last['split'], 'validation'); expect(calls.last['cursor'], isNull);
     expect(find.text('Check masked optimization'), findsNothing);
   });
+  testWidgets('learned IDs use their own read-only route without optimizer controls', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(
+      reviewed: const {'id': 'learned'}, routePrefix: 'decoder-stream-learned-windows', allowOptimization: false,
+      request: (path, body) async {
+        expect(path, '/decoder-stream-learned-windows/learned/batch');
+        expect(body['reviewed'], {'id': 'learned'});
+        return {'rows': 1, 'real_target_tokens': 1, 'sequence_lengths': [1], 'inputs': [[259]],
+          'targets': [[258]], 'loss_mask': [[1]], 'next_cursor': null};
+      }))));
+    await tester.pumpAndSettle();
+    expect(find.text('Check masked optimization'), findsNothing);
+    expect(find.text('Saved optimizer checks'), findsNothing);
+    await tester.tap(find.text('View arrays, masks and source references')); await tester.pumpAndSettle();
+    expect(find.textContaining('259'), findsOneWidget);
+  });
+
   testWidgets('batch inspector allows retry after a binding failure', (tester) async {
     var attempts = 0;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(reviewed: const {'id': 'fixture'}, request: (path, body) async {

@@ -2233,12 +2233,15 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _showStreamWindows(Map<String, dynamic> record) async {
+    final learned = record['format'] == 'almg-stream-learned-windows-v1';
+    final route = learned ? 'decoder-stream-learned-windows' : 'decoder-stream-windows';
     final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Streamed windows · ${record['status']}'), scrollable: true,
       content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('${record['processed_records']} / ${record['total_records']} unique normalized records analyzed.'),
         const Text('Source-bound next-token windows, with original document boundaries and splits preserved. '
           'Token IDs can reconstruct personal text. The lexical overlap gate is limited; no model training or approval is enabled.'),
+        if (learned) Text('Learned vocabulary: ${record['vocabulary_size']} IDs · lossless full-index comparison verified'),
         Text('Windows by split: ${record['window_counts']} · ${record['target_tokens']} target tokens'),
         ExpansionTile(title: const Text('View streamed windows and provenance'), children: [
           SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
@@ -2248,17 +2251,18 @@ class _StudioPageState extends State<StudioPage> {
         if (record['status'] == 'complete') TextButton(onPressed: () {
           Navigator.pop(context, false);
           showDialog<void>(context: this.context, builder: (context) => StreamIndexRecordsDialog(
-            indexId: record['id'] as String, recordsPath: '/decoder-stream-windows/${record['id']}/records',
+            indexId: record['id'] as String, recordsPath: '/$route/${record['id']}/records',
             title: 'Review streamed window records', description: 'Token IDs encode original text. Source references and split boundaries are preserved; training remains disabled.',
             request: (path, body) => _request(path, body)));
         }, child: const Text('Review token windows')),
         if (record['status'] == 'complete') TextButton(onPressed: () {
           Navigator.pop(context, false);
           showDialog<void>(context: this.context, builder: (context) => StreamModelBatchesDialog(
-            reviewed: record, request: (path, body) => _request(path, body, const Duration(minutes: 10))));
+            reviewed: record, routePrefix: route, allowOptimization: !learned,
+            request: (path, body) => _request(path, body, const Duration(minutes: 10))));
         }, child: const Text('Inspect model input batches')),
-        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _planStreamedApproach(record); }, child: const Text('Plan streamed approach')),
-        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _savedStreamedPlans(record); }, child: const Text('View saved streamed plans')),
+        if (!learned && record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _planStreamedApproach(record); }, child: const Text('Plan streamed approach')),
+        if (!learned && record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _savedStreamedPlans(record); }, child: const Text('View saved streamed plans')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume streamed windows'))],
     ));
     if (resume == true && mounted) await _runStreamWindows(record);
@@ -2367,6 +2371,7 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _runStreamWindows(Map<String, dynamic> initial) async {
+    final route = initial['format'] == 'almg-stream-learned-windows-v1' ? 'decoder-stream-learned-windows' : 'decoder-stream-windows';
     var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
     unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
       child: StatefulBuilder(builder: (context, update) {
@@ -2378,7 +2383,7 @@ class _StudioPageState extends State<StudioPage> {
       }))));
     try {
       while (!pause && record['status'] != 'complete') {
-        record = await _request('/decoder-stream-windows/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        record = await _request('/$route/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
         if (!mounted) return;
         refresh?.call(() {});
       }
@@ -2786,6 +2791,50 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _beginLearnedWindows(Map<String, dynamic> comparison) async {
+    try {
+      final reports = (await _request('/decoder-stream-indexes/${comparison['index_id']}/overlap'))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Select completed overlap evidence'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('Run streamed overlap analysis first.')),
+          for (final report in reports) if (report['status'] == 'complete') SimpleDialogOption(
+            onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['id'] as String).substring(0, 8)} · ${report['cross_split_pairs']} cross-split pairs')),
+        ]));
+      if (selected == null || !mounted) return;
+      final path = '/decoder-stream-fitted-tokenizer-evaluations/${comparison['id']}';
+      final reviewed = await _request('$path/window-review', {'overlap_id': selected['id']});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Prepare learned-tokenizer windows?'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Save next-token windows of at most 17 learned IDs, stride 16, preserving document boundaries and saved splits. '
+            'All source records must have at least two tokens. Lossless full-index comparison and zero cross-split lexical findings are required. '
+            'Short and semantic overlap can remain unchecked. IDs encode personal source text. No optimizer execution or model-training approval is enabled.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(reviewed)),
+        ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm learned windows'))]));
+      if (confirmed != true || !mounted) return;
+      final record = await _request('$path/windows', {'overlap_id': selected['id'], 'confirmed': true, 'reviewed': reviewed});
+      if (mounted) await _runStreamWindows(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _savedLearnedWindows(Map<String, dynamic> comparison) async {
+    try {
+      final reports = (await _request('/decoder-stream-fitted-tokenizer-evaluations/${comparison['id']}/windows'))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved learned-tokenizer windows'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved learned-tokenizer windows.')),
+          for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['id'] as String).substring(0, 8)} · ${report['status']} · ${report['processed_records']}/${report['total_records']} analyzed')),
+        ]));
+      if (selected != null && mounted) await _showStreamWindows(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _showStreamTokenizerEvaluation(Map<String, dynamic> record) async {
     final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Full-index tokenizer comparison · ${record['status']}'), scrollable: true,
@@ -2797,6 +2846,10 @@ class _StudioPageState extends State<StudioPage> {
           Text('${entry.key}: ${entry.value['lossless_records']}/${entry.value['records']} lossless · ${entry.value['unsupported_records']} unsupported · ${entry.value['lossy_records']} lossy · ${entry.value['encoding_failures']} encoding failures'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] == 'complete' && record['format'] == 'almg-stream-fitted-tokenizer-evaluation-v1') ...[
+          TextButton(onPressed: () { Navigator.pop(context, false); _beginLearnedWindows(record); }, child: const Text('Prepare learned-tokenizer windows')),
+          TextButton(onPressed: () { Navigator.pop(context, false); _savedLearnedWindows(record); }, child: const Text('View learned-tokenizer windows')),
+        ],
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume full-index tokenizer comparison'))]));
     if (resume == true && mounted) await _runStreamTokenizerEvaluation(record);
   }

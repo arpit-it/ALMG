@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_stream_learned_windows, decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -68,6 +68,7 @@ else:
     import decoder_html_preparations
     import decoder_stream_tokenizers
     import decoder_stream_windows
+    import decoder_stream_learned_windows
     import decoder_stream_batches
     import decoder_stream_optimization
     import decoder_stream_plans
@@ -2085,6 +2086,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'reports': decoder_stream_token_stats.list_reports(ROOT, stream_parts[1])})
             except ValueError as error:
                 return self.respond({'error': str(error)}, 404)
+        if len(stream_parts) == 3 and stream_parts[0] == 'decoder-stream-fitted-tokenizer-evaluations' and stream_parts[2] == 'windows':
+            try:
+                comparison = decoder_stream_fitted_tokenizer_evaluations.read(ROOT, stream_parts[1])
+                return self.respond({'reports': [record for record in decoder_stream_learned_windows.list_audits(ROOT, comparison['index_id']) if record['comparison_id'] == comparison['id']]})
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if len(stream_parts) == 4 and stream_parts[0] == 'decoder-stream-fitted-tokenizers' and stream_parts[3] == 'evaluations':
             return self.respond({'reports': decoder_stream_fitted_tokenizer_evaluations.list_reports(ROOT, stream_parts[2], stream_parts[1])})
         if len(stream_parts) == 3 and stream_parts[0] == 'decoder-stream-indexes' and stream_parts[2] == 'iterative-byte-bpe-fits':
@@ -2316,6 +2323,17 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_tokenizer_experiments.train(ROOT, parts[1], data.get('confirmed'), data.get('reviewed'), data.get('config')))
             if len(parts) == 4 and parts[0] == 'decoder-stream-fitted-tokenizers' and parts[3] == 'evaluations':
                 return self.respond(decoder_stream_fitted_tokenizer_evaluations.begin(ROOT, parts[2], data.get('confirmed'), data.get('reviewed'), parts[1]), 201)
+            if len(parts) == 3 and parts[0] == 'decoder-stream-fitted-tokenizer-evaluations' and parts[2] == 'window-review':
+                return self.respond(decoder_stream_learned_windows.review(ROOT, parts[1], data.get('overlap_id')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-fitted-tokenizer-evaluations' and parts[2] == 'windows':
+                return self.respond(decoder_stream_learned_windows.begin(ROOT, parts[1], data.get('overlap_id'), data.get('confirmed'), data.get('reviewed')), 201)
+            if len(parts) == 3 and parts[0] == 'decoder-stream-learned-windows':
+                if parts[2] == 'step':
+                    return self.respond(decoder_stream_learned_windows.step(ROOT, parts[1], data.get('confirmed')))
+                if parts[2] == 'records':
+                    return self.respond(decoder_stream_learned_windows.record_page(ROOT, parts[1], data.get('confirmed'), data.get('cursor'), data.get('split', 'all'), data.get('limit', 10)))
+                if parts[2] == 'batch':
+                    return self.respond(decoder_stream_learned_windows.read_batch(ROOT, parts[1], data.get('confirmed'), data.get('reviewed'), data.get('cursor'), data.get('split', 'train'), data.get('batch_size', 4)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-fitted-tokenizer-evaluations' and parts[2] == 'step':
                 return self.respond(decoder_stream_fitted_tokenizer_evaluations.step(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'iterative-byte-bpe-review':

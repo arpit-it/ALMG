@@ -4556,6 +4556,53 @@ P3-LMF-03 partial progress · wider decoder profile and trained byte-BPE persist
   skipped without unchanged polling. No external collection, downloads, generated
   artifact commits or push; user edits and prior weights/artifacts are preserved.
 
+P3-LMF-03 partial progress · learned-tokenizer streamed windows and masked input inspection · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed full-split one-merge and iterative byte-BPE
+  comparisons now offer separately confirmed learned-tokenizer window preparation.
+  Admission requires an exact completed lossless full-index comparison, matching
+  exhaustive five-word-shingle overlap evidence with zero cross-split findings,
+  unchanged source/codec/permission bindings and nonempty saved splits. Lexical
+  evidence does not establish absence of short or semantic contamination.
+- The separate v1 learned-window namespace stores at most 17 IDs per window with
+  stride 16, preserving document boundaries, unique-record split assignments,
+  original line/byte/hash references and occurrence counts without expanding
+  duplicates. Each batch transaction commits its windows, source references,
+  cursor and counters together; interrupted publication resumes without recounting.
+  Records encoding to fewer than two tokens fail explicitly rather than disappearing.
+  Preparation streams at most 100 records/about 1 MiB of source characters per step;
+  supported records retain the full-split codec's 64 KiB UTF-8 limit.
+- Native read-only batch inspection pages 1–16 windows with reviewed learned-ID
+  bounds, shifted targets, width-16 storage padding and mandatory loss masks.
+  The codec hash and vocabulary size accompany each batch. This path grants no
+  model-training approval and exposes no fixed-byte optimizer or approach-planning
+  action. Existing fixed-byte windows and their controls retain their prior route.
+- Local app evidence: rebuilt and launched the macOS app against isolated local
+  fixtures on port 28849. A 35-record lossless comparison with 156 cross-split
+  findings was rejected before window creation. Cancelling clean-source consent
+  also created nothing. Confirmed preparation 7d0b7868954f4d35b5095b57a0a43a6f
+  paused at 85/401 records; restarting both backend and app restored the exact
+  saved record, and explicit native resume completed all 401 records with 260 IDs.
+  Observed 4,714 train / 569 validation / 522 test windows and 89,228 targets.
+  The native inspector displayed train/validation/test arrays, pagination, learned
+  IDs through 259 and a padded test batch with lengths [16,16,4,16], totaling
+  52 unmasked targets. No optimizer controls or model trials were created.
+- Independent verification compared all 5,805 saved windows with fresh source
+  encodings, verified shifted targets/masks/source references in captured native
+  batches and confirmed all 20 pre-existing source/fit/comparison/overlap fixture
+  files remained byte-identical. Evidence stays outside Git at
+  /tmp/almg-learned-window-native-qa/verification.json and *-ui.json/*-ui.txt.
+  Regression validation: 471 Python tests with Metal checks and warnings treated
+  as errors, 35 Flutter tests, clean Flutter analysis and successful macOS rebuild.
+  Focused tests cover both fit kinds, incomplete comparisons, consent/stale review,
+  contamination, exact restart/cursors/splits/provenance, single-token rejection,
+  transaction rollback, publication recovery and mid-batch/permission changes.
+- Remaining: learned streamed optimizer/training admission and checkpoint recovery,
+  larger full-split vocabulary budgets, full-split character-BPE/Unigram fitting
+  and broader acceptance verification. P3-LMF-01 is already complete. Unchanged
+  larger-than-RAM, physical power and Windows verification blockers stay open and
+  skipped. No external collection, downloads, generated artifacts or weights are
+  included in this change; no push is authorized or performed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
