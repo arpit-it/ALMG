@@ -58,6 +58,12 @@ class Tokenizer:
 
     @classmethod
     def restore(cls, artifact):
+        if isinstance(artifact, dict) and artifact.get('format') == 'almg-reviewed-stream-model-tokenizer-v1':
+            if __package__:
+                from .decoder_stream_model_tokenizer import StreamModelTokenizer
+            else:
+                from decoder_stream_model_tokenizer import StreamModelTokenizer
+            return StreamModelTokenizer.restore(artifact)
         if isinstance(artifact, dict) and artifact.get('format') == 'almg-reviewed-model-tokenizer-v1':
             if __package__:
                 from .decoder_model_tokenizer import ModelTokenizer

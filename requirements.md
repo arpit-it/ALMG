@@ -4987,6 +4987,60 @@ P3-LMF-03 partial progress · reviewed full-split Unigram model inputs and numer
   downloads, generated artifacts/weights in Git or push; unrelated edits and prior
   artifacts are preserved.
 
+P3-LMF-03 partial progress · reviewed streamed-codec model bundle persistence contract · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Learned stream batch inspectors now offer a separate
+  private model/tokenizer persistence check. It saves the tiny seed-7 decoder and
+  exact reviewed full-split codec together, reloads them, compares every parameter
+  tensor and CPU output, and verifies lossless source-record IDs. Consent states
+  that saved model weights are untrained: zero optimizer updates, no student-training
+  approval, no quality target and no release. Read-only source/codec/permission and
+  inspected-batch bindings are rechecked before and after the operation.
+- The new streamed model-tokenizer wrapper restores supported one-merge/iterative
+  byte BPE, character BPE and trained Unigram codecs without refitting. It binds
+  window, fit, index, original source, codec and persistence-approval revisions,
+  validates 4–512 actual IDs, preserves strict lossless input encoding and caps
+  preview decoding at 160 IDs / 64 KiB (explicit byte replacement only for preview).
+  Bounded-dataset refitting is rejected; the existing training/checkpoint paths
+  cannot use this persistence-only wrapper to bypass streamed-training approval.
+- Decoder bundles use tokenization contract version 3 and an explicit
+  initialization_check stage. Pipeline interfaces identify reviewed stream inputs,
+  initialization-only pretraining and CPU persistence evaluation. Loader checks
+  exact approval scope, zero updates, default context 16 / width 8 / seed 7 and
+  every parameter against fresh initialization; modified/trained parameters or
+  training-stage relabeling reject. Existing tokenization v1/v2 bundles retain their
+  prior loading behavior. Resource reserves are checked before creating new files;
+  existing artifacts are never overwritten. Failed unpublished checks preserve
+  their private files without publishing a success report.
+- Native verification rebuilt/launched macOS on port 28857. Cancelling persistence
+  consent created no directory. Confirmed checks saved/reloaded Unigram 64-ID
+  bundle 44329a7553b74eaca0af9cf3ff929037, iterative byte-BPE 260-ID bundle
+  336252e9db174b87ab9bcb3779a125b0 and character-BPE 64-ID bundle
+  6cb0306fbc7f44cdbfe7e7ac9d90ad08. Each reported tokenization version 3, exact
+  parameter equality and CPU output error 0. The 260-ID model used architecture
+  version 2; the 64-ID models used architecture version 1. Every check performed
+  zero optimizer updates and retained false training/release/quality approvals.
+- Restarting both backend and app reopened each exact report from Saved persistence
+  checks. Independent bundle reloads reconstructed all source token IDs and previews,
+  reproduced CPU outputs from fresh initializers and verified all approval/hash
+  bindings. All 12 new bundle/report files stayed byte-identical across restart,
+  as did all 69 prior stream source/candidate/tokenizer/comparison/window/diagnostic
+  files. The earlier trained 320-ID tokenization-v2 bundle and step-50 checkpoint
+  also loaded unchanged. Fresh check weights remain private artifacts outside Git.
+- Validation: 505 Python tests with Metal checks and warnings as errors, 39 Flutter
+  tests, clean Flutter analysis/diff checks and successful native builds. Added
+  tests cover all streamed codec families, exact parameter/output round trips,
+  approval/stale-batch/post-save-source guards, preview bounds, policy and stage
+  tampering, modified-weight rejection, checkpoint/training exclusion, maximum
+  512-ID persistence and tokenization downgrade rejection. Evidence remains outside
+  Git at /tmp/almg-stream-persistence-native-qa/verification.json, *-ui.json/*-ui.txt,
+  artifact fingerprints and native build/restart/test logs.
+- Remaining: separately approved durable streamed student optimization, checkpoint
+  recovery and trained-model/tokenizer persistence/inference; broader acceptance.
+  These initialization-only bundles establish an artifact contract, not usable
+  trained student models. Independent physical/Windows/larger-than-RAM blockers
+  remain open and skipped. No external collection, downloads, generated artifacts/
+  weights in Git or push; unrelated edits and prior training artifacts are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

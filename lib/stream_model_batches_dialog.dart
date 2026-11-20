@@ -4,11 +4,12 @@ import 'package:flutter/material.dart';
 typedef ModelBatchRequest = Future<Map<String, dynamic>> Function(String, Map<String, dynamic>);
 
 class StreamModelBatchesDialog extends StatefulWidget {
-  const StreamModelBatchesDialog({super.key, required this.reviewed, required this.request, this.routePrefix = 'decoder-stream-windows', this.allowOptimization = true});
+  const StreamModelBatchesDialog({super.key, required this.reviewed, required this.request, this.routePrefix = 'decoder-stream-windows', this.allowOptimization = true, this.allowPersistence = false});
   final Map<String, dynamic> reviewed;
   final ModelBatchRequest request;
   final String routePrefix;
   final bool allowOptimization;
+  final bool allowPersistence;
   @override State<StreamModelBatchesDialog> createState() => _StreamModelBatchesDialogState();
 }
 
@@ -66,6 +67,53 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
       ));
   }
 
+  Future<void> _showPersistenceReport(Map<String, dynamic> report) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Stream model/tokenizer persistence verified'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('${report['vocabulary_size']} IDs · tokenization version ${report['tokenization_version']} · architecture version ${report['architecture_version']}'),
+        Text('CPU output difference after reload: ${report['cpu_logit_max_error']}'),
+        const Text('Fresh seed-7 weights only, with zero optimizer updates. The private model and exact tokenizer were saved together and reloaded. This establishes no model quality, student-training approval or release.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(report)),
+      ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+  }
+
+  Future<void> _checkPersistence() async {
+    final batch = _batch;
+    if (!widget.allowPersistence || batch == null || _split != 'train') return;
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Save a fresh model/tokenizer persistence check?'),
+      content: const Text('Save a tiny newly initialized decoder and the exact reviewed streamed tokenizer in a new private folder. Reload both, compare every parameter and CPU output, and check lossless source encoding. '
+        'No optimizer update or student training runs. Saved weights are untrained; no model quality or release is approved. Tokenizer pieces and probe text may be private.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm private persistence check'))]));
+    if (confirmed != true || !mounted) return;
+    setState(() { _loading = true; _error = null; });
+    try {
+      final report = await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/persistence-check', {
+        'confirmed': true, 'reviewed': widget.reviewed, 'reviewed_batch': batch, 'cursor': _cursor,
+      });
+      if (!mounted) return;
+      setState(() => _loading = false);
+      await _showPersistenceReport(report);
+    } catch (error) { if (mounted) setState(() { _error = error.toString(); _loading = false; }); }
+  }
+
+  Future<void> _savedPersistenceChecks() async {
+    if (!widget.allowPersistence) return;
+    try {
+      final reports = (await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/persistence-checks', {'confirmed': true}))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved stream persistence checks'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved persistence checks.')),
+          for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['id'] as String).substring(0, 8)} · ${report['tokenizer_kind']} · ${report['vocabulary_size']} IDs · untrained')),
+        ]));
+      if (selected != null && mounted) await _showPersistenceReport(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _savedOptimizationChecks() async {
     if (!widget.allowOptimization) return;
     try {
@@ -101,6 +149,8 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
         ]))),
     ])),
     actions: [Wrap(spacing: 8, runSpacing: 4, alignment: WrapAlignment.end, children: [
+      if (widget.allowPersistence && _split == 'train') TextButton(onPressed: _loading || _batch == null ? null : _checkPersistence, child: const Text('Check model/tokenizer persistence')),
+      if (widget.allowPersistence) TextButton(onPressed: _loading ? null : _savedPersistenceChecks, child: const Text('Saved persistence checks')),
       if (widget.allowOptimization && _split == 'train') TextButton(onPressed: _loading || _batch == null ? null : _checkOptimization, child: const Text('Check masked optimization')),
       if (widget.allowOptimization) TextButton(onPressed: _loading ? null : _savedOptimizationChecks, child: const Text('Saved optimizer checks')),
       TextButton(onPressed: _loading || _cursor == null ? null : () { _cursor = null; _load(); }, child: const Text('First input batch')),
