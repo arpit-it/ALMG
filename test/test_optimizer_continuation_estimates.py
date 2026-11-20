@@ -22,7 +22,7 @@ class ContinuationFeedbackTests(unittest.TestCase):
 
     def test_nonisolated_incomplete_or_malformed_feedback_is_ignored(self):
         current=self.current()
-        for key,value in [('restored_steps',5),('completed_steps',10),('scheduler_completed_steps',10),('source_modified',True)]:
+        for key,value in [('status','canceled'),('restored_steps',5),('completed_steps',10),('scheduler_completed_steps',10),('source_modified',True)]:
             record=self.record(current);record[key]=value;record['revision']=digest({k:v for k,v in record.items() if k!='revision'});self.assertEqual(feedback.feedback([record],current),(None,None))
         for key,value in [('scope','fresh_process_bounded_optimizer_fixture'),('isolated_trial_peak_measured',False),('elapsed_seconds',0),('isolated_process_peak_rss_bytes',True),('isolated_metal_peak_bytes',-1)]:
             record=self.record(current);record['isolated_workflow_measurements'][key]=value;record['revision']=digest({k:v for k,v in record.items() if k!='revision'});self.assertEqual(feedback.feedback([record],current),(None,None))

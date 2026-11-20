@@ -6812,6 +6812,59 @@ P3-LMF-05 partial progress · isolated checkpoint-continuation peak feedback · 
   Unchanged Windows/CUDA, physical power and oversized-fixture blockers remain open
   and skipped; bounded observations do not establish large-model feasibility.
 
+P3-LMF-06 partial progress · cooperative continuation cancellation · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Running checkpoint continuation now exposes an
+  explicit cancel action tied to a fresh per-request token. A separate backend
+  request persists a consented, versioned intent bound to the exact parent record
+  revision. The worker checks between optimizer updates, finishes any update in
+  progress and retains a new private partial model, moments and scheduler counter.
+  It is never killed for cancellation and original models/checkpoints stay unchanged.
+  A request arriving before worker execution is honored at the restored checkpoint.
+- New continuation records use version-2 terminal status (completed/canceled) and
+  cancellation provenance. Readers retain version-1 completed compatibility and
+  validate partial counter ranges, scheduler/log cadence, model configuration,
+  moment shapes/finiteness, file hashes, parent lineage and own CPU inference.
+  Canceled records do not claim final-model equivalence or release approval and
+  cannot feed completed-work calibration. The UI distinguishes retained partial
+  state from completed output. Continuing a canceled partial artifact through the
+  app is not yet exposed; general fresh-run cancellation remains separate/open.
+- Native verification: rebuilt and ran ALMG with the isolated local 8704-parameter
+  two-layer initialization and external collection disabled. Reopened all twenty
+  retained v1 records before writes. Used a local pacing fixture only to exercise
+  live cancel clicks after real SGD/AdamW updates; ordinary completions used the
+  unmodified worker path. From FP32 SGD source d771750a3f814551822e03f618dfb691,
+  canceling continuation f700a12756864ffb8983f7629acf15df stopped at update eleven
+  and saved scheduler counter eleven, model/state and a scoped cancellation intent.
+  Its loss moved 4.7254509925842285 → 4.7173380851745605. Mixed FP16 AdamW source
+  8bab00e00b934e3086ec6da1a83b2815 canceled into
+  892d76ba946741d880e3dc303e110a9e at update eleven, retaining nonempty moments
+  and loss 3.1773459911346436 → 3.076367139816284. Both recorded exactly the
+  original step-eleven gradient/clipping/scheduler trace and stayed unreleased.
+- Renewed reviews excluded both canceled samples. Separately approved uncanceled
+  continuations 39fe60a10e7a4152a2c6e42b321e4020 (SGD) and
+  ae6b89dde53b4ddc98818241cee077a7 (AdamW) completed step twenty with 0.0 source
+  final-weight error and identical source CPU token generation. Later calibration
+  used only the one completed sample for each parent, never the paced canceled work.
+- After app/backend restart all twenty-four legacy/v2 completed/canceled records,
+  private partial state, cancellation intents and CPU inference reopened exactly.
+  All 106 optimizer/continuation/cancellation files, three source files and 569 prior
+  artifact files retained their hashes. Evidence:
+  /tmp/almg-cancel-native-qa/verification.json and native UI captures; generated
+  datasets, models, checkpoints and cancellation intents remain outside Git.
+- Validation: 612 Python tests passed with warnings as errors and Metal enabled,
+  69 Flutter tests passed, and analysis was clean. Tests cover intent consent/
+  token/source/revision binding, tampering, queued cross-process cancellation,
+  safe mid-update cancellation, v1/v2 reads, active-token UI and calibration exclusion.
+  A numerical recovery test loaded saved step-twelve mixed AdamW partial state and
+  finished in memory to reproduce every original final parameter exactly, proving
+  retained moments/scheduler state are usable without exposing an unverified UI path.
+- Remaining: app approval/resume from canceled partial artifacts, arbitrary durable
+  OS/process interruption, general fresh-run cancellation, approved text-corpus/
+  tokenizer integration, broader budgets/resource profiling and profiled 50M–100M
+  training. Current synthetic fixtures remain capped at 16384 parameters. Unchanged
+  hardware/user-action blockers stay open and skipped; language quality and release
+  acceptance are not established by these fixture checks.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

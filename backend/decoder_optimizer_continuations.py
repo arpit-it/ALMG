@@ -6,9 +6,9 @@ from pathlib import Path
 import uuid
 import numpy as np
 if __package__:
-    from . import decoder_optimizer_fixture as fixture,decoder_optimizer_continuation_estimates as measured_feedback
+    from . import decoder_optimizer_fixture as fixture,decoder_optimizer_continuation_estimates as measured_feedback,decoder_optimizer_cancellations as cancellation
 else:
-    import decoder_optimizer_fixture as fixture,decoder_optimizer_continuation_estimates as measured_feedback
+    import decoder_optimizer_fixture as fixture,decoder_optimizer_continuation_estimates as measured_feedback,decoder_optimizer_cancellations as cancellation
 
 
 def _source(root,identifier):
@@ -29,7 +29,7 @@ def review(root,identifier):
         'config':c,'runtime':admission['runtime'],'hardware':admission['hardware'],'estimates':estimates,
         'feasible':admission['feasible'],'blockers':admission['blockers'],'training_approved':False,'release_approved':False,
         'scope':'restore_saved_midpoint_and_finish_original_synthetic_budget_in_new_private_artifact',
-        'implementation_sha256':fixture.digest({name:fixture.file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_continuations.py','decoder_optimizer_continuation_estimates.py','decoder_optimizer_isolated.py','decoder_optimizer_worker.py','decoder_optimizer_fixture.py','decoder_architecture_backward.py','decoder_mixed_precision.py','planned_decoder.py')})}
+        'implementation_sha256':fixture.digest({name:fixture.file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_continuations.py','decoder_optimizer_cancellations.py','decoder_optimizer_continuation_estimates.py','decoder_optimizer_isolated.py','decoder_optimizer_worker.py','decoder_optimizer_fixture.py','decoder_architecture_backward.py','decoder_mixed_precision.py','planned_decoder.py')})}
     memory,work=measured_feedback.feedback(history(root,identifier),record)
     estimates['isolated_optimizer_memory']=memory;estimates['optimizer_work_estimate']=work
     if memory is not None:estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],memory['calculated_memory_floor_bytes'])
@@ -43,8 +43,9 @@ def _folder(root,identifier):
     return Path(root)/'decoder-optimizer-continuations'/identifier
 
 
-def run(root,identifier,confirmed,approved):
+def run(root,identifier,confirmed,approved,cancel_request_id=None):
     if confirmed is not True:raise ValueError('Explicitly approve checkpoint continuation and a new private artifact.')
+    if cancel_request_id is not None:cancellation.validate(cancel_request_id)
     current=review(root,identifier)
     if not isinstance(approved,dict) or approved.get('revision')!=fixture.digest({k:v for k,v in approved.items() if k!='revision'}) or any(approved.get(key)!=current[key] for key in ('format','schema_version','source','config','runtime','estimates','implementation_sha256')):raise ValueError('Checkpoint continuation review changed; reopen it before approval.')
     if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Checkpoint continuation is blocked by hardware/resources.')
@@ -56,8 +57,9 @@ def run(root,identifier,confirmed,approved):
     with mx.stream(mx.gpu):
         _,loss,gradient=fixture.mixed_precision.functions(shape,mx,scale) if c.get('compute_precision')=='mixed_float16' else fixture.backward.metal_functions(shape,mx)
         def score():return float(loss({name:mx.array(value) for name,value in model.parameters.items()},mx.array(x),mx.array(y),mx.array(mask)).item())
-        initial=score();logs=[]
+        initial=score();logs=[];cancelled=False
         while state['step']<c['steps']:
+            if cancellation.requested(root,identifier,parent['revision'],cancel_request_id):cancelled=True;break
             pieces=[]
             for inputs,targets,weights in zip(np.array_split(x,accumulation),np.array_split(y,accumulation),np.array_split(mask,accumulation)):
                 gradients=gradient({name:mx.array(value) for name,value in model.parameters.items()},mx.array(inputs),mx.array(targets),mx.array(weights));mx.eval(gradients)
@@ -66,18 +68,19 @@ def run(root,identifier,confirmed,approved):
             model.parameters,state,entry=fixture.update(model.parameters,grads,state,c);entry.update(microbatches=accumulation,target_tokens=int(mask.sum()));logs.append(entry)
         final=score()
     reference=fixture.PlannedDecoder.load(fixture._folder(root,identifier)/'trained-model.json')
-    error=max(float(np.max(np.abs(model.parameters[name]-reference.parameters[name]))) for name in model.parameters)
+    error=None if cancelled else max(float(np.max(np.abs(model.parameters[name]-reference.parameters[name]))) for name in model.parameters)
     generated=fixture._generate(model)
-    if not math.isfinite(final) or not final<initial or error>1e-7 or generated!=parent['generated_token_ids']:raise ValueError('Independent continuation failed loss/weight/inference checks; original artifacts remain unchanged.')
+    if not math.isfinite(final) or (not cancelled and (not final<initial or error>1e-7 or generated!=parent['generated_token_ids'])):raise ValueError('Independent continuation failed loss/weight/inference checks; original artifacts remain unchanged.')
     if fixture.read(root,identifier)!=parent:raise ValueError('Source optimizer run changed during continuation.')
     continuation=uuid.uuid4().hex;directory=_folder(root,continuation);directory.mkdir(parents=True)
     model.save(directory/'trained-model.json');payload={'step':state['step'],'m':{name:value.tolist() for name,value in state['m'].items()},'v':{name:value.tolist() for name,value in state['v'].items()}}
     (directory/'optimizer.json').write_text(json.dumps(payload,allow_nan=False))
-    record={'format':'almg-optimizer-continuation-v1','schema_version':1,'id':continuation,'created_at':datetime.now(timezone.utc).isoformat(),
+    record={'format':'almg-optimizer-continuation-v2','schema_version':2,'status':'canceled' if cancelled else 'completed',
+        'cancellation':{'request_id':cancel_request_id,'honored':cancelled,'checkpoint_step':state['step']} if cancel_request_id is not None else None,'id':continuation,'created_at':datetime.now(timezone.utc).isoformat(),
         'review':current,'approved_review':approved,'restored_steps':restored_step,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':logs,
         'initial_train_loss':initial,'final_train_loss':final,'source_final_parameter_max_error':error,'generated_token_ids':generated,
         'training_approved':True,'release_approved':False,'source_modified':False,'pretrained_student_weights_loaded':False,'inference_runtime':'planned_decoder_numpy_cpu',
-        'limitations':'Completes the original bounded synthetic budget from a verified saved midpoint. No text-corpus, extended-budget, arbitrary-interruption or graceful-cancellation claim.',
+        'limitations':'Original bounded synthetic budget only. Cooperative cancellation preserves a private partial model and optimizer/scheduler state at an update boundary. Continuing a canceled partial artifact, general fresh-run cancellation, text corpora and arbitrary OS/process interruption are not yet supported.',
         'files':{name:fixture.file_digest(directory/name) for name in ('trained-model.json','optimizer.json')}}
     record['revision']=fixture.digest(record);(directory/'record.json').write_text(json.dumps(record,allow_nan=False,indent=2));return record
 
@@ -86,25 +89,32 @@ def read(root,identifier):
     directory=_folder(root,identifier)
     if (directory/'record.json').stat().st_size>128000 or any((directory/name).stat().st_size>16*1024**2 for name in ('trained-model.json','optimizer.json')):raise ValueError('Continuation artifacts exceed bounded size.')
     record=json.loads((directory/'record.json').read_text())
-    if (record.get('format')!='almg-optimizer-continuation-v1' or record.get('schema_version')!=1 or record.get('id')!=identifier
+    if ((record.get('format'),record.get('schema_version')) not in (('almg-optimizer-continuation-v1',1),('almg-optimizer-continuation-v2',2)) or record.get('id')!=identifier
         or record.get('revision')!=fixture.digest({k:v for k,v in record.items() if k!='revision'}) or set(record['files'])!={'trained-model.json','optimizer.json'}
         or any(fixture.file_digest(directory/name)!=sha for name,sha in record['files'].items())):raise ValueError('Continuation artifact binding changed.')
     parent=fixture.read(root,record['review']['source']['record_id']);c=parent['optimizer']
-    source=record['review']['source'];midpoint=c['steps']//2
+    source=record['review']['source'];midpoint=c['steps']//2;completed=record['completed_steps'];status=record.get('status','completed')
+    if record['schema_version']==2 and 'status' not in record:raise ValueError('Version-2 continuation needs a terminal status.')
+    if (type(completed) is not int or not midpoint<=completed<=c['steps'] or status not in ('completed','canceled')
+        or (status=='completed' and completed!=c['steps']) or (status=='canceled' and (record['schema_version']!=2 or completed>=c['steps']))):raise ValueError('Invalid continuation terminal status/counter.')
+    if status=='canceled':
+        intent=record['cancellation'];cancellation.validate(intent['request_id'])
+        if intent.get('honored') is not True or intent.get('checkpoint_step')!=completed:raise ValueError('Canceled checkpoint binding changed.')
     if (parent['revision']!=source['record_revision'] or record['review']['config']!=c or record['restored_steps']!=midpoint
         or source['checkpoint_sha256']!=parent['files'][f'step-{midpoint}/checkpoint.json']
         or source['optimizer_sha256']!=parent['files'][f'step-{midpoint}/optimizer.json']
         or source['trained_model_sha256']!=parent['files']['trained-model.json']
-        or record['scheduler_completed_steps']!=c['steps']
-        or [entry['step'] for entry in record['step_log']]!=list(range(midpoint+1,c['steps']+1))):raise ValueError('Source optimizer record or continued scheduler lineage changed.')
+        or record['scheduler_completed_steps']!=completed
+        or [entry['step'] for entry in record['step_log']]!=list(range(midpoint+1,completed+1))):raise ValueError('Source optimizer record or continued scheduler lineage changed.')
     model=fixture.PlannedDecoder.load(directory/'trained-model.json');state=json.loads((directory/'optimizer.json').read_text());expected=set(model.parameters) if c['optimizer']=='adamw' else set()
-    if type(state['step']) is not int or state['step']!=c['steps'] or record['completed_steps']!=state['step']:raise ValueError('Continuation optimizer/scheduler counter changed.')
+    if type(state['step']) is not int or state['step']!=completed or record['completed_steps']!=state['step']:raise ValueError('Continuation optimizer/scheduler counter changed.')
     for kind in ('m','v'):
         if set(state[kind])!=expected:raise ValueError('Continuation optimizer moments changed.')
         for name,value in state[kind].items():
             values=np.asarray(value,dtype=np.float32)
             if values.shape!=model.parameters[name].shape or not np.isfinite(values).all() or (kind=='v' and np.any(values<0)):raise ValueError('Invalid continued optimizer state.')
-    if fixture._generate(model)!=record['generated_token_ids'] or record['generated_token_ids']!=parent['generated_token_ids']:raise ValueError('Continued CPU inference changed.')
+    if model.config!=parent['review']['model_config']:raise ValueError('Continued model configuration changed.')
+    if fixture._generate(model)!=record['generated_token_ids'] or (status=='completed' and record['generated_token_ids']!=parent['generated_token_ids']):raise ValueError('Continued CPU inference changed.')
     return record
 
 

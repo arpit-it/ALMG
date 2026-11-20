@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/decoder_optimizer_continuation_dialog.dart';
@@ -20,7 +21,8 @@ void main() {
       return review();
     })));
     await tester.pumpAndSettle(); await tester.tap(find.text('Continue saved checkpoint')); await tester.pump(); await tester.pump(const Duration(milliseconds: 300));
-    expect(approval, {'confirmed': true, 'reviewed': review()});
+    expect(approval?['confirmed'], true); expect(approval?['reviewed'], review());
+    expect(approval?['request_id'], matches(RegExp(r'^[a-f0-9]{32}$')));
     expect(find.text('Saved checkpoint continuation'), findsOneWidget);
     await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
   });
@@ -41,5 +43,21 @@ void main() {
     expect(find.text('Measured isolated continuation work: 1.250 s.'), findsOneWidget);
     expect(find.textContaining('Measured continuation peaks: RSS 200 bytes'), findsOneWidget);
     await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
+  });
+  testWidgets('cancel uses the active request token and retains a canceled checkpoint result', (tester) async {
+    final completion = Completer<Map<String, dynamic>>();
+    String? active; String? canceled;
+    await tester.pumpWidget(MaterialApp(home: DecoderOptimizerContinuationDialog(sourceId: 'source', request: (path, body) async {
+      if (path.endsWith('/continue')) { active = body['request_id'] as String; return completion.future; }
+      if (path.endsWith('/cancel-continuation')) { canceled = body['request_id'] as String; return {'cancel_requested': true}; }
+      return review();
+    })));
+    await tester.pumpAndSettle(); await tester.tap(find.text('Continue saved checkpoint')); await tester.pump();
+    await tester.tap(find.text('Cancel running continuation')); await tester.pump();
+    expect(canceled, active); expect(find.textContaining('Waiting for the next safe optimizer boundary'), findsOneWidget);
+    completion.complete({'status': 'canceled', 'completed_steps': 12}); await tester.pump(); await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Continuation canceled at optimizer step 12.'), findsOneWidget);
+    await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
+    expect(find.text('Cancel running continuation'), findsNothing);
   });
 }

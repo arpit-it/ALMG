@@ -15,7 +15,7 @@ def main():
     continuing=request.get('action','fixture')=='continuation'
     if continuing:
         from . import decoder_optimizer_continuations as continuations
-        record=continuations.run(root,request['identifier'],True,request['approved']);folder=continuations._folder(root,record['id'])
+        record=continuations.run(root,request['identifier'],True,request['approved'],request.get('request_id'));folder=continuations._folder(root,record['id'])
     else:
         record=fixture.run(root,request['plan_id'],True,request['initialized'],request['settings'],request['approved']);folder=fixture._folder(root,record['id'])
     import mlx.core as mx

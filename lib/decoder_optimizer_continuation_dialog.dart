@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'package:flutter/material.dart';
 
 class DecoderOptimizerContinuationDialog extends StatefulWidget {
@@ -11,6 +12,8 @@ class DecoderOptimizerContinuationDialog extends StatefulWidget {
 class _DecoderOptimizerContinuationDialogState extends State<DecoderOptimizerContinuationDialog> {
   Map<String, dynamic>? _review;
   bool _busy = false;
+  bool _cancelPending = false;
+  String? _requestId;
   String? _error;
   String get _path => '/decoder-optimizer-fixtures/${widget.sourceId}';
   @override void initState() { super.initState(); _load(); }
@@ -25,6 +28,8 @@ class _DecoderOptimizerContinuationDialogState extends State<DecoderOptimizerCon
   Future<void> _show(Map<String, dynamic> record) => showDialog<void>(context: context, builder: (context) => AlertDialog(
     title: const Text('Saved checkpoint continuation'), scrollable: true,
     content: SizedBox(width: 660, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (record['status'] == 'completed') Text('Continuation completed at optimizer step ${record['completed_steps']}. The result stays private and is not released.'),
+      if (record['status'] == 'canceled') Text('Continuation canceled at optimizer step ${record['completed_steps']}. Its partial model, moments and scheduler state are retained privately; it is not released.'),
       if (record['isolated_workflow_measurements'] case final Map measured) ...[
         Text('Measured isolated continuation work: ${(measured['elapsed_seconds'] as num).toStringAsFixed(3)} s.'),
         Text('Measured continuation peaks: RSS ${measured['isolated_process_peak_rss_bytes']} bytes · Metal ${measured['isolated_metal_peak_bytes']} bytes.'),
@@ -34,12 +39,21 @@ class _DecoderOptimizerContinuationDialogState extends State<DecoderOptimizerCon
     ])),
     actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   Future<void> _continue() async {
-    setState(() { _busy = true; _error = null; });
+    final random = Random.secure();
+    final token = List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+    setState(() { _busy = true; _error = null; _requestId = token; _cancelPending = false; });
     try {
-      final result = await widget.request('$_path/continue', {'confirmed': true, 'reviewed': _review});
+      final result = await widget.request('$_path/continue', {'confirmed': true, 'reviewed': _review, 'request_id': token});
       if (mounted) await _show(result);
     } catch (error) { if (mounted) setState(() => _error = '$error'); }
-    finally { if (mounted) setState(() => _busy = false); }
+    finally { if (mounted) setState(() { _busy = false; _requestId = null; _cancelPending = false; }); }
+  }
+  Future<void> _cancel() async {
+    final token = _requestId;
+    if (token == null) return;
+    setState(() { _cancelPending = true; _error = null; });
+    try { await widget.request('$_path/cancel-continuation', {'confirmed': true, 'request_id': token}); }
+    catch (error) { if (mounted && _requestId == token) setState(() { _cancelPending = false; _error = '$error'; }); }
   }
   Future<void> _history() async {
     try {
@@ -48,7 +62,7 @@ class _DecoderOptimizerContinuationDialogState extends State<DecoderOptimizerCon
       final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(title: const Text('Saved checkpoint continuations'), children: [
         if (records.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No checkpoint continuations saved.')),
         for (final record in records) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(record as Map)),
-          child: Text('${(record['id'] as String).substring(0, 8)} · completed step ${record['completed_steps']}')),
+          child: Text('${(record['id'] as String).substring(0, 8)} · ${record['status'] ?? 'completed'} · step ${record['completed_steps']}')),
       ]));
       if (selected != null && mounted) await _show(selected);
     } catch (error) { if (mounted) setState(() => _error = '$error'); }
@@ -56,7 +70,9 @@ class _DecoderOptimizerContinuationDialogState extends State<DecoderOptimizerCon
   @override Widget build(BuildContext context) => AlertDialog(title: const Text('Review checkpoint continuation'), scrollable: true,
     content: SizedBox(width: 640, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Restore the saved midpoint model, optimizer moments and scheduler counter. Finish the original synthetic training budget in a separate private artifact and compare with the original final model. The source run and checkpoint stay unchanged. This does not establish recovery from an arbitrary interruption or add a text corpus.'),
+      const Text('Cancel a running continuation at the next safe update boundary. Its partial model and optimizer state stay private; continuing a canceled partial artifact is not exposed yet.'),
       if (_busy) const LinearProgressIndicator(),
+      if (_cancelPending) const Text('Cancellation requested. Waiting for the next safe optimizer boundary.'),
       if (_error != null) Text(_error!),
       if (_review != null) ...[
         Text('Restore step ${_review!['source']['checkpoint_step']} · remaining updates: ${_review!['estimates']['optimizer_updates']} · original total: ${_review!['config']['steps']}.'),
@@ -71,6 +87,7 @@ class _DecoderOptimizerContinuationDialogState extends State<DecoderOptimizerCon
         ExpansionTile(title: const Text('View checkpoint continuation review'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],
     ])), actions: [
+      if (_busy && _requestId != null) TextButton(onPressed: _cancelPending ? null : _cancel, child: const Text('Cancel running continuation')),
       TextButton(onPressed: _busy ? null : _history, child: const Text('Saved checkpoint continuations')),
       TextButton(onPressed: _busy ? null : _load, child: const Text('Refresh continuation review')),
       TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Close')),

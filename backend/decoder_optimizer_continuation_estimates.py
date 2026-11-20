@@ -11,7 +11,7 @@ def feedback(records,current):
     for record in records:
         try:
             saved=record['review'];observed=record['isolated_workflow_measurements'];seconds=observed['elapsed_seconds'];cpu=observed['isolated_process_peak_rss_bytes'];gpu=observed['isolated_metal_peak_bytes']
-            if (record.get('format')!='almg-optimizer-continuation-v1' or record.get('schema_version')!=1
+            if ((record.get('format'),record.get('schema_version')) not in (('almg-optimizer-continuation-v1',1),('almg-optimizer-continuation-v2',2)) or record.get('status','completed')!='completed'
                 or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
                 or any(saved.get(key)!=current[key] for key in ('source','config','runtime','implementation_sha256'))
                 or record.get('training_approved') is not True or record.get('source_modified') is not False

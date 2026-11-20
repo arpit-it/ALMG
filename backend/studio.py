@@ -2364,8 +2364,10 @@ class Handler(BaseHTTPRequestHandler):
             if len(optimizer_parts) == 3 and optimizer_parts[0] == 'decoder-optimizer-fixtures':
                 if optimizer_parts[2] == 'continuation-review':
                     return self.respond(decoder_optimizer_continuations.review(ROOT,optimizer_parts[1]))
+                if optimizer_parts[2] == 'cancel-continuation':
+                    return self.respond(decoder_optimizer_continuations.cancellation.request(ROOT,optimizer_parts[1],data.get('request_id'),data.get('confirmed')))
                 if optimizer_parts[2] == 'continue':
-                    return self.respond(inference.WORKER.submit(decoder_optimizer_isolated.run_continuation,ROOT,optimizer_parts[1],data.get('confirmed'),data.get('reviewed')).result())
+                    return self.respond(inference.WORKER.submit(decoder_optimizer_isolated.run_continuation,ROOT,optimizer_parts[1],data.get('confirmed'),data.get('reviewed'),data.get('request_id')).result())
                 if optimizer_parts[2] == 'continuations':
                     return self.respond({'records':decoder_optimizer_continuations.history(ROOT,optimizer_parts[1])})
             architecture_parts = self.path.strip('/').split('/')

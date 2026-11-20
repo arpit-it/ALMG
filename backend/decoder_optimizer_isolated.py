@@ -19,14 +19,15 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
     return _execute(root,{'plan_id':plan_id,'initialized':initialized,'settings':settings},approved,fixture.read,'plan_id',plan_id,'fixture')
 
 
-def run_continuation(root,identifier,confirmed,approved):
+def run_continuation(root,identifier,confirmed,approved,request_id=None):
     if confirmed is not True:raise ValueError('Explicitly approve checkpoint continuation before starting an isolated worker.')
     if __package__:from . import decoder_optimizer_continuations as continuations
     else:import decoder_optimizer_continuations as continuations
+    if request_id is not None:continuations.cancellation.validate(request_id)
     current=continuations.review(root,identifier)
     if not isinstance(approved,dict) or approved.get('revision')!=fixture.digest({k:v for k,v in approved.items() if k!='revision'}) or any(approved.get(key)!=current[key] for key in ('format','schema_version','source','config','runtime','estimates','implementation_sha256')):raise ValueError('Checkpoint continuation review changed; reopen it before approval.')
     if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Isolated checkpoint continuation is blocked by hardware/resources.')
-    return _execute(root,{'identifier':identifier},approved,continuations.read,'record_id',identifier,'continuation')
+    return _execute(root,{'identifier':identifier,'request_id':request_id},approved,continuations.read,'record_id',identifier,'continuation')
 
 
 def _execute(root,payload,approved,reader,source_key,source_id,kind):
