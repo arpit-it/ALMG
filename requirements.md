@@ -5346,6 +5346,64 @@ P3-LMF-04 partial progress · validated pre-allocation architecture plans · 202
   P3-LMF-03 stays complete. Unchanged P3-LMF-02 hardware/Windows/oversized-fixture
   blockers remain open and skipped; unrelated user changes are preserved.
 
+P3-LMF-04 partial progress · fresh multilayer/multihead CPU models and persistence · 2026-11-20:
+- [ ] P3-LMF-04 remains open. Saved architecture plans now offer a separate
+  “Initialize fresh planned model” confirmation and saved initialization history.
+  Confirmation binds the exact immutable plan and checks memory/disk reserves
+  before allocation. New seeded NumPy weights are independent of Qwen/downloaded
+  checkpoints. The plan itself remains a layout artifact; initialized models and
+  CPU evidence are published separately, without training or release approval.
+- The new versioned PlannedDecoder implements the reviewed layer/head dimensions:
+  per-layer Q/K/V projections, head splitting, scaled causal attention, head merge,
+  residual attention/FF blocks, learned absolute positions, parameter-free layer
+  normalization, ReLU and an untied output head. Configuration validation precedes
+  RNG/allocation. Actual tensor count, actual parameter count and actual FP32
+  parameter bytes must equal the reviewed layout. Existing legacy decoder recipes,
+  artifact formats, tokenizer bundles and trained checkpoints are unchanged.
+- Each initialization runs a bounded synthetic CPU batch, checks finite logits and
+  causal-prefix invariance after changing future IDs, saves a JSON model artifact without
+  executable serialization, reloads every parameter and requires exactly identical CPU output.
+  Artifact loading validates format, configuration, parameter names/shapes, numeric
+  values and FP32 bounds. Initialization history additionally verifies every tensor
+  against the fresh seeded plan, so trained/modified weights cannot be relabeled
+  as a zero-update initialization. Publication is atomic and preserves prior files.
+- Local app verification: rebuilt and ran ALMG on this Mac with fixture backend
+  port 28864. Canceled initialization without creating weights, then explicitly
+  initialized three saved layouts through native controls:
+  - Tiny one-layer/one-head: plan 14596499, initialization 6e292eb5, 9 tensors,
+    1,664 parameters, 6,656 FP32 weight bytes and output shape [2,8,64].
+  - Two-layer/two-head: plan 5373ba6f, initialization a8ec93ad, 15 tensors,
+    8,704 parameters, 34,816 bytes and output shape [2,8,128].
+  - Four-layer/four-head: plan fb3aa5aa, initialization d030e1a2, 27 tensors,
+    270,336 parameters, 1,081,344 bytes and output shape [2,8,512].
+  All had zero causal-prefix error and zero immediate CPU reload difference;
+  every parameter reloaded exactly. Backward checks remained false, optimizer
+  updates zero, pretrained_weights_loaded=false and training/release flags false.
+- After complete app/backend restart, all three original records and full CPU
+  forward arrays matched exactly. A new native seed-7 initialization of the same
+  two-layer plan produced an identical model SHA-256
+  f66f3013d8255302fb96044f2ff443a088eb538b2f425c1a876cfc99b8da56f3.
+  All eight prior imported-model/plan files and the six original initialization
+  files remained byte-identical. Actual parameter bytes exclude allocation/runtime
+  overhead; the NumPy reference uses float64 forward intermediates. The inherited
+  FP32 training-layout estimates remain explicitly unmeasured and are not a CPU
+  peak-memory measurement or training-feasibility guarantee.
+- Verification: 528 Python tests passed with real Metal legacy regression fixtures
+  and warnings as errors; 46 Flutter tests passed; Flutter analysis and diff checks
+  were clean. New tests compare vectorized multihead/multilayer math against a
+  separate per-head reference, compare the one-head formula against legacy math,
+  verify seed identity/difference and causality, reject invalid inputs before RNG,
+  enforce consent/stale/resource gates, preserve exact reloads, reject rehashed
+  modified parameters and recover failed publication. Evidence is under
+  /tmp/almg-architecture-init-native-qa/ (native consent/initialization/restart JSON,
+  verification.json, saved probe arrays and build/test logs). Generated weights and
+  artifacts are outside Git; no external collection or pretrained download ran.
+- Remaining acceptance: execute and validate a backward pass for these configured
+  architectures, including finite gradients and a meaningful small-batch numerical
+  check. Training engines and quality/release remain separate requirements.
+  P3-LMF-03 stays complete; unchanged hardware/Windows/oversized-fixture blockers
+  remain open and skipped. Unrelated user edits and previous weights are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
