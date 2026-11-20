@@ -6320,6 +6320,44 @@ P3-LMF-05 partial progress · factory-handoff feasibility before decoder approva
   feasibility and suitable Windows/CUDA verification. Unchanged hardware/user-
   action blockers remain open and skipped.
 
+P3-LMF-05 partial progress · measured saved-trial worker work and compatible estimate · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Saved decoder workers now append optional versioned
+  elapsed-work observations without changing the training/checkpoint engine.
+  Timing wraps actual model loading, training, evaluation, checkpoint/bundle
+  persistence and engine state writes, and excludes queue/approval/idle waits,
+  the instrumentation hardware probe and observation publication. This is shared-
+  backend worker timing, not isolated peak-memory evidence or total wall time.
+  Evidence capture/publication failure preserves the engine result and artifacts.
+- Feasibility can estimate the same worker work from compatible completed
+  observations, using the highest time plus explicit 25% heuristic headroom.
+  Reports retain source trial/measurement IDs and revisions, observed range,
+  count, method and exclusions. Compatibility requires exact specification/data,
+  runtime/CPU topology/Metal device, implementation and input-checkpoint hashes;
+  interrupted, corrupt or mismatched observations are excluded. Fresh work and
+  step-50 resume work are distinct. History considers the latest 200 trial records.
+  Total wall-clock duration remains unknown; the estimate is not an upper bound.
+- Native verification: rebuilt and ran ALMG with an isolated generated-text trial
+  53ff5b9bb38643b19b8ab7dcebd1fd8f. The initial review had no estimate. Explicitly
+  approved real Metal training completed and saved a measured worker duration of
+  1.3783700410276651 seconds. The next review displayed a calculated
+  1.7229625512845814-second worker-work estimate based on that exact observation.
+  Cancelling created no second trial and did not change the trained files.
+  After app/backend restart, both the observation and reconstructed estimate
+  reopened exactly. All seven trial/checkpoint/bundle files and 45 prior artifact
+  files retained their hashes. Local evidence is under
+  /tmp/almg-worker-duration-native-qa/verification.json and native UI captures;
+  generated fixtures, checkpoints and weights remain outside Git.
+- Validation: 582 Python tests passed with warnings as errors and Metal enabled,
+  60 Flutter tests passed, and analysis was clean. Coverage includes real complete
+  worker timing, estimate provenance, absent history, runtime/implementation/
+  checkpoint/approval/outcome/timing-integrity exclusions, no fresh-work forecast
+  for a different checkpoint, and optional-publication failure preserving the
+  engine's result and completed state. Existing real local-data/resume tests also
+  execute the timing wrapper while preserving original checkpoints and profiles.
+- Remaining: queue/idle/approval-aware total wall-time estimates, broader neural/
+  full-epoch feasibility and suitable Windows/CUDA hardware verification.
+  Unchanged hardware/user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

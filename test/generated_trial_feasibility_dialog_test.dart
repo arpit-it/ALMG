@@ -3,6 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/generated_trial_feasibility_dialog.dart';
 
 void main() {
+  testWidgets('saved worker estimate excludes waits and total wall time', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: GeneratedTrialFeasibilityDialog(report: {
+      'feasible': true, 'hardware': <String, dynamic>{}, 'blockers': <String>[],
+      'estimates': {'worker_work_estimate': {'estimated_seconds': 2.5, 'sample_count': 1}},
+    })));
+    expect(find.textContaining('Estimated saved-trial worker work: 2.5 s'), findsOneWidget);
+    expect(find.textContaining('total wall time remains unknown'), findsOneWidget);
+  });
   testWidgets('factory handoff has its own final approval', (tester) async {
     await tester.pumpWidget(MaterialApp(home: GeneratedTrialFeasibilityDialog(report: {
       'feasible': true, 'hardware': <String, dynamic>{}, 'estimates': <String, dynamic>{}, 'blockers': <String>[],

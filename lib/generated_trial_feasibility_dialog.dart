@@ -15,6 +15,7 @@ class GeneratedTrialFeasibilityDialog extends StatelessWidget {
       Text('Device: ${report['hardware']['metal_device']?['device_name'] ?? 'Metal unavailable'} · MLX ${report['hardware']['mlx_version'] ?? 'unavailable'}'),
       Text('Calculated memory reserve: ${report['estimates']['required_available_memory_bytes']} bytes · disk reserve: ${report['estimates']['required_free_disk_bytes']} bytes.'),
       const Text('These are calculated reserves, not measured peaks or a duration prediction. This report covers only the reviewed scope and data. Resources are checked again before and during fitting.'),
+      if (report['estimates']['worker_work_estimate'] != null) Text('Estimated saved-trial worker work: ${report['estimates']['worker_work_estimate']['estimated_seconds']} s from ${report['estimates']['worker_work_estimate']['sample_count']} compatible completed measurement(s), highest observed time plus 25%. Includes training, evaluation and checkpoint/bundle saving. Excludes queue, approval and idle/AC waits. A heuristic, not an upper bound; total wall time remains unknown.'),
       for (final reason in report['blockers'] as List) Text(reason as String),
       ExpansionTile(title: Text(report['factory'] != null ? 'View factory hardware record' : report['resume'] != null ? 'View resume hardware record' : report['dataset'] != null ? 'View reviewed dataset hardware record' : 'View generated trial hardware record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(report))]),
     ])), actions: [

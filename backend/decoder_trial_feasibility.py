@@ -2,10 +2,10 @@
 from pathlib import Path
 import json
 if __package__:
-    from . import decoder_trials as trials,decoder_architecture_feasibility as architecture,training_resources
+    from . import decoder_trials as trials,decoder_architecture_feasibility as architecture,training_resources,decoder_trial_measurements as measurements
     from .run_manifest import digest,file_digest
 else:
-    import decoder_trials as trials,decoder_architecture_feasibility as architecture,training_resources
+    import decoder_trials as trials,decoder_architecture_feasibility as architecture,training_resources,decoder_trial_measurements as measurements
     from run_manifest import digest,file_digest
 
 
@@ -30,13 +30,14 @@ def review(root,dataset=None):
         'required_available_memory_bytes':256*1024**2+encoded*8+parameter_bytes*8+activation_bytes*2,
         'required_free_disk_bytes':64*1024**2+encoded*4+parameter_bytes*32,
         'precision':'float32','measured':False,'duration_estimate_seconds':None,
+        'worker_work_estimate':measurements.estimate(root,digest(specification),hardware),
         'scope':('Reviewed local dataset, fixed width-8/context-16 FP32 SGD, 100 steps and step-50 checkpoint; all training-window graphs and vocabulary-dependent logits are budgeted.' if binding else 'Fixed generated four-word fixture only; SGD resume comparison includes uninterrupted 100 steps plus a separate 50+50 trajectory.')+' Not a 50M model or general pretraining estimate.'}
     reasons=list(hardware['errors'])
     if hardware['system']!='Darwin' or hardware['machine']!='arm64' or not hardware['metal_available']:reasons.append('This saved decoder trial requires Apple silicon with MLX Metal; CPU/CUDA training fallback is unavailable.')
     if not architecture._fits(hardware,{**estimates,'estimated_gpu_working_bytes':parameter_bytes*8+activation_bytes*2}):reasons.append('Available memory, disk or Metal working-set recommendation does not cover this fixed trial. Close other apps or free disk, then review again.')
     report={'format':'almg-local-dataset-decoder-feasibility-v1' if binding else 'almg-generated-decoder-feasibility-v1','schema_version':1,'specification_sha256':digest(specification),
         'scope':'reviewed_local_text_trial_only' if binding else 'generated_local_text_fixture_only','dataset':binding,'hardware':hardware,'estimates':estimates,'feasible':not reasons,'blockers':reasons,
-        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_trial_feasibility.py','decoder_trials.py','decoder_training.py','decoder_recipe.py','decoder_dataset_training.py','decoder_datasets.py','training_resources.py','decoder_architecture_feasibility.py')})}
+        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_trial_feasibility.py','decoder_trial_measurements.py','decoder_trials.py','decoder_training.py','decoder_recipe.py','decoder_dataset_training.py','decoder_datasets.py','training_resources.py','decoder_architecture_feasibility.py')})}
     report['revision']=digest(report);return report
 
 
@@ -49,7 +50,7 @@ def admit(root,approved=None,dataset=None):
     return fresh
 
 
-def start(root,confirmed,submit,approved=None,**options):
+def start(root,confirmed,submit,approved=None,_measure_execution=True,**options):
     if confirmed is not True:raise ValueError('Confirm the saved decoder trial after reviewing feasibility.')
     dataset=options.get('dataset');admission=admit(root,approved,dataset)
     def save_and_submit(function,*arguments):
@@ -60,7 +61,7 @@ def start(root,confirmed,submit,approved=None,**options):
                 'approval':approved or admission,'admission':fresh,'reviewed_before_approval':approved is not None,
                 'execution_policy':'Existing trial checks memory/disk again before and during fitting; this snapshot records submission admission, not measured execution peaks.'}
             trials.write(root,record)
-        return submit(function,*arguments)
+        return submit(measurements.execute,function,*arguments) if _measure_execution else submit(function,*arguments)
     return trials.start(root,confirmed,save_and_submit,**options)
 
 
@@ -87,7 +88,7 @@ def resume_review(root,trial_id):
         if (trials.folder(root,trial_id)/'artifacts/bundle').exists():raise ValueError('A completed bundle exists; preserve it and approve a new trial instead.')
         if record['specification']!=trials.specification(record.get('dataset')):raise ValueError('Saved training implementation changed; approve a new trial instead.')
         binding={'trial_id':trial_id,'previous_approval_sha256':digest(record['approval']),'checkpoint':_checkpoint(root,trial_id)}
-    report=review(root,record.get('dataset'));report['resume']=binding;report['revision']=digest({k:v for k,v in report.items() if k!='revision'});return report
+    report=review(root,record.get('dataset'));report['estimates']['worker_work_estimate']=measurements.estimate(root,report['specification_sha256'],report['hardware'],binding['checkpoint']);report['resume']=binding;report['revision']=digest({k:v for k,v in report.items() if k!='revision'});return report
 
 
 def resume(root,trial_id,confirmed,submit,approved=None,**options):
@@ -102,6 +103,7 @@ def resume(root,trial_id,confirmed,submit,approved=None,**options):
     def save_and_submit(function,*arguments):
         admission=admit(root,None,dataset)
         if _checkpoint(root,trial_id)!=binding['checkpoint']:raise ValueError('Checkpoint changed before submission; review resume again.')
+        admission['estimates']['worker_work_estimate']=measurements.estimate(root,admission['specification_sha256'],admission['hardware'],binding['checkpoint'])
         admission['resume']=binding;admission['revision']=digest({k:v for k,v in admission.items() if k!='revision'})
         if any(admission.get(key)!=fresh.get(key) for key in ('format','schema_version','specification_sha256','scope','dataset','estimates','implementation_sha256','resume')):raise ValueError('Resume feasibility changed before submission; review it again.')
         with trials._LOCK:
@@ -110,7 +112,7 @@ def resume(root,trial_id,confirmed,submit,approved=None,**options):
             record['resume_hardware_reviews']=[*record.get('resume_hardware_reviews',[]),{
                 'approval':approved or fresh,'admission':admission,'reviewed_before_approval':approved is not None}]
             trials.write(root,record)
-        return submit(function,*arguments)
+        return submit(measurements.execute,function,*arguments)
     return trials.start(root,True,save_and_submit,trial_id=trial_id,**options)
 
 
@@ -141,5 +143,5 @@ def factory_start(root,job,confirmed,submit,proposal_revision,approved=None,**op
             record['factory_hardware_review']={
                 'approval':approved or fresh,'admission':admission,'reviewed_before_approval':approved is not None}
             trials.write(root,record)
-        return submit(function,*arguments)
-    return start(root,True,save_factory_and_submit,base,proposal_id=job['decoder_proposal']['id'],proposal_revision=proposal_revision,dataset=job.get('decoder_dataset'),**options)
+        return submit(measurements.execute,function,*arguments)
+    return start(root,True,save_factory_and_submit,base,_measure_execution=False,proposal_id=job['decoder_proposal']['id'],proposal_revision=proposal_revision,dataset=job.get('decoder_dataset'),**options)
