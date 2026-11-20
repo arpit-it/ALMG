@@ -74,7 +74,7 @@ class WholeCharacterBPETests(unittest.TestCase):
             self.assertEqual(sum(v['uncovered_characters'] for v in report['splits'].values()),1)
             self.assertEqual(sum(v['encoding_failures'] for v in report['splits'].values()),1)
             self.assertTrue(all(p.read_bytes()==data for p,data in before.items()))
-            with self.assertRaisesRegex(ValueError,'character-BPE admission'):windows.review(root,report['id'],'a'*32)
+            with self.assertRaisesRegex(ValueError,'lossless full-index'):windows.review(root,report['id'],'a'*32)
 
     def test_alphabet_overflow_consent_and_changed_review_fail_without_publication(self):
         with TemporaryDirectory() as temporary:

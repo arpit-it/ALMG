@@ -4757,6 +4757,66 @@ P3-LMF-03 partial progress · resumable full-training-split character BPE · 202
   and skipped without polling. No external collection, downloads, generated
   artifacts/weights in Git or push; unrelated edits and prior artifacts preserved.
 
+P3-LMF-03 partial progress · reviewed full-split character model inputs and numerical checks · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed full-split character-BPE comparisons now
+  offer reviewed model-input preparation only when every saved record round-trips
+  losslessly, all splits are nonempty, and a matching exhaustive lexical overlap
+  report has zero cross-split findings. Source/index/codec/permission revisions
+  remain bound to the exact review. The actual codec vocabulary must match its
+  saved manifest and fit the registered decoder's 4–512-ID profile before any
+  windows are created. Lexical evidence does not establish semantic cleanliness.
+- Character inputs use v2 window, masked-batch and numerical-diagnostic contracts
+  with an explicit character model-input profile (vocabulary, architecture version,
+  context 16, no special tokens, no training/release approval). Existing byte-BPE
+  v1 contracts and completed artifacts remain readable without rewriting. Windows
+  preserve document boundaries, original split/group/line/byte/hash provenance,
+  stride-16 next-token targets, duplicate counts without expansion and exact
+  padding masks. Records shorter than two encoded tokens reject explicitly.
+- The separately confirmed five-step Metal diagnostic accepts only the matching
+  v2 character batch/profile, starts new weights, checks all parameter tensors,
+  CPU inference and masked loss/gradient invariance, and evaluates every saved
+  validation/test window without held-out updates. The character padding probe
+  uses a guaranteed different valid ID and records how many masked targets changed;
+  a 127-ID regression test prevents a vacuous unchanged-target probe. Weights are
+  discarded and only the numerical report is persisted. Durable training, model
+  persistence, quality acceptance and release are not approved by this path.
+- Native verification rebuilt/launched macOS on port 28853, reopened legacy v1
+  byte inputs, rejected a character comparison with a held-out-only coverage gap
+  before creating windows, and cancelled clean-source consent without creating work.
+  Character preparation 4f852a8cb89a45ce9cb31f0bc5f44607 paused at 7/401 records;
+  restarting backend/app restored the identical record. Explicit native resume
+  produced 1,486 train / 187 validation / 174 test windows and 28,428 real targets
+  with 64 IDs/architecture version 1. All three split inspectors and pagination
+  were exercised, including padded training arrays. QA-only one-record steps and
+  response latency made the pause deterministic; production batching is unchanged.
+- Cancelling diagnostic consent saved nothing. Final native check
+  0f6df76a6bd14940a27cfb9c0759739f changed its one padded target and reduced batch
+  loss 4.16221809387207 → 4.023611545562744. Masked loss error was 0, gradient error
+  1.4901161193847656e-08 and CPU/Metal error 3.355084141065667e-08. Evaluation
+  covered all 187 validation windows / 2,921 targets in 12 batches and all 174 test
+  windows / 2,713 targets in 11 batches, with zero held-out optimizer updates.
+  Accuracy was about 0.042/0.036; this numerical test establishes no quality target.
+  Completed windows and the exact final report reopened after further backend/app
+  restarts. The earlier local diagnostic report was preserved as well.
+- Independent checks compared all 1,847 windows and captured native arrays/masks/
+  provenance with fresh source encodings, verified batch/report hashes and complete
+  held-out counts, and confirmed all 49 prior source/fit/comparison/window/diagnostic
+  files stayed byte-identical. No model/trial was saved. Evidence remains outside
+  Git at /tmp/almg-character-input-native-qa/verification.json, *-ui.json/*-ui.txt,
+  fingerprints and native build/restart/test logs.
+- Validation: 489 Python tests with Metal checks and warnings as errors, 37 Flutter
+  tests, clean Flutter analysis/diff checks and successful native rebuilds. New
+  coverage includes v2 exact IDs/masks/provenance, complete split traversal, current
+  profile/review/vocabulary/contamination guards, transaction rollback/publication
+  recovery, actual character Metal updates, report reload, 127-ID padding changes
+  and native UI routing. The prior held-out-character guard now explicitly requires
+  a lossless comparison rather than rejecting the entire character family.
+- Remaining: full-split Unigram, durable approved streamed training/checkpoint/model
+  persistence for full-split codecs and broader acceptance. Independent physical,
+  Windows and larger-than-RAM blockers remain open and skipped. No external
+  collection, downloads, generated artifacts/weights in Git or push; unrelated
+  user edits and prior artifacts are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

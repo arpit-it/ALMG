@@ -2233,7 +2233,7 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _showStreamWindows(Map<String, dynamic> record) async {
-    final learned = record['format'] == 'almg-stream-learned-windows-v1';
+    final learned = const ['almg-stream-learned-windows-v1', 'almg-stream-learned-windows-v2'].contains(record['format']);
     final route = learned ? 'decoder-stream-learned-windows' : 'decoder-stream-windows';
     final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Streamed windows · ${record['status']}'), scrollable: true,
@@ -2241,6 +2241,7 @@ class _StudioPageState extends State<StudioPage> {
         Text('${record['processed_records']} / ${record['total_records']} unique normalized records analyzed.'),
         const Text('Source-bound next-token windows, with original document boundaries and splits preserved. '
           'Token IDs can reconstruct personal text. The lexical overlap gate is limited; no model training or approval is enabled.'),
+        if (record['format'] == 'almg-stream-learned-windows-v2') const Text('Character-BPE model inputs · reviewed architecture profile · training approval remains disabled'),
         if (learned) Text('Learned vocabulary: ${record['vocabulary_size']} IDs · lossless full-index comparison verified'),
         Text('Windows by split: ${record['window_counts']} · ${record['target_tokens']} target tokens'),
         ExpansionTile(title: const Text('View streamed windows and provenance'), children: [
@@ -2371,7 +2372,7 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _runStreamWindows(Map<String, dynamic> initial) async {
-    final route = initial['format'] == 'almg-stream-learned-windows-v1' ? 'decoder-stream-learned-windows' : 'decoder-stream-windows';
+    final route = const ['almg-stream-learned-windows-v1', 'almg-stream-learned-windows-v2'].contains(initial['format']) ? 'decoder-stream-learned-windows' : 'decoder-stream-windows';
     var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
     unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
       child: StatefulBuilder(builder: (context, update) {
@@ -2845,7 +2846,7 @@ class _StudioPageState extends State<StudioPage> {
           Text('${entry.key}: ${entry.value['lossless_records']}/${entry.value['records']} lossless · ${entry.value['unsupported_records']} unsupported · ${entry.value['lossy_records']} lossy · ${entry.value['encoding_failures']} encoding failures'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
-        if (record['status'] == 'complete' && record['format'] == 'almg-stream-fitted-tokenizer-evaluation-v1' && record['fit_kind'] != 'character_bpe') ...[
+        if (record['status'] == 'complete' && record['format'] == 'almg-stream-fitted-tokenizer-evaluation-v1') ...[
           TextButton(onPressed: () { Navigator.pop(context, false); _beginLearnedWindows(record); }, child: const Text('Prepare learned-tokenizer windows')),
           TextButton(onPressed: () { Navigator.pop(context, false); _savedLearnedWindows(record); }, child: const Text('View learned-tokenizer windows')),
         ],

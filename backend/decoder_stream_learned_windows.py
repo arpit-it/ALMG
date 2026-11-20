@@ -8,12 +8,13 @@ import threading
 import uuid
 
 if __package__:
-    from . import decoder_stream_fitted_tokenizer_evaluations as comparisons, decoder_stream_overlap as overlap, decoder_stream_indexes as indexes
+    from . import decoder_stream_fitted_tokenizer_evaluations as comparisons, decoder_stream_overlap as overlap, decoder_stream_indexes as indexes, decoder_recipe
     from .run_manifest import digest,file_digest
 else:
     import decoder_stream_fitted_tokenizer_evaluations as comparisons
     import decoder_stream_overlap as overlap
     import decoder_stream_indexes as indexes
+    import decoder_recipe
     from run_manifest import digest,file_digest
 
 _LOCK=threading.RLock()
@@ -33,25 +34,35 @@ def _runtime():
 
 def _implementation():
     return digest({'files':{name:file_digest(Path(__file__).with_name(name)) for name in
-                   ('decoder_stream_learned_windows.py','decoder_stream_fitted_tokenizer_evaluations.py','decoder_stream_bpe.py','decoder_stream_iterative_bpe.py','decoder_bpe.py','decoder_stream_overlap.py','decoder_stream_indexes.py','run_manifest.py')},'runtime':_runtime()})
+                   ('decoder_stream_learned_windows.py','decoder_stream_fitted_tokenizer_evaluations.py','decoder_stream_bpe.py','decoder_stream_iterative_bpe.py','decoder_bpe.py','decoder_stream_character_bpe.py','decoder_character_bpe.py','decoder_recipe.py','decoder_stream_overlap.py','decoder_stream_indexes.py','run_manifest.py')},'runtime':_runtime()})
 
 
 def _state(connection):
     row=connection.execute('SELECT value FROM state WHERE id=1').fetchone()
     record=json.loads(row[0]) if row else {}
-    if (record.get('format')!='almg-stream-learned-windows-v1' or type(record.get('schema_version')) is not int
-            or record['schema_version']!=1 or record.get('status') not in ('preparing','awaiting_publication')):
+    version=2 if record.get('fit_kind')=='character_bpe' else 1
+    if (record.get('format')!=f'almg-stream-learned-windows-v{version}' or type(record.get('schema_version')) is not int
+            or record['schema_version']!=version or record.get('status') not in ('preparing','awaiting_publication')):
         raise ValueError('Unsupported token-window preparation state.')
     return record
 
 
 def _sources(root,comparison_id,overlap_id,full=True):
     comparison=comparisons.read(root,comparison_id)
-    if comparison['fit_kind'] not in ('one_merge','iterative'):
-        raise ValueError('Learned streamed windows currently require a reviewed whole-split byte-BPE codec; character-BPE admission remains unavailable.')
+    if comparison['fit_kind'] not in ('one_merge','iterative','character_bpe'):
+        raise ValueError('Choose a supported completed whole-split learned codec.')
     if comparison['status']!='complete' or comparison.get('all_records_lossless') is not True:
         raise ValueError('Complete a lossless full-index comparison before preparing learned-tokenizer windows.')
     fitted,index,codec,signatures=comparisons._binding(root,comparison['fit_id'],comparison['fit_kind'],full)
+    profile=None
+    if comparison['fit_kind']=='character_bpe':
+        architecture=decoder_recipe.architecture_version({'vocab_size':fitted['vocabulary_size']})
+        if fitted['vocabulary_size']!=len(codec.pieces):raise ValueError('Character codec and model vocabulary disagree.')
+        profile={'format':'almg-stream-character-model-input-profile-v1','schema_version':1,
+                 'tokenizer_kind':'character_bpe','vocabulary_size':len(codec.pieces),
+                 'architecture_version':architecture,'context_length':16,'special_tokens':False,
+                 'scope':'masked_input_inspection_and_separately_confirmed_discarded_weight_diagnostic',
+                 'training_approved':False,'release_approved':False}
     if (comparison['fit_revision']!=fitted['revision'] or comparison['tokenizer_sha256']!=fitted['tokenizer_sha256']
             or comparison['index_id']!=index['id'] or comparison['index_revision']!=index['revision']
             or comparison['processed_records']!=index['unique_records']
@@ -73,7 +84,9 @@ def _sources(root,comparison_id,overlap_id,full=True):
     paths={'comparison':comparisons._folder(root,comparison_id)/'report.json',
            'overlap_manifest':overlap_folder/'manifest.json','overlap_database':overlap_folder/'overlap.sqlite3'}
     signatures.update({key:comparisons._signature(path) for key,path in paths.items()})
-    return {'index':index,'fit':fitted,'comparison':comparison,'overlap':report,'file_signatures':signatures},codec
+    sources={'index':index,'fit':fitted,'comparison':comparison,'overlap':report,'file_signatures':signatures}
+    if profile is not None:sources['model_input_profile']=profile
+    return sources,codec
 
 
 def review(root,comparison_id,overlap_id):return _sources(root,comparison_id,overlap_id)[0]
@@ -84,7 +97,8 @@ def begin(root,comparison_id,overlap_id,confirmed,reviewed):
     current=review(root,comparison_id,overlap_id)
     if not isinstance(reviewed,dict) or reviewed!=current:raise ValueError('The learned-window review changed. Reopen it before preparing.')
     index=current['index'];fitted=current['fit'];report=current['overlap']
-    record={'format':'almg-stream-learned-windows-v1','schema_version':1,'id':uuid.uuid4().hex,'status':'preparing',
+    version=2 if current['comparison']['fit_kind']=='character_bpe' else 1
+    record={'format':f'almg-stream-learned-windows-v{version}','schema_version':version,'id':uuid.uuid4().hex,'status':'preparing',
             'comparison_id':comparison_id,'overlap_id':overlap_id,'reviewed_sources':current,
             'index_id':index['id'],'index_revision':index['revision'],'vocabulary_size':fitted['vocabulary_size'],
             'fit_id':fitted['id'],'fit_kind':current['comparison']['fit_kind'],'tokenizer_sha256':fitted['tokenizer_sha256'],
@@ -99,6 +113,7 @@ def begin(root,comparison_id,overlap_id,confirmed,reviewed):
                       'short_pairs_skipped':report['short_pairs_skipped'],
                       'limitations':'Lexical gate only; short/semantic overlap can remain unchecked. Learned IDs encode original text. No model training approval.'},
             'policy':'learned_token_windows_only_training_disabled'}
+    if version==2:record['model_input_profile']=current['model_input_profile']
     directory=_folder(root,record['id']);directory.mkdir(parents=True)
     with indexes._connect(directory/'windows.sqlite3') as db:
         db.execute('CREATE TABLE state(id INTEGER PRIMARY KEY CHECK(id=1),value TEXT NOT NULL)')
@@ -255,10 +270,14 @@ def _assemble(window_id,record,split,page):
         inputs.append(ids[:-1]+[0]*padding);targets.append(ids[1:]+[0]*padding)
         masks.append([1]*length+[0]*padding);lengths.append(length)
         provenance.append({key:row[key] for key in ('group','token_offset','split','first_line','first_byte_offset','raw_line_sha256','occurrences','source_sha256')})
-    return {'format':'almg-stream-learned-model-batch-v1','schema_version':1,'windows_id':window_id,'windows_revision':record['revision'],
+    version=record['schema_version']
+    result={'format':f'almg-stream-learned-model-batch-v{version}','schema_version':version,'windows_id':window_id,'windows_revision':record['revision'],
             'split':split,'rows':len(inputs),'sequence_width':16,'vocabulary_size':record['vocabulary_size'],
             'tokenizer_sha256':record['tokenizer_sha256'],'inputs':inputs,'targets':targets,'loss_mask':masks,'sequence_lengths':lengths,
             'real_target_tokens':sum(lengths),'provenance':provenance,'next_cursor':page['next_cursor'],
             'method':{'version':1,'padding_value':0,'padding_is_special_token':False,'loss_mask_required':True,
                       'document_boundaries_preserved':True,'source_occurrences_expanded':False,'model_execution_enabled':False},
             'training_approved':False}
+
+    if version==2:result['tokenizer_kind']='character_bpe'
+    return result

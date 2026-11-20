@@ -91,3 +91,38 @@ class LearnedCompleteSplitTests(unittest.TestCase):
         scan=batches.iter_batches(self.root,self.record['id'],True,self.record,'test',1);next(scan)
         database=windows._folder(self.root,self.record['id'])/'windows.sqlite3';database.write_bytes(database.read_bytes())
         with self.assertRaisesRegex(ValueError,'source files changed'):next(scan)
+
+
+class CharacterOptimizationTests(unittest.TestCase):
+    @unittest.skipUnless(METAL,'Requires explicit local Metal tests')
+    def test_actual_character_profile_updates_and_version2_report_reload(self):
+        review={**REVIEW,'format':'almg-stream-learned-windows-v2','schema_version':2,'fit_kind':'character_bpe','vocabulary_size':64}
+        def read(root,wid,confirmed,reviewed,cursor=None,split='train',batch_size=4):
+            batch=fixture_batch(split)
+            return {**batch,'format':'almg-stream-learned-model-batch-v2','schema_version':2,'tokenizer_kind':'character_bpe','vocabulary_size':64,
+                    'inputs':[[value%64 for value in row] for row in batch['inputs']],
+                    'targets':[[value%64 for value in row] for row in batch['targets']]}
+        with TemporaryDirectory() as root,patch.object(batches,'read_batch',side_effect=read),patch.object(batches,'iter_batches',side_effect=lambda root,wid,confirmed,reviewed,split,size:iter([read(root,wid,True,reviewed,split=split)])):
+            report=optimization.run(root,'c'*32,True,review,read(root,'c'*32,True,review))
+            self.assertEqual(report['format'],'almg-stream-learned-masked-optimizer-check-v2');self.assertEqual(report['schema_version'],2)
+            self.assertEqual(report['tokenizer_kind'],'character_bpe');self.assertEqual(report['model_architecture_version'],1)
+            self.assertEqual(report['vocabulary_size'],64);self.assertLess(report['final_batch_loss'],report['initial_batch_loss'])
+            self.assertEqual(report['padded_positions'],12);self.assertLessEqual(report['masked_target_gradient_error'],1e-6)
+            self.assertLess(report['cpu_inference_max_error'],1e-5);self.assertEqual(optimization.list_reports(root,'c'*32,True),[report])
+            self.assertFalse(report['model_saved']);self.assertFalse(report['training_approved']);self.assertFalse(report['release_approved'])
+            with patch.object(optimization.core.recipe_contracts,'initialize_recipe') as initialize:
+                with self.assertRaisesRegex(ValueError,'contract changed'):optimization.run(root,'c'*32,True,{**review,'fit_kind':'iterative'},read(root,'c'*32,True,review))
+                initialize.assert_not_called()
+
+    @unittest.skipUnless(METAL,'Requires explicit local Metal tests')
+    def test_127_id_character_padding_probe_changes_every_masked_target(self):
+        review={**REVIEW,'format':'almg-stream-learned-windows-v2','schema_version':2,'fit_kind':'character_bpe','vocabulary_size':127}
+        def read(root,wid,confirmed,reviewed,cursor=None,split='train',batch_size=4):
+            batch=fixture_batch(split)
+            return {**batch,'schema_version':2,'tokenizer_kind':'character_bpe','vocabulary_size':127,
+                    'inputs':[[value%127 for value in row] for row in batch['inputs']],
+                    'targets':[[value%127 for value in row] for row in batch['targets']]}
+        with TemporaryDirectory() as root,patch.object(batches,'read_batch',side_effect=read),patch.object(batches,'iter_batches',side_effect=lambda root,wid,confirmed,reviewed,split,size:iter([read(root,wid,True,reviewed,split=split)])):
+            report=optimization.run(root,'d'*32,True,review,read(root,'d'*32,True,review))
+            self.assertEqual(report['padding_targets_changed'],12);self.assertEqual(report['padded_positions'],12)
+            self.assertLessEqual(report['masked_target_loss_error'],1e-6);self.assertLessEqual(report['masked_target_gradient_error'],1e-6)
