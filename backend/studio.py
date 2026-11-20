@@ -45,6 +45,7 @@ if __package__:
     from . import decoder_stream_training_measurements
     from . import classifier_feasibility
     from . import image_feasibility
+    from . import image_resource_trials
     from . import classifier_resource_trials
 else:
     import training_resources
@@ -81,6 +82,7 @@ else:
     import decoder_stream_training_measurements
     import classifier_feasibility
     import image_feasibility
+    import image_resource_trials
     import classifier_resource_trials
     import decoder_stream_previews
     import decoder_stream_evaluations
@@ -2250,7 +2252,8 @@ class Handler(BaseHTTPRequestHandler):
         if len(parts)==3 and parts[0]=='jobs' and parts[2]=='cpu-resource-trials':
             with LOCK:
                 if parts[1] not in JOBS:return self.respond({'error':'Training task not found.'},404)
-                return self.respond(classifier_resource_trials.read(ROOT,parts[1]))
+                trials=image_resource_trials if JOBS[parts[1]].get('recipe')=='text_to_image' else classifier_resource_trials
+                return self.respond(trials.read(ROOT,parts[1]))
         with LOCK:
             job = dict(JOBS.get(self.path.removeprefix("/jobs/"), {}))
         if job:
@@ -2717,7 +2720,8 @@ class Handler(BaseHTTPRequestHandler):
                         return self.respond(classifier_feasibility.review(ROOT, job, TRAINING_DATA.get(job['id'], []), data))
                     if action=='cpu-resource-trial' and status=='dataset_ready':
                         parameters={key:value for key,value in data.items() if key not in ('confirmed','reviewed_feasibility')}
-                        return self.respond(classifier_resource_trials.run(ROOT,job,TRAINING_DATA.get(job['id'], []),parameters,data.get('confirmed'),data.get('reviewed_feasibility')))
+                        trials=image_resource_trials if job.get('recipe')=='text_to_image' else classifier_resource_trials
+                        return self.respond(trials.run(ROOT,job,TRAINING_DATA.get(job['id'], []),parameters,data.get('confirmed'),data.get('reviewed_feasibility')))
                     if action == 'image-feasibility' and status == 'dataset_ready':
                         return self.respond(image_feasibility.review(ROOT,job,TRAINING_DATA.get(job['id'], []),data))
                     if action == 'plan-decoder-dataset' and status == 'factory_review':

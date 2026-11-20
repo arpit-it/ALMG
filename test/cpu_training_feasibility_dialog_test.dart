@@ -3,6 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/cpu_training_feasibility_dialog.dart';
 
 void main() {
+  testWidgets('image trial confirmation names image fitting and cancellation runs nothing', (tester) async {
+    var runs = 0;
+    await tester.pumpWidget(MaterialApp(home: CpuTrainingFeasibilityDialog(
+      title: 'CPU image recipe feasibility', trialRecipeLabel: 'image',
+      report: const {'feasible': true, 'estimates': <String, dynamic>{}, 'blockers': <String>[]},
+      measure: (review) async { runs++; return <String, dynamic>{}; },
+    )));
+    await tester.tap(find.text('Measure discarded CPU fit')); await tester.pumpAndSettle();
+    expect(find.textContaining('Fit this prepared image dataset'), findsOneWidget);
+    await tester.tap(find.text('Cancel').last); await tester.pumpAndSettle();
+    expect(runs, 0);
+  });
   testWidgets('fit work forecast displays its basis and excluded work', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: CpuTrainingFeasibilityDialog(report: {
       'feasible': true, 'blockers': <String>[], 'estimates': {

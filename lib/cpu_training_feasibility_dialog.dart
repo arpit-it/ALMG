@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 class CpuTrainingFeasibilityDialog extends StatelessWidget {
   const CpuTrainingFeasibilityDialog({super.key, required this.report, this.title = 'CPU classifier feasibility',
     this.description = 'This classifier trains on CPU without Metal or CUDA. Optional Qwen repair planning is separate from classifier fitting.',
-    this.approvalLabel = 'Approve CPU classifier training', this.recordLabel = 'View CPU classifier feasibility record', this.measure, this.history});
+    this.approvalLabel = 'Approve CPU classifier training', this.recordLabel = 'View CPU classifier feasibility record', this.measure, this.history, this.trialRecipeLabel = 'classifier'});
   final Map<String, dynamic> report;
-  final String title, description, approvalLabel, recordLabel;
+  final String title, description, approvalLabel, recordLabel, trialRecipeLabel;
   final Future<Map<String, dynamic>> Function(Map<String, dynamic>)? measure;
   final Future<Map<String, dynamic>> Function()? history;
   Future<void> _show(BuildContext context, String title, Map<String, dynamic> data) => showDialog<void>(context: context, builder: (context) => AlertDialog(
@@ -15,12 +15,12 @@ class CpuTrainingFeasibilityDialog extends StatelessWidget {
   Future<void> _measure(BuildContext context) async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Run a discarded CPU resource trial?'),
-      content: const Text('Fit this prepared classifier dataset once now, without Qwen repair or idle scheduling. Discard temporary models and save only timing/memory evidence. Main training and release remain unapproved.'),
+      content: Text('Fit this prepared $trialRecipeLabel dataset once now, without Qwen repair or idle scheduling. Discard temporary models and save only timing/memory evidence. Main training and release remain unapproved.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm discarded CPU trial'))]));
     if (confirmed != true || !context.mounted) return;
-    showDialog<void>(context: context, barrierDismissible: false, builder: (context) => const PopScope(canPop: false,
-      child: AlertDialog(title: Text('Measuring CPU classifier resources'), content: LinearProgressIndicator())));
+    showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: AlertDialog(title: Text('Measuring CPU $trialRecipeLabel resources'), content: const LinearProgressIndicator())));
     try {
       final result = await measure!(report);
       if (!context.mounted) return;

@@ -6065,6 +6065,40 @@ P3-LMF-05 partial progress · bounded CPU fit-work duration estimate · 2026-11-
   CUDA verification. Unchanged hardware/user-action blockers remain open and
   skipped; this bounded estimate does not close the entire requirement.
 
+P3-LMF-05 partial progress · discarded CPU image resource trials · 2026-11-20:
+- [ ] P3-LMF-05 remains open. The existing experimental CPU image feasibility
+  dialog now offers separately confirmed discarded fits for local shapes and
+  prepared 48x48 caption-to-pixel ridge data. Each runs in a fresh isolated CPU
+  process through the existing dataset/execution contracts, without collection,
+  Qwen repair, idle scheduling or model persistence. Main training/release remain
+  unapproved. Fresh admission and before/after prepared-data digest checks bind
+  timing and peak process RSS to the reviewed input/settings/variant.
+- Immutable versioned JSON history retains source digest, variant, admission,
+  runtime and implementation provenance; the native app can reopen it. Process
+  peak RSS includes interpreter/imports and workspace. Fit/validation time excludes
+  interpreter/import startup, scheduling waits and main candidate persistence.
+  Consent rejection, failed workers and timeouts save no successful report.
+  These image observations do not yet calibrate estimates or forecast duration.
+- Verification: rebuilt and ran the native macOS app against isolated fixtures:
+  45 local shape examples and 15 locally generated captioned PNGs (external reads
+  explicitly disabled). Cancel ran nothing for each recipe. Separate confirmation
+  measured shape fitting at 0.01779999991413206 seconds / 39862272 bytes peak RSS,
+  and caption ridge at 0.03267183294519782 seconds / 51167232 bytes. Both saved
+  histories reopened exactly after backend/app restart. Both main jobs remained
+  dataset_ready without training approval; all four prepared files and seventeen
+  prior fixture/artifact files retained their hashes. The trial root contained
+  JSON evidence/input only, with no fitted weights. Local evidence is under
+  /tmp/almg-image-resource-trial-native-qa/verification.json and native UI captures;
+  generated artifacts are not committed.
+- Validation: 567 Python tests passed with warnings as errors and Metal enabled;
+  55 Flutter tests passed and analysis was clean. Tests exercise both actual
+  isolated image variants, preserved inputs, discarded weights, history integrity,
+  separate consent, stale reviews, worker failure and timeout behavior.
+- Remaining: compatible image measurement calibration and bounded duration
+  estimation, total wall-time forecasting, broader neural/full-epoch feasibility,
+  and suitable Windows/CUDA hardware verification. Unchanged hardware/user-action
+  blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
