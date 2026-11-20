@@ -5541,6 +5541,45 @@ P3-LMF-05 partial progress · synchronized diagnostic memory and timing observat
   hardware/user-action blockers remain open and skipped. No generated artifacts,
   private data, weights or unrelated user edits are included in this commit.
 
+P3-LMF-05 partial progress · isolated synthetic diagnostic peak measurements · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Approved architecture backward checks now execute
+  in a fresh local Python process with a separate Metal allocator peak counter.
+  Reports capture that process's Metal peak, peak resident memory including
+  interpreter/imports/source loading/CPU checks, and workflow elapsed time.
+  RSS and Metal peak are displayed separately because unified-memory usage can
+  overlap; Metal allocator measurements exclude cached buffers. Workflow time
+  excludes interpreter/import startup and is not a full-training prediction.
+- Compare the isolated Metal peak with the calculated GPU working estimate and
+  retain the larger value as observed diagnostic budget feedback. Parent and
+  worker recheck feasibility; the worker cannot publish. The parent validates
+  the returned record and rechecks unchanged initialization before atomic save.
+  Worker errors, malformed results and timeouts publish no report. No updated
+  model weights are stored and no training/release approval is granted.
+- New v4 reports add isolated measurements; v1/v2/v3 historical reports remain
+  readable and immutable. Shared-process direct diagnostic results are still
+  identified as shared rather than mislabeled isolated measurements.
+- Local native verification: rebuilt and ran macOS ALMG on Apple M4 Max with
+  isolated local fixtures, reviewed feasibility and confirmed five Metal steps.
+  Report 811e15baec64429bb8ce8acd7113e070 recorded worker PID 22857,
+  separate from fixture backend PID 22137, Metal peak 254912 bytes,
+  peak RSS 67354624 bytes and workflow elapsed
+  0.21786929201334715 seconds. Metal peak exceeded the calculated
+  167936-byte estimate; the UI flagged the overrun and showed an observed
+  budget of 254912 bytes with measurement limitations.
+  Synthetic loss fell 4.831958293914795 -> 4.393815040588379. After restarting
+  app and fixture backend, new v4 and all three historical formats reopened with
+  exact saved-record equality. All 24 pre-existing fixture artifact hashes held.
+- Verification: 540 Python tests passed with actual Metal and warnings as errors;
+  final worker validation passed both focused worker tests; 48 Flutter tests passed,
+  Flutter analysis clean. Tests cover consent, error/malformed/timeout nonpublication,
+  actual separate worker PID/peaks, immutable sources and report compatibility.
+  Evidence: /tmp/almg-isolated-diagnostic-native-qa/verification.json and logs.
+- Remaining: measured full-dataset training calibration and duration prediction,
+  training approval integration, supported-recipe CPU fallback verification and
+  Windows/CUDA host verification. The isolated synthetic diagnostic is not proof
+  of full-training feasibility. Unchanged hardware/user-action blockers remain
+  open and skipped. No private/generated data, weights or unrelated edits committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

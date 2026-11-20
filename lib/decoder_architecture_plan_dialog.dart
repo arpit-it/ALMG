@@ -89,7 +89,13 @@ class _DecoderArchitecturePlanDialogState extends State<DecoderArchitecturePlanD
             'sampled incremental Metal memory: ${report['diagnostic_measurements']['sampled_incremental_metal_bytes']} bytes.'),
           Text('Estimate comparison: ${report['diagnostic_measurements']['observed_increment_exceeds_estimate'] == true ? 'sampled increment exceeded the estimate' : 'sampled increment stayed within the estimate'}. '
             'Conservative observed GPU budget: ${report['diagnostic_measurements']['conservative_observed_gpu_budget_bytes']} bytes.'),
-          const Text('Memory observations share the backend process and may include other work. Samples can miss transient peaks and exclude cached buffers and CPU memory. '
+          if (report['diagnostic_measurements']['isolated_trial_peak_measured'] == true) ...[
+            Text('Isolated diagnostic Metal peak: ${report['diagnostic_measurements']['isolated_metal_peak_bytes']} bytes · '
+              'process peak RSS: ${report['diagnostic_measurements']['isolated_process_peak_rss_bytes']} bytes.'),
+            Text('Peak comparison: ${report['diagnostic_measurements']['observed_peak_exceeds_estimate'] == true ? 'measured Metal peak exceeded the estimate' : 'measured Metal peak stayed within the estimate'}.'),
+            const Text('A fresh local process ran only this diagnostic. Metal peak excludes cached buffers and CPU memory. Process peak RSS includes interpreter, source loading and CPU checks; '
+              'the two values may overlap in unified memory and are not added. Workflow time excludes interpreter/import startup. No full-training peak or duration prediction is claimed.'),
+          ] else const Text('Memory observations share the backend process and may include other work. Samples can miss transient peaks and exclude cached buffers and CPU memory. '
             'Process peak counters are retained without resetting. Diagnostic time includes CPU checks; no isolated trial peak or full-training duration is claimed.'),
         ] else const Text('Legacy report: diagnostic timing and memory samples were not captured.'),
         Text(report['padding_check_applicable'] == true ? 'Masked padding loss and gradients were invariant.' : 'Padding check not applicable to this minimum batch/context; both real targets were retained.'),

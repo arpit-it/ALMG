@@ -18,7 +18,8 @@ void main() {
       }
       checks++; expect(body['confirmed'], true); expect(body['reviewed'], initialized);
       return {'initial_loss': 4.0, 'final_loss': 3.0, 'changed_parameter_tensors': ['head'], 'parameter_tensors': 1,
-        'diagnostic_measurements': {'elapsed_seconds': 2.5, 'sampled_incremental_metal_bytes': 160, 'observed_increment_exceeds_estimate': true, 'conservative_observed_gpu_budget_bytes': 160},
+        'diagnostic_measurements': {'elapsed_seconds': 2.5, 'sampled_incremental_metal_bytes': 160, 'observed_increment_exceeds_estimate': true, 'conservative_observed_gpu_budget_bytes': 200,
+          'isolated_trial_peak_measured': true, 'isolated_metal_peak_bytes': 200, 'isolated_process_peak_rss_bytes': 500, 'observed_peak_exceeds_estimate': true},
         'cpu_metal_max_error_before': 0, 'cpu_metal_max_error_after': 0, 'padding_check_applicable': true};
     }))));
     await tester.pumpAndSettle(); await tester.tap(find.text('Review architecture estimate')); await tester.pumpAndSettle();
@@ -32,6 +33,8 @@ void main() {
     expect(checks, 1); expect(find.text('Planned-model backward diagnostic'), findsOneWidget);
     expect(find.textContaining('Measured diagnostic time: 2.5 seconds'), findsOneWidget);
     expect(find.textContaining('sampled increment exceeded the estimate'), findsOneWidget);
+    expect(find.textContaining('Isolated diagnostic Metal peak: 200 bytes'), findsOneWidget);
+    expect(find.textContaining('measured Metal peak exceeded the estimate'), findsOneWidget);
     expect(find.textContaining('Updated diagnostic weights were discarded'), findsOneWidget);
   });
 

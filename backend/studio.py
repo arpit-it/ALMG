@@ -2339,7 +2339,7 @@ class Handler(BaseHTTPRequestHandler):
                 if architecture_parts[2] == 'initializations':
                     return self.respond({'records': decoder_architecture_initializations.list_records(ROOT, architecture_parts[1], data.get('confirmed'))})
                 if architecture_parts[2] == 'backward-check':
-                    return self.respond(decoder_architecture_backward.run(ROOT, architecture_parts[1], data.get('confirmed'), data.get('reviewed'), data.get('reviewed_feasibility')))
+                    return self.respond(decoder_architecture_backward.run_isolated(ROOT, architecture_parts[1], data.get('confirmed'), data.get('reviewed'), data.get('reviewed_feasibility')))
                 if architecture_parts[2] == 'feasibility':
                     return self.respond(decoder_architecture_feasibility.review(ROOT, architecture_parts[1], data.get('confirmed'), data.get('reviewed'), data.get('precision', 'float32'), data.get('device', 'metal')))
                 if architecture_parts[2] == 'backward-checks':

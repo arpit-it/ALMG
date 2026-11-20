@@ -42,6 +42,10 @@ class ArchitectureBackwardTests(unittest.TestCase):
                 self.assertTrue(all(item['absolute_error']<=item['tolerance'] for item in result['finite_difference_probes']))
                 self.assertFalse(result['updated_weights_saved']);self.assertFalse(result['training_approved']);self.assertFalse(result['release_approved'])
                 importlib.reload(backward);self.assertEqual(backward.list_reports(root,record['plan_id'],True),[result])
+                v3={**result,'format':'almg-planned-decoder-backward-check-v3','schema_version':3,'id':'2'*32}
+                v3['revision']=digest({k:v for k,v in v3.items() if k!='revision'})
+                (backward._folder(root,record['plan_id'])/('2'*32+'.json')).write_text(json.dumps(v3))
+                self.assertIn(v3,backward.list_reports(root,record['plan_id'],True))
                 previous={k:v for k,v in result.items() if k!='diagnostic_measurements'}
                 previous.update(format='almg-planned-decoder-backward-check-v2',schema_version=2,id='1'*32)
                 previous['revision']=digest({k:v for k,v in previous.items() if k!='revision'})
