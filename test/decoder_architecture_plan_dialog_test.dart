@@ -3,6 +3,31 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/decoder_architecture_plan_dialog.dart';
 
 void main() {
+  testWidgets('backward diagnostic needs separate confirmation and discards updated weights', (tester) async {
+    var checks = 0;
+    final review = {'config': <String, dynamic>{}, 'calculated_parameter_count': 1664, 'estimates': {'weight_bytes': 6656, 'training_layout_bytes': 59392}};
+    final saved = {'id': 'a123456789', 'review': review};
+    final initialized = {'id': 'initialized', 'plan_id': saved['id'], 'actual_parameter_count': 1664, 'actual_weight_bytes': 6656, 'forward_shape': [2, 8, 64], 'causal_prefix_max_error': 0, 'reload_cpu_max_error': 0};
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: DecoderArchitecturePlanDialog(request: (path, body) async {
+      if (path.endsWith('/review')) return review;
+      if (path.endsWith('/save')) return saved;
+      if (path.endsWith('/initialize')) return initialized;
+      checks++; expect(body['confirmed'], true); expect(body['reviewed'], initialized);
+      return {'initial_loss': 4.0, 'final_loss': 3.0, 'changed_parameter_tensors': ['head'], 'parameter_tensors': 1,
+        'cpu_metal_max_error_before': 0, 'cpu_metal_max_error_after': 0, 'padding_check_applicable': true};
+    }))));
+    await tester.pumpAndSettle(); await tester.tap(find.text('Review architecture estimate')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Save reviewed architecture plan')); await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Initialize fresh planned model')); await tester.tap(find.text('Initialize fresh planned model')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm fresh architecture initialization')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Check planned-model backward pass')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel')); await tester.pumpAndSettle(); expect(checks, 0);
+    await tester.tap(find.text('Check planned-model backward pass')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm planned-model backward check')); await tester.pumpAndSettle();
+    expect(checks, 1); expect(find.text('Planned-model backward diagnostic'), findsOneWidget);
+    expect(find.textContaining('Updated diagnostic weights were discarded'), findsOneWidget);
+  });
+
   testWidgets('fresh planned model requires separate confirmation and reports forward-only scope', (tester) async {
     var initializations = 0;
     final review = {'config': <String, dynamic>{}, 'calculated_parameter_count': 8704, 'estimates': {'weight_bytes': 34816, 'training_layout_bytes': 466944}};
@@ -20,7 +45,7 @@ void main() {
     await tester.tap(find.text('Initialize fresh planned model')); await tester.pumpAndSettle();
     await tester.tap(find.text('Confirm fresh architecture initialization')); await tester.pumpAndSettle();
     expect(initializations, 1); expect(find.text('Initialized architecture CPU check'), findsOneWidget);
-    expect(find.textContaining('Backward execution has not been checked'), findsOneWidget);
+    expect(find.textContaining('backward results are separate diagnostics'), findsOneWidget);
   });
 
   testWidgets('architecture review is read-only and editing invalidates save approval', (tester) async {

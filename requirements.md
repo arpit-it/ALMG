@@ -5404,6 +5404,78 @@ P3-LMF-04 partial progress · fresh multilayer/multihead CPU models and persiste
   P3-LMF-03 stays complete; unchanged hardware/Windows/oversized-fixture blockers
   remain open and skipped. Unrelated user edits and previous weights are preserved.
 
+P3-LMF-04 acceptance complete · configurable architecture backward validation · 2026-11-20:
+- [x] P3-LMF-04 — Neural Architecture Generator acceptance is complete for the
+  implemented bounded decoder profile. Earlier partial entries remain historical
+  evidence. Supported policies remain explicit: bias-free dense attention/FF,
+  learned absolute positions, parameter-free LayerNorm, ReLU, seeded normal(0,.02)
+  initialization and the documented geometry bounds. Other positional/norm/
+  activation policies and GQA/MoE/recurrent/multimodal extensions remain unsupported
+  and planned; this completion does not claim those extensions or production training.
+- Delivered this change: saved initialized architectures now offer a separate
+  “Check planned-model backward pass” confirmation and saved diagnostic history.
+  It loads the exact unchanged seeded model and runs five temporary Metal SGD
+  updates (learning rate .05) on a bounded synthetic next-token batch. Every
+  gradient bank must be finite and nonzero, every tensor must change during the
+  diagnostic, loss must decrease, and CPU/Metal logits must agree within 1e-5.
+  Updated weights are discarded; only a versioned report is published. Original
+  initialization receipts remain immutable forward-only historical records.
+- Masked padding targets are changed nonvacuously where the batch/context permits
+  padding, with loss/gradient differences limited to 1e-6. For the minimum one-row,
+  two-position configuration, both targets are retained so attention gradients
+  stay nonvacuous and padding is explicitly reported not applicable. Three selected
+  gradient coordinates (output head, first attention query, last FF input) are
+  independently checked by CPU central finite differences at epsilon .001, using
+  absolute tolerance 1e-6 + .02*max(abs(analytic),abs(numerical)). This is selected
+  numerical validation, not an exhaustive numerical derivative for every parameter.
+- Local app verification: rebuilt and ran ALMG on this Mac using fixture backend
+  port 28865. Canceled the first backward confirmation without creating a report,
+  then ran actual Metal checks from saved models through native controls:
+  - One-layer/one-head report 6fea2bd1: all 9 tensors changed; synthetic loss
+    4.14838171 → 3.93458009; final CPU/Metal maximum difference 3.49e-8.
+  - Two-layer/two-head report 06509fb7: all 15 tensors changed; loss
+    4.83195829 → 4.39381504; final CPU/Metal maximum difference 6.36e-8.
+  - Four-layer/four-head report 24a63517: all 27 tensors changed; loss
+    6.32929897 → 4.90557861; final CPU/Metal maximum difference 4.24e-7.
+  Each had two changed padded targets, invariant masked loss/gradients and all
+  three finite-difference probes within the declared tolerance. No updated weights,
+  training approval, model quality claim or release was produced.
+- After complete app/backend restart, all three saved reports reopened exactly.
+  Repeating the two-layer diagnostic reproduced initial/final losses within 1e-5.
+  All 18 prior initialized model/plan/import files and the three original reports
+  remained byte-identical. Report retrieval rechecks source initialization revision,
+  model hash and the seeded-weight invariant; failed numerical/source/publication
+  checks save no partial report and never overwrite the source model.
+- Acceptance audit (all six criteria verified):
+  1. Structured architecture generation: versioned plans validate and construct
+     configured layers, widths, head counts/dimensions, FF/context/vocabulary and
+     seed/policy fields; native one-/two-/four-layer layouts execute successfully.
+  2. Independent initialization: native fresh-weight confirmation and seed identity/
+     difference tests verify new NumPy weights with no Qwen/downloaded checkpoint.
+  3. Forward/backward execution: saved-model CPU finite/causal forward checks plus
+     actual Metal autodiff, gradient finite differences and decreasing synthetic
+     loss passed for all three native layouts and the minimum context/batch test.
+  4. Invalid dimensions: native hidden/head mismatch and current strict-schema,
+     type/bounds, input-ID/context and pre-allocation rejection tests passed.
+  5. Architecture persistence: native plan/config/model/parameter/forward-array
+     save/reload and restart checks passed; original seeded artifacts stay intact.
+  6. Counts/memory: actual tensor/parameter counts and FP32 bytes match each reviewed
+     layout, including 270,336 parameters/1,081,344 bytes for four layers/four heads.
+     FP32 training-layout estimates remain labeled calculated/unmeasured, excluding
+     workspace/allocator/runtime overhead. Peak-memory profiling belongs to hardware
+     feasibility; no estimate is presented as a measured training guarantee.
+- Verification: 532 Python tests passed with real Metal enabled and warnings as
+  errors; 47 Flutter tests passed; Flutter analysis and diff checks were clean.
+  Added tests cover approval/staleness, all native layouts, masked targets, minimum
+  context/batch, deliberately wrong-gradient rejection, immutable initialized
+  weights, report restart and failed publication. Evidence is under
+  /tmp/almg-architecture-backward-native-qa/ (verification.json, native consent,
+  reports/restart captures, prototype diagnostics and test/build logs).
+  Generated/private files and weights are outside Git. P3-LMF-03 remains complete;
+  unchanged physical power/Windows/oversized-fixture blockers stay open and skipped.
+  Continue with the next independently actionable requirement in document order;
+  unrelated user changes, old artifacts and downloaded weights are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

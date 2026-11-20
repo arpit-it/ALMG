@@ -66,9 +66,59 @@ class _DecoderArchitecturePlanDialogState extends State<DecoderArchitecturePlanD
         Text('Actual parameters: ${record['actual_parameter_count']} · actual FP32 tensor bytes: ${record['actual_weight_bytes']}'),
         Text('CPU output shape: ${record['forward_shape']} · causal prefix error: ${record['causal_prefix_max_error']} · reload error: ${record['reload_cpu_max_error']}'),
         const Text('Fresh seeded weights only. Synthetic token IDs were used for the CPU forward check. Every parameter and forward output reloaded exactly. '
-          'Backward execution has not been checked. No optimizer update, model quality, training approval or release is established. Planned memory estimates remain unmeasured; actual tensor bytes exclude runtime overhead.'),
+          'This initialization record covers the CPU forward check only; backward results are separate diagnostics. No optimizer update, model quality, training approval or release is established by initialization. Planned memory estimates remain unmeasured; actual tensor bytes exclude runtime overhead.'),
         ExpansionTile(title: const Text('View initialized architecture record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(record))]),
+      ])), actions: [
+        TextButton(onPressed: () => _backward(record), child: const Text('Check planned-model backward pass')),
+        TextButton(onPressed: () => _backwardHistory(record), child: const Text('Saved backward checks')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+  }
+  Future<void> _showBackward(Map<String, dynamic> report) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Planned-model backward diagnostic'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Five-step synthetic loss: ${report['initial_loss']} → ${report['final_loss']}'),
+        Text('Finite gradients and changed tensors: ${(report['changed_parameter_tensors'] as List).length} / ${report['parameter_tensors']}'),
+        Text('CPU/Metal output difference: ${report['cpu_metal_max_error_before']} before · ${report['cpu_metal_max_error_after']} after'),
+        Text(report['padding_check_applicable'] == true ? 'Masked padding loss and gradients were invariant.' : 'Padding check not applicable to this minimum batch/context; both real targets were retained.'),
+        const Text('The initialized model is unchanged. Updated diagnostic weights were discarded; only this report was saved. '
+          'Selected CPU finite-difference gradients were checked. This synthetic numerical check establishes no model quality, training approval or release.'),
+        ExpansionTile(title: const Text('View backward diagnostic record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(report))]),
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+  }
+  Future<void> _backward(Map<String, dynamic> initialized) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Check five synthetic backward steps?'),
+      content: const Text('Load these saved fresh weights and run five temporary SGD updates on a bounded synthetic batch using Metal. '
+        'Check gradients, masked padding, CPU/Metal outputs and selected CPU finite differences. Updated weights are discarded; a private numerical report is saved. '
+        'The saved initialized model stays unchanged. No dataset training or model release is approved.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm planned-model backward check'))]));
+    if (confirmed != true || !mounted) return;
+    setState(() { _busy = true; _error = null; });
+    showDialog<void>(context: context, barrierDismissible: false, builder: (context) => const PopScope(canPop: false,
+      child: AlertDialog(title: Text('Checking Metal backward pass'), content: SizedBox(height: 48, child: Center(child: CircularProgressIndicator())))));
+    try {
+      final report = await widget.request('/decoder-architecture-plans/${initialized['plan_id']}/backward-check', {'confirmed': true, 'reviewed': initialized});
+      if (!mounted) return;
+      Navigator.of(context, rootNavigator: true).pop(); setState(() => _busy = false); await _showBackward(report);
+    } catch (error) { if (mounted) {
+      Navigator.of(context, rootNavigator: true).pop(); setState(() { _error = error.toString(); _busy = false; });
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(title: const Text('Backward check unavailable'), content: Text(error.toString()),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    } }
+  }
+  Future<void> _backwardHistory(Map<String, dynamic> initialized) async {
+    try {
+      final records = (await widget.request('/decoder-architecture-plans/${initialized['plan_id']}/backward-checks', {'confirmed': true}))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(title: const Text('Saved planned-model backward checks'), children: [
+        if (!records.any((record) => record['initialization_id'] == initialized['id'])) const Padding(padding: EdgeInsets.all(16), child: Text('No backward checks for this initialized model.')),
+        for (final record in records.where((record) => record['initialization_id'] == initialized['id'])) SimpleDialogOption(
+          onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(record as Map)), child: Text('${(record['id'] as String).substring(0, 8)} · five steps · weights discarded')),
+      ]));
+      if (selected != null && mounted) await _showBackward(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
   Future<void> _initialize() async {
     final saved = _saved;
@@ -107,7 +157,7 @@ class _DecoderArchitecturePlanDialogState extends State<DecoderArchitecturePlanD
   @override Widget build(BuildContext context) => AlertDialog(
     title: const Text('Decoder architecture plan'), scrollable: true,
     content: SizedBox(width: 680, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Review and save layouts without allocating weights or approving training. A separate confirmed initialization can allocate fresh weights and check a CPU forward pass; backward execution remains unchecked. '
+      const Text('Review and save layouts without allocating weights or approving training. Separate confirmations can initialize fresh weights, check CPU forward execution and run a Metal backward diagnostic that discards updated weights. '
         'Validate dimensions and calculate parameter and memory estimates before allocation. This version supports bias-free dense layers, untied embeddings/head, learned absolute positions, parameter-free LayerNorm, ReLU and normal(0, 0.02) initialization.'),
       DropdownButton<String>(value: _preset, items: [for (final name in ['Tiny single-layer', 'Two-layer / two-head', 'Four-layer / four-head']) DropdownMenuItem(value: name, child: Text(name))], onChanged: _busy ? null : (value) { if (value != null) _usePreset(value); }),
       Wrap(spacing: 12, runSpacing: 8, children: [for (final entry in _fields.entries) SizedBox(width: 200, child: entry.key == 'attention_heads'
