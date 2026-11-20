@@ -2605,8 +2605,10 @@ class Handler(BaseHTTPRequestHandler):
                                                           data.get('prompt'), data.get('max_new_tokens', 12)))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'cancel':
                 return self.respond(decoder_trials.cancel(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'feasibility':
+                return self.respond(decoder_trial_feasibility.resume_review(ROOT,parts[1]))
             if len(parts) == 3 and parts[0] == 'decoder-trials' and parts[2] == 'resume':
-                record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit, parts[1], readiness=training_readiness, post_training=data.get('post_training'))
+                record = decoder_trial_feasibility.resume(ROOT, parts[1], data.get('confirmed'), inference.WORKER.submit, data.get('reviewed_feasibility'), readiness=training_readiness, post_training=data.get('post_training'))
                 return self.respond({'id': record['id']}, 202)
             if self.path == "/runtime/decoder-training":
                 if data.get('confirmed') is not True:

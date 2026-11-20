@@ -1,5 +1,6 @@
 """Preapproval hardware evidence for unchanged bounded saved decoder trials."""
 from pathlib import Path
+import json
 if __package__:
     from . import decoder_trials as trials,decoder_architecture_feasibility as architecture,training_resources
     from .run_manifest import digest,file_digest
@@ -43,7 +44,7 @@ def admit(root,approved=None,dataset=None):
     fresh=review(root,dataset)
     if approved is not None and (not isinstance(approved,dict) or approved.get('feasible') is not True
         or approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'})
-        or any(approved.get(key)!=fresh[key] for key in ('format','schema_version','specification_sha256','scope','dataset','estimates','implementation_sha256'))):raise ValueError('Saved decoder hardware review changed; reopen feasibility before approval.')
+        or any(approved.get(key)!=fresh.get(key) for key in ('format','schema_version','specification_sha256','scope','dataset','estimates','implementation_sha256','resume'))):raise ValueError('Saved decoder hardware review changed; reopen feasibility before approval.')
     if not fresh['feasible']:raise training_resources.ResourceUnavailable('Saved decoder trial blocked: '+' '.join(fresh['blockers']))
     return fresh
 
@@ -61,3 +62,53 @@ def start(root,confirmed,submit,approved=None,**options):
             trials.write(root,record)
         return submit(function,*arguments)
     return trials.start(root,confirmed,save_and_submit,**options)
+
+
+def _checkpoint(root,trial_id):
+    directory=trials.folder(root,trial_id)/'artifacts/step-50'
+    if not directory.exists():return {'completed_steps':0,'files':{}}
+    try:
+        names=('manifest.json','decoder.json','tokenizer.json')
+        if any((directory/name).stat().st_size>16*1024**2 for name in names):raise ValueError('Checkpoint exceeds the bounded trial size.')
+        manifest=json.loads((directory/'manifest.json').read_text(encoding='utf-8'));training=manifest['training']
+        if (manifest.get('format')!='almg-decoder-bundle-v1' or manifest.get('schema_version')!=1 or training.get('schema_version')!=1 or training.get('kind')!='decoder_sgd_checkpoint'
+            or training.get('completed_steps')!=50 or type(training.get('completed_steps')) is not int
+            or manifest.get('training_sha256')!=digest(training) or training.get('revision_sha256')!=digest(training['revision'])
+            or set(manifest['files'])!={'decoder.json','tokenizer.json'}
+            or any(file_digest(directory/name)!=manifest['files'][name] for name in manifest['files'])):raise ValueError('Checkpoint metadata or file hashes changed.')
+        return {'completed_steps':50,'files':{name:file_digest(directory/name) for name in names}}
+    except (OSError,ValueError,TypeError,KeyError) as error:raise ValueError('Checkpoint is unreadable or changed; preserve it and review recovery before resuming.') from error
+
+
+def resume_review(root,trial_id):
+    with trials._LOCK:
+        record=trials.read(root,trial_id)
+        if record['status']!='interrupted' or (str(Path(root)),trial_id) in trials._ACTIVE:raise ValueError('Only an inactive interrupted trial can be reviewed for resume.')
+        if (trials.folder(root,trial_id)/'artifacts/bundle').exists():raise ValueError('A completed bundle exists; preserve it and approve a new trial instead.')
+        if record['specification']!=trials.specification(record.get('dataset')):raise ValueError('Saved training implementation changed; approve a new trial instead.')
+        binding={'trial_id':trial_id,'previous_approval_sha256':digest(record['approval']),'checkpoint':_checkpoint(root,trial_id)}
+    report=review(root,record.get('dataset'));report['resume']=binding;report['revision']=digest({k:v for k,v in report.items() if k!='revision'});return report
+
+
+def resume(root,trial_id,confirmed,submit,approved=None,**options):
+    if confirmed is not True:raise ValueError('Review and confirm the saved trial resume.')
+    fresh=resume_review(root,trial_id)
+    # Validate the full reviewed action, including the prior approval and checkpoint hashes.
+    if approved is not None and (not isinstance(approved,dict) or approved.get('feasible') is not True
+        or approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'})
+        or any(approved.get(key)!=fresh.get(key) for key in ('format','schema_version','specification_sha256','scope','dataset','estimates','implementation_sha256','resume'))):raise ValueError('Resume hardware or checkpoint review changed; reopen it before approval.')
+    if not fresh['feasible']:raise training_resources.ResourceUnavailable('Saved trial resume blocked: '+' '.join(fresh['blockers']))
+    binding=fresh['resume'];dataset=trials.read(root,trial_id).get('dataset')
+    def save_and_submit(function,*arguments):
+        admission=admit(root,None,dataset)
+        if _checkpoint(root,trial_id)!=binding['checkpoint']:raise ValueError('Checkpoint changed before submission; review resume again.')
+        admission['resume']=binding;admission['revision']=digest({k:v for k,v in admission.items() if k!='revision'})
+        if any(admission.get(key)!=fresh.get(key) for key in ('format','schema_version','specification_sha256','scope','dataset','estimates','implementation_sha256','resume')):raise ValueError('Resume feasibility changed before submission; review it again.')
+        with trials._LOCK:
+            record=trials.read(root,trial_id)
+            if not record.get('previous_approvals') or digest(record['previous_approvals'][-1])!=binding['previous_approval_sha256']:raise ValueError('Previous approval changed before resume submission.')
+            record['resume_hardware_reviews']=[*record.get('resume_hardware_reviews',[]),{
+                'approval':approved or fresh,'admission':admission,'reviewed_before_approval':approved is not None}]
+            trials.write(root,record)
+        return submit(function,*arguments)
+    return trials.start(root,True,save_and_submit,trial_id=trial_id,**options)

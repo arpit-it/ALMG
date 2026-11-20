@@ -6244,6 +6244,44 @@ P3-LMF-05 partial progress · reviewed-local-data decoder feasibility before app
   Windows/CUDA verification. Unchanged hardware/user-action blockers stay open
   and skipped.
 
+P3-LMF-05 partial progress · checkpoint-bound hardware review before saved-trial resume · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Saved decoder trials now require a fresh native
+  feasibility review before resume approval. Read-only review requires an inactive
+  interrupted trial with an unchanged training specification and no completed
+  bundle. It binds the prior approval hash plus the step-50 checkpoint manifest,
+  decoder and tokenizer hashes, and verifies bounded checkpoint metadata/file
+  checksums without constructing model tensors. A missing checkpoint is explicitly
+  represented as zero saved steps and a restart from fresh weights.
+- Submission rechecks resources, feasibility implementation, checkpoint hashes
+  and prior approval lineage before queuing optimization. Resume approval and
+  admission reports append to optional resume_hardware_reviews; original training
+  profiles and previous approvals are preserved. The existing checkpoint loader,
+  execution resource checks, cancellation and idle/AC policy remain in force.
+  Legacy API resume requests still get fresh admission, labeled when no explicit
+  hardware review was supplied. Core training and artifact formats are unchanged.
+- Native verification: rebuilt and ran ALMG against six local documents. A local
+  fixture interrupted explicitly approved Metal training immediately after its
+  actual step-50 checkpoint. Trial fdddb100fa83476ea2a1fb5d6fb37dec then displayed
+  checkpoint-bound resume feasibility. Cancel preserved the interrupted record
+  exactly. Renewed approval reused that same checkpoint and completed training;
+  the original local-data hardware profile and prior approval were retained.
+  Loss fell from 1.365828275680542 to 0.06752631813287735, with validation/test
+  accuracy 1.0/1.0 on the contrived fixture, not a general quality claim.
+- After app/backend restart the complete trial and resume profile reopened exactly.
+  All three checkpoint files, three dataset files, seven completed trial files and
+  27 prior artifact files retained their hashes. This fixture does not establish
+  physical sleep/power recovery. Local evidence is under
+  /tmp/almg-resume-feasibility-native-qa/verification.json and native UI captures;
+  generated data, checkpoints and weights stay outside Git.
+- Validation: 579 Python tests passed with warnings as errors and Metal enabled,
+  58 Flutter tests passed, and analysis was clean. Added tests cover read-only
+  zero-checkpoint review, stale/consent rejection, changed submission feasibility
+  blocking the optimizer queue, actual interruption/checkpoint reuse, original
+  profile preservation, corrupt checkpoint rejection and distinct resume controls.
+- Remaining: automatic factory-handoff feasibility profiles, total wall-time
+  estimates, broader neural/full-epoch feasibility and suitable Windows/CUDA
+  verification. Unchanged hardware/user-action blockers stay open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

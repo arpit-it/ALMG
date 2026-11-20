@@ -3703,15 +3703,12 @@ class _StudioPageState extends State<StudioPage> {
 
   Future<void> _startDecoderTrial({String? id, Map<String, dynamic>? proposal, Map<String, dynamic>? dataset}) async {
     try {
-      Map<String, dynamic>? hardware;
-      if (id == null) {
-        hardware = await _request('/decoder-trials/feasibility', {'confirmed': true, 'dataset': ?dataset});
-        if (!mounted) return;
-        final approved = await showDialog<bool>(context: context, builder: (context) => GeneratedTrialFeasibilityDialog(report: hardware!));
-        if (approved != true || !mounted) return;
-      }
+      final hardware = await _request(id == null ? '/decoder-trials/feasibility' : '/decoder-trials/$id/feasibility', {'confirmed': true, 'dataset': ?dataset});
+      if (!mounted) return;
+      final approved = await showDialog<bool>(context: context, builder: (context) => GeneratedTrialFeasibilityDialog(report: hardware));
+      if (approved != true || !mounted) return;
       final created = await _request(id == null ? '/decoder-trials' : '/decoder-trials/$id/resume', {
-        'confirmed': true, 'reviewed_feasibility': ?hardware, if (proposal != null) 'proposal_id': proposal['id'],
+        'confirmed': true, 'reviewed_feasibility': hardware, if (proposal != null) 'proposal_id': proposal['id'],
         if (proposal != null) 'proposal_revision': proposal['revision'],
         'dataset': ?dataset,
       });
