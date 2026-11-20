@@ -5132,6 +5132,49 @@ P3-LMF-03 partial progress · saved streamed-model private CPU previews · 2026-
   already complete; unchanged physical power, Windows and oversized-fixture
   blockers remain open and skipped. Unrelated user edits and weights are preserved.
 
+P3-LMF-03 partial progress · independent saved-stream CPU evaluation · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed streamed trials now offer “Re-evaluate saved
+  model”. Opening/closing the native dialog performs no evaluation; “Evaluate
+  saved model on CPU” explicitly reloads the immutable model/tokenizer and saves
+  a new private evaluation report. The main display shows split populations,
+  real-target counts, accuracy, loss and whether both splits meet the 80% target;
+  detailed provenance is expandable. Neither a passing nor a failing report grants
+  training, export approval or model release.
+- The independent NumPy scorer exhausts every saved validation/test window in
+  batches of at most 16, excludes padding and aggregates by real target tokens.
+  Reports bind the exact completed trial/checkpoint, tokenizer/windows revisions,
+  CPU runtime, evaluation version and implementation hash, and compare accuracy
+  and loss with the original Metal evaluation. Current source/permission/overlap
+  and checkpoint integrity are checked before and after scoring. Nonfinite scores,
+  stale/incomplete trials and publication/source failures save no partial report.
+  Reports are separate, bounded, atomically published and hash-checked in history;
+  frozen weights, training state, earlier reports and preview history are untouched.
+- Local app verification: rebuilt and ran ALMG on this Mac using fixture backend
+  port 28860. Canceled the Unigram evaluation dialog without creating a report,
+  then evaluated all three saved full-split codec families through native controls.
+  CPU report 71b6119a covered Unigram validation 298 windows/4404 targets and test
+  273/4055; f9497a3d covered byte BPE 569/8732 and 522/8028; c96f3ef3 covered
+  character BPE 187/2921 and 174/2713. CPU accuracies matched the original Metal
+  values exactly; maximum absolute loss differences were 1.59e-7, 5.88e-8 and
+  1.56e-7 respectively. All correctly reported passed=false and release=false.
+- After a complete app/backend restart, all three original reports reopened
+  identically in native saved history and fresh CPU evaluations reproduced exactly
+  the same metrics. All 145 prior stream/source/model/checkpoint/preview files and
+  original report files remained byte-identical. 514 Python tests passed with real
+  Metal fixture training and warnings as errors; 42 Flutter tests passed; Flutter
+  analysis and diff checks were clean. Tests verify consent/stale/incomplete gates,
+  full populations, nonvacuous padding-target invariance, restart/history, nonfinite
+  scores, source changes and failed atomic publication without weight changes.
+  Evidence: /tmp/almg-stream-evaluation-native-qa/ (verification.json, native and
+  restart captures, consent UI, test/build logs). Generated/private files stay out
+  of Git; no external requests or pretrained downloads were used.
+- Remaining: streamed-model archive export/import, production-scale training,
+  broader tokenizer acceptance and scheduler integration. Current short trials
+  remain below the export flow's 80% evaluation target; this gate was preserved.
+  Repeating unchanged evaluations is unnecessary unless checkpoint/evidence changes.
+  P3-LMF-01 is already complete. Unchanged physical power, Windows and oversized-
+  fixture blockers remain open and skipped; unrelated edits and weights are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

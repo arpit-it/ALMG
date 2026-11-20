@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'stream_trial_preview_dialog.dart';
+import 'stream_trial_evaluation_dialog.dart';
 
 typedef ModelBatchRequest = Future<Map<String, dynamic>> Function(String, Map<String, dynamic>);
 
@@ -150,6 +151,8 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
         if (error != null) Text(error!),
         SelectableText(const JsonEncoder.withIndent('  ').convert(run)),
       ])), actions: [
+        if (run['status'] == 'complete') TextButton(onPressed: busy ? null : () => showDialog<void>(context: context,
+          builder: (context) => StreamTrialEvaluationDialog(run: run, request: widget.request)), child: const Text('Re-evaluate saved model')),
         if (run['status'] == 'complete') TextButton(onPressed: busy ? null : () => showDialog<void>(context: context,
           builder: (context) => StreamTrialPreviewDialog(run: run, request: widget.request)), child: const Text('Preview saved model')),
         if (run['status'] != 'complete') TextButton(onPressed: busy ? null : () async {
