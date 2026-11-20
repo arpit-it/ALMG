@@ -24,7 +24,14 @@ class _DecoderOptimizerContinuationDialogState extends State<DecoderOptimizerCon
   }
   Future<void> _show(Map<String, dynamic> record) => showDialog<void>(context: context, builder: (context) => AlertDialog(
     title: const Text('Saved checkpoint continuation'), scrollable: true,
-    content: SizedBox(width: 660, child: SelectableText(const JsonEncoder.withIndent('  ').convert(record))),
+    content: SizedBox(width: 660, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (record['isolated_workflow_measurements'] case final Map measured) ...[
+        Text('Measured isolated continuation work: ${(measured['elapsed_seconds'] as num).toStringAsFixed(3)} s.'),
+        Text('Measured continuation peaks: RSS ${measured['isolated_process_peak_rss_bytes']} bytes · Metal ${measured['isolated_metal_peak_bytes']} bytes.'),
+        const Text('Fresh-worker observations cover only the approved remaining updates plus startup, restore and inference work. Queue and approval waits are excluded.'),
+      ],
+      SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+    ])),
     actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   Future<void> _continue() async {
     setState(() { _busy = true; _error = null; });
@@ -54,6 +61,12 @@ class _DecoderOptimizerContinuationDialogState extends State<DecoderOptimizerCon
       if (_review != null) ...[
         Text('Restore step ${_review!['source']['checkpoint_step']} · remaining updates: ${_review!['estimates']['optimizer_updates']} · original total: ${_review!['config']['steps']}.'),
         Text(_review!['feasible'] == true ? 'Resources cover conservative continuation reserves.' : 'Checkpoint continuation cannot start.'),
+        Text('Conservative continuation memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes.'),
+        if (_review!['estimates']['isolated_optimizer_memory'] case final Map memory) Text('Measured isolated continuation peaks: RSS ${memory['isolated_process_peak_rss_bytes']} bytes · Metal ${memory['isolated_metal_peak_bytes']} bytes. Existing admission reserves are never reduced.'),
+        if (_review!['estimates']['optimizer_work_estimate'] case final Map work) ...[
+          Text('Estimated remaining checkpoint work: ${(work['estimated_seconds'] as num).toStringAsFixed(3)} s from ${work['sample_count']} compatible continuation(s).'),
+          const Text('Uses exact checkpoint/configuration/runtime/producer matches. Includes fresh-worker startup, restore and inference; excludes queue/approval waits and is not a total wall-time guarantee.'),
+        ] else const Text('Remaining-work estimate unavailable until a compatible isolated continuation completes.'),
         for (final reason in _review!['blockers'] as List) Text(reason as String),
         ExpansionTile(title: const Text('View checkpoint continuation review'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],

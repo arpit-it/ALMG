@@ -6759,6 +6759,59 @@ P3-LMF-05 partial progress · fresh-worker optimizer peaks and calibrated reserv
   synthetic fixtures remain capped at 16384 parameters. Windows/CUDA, physical
   power and oversized-fixture blockers remain open and skipped unchanged.
 
+P3-LMF-05 partial progress · isolated checkpoint-continuation peak feedback · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Separately approved optimizer checkpoint continuation
+  now runs in a fresh local worker, with the same consent/review/resource checks,
+  nonce/PID binding, retained-artifact behavior and atomic measurement publication
+  as bounded fresh training. Normal training and continuation use distinct measured
+  formats/scopes; the latter measures only remaining original updates plus bootstrap,
+  admission, restoration and final CPU inference. Shared counters are never reset.
+- Continuation review derives its own memory/time feedback from verified isolated
+  continuation records matching the exact parent/checkpoint hashes, configuration,
+  runtime and producer. Full-training timing is not reused. Work estimates use the
+  highest compatible observation plus 25% headroom; a derived memory floor sums
+  isolated RSS/Metal peaks with the same headroom and never reduces the preexisting
+  admission reserve. Changed checkpoint state/context, unfinished/non-isolated
+  records and malformed peaks are ignored. Above-reserve measured floors block
+  machines that cover only the smaller calculated reserve before worker launch.
+- The app labels measured continuation peaks/work separately from estimated
+  remaining checkpoint work, and explains bootstrap/restore/inference overhead,
+  exclusions and scope. Old normal and continuation records remain readable.
+  No arbitrary-interruption, extended-budget or total wall-time claim is added.
+- Native verification: rebuilt and ran ALMG with the isolated local 8704-parameter
+  two-layer initialization and external collection disabled. Reopened all eighteen
+  retained records before writes. From previously isolated normal-training sources
+  d771750a3f814551822e03f618dfb691 (FP32 SGD) and
+  8bab00e00b934e3086ec6da1a83b2815 (mixed FP16 AdamW), separately approved
+  continuations 1bca6effdcd2431c84df2564e759ac44 and
+  127330e5dcb341c28d14e51b695bd466. Canceling the first review created no artifact.
+  Fresh worker PIDs 86271/86380 were distinct from backend PID 81774 and each other.
+- SGD measured 0.4200614580186084 s with peak RSS/Metal 74432512/140144 bytes;
+  AdamW measured 0.43341808300465345 s with peaks 76382208/171376 bytes. Each
+  restored step ten, completed exactly steps eleven through twenty with the original
+  scheduler/gradient/clipping trace, matched source final weights with 0.0 error
+  and reproduced source CPU-generated token IDs. SGD loss fell 4.7254509925842285 →
+  4.686117172241211; AdamW loss fell 3.1773459911346436 → 2.6992383003234863.
+- Refreshed continuation reviews showed one compatible source each and remaining-
+  work estimates 0.5250768225232605/0.5417726037558168 s. Memory reserves correctly
+  stayed at their larger existing 271505728/271784256-byte floors. Closing those
+  reviews produced no extra training. After app/backend restart all twenty records,
+  optimizer state, CPU inference and both continuation-specific calibrations
+  reopened exactly. All ninety-two optimizer/continuation files, three source files
+  and 477 prior artifact files retained their hashes. Evidence:
+  /tmp/almg-continuation-peaks-native-qa/verification.json and native captures;
+  generated datasets, checkpoints and weights remain outside Git.
+- Validation: 610 Python tests passed with warnings as errors and Metal enabled,
+  68 Flutter tests passed, and analysis was clean. Tests cover normal and continuation
+  worker execution, legacy state/schedule preservation, exact-checkpoint context
+  rejection, separate-scope feedback, measured-floor admission blocking before
+  launch, source preservation and measured-versus-estimated continuation UI.
+- Remaining: broader corpus/engine profiling as P3-LMF-06 grows, arbitrary durable
+  interruption and graceful cancellation, text-corpus integration and profiled
+  50M–100M training. Current synthetic fixtures remain capped at 16384 parameters.
+  Unchanged Windows/CUDA, physical power and oversized-fixture blockers remain open
+  and skipped; bounded observations do not establish large-model feasibility.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

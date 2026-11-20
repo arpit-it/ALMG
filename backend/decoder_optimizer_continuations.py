@@ -6,9 +6,9 @@ from pathlib import Path
 import uuid
 import numpy as np
 if __package__:
-    from . import decoder_optimizer_fixture as fixture
+    from . import decoder_optimizer_fixture as fixture,decoder_optimizer_continuation_estimates as measured_feedback
 else:
-    import decoder_optimizer_fixture as fixture
+    import decoder_optimizer_fixture as fixture,decoder_optimizer_continuation_estimates as measured_feedback
 
 
 def _source(root,identifier):
@@ -20,7 +20,7 @@ def _source(root,identifier):
 
 def review(root,identifier):
     parent,admission,checkpoint=_source(root,identifier);c=parent['optimizer'];midpoint=c['steps']//2
-    estimates={**admission['estimates'],'optimizer_work_estimate':None,'optimizer_updates':c['steps']-midpoint,
+    estimates={**admission['estimates'],'optimizer_work_estimate':None,'isolated_optimizer_memory':None,'pre_continuation_calibration_reserve_bytes':admission['estimates']['required_available_memory_bytes'],'optimizer_updates':c['steps']-midpoint,
         'checkpoint_step':midpoint,'recorded_microbatch_backward_calls':(c['steps']-midpoint)*c.get('gradient_accumulation_steps',1),'reference_comparison_optimizer_updates':0}
     record={'format':'almg-optimizer-continuation-review-v1','schema_version':1,
         'source':{'record_id':identifier,'record_revision':parent['revision'],'checkpoint_step':midpoint,
@@ -29,7 +29,12 @@ def review(root,identifier):
         'config':c,'runtime':admission['runtime'],'hardware':admission['hardware'],'estimates':estimates,
         'feasible':admission['feasible'],'blockers':admission['blockers'],'training_approved':False,'release_approved':False,
         'scope':'restore_saved_midpoint_and_finish_original_synthetic_budget_in_new_private_artifact',
-        'implementation_sha256':fixture.digest({name:fixture.file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_continuations.py','decoder_optimizer_fixture.py','decoder_architecture_backward.py','decoder_mixed_precision.py','planned_decoder.py')})}
+        'implementation_sha256':fixture.digest({name:fixture.file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_continuations.py','decoder_optimizer_continuation_estimates.py','decoder_optimizer_isolated.py','decoder_optimizer_worker.py','decoder_optimizer_fixture.py','decoder_architecture_backward.py','decoder_mixed_precision.py','planned_decoder.py')})}
+    memory,work=measured_feedback.feedback(history(root,identifier),record)
+    estimates['isolated_optimizer_memory']=memory;estimates['optimizer_work_estimate']=work
+    if memory is not None:estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],memory['calculated_memory_floor_bytes'])
+    if not fixture.hardware._fits(record['hardware'],estimates) and not any('memory/disk' in reason for reason in record['blockers']):record['blockers'].append('Current memory/disk does not cover isolated continuation calibration reserves.')
+    record['feasible']=not record['blockers']
     record['revision']=fixture.digest(record);return record
 
 

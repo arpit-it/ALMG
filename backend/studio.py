@@ -2365,7 +2365,7 @@ class Handler(BaseHTTPRequestHandler):
                 if optimizer_parts[2] == 'continuation-review':
                     return self.respond(decoder_optimizer_continuations.review(ROOT,optimizer_parts[1]))
                 if optimizer_parts[2] == 'continue':
-                    return self.respond(inference.WORKER.submit(decoder_optimizer_continuations.run,ROOT,optimizer_parts[1],data.get('confirmed'),data.get('reviewed')).result())
+                    return self.respond(inference.WORKER.submit(decoder_optimizer_isolated.run_continuation,ROOT,optimizer_parts[1],data.get('confirmed'),data.get('reviewed')).result())
                 if optimizer_parts[2] == 'continuations':
                     return self.respond({'records':decoder_optimizer_continuations.history(ROOT,optimizer_parts[1])})
             architecture_parts = self.path.strip('/').split('/')
