@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'decoder_corpus_continuation_dialog.dart';
 import 'package:flutter/material.dart';
 
 class DecoderCorpusOptimizerDialog extends StatefulWidget {
@@ -43,7 +44,9 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
       const Text('Held-out losses are diagnostics on this small corpus. This private result does not establish language quality or release approval.'),
       const Text('Workflow time and memory observations share the backend process; these are not isolated training peaks.'),
       SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
-    ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    ])), actions: [
+      if (record['id'] is String) TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusContinuationDialog(sourceId: record['id'] as String, request: widget.request)), child: const Text('Review corpus checkpoint continuation')),
+      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   Future<void> _train() => _perform(() async {
     final record = await widget.request('$_path/corpus-optimizer-train', {..._body, 'confirmed': true, 'reviewed_feasibility': _review});
     if (mounted) await _show(record);
@@ -74,7 +77,7 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
         onChanged: _busy ? null : (value) => setState(() { _batch = value!; _review = null; })),
       DropdownButton<int>(value: _accumulation, items: const [DropdownMenuItem(value: 1, child: Text('1 corpus microbatch per update')), DropdownMenuItem(value: 2, child: Text('2 corpus microbatches per update'))],
         onChanged: _busy ? null : (value) => setState(() { _accumulation = value!; _review = null; })),
-      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. This bounded path does not expose cancellation or independent continuation yet. Reported split losses evaluate the saved FP32 master model.'),
+      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. This bounded path Saved midpoint continuation requires separate approval; cancellation is not exposed yet. Reported split losses evaluate the saved FP32 master model.'),
       if (_busy) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
       if (_review != null) ...[

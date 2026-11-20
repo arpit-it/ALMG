@@ -36,6 +36,48 @@ def batch_arrays(windows, step, rows):
     return indices, arrays
 
 
+def split_losses(model, windows):
+    result = {}
+    for part, rows in windows.items():
+        total = count = 0
+        for row in rows:
+            mask = np.array([row['target_mask']], dtype=np.float32); targets = int(mask.sum())
+            total += backward.cpu_loss(model, np.array([row['inputs']]), np.array([row['targets']]), mask) * targets
+            count += targets
+        result[part] = total / count
+    return result
+
+
+def train_updates(values, state, end, windows, c, model_config, mx, observer):
+    precision = c['compute_precision']; scale = c['loss_scale']
+    _, _, gradient = mixed.functions(model_config, mx, scale) if precision == 'mixed_float16' else backward.metal_functions(model_config, mx)
+    gradient_tolerance = 1e-3 if precision == 'mixed_float16' else 1e-5
+    gradient_error = 0.0
+    logs = []
+    while state['step'] < end:
+        indices, arrays = batch_arrays(windows, state['step'], c['batch_size'])
+        parameters = {name: mx.array(value) for name, value in values.items()}
+        def gradients_for(batch):
+            grads = gradient(parameters, *[mx.array(value) for value in batch]); mx.eval(grads)
+            return mixed.unscale({name: np.array(value) for name, value in grads.items()}, scale)
+        full = gradients_for(arrays)
+        if c['gradient_accumulation_steps'] > 1:
+            pieces = [(gradients_for([array[index:index + 1] for array in arrays]), int(arrays[2][index].sum()))
+                      for index in range(c['batch_size'])]
+            gradients = optimizer.accumulate(pieces)
+            error = max(float(np.max(np.abs(full[name] - gradients[name]))) for name in full)
+            gradient_error = max(gradient_error, error)
+            if error > gradient_tolerance:
+                raise ValueError('Token-weighted corpus accumulation differs from the full effective batch; checkpoints retained.')
+        else:
+            gradients = full
+        values, state, entry = optimizer.update(values, gradients, state, c)
+        entry.update(window_index=indices[0], window_indices=indices, target_tokens=int(arrays[2].sum()),
+                     microbatches=c['gradient_accumulation_steps'])
+        logs.append(entry); observer.sample(f"corpus_update_{state['step']}")
+    return values, state, logs, gradient_error
+
+
 def _source(root, initialized, reviewed_inputs):
     if not isinstance(reviewed_inputs, dict):
         raise ValueError('Reopen saved corpus inputs before reviewing training.')
@@ -138,15 +180,7 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
     identifier = uuid.uuid4().hex; folder = _folder(root, identifier); folder.mkdir(parents=True)
     def cpu_scores(values):
         model.parameters = values
-        result = {}
-        for part, rows in windows.items():
-            total = count = 0
-            for row in rows:
-                mask = np.array([row['target_mask']], dtype=np.float32); targets = int(mask.sum())
-                total += backward.cpu_loss(model, np.array([row['inputs']]), np.array([row['targets']]), mask) * targets
-                count += targets
-            result[part] = total / count
-        return result
+        return split_losses(model, windows)
     initial_losses = cpu_scores(initial_parameters)
     with mx.stream(mx.gpu):
         fp32_logits, fp32_loss, fp32_gradient = backward.metal_functions(model.config, mx)
@@ -165,28 +199,8 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
         gradient_error = 0.0
         def optimize(values, state, end):
             nonlocal gradient_error
-            logs = []
-            while state['step'] < end:
-                indices, arrays = batch_arrays(windows['train'], state['step'], c['batch_size'])
-                parameters = {name: mx.array(value) for name, value in values.items()}
-                def gradients_for(batch):
-                    grads = gradient(parameters, *[mx.array(value) for value in batch]); mx.eval(grads)
-                    return mixed.unscale({name: np.array(value) for name, value in grads.items()}, scale)
-                full = gradients_for(arrays)
-                if c['gradient_accumulation_steps'] > 1:
-                    pieces = [(gradients_for([array[index:index + 1] for array in arrays]), int(arrays[2][index].sum()))
-                              for index in range(c['batch_size'])]
-                    gradients = optimizer.accumulate(pieces)
-                    error = max(float(np.max(np.abs(full[name] - gradients[name]))) for name in full)
-                    gradient_error = max(gradient_error, error)
-                    if error > gradient_tolerance:
-                        raise ValueError('Token-weighted corpus accumulation differs from the full effective batch; checkpoints retained.')
-                else:
-                    gradients = full
-                values, state, entry = optimizer.update(values, gradients, state, c)
-                entry.update(window_index=indices[0], window_indices=indices, target_tokens=int(arrays[2].sum()),
-                             microbatches=c['gradient_accumulation_steps'])
-                logs.append(entry); observer.sample(f"corpus_update_{state['step']}")
+            values, state, logs, error = train_updates(values, state, end, windows['train'], c, model.config, mx, observer)
+            gradient_error = max(gradient_error, error)
             return values, state, logs
         empty = {'step': 0, 'm': {}, 'v': {}}; midpoint = c['steps'] // 2
         reference, reference_state, _ = optimize(initial_parameters, empty, c['steps'])
@@ -235,7 +249,7 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
               'inference_runtime': 'planned_decoder_numpy_cpu', 'pretrained_student_weights_loaded': False,
               'training_approved': True, 'release_approved': False, 'source_initialization_modified': False,
               'workflow_measurements': observed,
-              'limitations': 'Small reviewed text corpus, FP32 or bounded mixed FP16 SGD/AdamW, FP32 masters, one/two effective rows and one/two token-weighted microbatches only. Held-out losses are diagnostics; no quality/release gate. Both comparison trajectories execute. Independent continuation and fresh-run cancellation on this corpus path remain unexposed. Fixed-scale mixed precision is validated only for bounded corpus fixtures; split losses use the saved FP32 master model, not a general quality or memory-savings claim.',
+              'limitations': 'Small reviewed text corpus, FP32 or bounded mixed FP16 SGD/AdamW, FP32 masters, one/two effective rows and one/two token-weighted microbatches only. Held-out losses are diagnostics; no quality/release gate. Both comparison trajectories execute. Saved midpoint continuation requires separate approval; fresh-run cancellation remains unexposed. Fixed-scale mixed precision is validated only for bounded corpus fixtures; split losses use the saved FP32 master model, not a general quality or memory-savings claim.',
               'files': {str(path.relative_to(folder)): file_digest(path) for path in folder.rglob('*') if path.is_file()}}
     record['revision'] = digest(record)
     (folder / 'record.json').write_text(json.dumps(record, allow_nan=False, indent=2))

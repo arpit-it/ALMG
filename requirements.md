@@ -7113,6 +7113,61 @@ P3-LMF-06 partial progress · bounded mixed FP16 corpus training · 2026-11-21:
   evaluation and profiled 50M–100M training. Unchanged independent hardware/user-
   action blockers remain open and skipped.
 
+P3-LMF-06 partial progress · independently approved corpus checkpoint continuation · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Saved corpus optimizer runs now offer a separate
+  midpoint-continuation review and explicit confirmation. Review binds the original
+  record/revision, checkpoint/model/optimizer hashes, corpus revision, original
+  configuration/precision, runtime, implementation and current conservative resource
+  admission. Closing or declining creates no continuation output; stale review,
+  changed source state and insufficient resources reject execution.
+- Continuation restores the retained midpoint model, FP32 optimizer moments and
+  scheduler counter, then executes only the remaining original updates into new
+  private artifacts. A shared corpus update routine preserves original step-derived
+  window selection, masked token weighting, scaling, clipping and learning rates.
+  This replays a completed run's retained midpoint; arbitrary crash/OS interruption
+  recovery and cancellation are not established by this change.
+- Separate version-1 continuation records retain immutable parent/checkpoint/corpus
+  lineage, actual restored/completed counters, remaining update logs, split losses,
+  generated text, trained model, tokenizer and final FP32 optimizer state. Records
+  publish atomically after checks. Final weights must match the original saved model
+  within 1e-7 and CPU generation must match exactly. Reads revalidate file hashes,
+  original source/checkpoint bindings, moment shapes/finite values/counters, exact
+  window/target/learning-rate schedule, final reference weights and tokenizer-backed
+  CPU inference. Shared-process observations do not claim isolated peaks or forecasts.
+- Native verification: rebuilt/launched ALMG with retained local corpus fixtures and
+  reopened all six v1/v2/v3 source runs exactly. Reviewed legacy FP32 SGD source
+  f0a8d481e17b4ff0b22b70501a351b2b and mixed FP16 AdamW source
+  f15c14ccde1049ba928ecaa17ae53f40. Reviews showed restore update ten, ten remaining
+  updates and zero reference-retraining updates. Closing the first review created
+  no artifact. Explicit confirmation produced SGD continuation
+  6a3cf68b11504259b012a1879e5050ce and AdamW
+  b8117bd1c8ea495c9e637ee431df4c9b, each recording only updates eleven through
+  twenty and finishing optimizer/scheduler counter twenty.
+- Both native results matched original final weights with 0.0 error and identical
+  CPU-generated token IDs/text. Train loss from restored checkpoints decreased
+  1.2918970995 → 1.2617147935 (SGD) and .9098939715 → .7765709044 (AdamW);
+  validation/test losses also decreased. AdamW used original batch-two, two-way
+  accumulation and fixed-scale mixed computation; SGD preserved its legacy one-row
+  FP32 configuration. These toy-corpus checks establish checkpoint engineering,
+  not language-quality or release acceptance.
+- After app/backend restart all eight source/continuation records, final optimizer
+  states, checkpoint lineage and CPU text reopened exactly without further training.
+  All 191 original fixture files retained their hashes. Evidence:
+  /tmp/almg-corpus-continuation-native-qa/verification.json, sgd-review-ui.json,
+  adamw-review-ui.json, sgd-continued-ui.json, adamw-continued-ui.json and restarted
+  native captures. No external collection occurred; generated artifacts, tokenizers
+  and weights remain outside Git.
+- Validation: 624 Python tests passed with warnings as errors and Metal enabled,
+  75 Flutter tests passed, analysis clean. New real FP32 SGD/mixed AdamW tests verify
+  remaining-only execution, restored state/schedule and final reference inference,
+  source preservation, scoped history, consent/resource/stale-review rejection,
+  corrupted checkpoint/final state rejection and changed saved learning-rate logs.
+  UI tests cover separate review, blocked resources and explicit confirmation.
+- Remaining: corpus continuation/fresh-run cancellation, retained partial recovery,
+  arbitrary durable OS/process interruption, larger budgets/resource profiling,
+  broader quality evaluation and profiled 50M–100M training. Independent unchanged
+  hardware/user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
