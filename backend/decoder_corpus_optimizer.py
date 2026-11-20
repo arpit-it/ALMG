@@ -48,13 +48,15 @@ def split_losses(model, windows):
     return result
 
 
-def train_updates(values, state, end, windows, c, model_config, mx, observer):
+def train_updates(values, state, end, windows, c, model_config, mx, observer, stop=None):
     precision = c['compute_precision']; scale = c['loss_scale']
     _, _, gradient = mixed.functions(model_config, mx, scale) if precision == 'mixed_float16' else backward.metal_functions(model_config, mx)
     gradient_tolerance = 1e-3 if precision == 'mixed_float16' else 1e-5
     gradient_error = 0.0
     logs = []
     while state['step'] < end:
+        if stop is not None and stop():
+            break
         indices, arrays = batch_arrays(windows, state['step'], c['batch_size'])
         parameters = {name: mx.array(value) for name, value in values.items()}
         def gradients_for(batch):

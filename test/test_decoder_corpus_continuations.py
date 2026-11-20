@@ -67,3 +67,55 @@ class CorpusContinuationTest(unittest.TestCase):
         with TemporaryDirectory() as temporary,patch.object(continuation,'review') as review:
             with self.assertRaises(ValueError):continuation.run(Path(temporary),'not-a-source',False,None)
             review.assert_not_called();self.assertEqual(list(Path(temporary).iterdir()),[])
+
+    @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS')=='1','Requires actual Metal update cancellation')
+    def test_cancel_retains_actual_counter_moments_and_own_cpu_inference(self):
+        import uuid
+        training=continuation.training
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);initialized,saved,settings=corpus(root)
+            previous=None
+            for kind,precision in (('sgd','float32'),('adamw','mixed_float16')):
+                c={**settings,'optimizer':kind,'weight_decay':.01 if kind=='adamw' else 0.,'batch_size':2,
+                   'gradient_accumulation_steps':2,'compute_precision':precision,'loss_scale':128. if precision=='mixed_float16' else 1.}
+                parent=training.run(root,True,initialized,saved,c,training.review(root,initialized,saved,c))
+                approved=continuation.review(root,parent['id']);token=uuid.uuid4().hex
+                before={path:path.read_bytes() for path in root.rglob('*') if path.is_file()}
+                original=training.optimizer.update
+                def cancel_after_update(*args):
+                    result=original(*args)
+                    continuation.cancellation.request(root,parent['id'],token,True)
+                    return result
+                with patch.object(training.optimizer,'update',side_effect=cancel_after_update):
+                    record=continuation.run(root,parent['id'],True,approved,token)
+                self.assertEqual(record['status'],'canceled');self.assertEqual(record['completed_steps'],11)
+                self.assertEqual(record['scheduler_completed_steps'],11);self.assertEqual(len(record['step_log']),1)
+                self.assertEqual(record['step_log'][0]['learning_rate'],parent['step_log'][10]['learning_rate'])
+                self.assertIsNone(record['reference_parameter_max_error']);self.assertFalse(record['release_approved'])
+                self.assertEqual(continuation.read(root,record['id']),record)
+                state=json.loads((continuation._folder(root,record['id'])/'optimizer.json').read_text())
+                self.assertEqual(state['step'],11)
+                if kind=='adamw':self.assertTrue(state['m'] and state['v'])
+                self.assertTrue(all(path.read_bytes()==content for path,content in before.items()))
+                receipt=continuation.cancellation.request(root,parent['id'],token,True)
+                self.assertEqual(continuation.cancellation.request(root,parent['id'],token,True),receipt)
+                if previous:
+                    with self.assertRaises(ValueError):continuation.cancellation.request(root,parent['id'],previous,True)
+                previous=token
+                if kind=='sgd':
+                    early=uuid.uuid4().hex;continuation.cancellation.request(root,parent['id'],early,True)
+                    zero=continuation.run(root,parent['id'],True,approved,early)
+                    self.assertEqual(zero['status'],'canceled');self.assertEqual(zero['completed_steps'],10)
+                    self.assertEqual(zero['step_log'],[])
+                receipt_path=continuation.cancellation._path(root,token);original_receipt=receipt_path.read_bytes()
+                receipt_path.write_text('{}')
+                with self.assertRaises(ValueError):continuation.read(root,record['id'])
+                receipt_path.write_bytes(original_receipt)
+
+    def test_cancellation_requires_explicit_consent_and_bounded_token(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary)
+            with self.assertRaises(ValueError):continuation.cancellation.request(root,'unknown','bad',False)
+            with self.assertRaises(ValueError):continuation.cancellation.validate('../escape')
+            self.assertFalse(continuation.cancellation.requested(root,'source','revision',None))
+            self.assertEqual(list(root.iterdir()),[])

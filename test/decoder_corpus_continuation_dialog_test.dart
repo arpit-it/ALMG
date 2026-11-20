@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/decoder_corpus_continuation_dialog.dart';
@@ -27,4 +28,25 @@ void main() {
     expect(calls.where((path) => path.endsWith('/continue')).length, 1);
     await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
   });
+  testWidgets('live corpus cancel uses the active run token and waits for a retained result', (tester) async {
+    final result=Completer<Map<String,dynamic>>();
+    String? runToken, cancelToken;
+    await tester.pumpWidget(MaterialApp(home: DecoderCorpusContinuationDialog(sourceId:'source',request:(path,body) async {
+      if(path.endsWith('/continue')) { runToken=body['request_id'] as String; return result.future; }
+      if(path.endsWith('/cancel-continuation')) { cancelToken=body['request_id'] as String; expect(body['confirmed'],true); return {'cancel_requested':true}; }
+      return {'feasible':true,'restore_step':10,'estimates':{'optimizer_updates':10},'blockers':[]};
+    })));
+    await tester.tap(find.text('Review corpus continuation resources')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm continue corpus checkpoint')); await tester.pump();
+    expect(find.text('Cancel corpus continuation'),findsOneWidget);
+    await tester.tap(find.text('Cancel corpus continuation')); await tester.pump();
+    expect(cancelToken,runToken); expect(RegExp(r'^[a-f0-9]{32}$').hasMatch(runToken!),true);
+    expect(find.textContaining('Waiting for a safe optimizer-update boundary'),findsOneWidget);
+    result.complete({'status':'canceled','restored_step':10,'completed_steps':11,'reference_parameter_max_error':null,'generated_text':'amber birch'});
+    await tester.pump(); await tester.pump(const Duration(milliseconds:300));
+    expect(find.textContaining('Corpus continuation canceled at update 11'),findsOneWidget);
+    await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
+    expect(find.text('Cancel corpus continuation'),findsNothing);
+  });
+
 }

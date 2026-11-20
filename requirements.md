@@ -7168,6 +7168,53 @@ P3-LMF-06 partial progress · independently approved corpus checkpoint continuat
   broader quality evaluation and profiled 50M–100M training. Independent unchanged
   hardware/user-action blockers remain open and skipped.
 
+P3-LMF-06 partial progress · cooperative corpus continuation cancellation · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Running corpus checkpoint continuation now exposes
+  Cancel. Each app run gets a fresh bounded random token; explicit cancellation
+  writes an atomic receipt bound to that token and original corpus run/revision.
+  Requests are handled outside the GPU queue and checked between complete optimizer
+  updates. No worker is killed and no source, checkpoint or trained weight is deleted.
+  A late request can finish as completed if no original work remains.
+- New version-2 continuation records distinguish completed and canceled outcomes.
+  Canceled results retain actual model, FP32 optimizer moments and scheduler counter,
+  tokenizer, executed update log and own CPU-generated text. They do not claim final
+  reference matching, decreasing loss or release acceptance. Cancellation before the
+  first new update can retain the restored midpoint unchanged. Reads validate receipt
+  ownership, status/counter ranges, optimizer state, exact executed window/schedule
+  and private CPU inference. Existing v1 completed records remain readable unchanged.
+- Native verification: rebuilt/launched ALMG, reopened all eight prior source/v1
+  continuation records exactly, and explicitly continued the retained FP32 SGD and
+  mixed FP16 AdamW sources. A local fixture delay only made the ten-update runs
+  observable for live Cancel; student gradients, updates and persistence were real.
+  Clicking Cancel stopped both at update eleven: private canceled SGD
+  0ad9d3c9c5f04b549372cb3d3a2343cf and AdamW
+  7ed1874d6ed44d12a5f72bd5c5d87e9c retained one new update, scheduler counter eleven
+  and matching saved optimizer state. Their reference-match fields stayed null.
+- Removed pacing and separately approved original-midpoint completion with new app
+  tokens. SGD 3cbaae77022d4e179dbbe78f824ca7da and AdamW
+  a227a54fe9c5470883735cc7efdaa355 completed update twenty, matched original final
+  weights with 0.0 error and identical CPU token output. Old cancellation receipts
+  did not stop these newly approved runs. This repeats the original midpoint work;
+  it does not resume the newly canceled update-eleven partials, which remain private.
+- After app/backend restart all twelve original/v1/v2 completed/canceled records,
+  partial state/counters, receipt bindings and CPU text reopened exactly without
+  further training. All 201 original fixture files and all 221 retained files
+  (including new model/state/receipt and fixture files) retained their hashes.
+  Evidence: /tmp/almg-corpus-cancel-native-qa/verification.json,
+  sgd-canceled-ui.json, adamw-canceled-ui.json, sgd-completed-ui.json,
+  adamw-completed-ui.json and restarted native captures. No external collection
+  occurred; generated artifacts, receipts, tokenizers and weights remain outside Git.
+- Validation: 626 Python tests passed with warnings as errors and Metal enabled,
+  76 Flutter tests passed, analysis clean. Real FP32 SGD/mixed AdamW coverage checks
+  stop-after-update and stop-before-first-update behavior, retained moments/counters,
+  source preservation, receipt idempotence/token isolation, malformed receipt rejection,
+  legacy completed reads and normal completion. UI tests verify the active run token,
+  cancellation while a request is in flight, waiting feedback and retained status.
+- Remaining: independently approved retained-partial corpus resume, fresh corpus-run
+  cancellation, arbitrary durable OS/process interruption, larger budgets/resource
+  profiling, broader quality evaluation and profiled 50M–100M training. Unchanged
+  independent hardware/user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

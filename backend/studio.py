@@ -2381,8 +2381,10 @@ class Handler(BaseHTTPRequestHandler):
             if len(corpus_parts) == 3 and corpus_parts[0] == 'decoder-corpus-optimizer-runs':
                 if corpus_parts[2] == 'continuation-review':
                     return self.respond(decoder_corpus_continuations.review(ROOT,corpus_parts[1]))
+                if corpus_parts[2] == 'cancel-continuation':
+                    return self.respond(decoder_corpus_continuations.cancellation.request(ROOT,corpus_parts[1],data.get('request_id'),data.get('confirmed')))
                 if corpus_parts[2] == 'continue':
-                    return self.respond(inference.WORKER.submit(decoder_corpus_continuations.run,ROOT,corpus_parts[1],data.get('confirmed'),data.get('reviewed')).result())
+                    return self.respond(inference.WORKER.submit(decoder_corpus_continuations.run,ROOT,corpus_parts[1],data.get('confirmed'),data.get('reviewed'),data.get('request_id')).result())
                 if corpus_parts[2] == 'continuations':
                     return self.respond({'records':decoder_corpus_continuations.history(ROOT,corpus_parts[1])})
             architecture_parts = self.path.strip('/').split('/')
