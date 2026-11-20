@@ -3842,6 +3842,42 @@ P3-LMF-02 partial progress · bounded complete-split reader integrity sessions �
   policies stay open. Unchanged hardware/Windows and scratch-space blockers were
   skipped without polling. No external collection, artifact/weight changes or push.
 
+P3-LMF-02 partial progress · summary-only streamed approach planning · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Completed streamed windows now connect to the
+  existing local planner and registered decoder recipe catalog. Planning sends
+  only the goal, window/source/tokenizer/overlap IDs and revisions, record/window/
+  target counts and recipe contracts; no original text, token arrays, source names
+  or permission notes are included. The planner can recommend from-scratch,
+  fine-tuning, distillation or retrieval, with an explanation and registered recipe.
+- Exact reviewed window/source bindings, recipe availability and planning code are
+  checked before/after planning. Plans are revisioned, immutable and reopenable in
+  a separate namespace. Explicit acknowledgment rechecks source evidence and saves
+  a separate revision-bound receipt; closing saves no acknowledgment. Both plan
+  and receipt remain non-executable with training/release approval false. Existing
+  executable-trial approval rejects these plans. Full streamed training remains
+  visibly unavailable; acknowledgment is not consent to run a model.
+- Local app verification: rebuilt native macOS ALMG on fixture port 28834 using a
+  clearly labeled scripted_local_fixture planner (not a live Qwen inference).
+  Submitted a synthetic goal, inspected captured summary-only planner input, and
+  reviewed plan a1080644a3dc4c2d947f7513b4c4651d. Closing created no acknowledgment.
+  Restarted both backend and app, reopened the identical saved plan without another
+  planner request, then explicitly acknowledged it. Native receipt confirmed all
+  execution/training/release flags false. No trial/model was created, and all 18
+  source fixture files remained byte-identical. Evidence:
+  /tmp/almg-stream-plan-native-qa/ (goal-ui.txt, plan-ui.json, planner-input.json,
+  reopened-plan-ui.json, receipt-ui.json, verification.json and build/restart logs).
+- Verification: 406 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed; Flutter analysis and diff checks passed. Added tests cover summary-only
+  payloads, registration/approach validation, missing consent, changed evidence,
+  saved-plan tampering, idempotent acknowledgment and rejection by trial approval.
+  Existing small-dataset planning and recipe regressions remain passing.
+- Remaining: live Qwen streamed-plan selection is not established by the scripted
+  fixture. Full streamed trial execution, scheduling, checkpoint cursor recovery,
+  broader mixing/incremental policies and larger-than-RAM acceptance remain open.
+  Physical power/Windows and safe scratch-space blockers stayed open and were
+  skipped without unchanged polling. No external collection, weights/artifact
+  modification, generated artifact commit or push; unrelated user edits preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

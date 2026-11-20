@@ -2109,9 +2109,62 @@ class _StudioPageState extends State<StudioPage> {
           showDialog<void>(context: this.context, builder: (context) => StreamModelBatchesDialog(
             reviewed: record, request: (path, body) => _request(path, body, const Duration(minutes: 10))));
         }, child: const Text('Inspect model input batches')),
+        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _planStreamedApproach(record); }, child: const Text('Plan streamed approach')),
+        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _savedStreamedPlans(record); }, child: const Text('View saved streamed plans')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume streamed windows'))],
     ));
     if (resume == true && mounted) await _runStreamWindows(record);
+  }
+
+  Future<void> _showStreamedPlan(Map<String, dynamic> plan) async {
+    final acknowledged = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Review streamed approach plan'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('Recommended approach: ${plan['approach']}'),
+        Text('Planner: ${plan['planner']?['model'] ?? plan['planner']?['provider'] ?? 'Unspecified'}'),
+        Text(plan['reason'] as String),
+        const Text('Planning only. Full streamed training, scheduling and checkpoint recovery are unavailable. Acknowledging this plan does not approve or start training. Source evidence is rechecked before acknowledgment.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(plan)),
+      ])),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Acknowledge plan only'))],
+    ));
+    if (acknowledged != true || !mounted) return;
+    try {
+      final receipt = await _request('/decoder-stream-plans/${plan['id']}/acknowledge', {'confirmed': true, 'reviewed': plan});
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(title: const Text('Plan acknowledged · training unavailable'),
+        scrollable: true, content: SelectableText(const JsonEncoder.withIndent('  ').convert(receipt)),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _planStreamedApproach(Map<String, dynamic> windows) async {
+    final goal = await showDialog<String>(context: context, builder: (context) => const _DecoderTrialGoalDialog(planningOnly: true));
+    if (goal == null || !mounted) return;
+    var waiting = true;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => const AlertDialog(
+      title: Text('Asking local Qwen'), content: Text('Planning from dataset counts and evidence revisions only. No source text or token arrays are sent.'))));
+    try {
+      final plan = await _request('/decoder-stream-windows/${windows['id']}/plans', {'confirmed': true, 'reviewed': windows, 'goal': goal}, const Duration(seconds: 120));
+      if (!mounted) return;
+      Navigator.pop(context); waiting = false;
+      await _showStreamedPlan(plan);
+    } catch (error) { if (mounted) { if (waiting) Navigator.pop(context); setState(() => _error = error.toString()); } }
+  }
+
+  Future<void> _savedStreamedPlans(Map<String, dynamic> windows) async {
+    try {
+      final plans = (await _request('/decoder-stream-windows/${windows['id']}/saved-plans', {'confirmed': true}))['plans'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved streamed plans'), children: [
+          if (plans.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved streamed plans.')),
+          for (final plan in plans) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(plan as Map)),
+            child: Text('${(plan['id'] as String).substring(0, 8)} · ${plan['approach']} · planning only')),
+        ]));
+      if (selected != null && mounted) await _showStreamedPlan(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
   Future<void> _beginStreamWindows(Map<String, dynamic> tokenizer) async {
@@ -4912,7 +4965,8 @@ class _StudioPageState extends State<StudioPage> {
 }
 
 class _DecoderTrialGoalDialog extends StatefulWidget {
-  const _DecoderTrialGoalDialog();
+  const _DecoderTrialGoalDialog({this.planningOnly = false});
+  final bool planningOnly;
 
   @override
   State<_DecoderTrialGoalDialog> createState() => _DecoderTrialGoalDialogState();
@@ -4929,9 +4983,9 @@ class _DecoderTrialGoalDialogState extends State<_DecoderTrialGoalDialog> {
 
   @override
   Widget build(BuildContext context) => AlertDialog(
-    title: const Text('Plan a local decoder trial'),
+    title: Text(widget.planningOnly ? 'Plan a streamed approach' : 'Plan a local decoder trial'),
     content: SizedBox(width: 520, child: TextField(controller: _input, autofocus: true, maxLength: 3000, maxLines: 4,
-      decoration: const InputDecoration(labelText: 'Trial goal', helperText: 'Local Qwen recommends an approach. Only a tiny generated-text trial can run.'))),
+      decoration: InputDecoration(labelText: 'Trial goal', helperText: widget.planningOnly ? 'Summary-only local planning. Streamed training is unavailable.' : 'Local Qwen recommends an approach. Only a tiny generated-text trial can run.'))),
     actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       TextButton(onPressed: () => Navigator.pop(context, _input.text), child: const Text('Ask local Qwen'))],
   );
