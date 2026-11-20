@@ -3701,6 +3701,17 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _approveFactoryTrial(String id, String revision) async {
+    try {
+      final report = await _request('/jobs/$id/decoder-feasibility', {'proposal_revision': revision});
+      if (!mounted) return;
+      final approved = await showDialog<bool>(context: context, builder: (context) => GeneratedTrialFeasibilityDialog(report: report));
+      if (approved != true || !mounted) return;
+      await _submit('/jobs/$id/approve-decoder-trial', {'confirmed': true, 'proposal_revision': revision,
+        'require_idle_ac': _decoderRequireIdle, 'reviewed_feasibility': report});
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _startDecoderTrial({String? id, Map<String, dynamic>? proposal, Map<String, dynamic>? dataset}) async {
     try {
       final hardware = await _request(id == null ? '/decoder-trials/feasibility' : '/decoder-trials/$id/feasibility', {'confirmed': true, 'dataset': ?dataset});
@@ -4306,9 +4317,7 @@ class _StudioPageState extends State<StudioPage> {
           if (!_decoderRequireIdle) const Text('Execution: start immediately after approval.'),
           OutlinedButton(onPressed: _busy ? null : _selectFactoryDataset, child: const Text('Choose reviewed local dataset')),
           if (proposal['executable'] == true)
-            FilledButton(onPressed: _busy ? null : () => _submit('/jobs/$id/approve-decoder-trial', {
-              'confirmed': true, 'proposal_revision': proposal['revision'], 'require_idle_ac': _decoderRequireIdle,
-            }), child: const Text('Confirm from-scratch decoder trial'))
+            FilledButton(onPressed: _busy ? null : () => _approveFactoryTrial(id, proposal['revision'] as String), child: const Text('Confirm from-scratch decoder trial'))
           else
             const Text('This approach is unavailable in the decoder trial workflow. Revise the goal to continue.'),
         ],

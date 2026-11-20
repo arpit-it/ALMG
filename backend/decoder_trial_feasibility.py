@@ -112,3 +112,34 @@ def resume(root,trial_id,confirmed,submit,approved=None,**options):
             trials.write(root,record)
         return submit(function,*arguments)
     return trials.start(root,True,save_and_submit,trial_id=trial_id,**options)
+
+
+def factory_review(root,job,proposal_revision):
+    proposal=job['decoder_proposal'];dataset=job.get('decoder_dataset')
+    if proposal_revision!=proposal['revision']:raise ValueError('Review the current decoder approach before hardware approval.')
+    current=trials.approved_proposal(root,proposal['id'],proposal_revision,trials.specification(dataset))
+    if current!=proposal:raise ValueError('Factory proposal changed; reopen the current approach.')
+    report=review(root,dataset);report['factory']={'job_id':job['id'],'proposal_id':proposal['id'],'proposal_revision':proposal_revision}
+    report['revision']=digest({k:v for k,v in report.items() if k!='revision'});return report
+
+
+def factory_start(root,job,confirmed,submit,proposal_revision,approved=None,**options):
+    if confirmed is not True:raise ValueError('Confirm the reviewed factory decoder handoff.')
+    fresh=factory_review(root,job,proposal_revision)
+    keys=('format','schema_version','specification_sha256','scope','dataset','estimates','implementation_sha256','factory')
+    if approved is not None and (not isinstance(approved,dict) or approved.get('feasible') is not True
+        or approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'})
+        or any(approved.get(key)!=fresh.get(key) for key in keys)):raise ValueError('Factory hardware or approach review changed; reopen it before approval.')
+    if not fresh['feasible']:raise training_resources.ResourceUnavailable('Factory decoder handoff blocked: '+' '.join(fresh['blockers']))
+    base={key:value for key,value in (approved or fresh).items() if key not in ('factory','revision')};base['revision']=digest(base)
+    def save_factory_and_submit(function,*arguments):
+        admission=factory_review(root,job,proposal_revision)
+        if not admission['feasible'] or any(admission.get(key)!=fresh.get(key) for key in keys):raise ValueError('Factory feasibility changed before submission; review again.')
+        with trials._LOCK:
+            record=trials.read(root,arguments[1])
+            record['local_dataset_trial_hardware' if job.get('decoder_dataset') is not None else 'generated_trial_hardware']['reviewed_before_approval']=approved is not None
+            record['factory_hardware_review']={
+                'approval':approved or fresh,'admission':admission,'reviewed_before_approval':approved is not None}
+            trials.write(root,record)
+        return submit(function,*arguments)
+    return start(root,True,save_factory_and_submit,base,proposal_id=job['decoder_proposal']['id'],proposal_revision=proposal_revision,dataset=job.get('decoder_dataset'),**options)

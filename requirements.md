@@ -6282,6 +6282,44 @@ P3-LMF-05 partial progress · checkpoint-bound hardware review before saved-tria
   estimates, broader neural/full-epoch feasibility and suitable Windows/CUDA
   verification. Unchanged hardware/user-action blockers stay open and skipped.
 
+P3-LMF-05 partial progress · factory-handoff feasibility before decoder approval · 2026-11-20:
+- [ ] P3-LMF-05 remains open. The main workbench's from-scratch factory
+  confirmation now opens a dedicated hardware feasibility review before creating
+  its linked saved trial. Review binds the workbench job, exact executable
+  proposal ID/revision, selected generated/local-data scope and unchanged training
+  specification. Fresh resources and proposal bindings are checked again at
+  submission. Cancellation leaves the factory review job unchanged.
+- The linked trial retains the exact reviewed report and admission as optional
+  factory_hardware_review metadata before optimizer work can run, alongside its
+  generated/local-data profile. Legacy API calls still get admission, explicitly
+  labeled when no hardware review was supplied. Existing approach consent,
+  dataset checks, idle/AC selection, trial linkage and artifact formats remain in
+  force. No collection or model release is implied by this hardware approval.
+- Native verification: rebuilt and ran ALMG with deterministic offline planner
+  fixtures for both generated text and six reviewed local documents. For each,
+  Cancel preserved the factory job and created no linked trial; renewed hardware
+  approval completed actual Metal training and displayed the exact proposal-bound
+  report through View linked decoder trial. Generated trial
+  9e930289d8504920bfc8f02e82e186bd reduced loss from 1.3726524114608765 to
+  0.0673074722290039 without loading pretrained student weights. Reviewed-data trial
+  55e5ce6a53414f8fb5928bdd51aeb172 reduced loss from 1.365828275680542 to
+  0.06752630323171616, with validation/test accuracy 1.0/1.0 on the contrived
+  fixture, not a general quality claim. Immediate execution was selected through
+  the app's idle/AC control; physical idle/power verification remains separate.
+- After app/backend restart, both workbench links, saved trials and hardware
+  profiles reopened exactly. All three prepared dataset files, 21 new artifact/
+  job/proposal files and 33 prior artifact files retained their hashes. Local
+  evidence: /tmp/almg-factory-feasibility-native-qa/verification.json and native UI
+  captures; generated fixtures, checkpoints and weights remain outside Git.
+- Validation: 580 Python tests passed with warnings as errors and Metal enabled,
+  59 Flutter tests passed, and analysis was clean. Coverage includes read-only
+  factory review, stale approach/hardware rejection, report retention before worker
+  submission, durable linkage, unavailable approaches and accurate legacy-review
+  provenance, with a distinct final factory approval control.
+- Remaining: total training wall-time estimates, broader neural/full-epoch
+  feasibility and suitable Windows/CUDA verification. Unchanged hardware/user-
+  action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

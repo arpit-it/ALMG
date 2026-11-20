@@ -9,6 +9,13 @@ from backend import studio, decoder_trials, recipe_contracts, decoder_datasets
 
 
 class FactoryWorkbenchTest(unittest.TestCase):
+    def setUp(self):
+        hardware={'system':'Darwin','machine':'arm64','metal_available':True,'mlx_version':'fixture',
+                  'metal_device':{'device_name':'Fixture GPU','max_recommended_working_set_size':8*1024**3},
+                  'available_memory_bytes':8*1024**3,'free_disk_bytes':8*1024**3,'errors':[]}
+        probe=patch.object(studio.decoder_trial_feasibility.architecture,'hardware',return_value=hardware)
+        probe.start();self.addCleanup(probe.stop)
+
     def proposal(self, system, payload):
         if 'registered_recipes' in payload:
             return {'recipe': 'decoder_from_scratch', 'approach': 'from_scratch', 'reason': 'Bounded fresh-weight trial.'}
@@ -42,6 +49,8 @@ class FactoryWorkbenchTest(unittest.TestCase):
             self.assertEqual(job['status'], 'factory_trial')
             record = decoder_trials.read(studio.ROOT, job['decoder_trial_id'])
             self.assertEqual(record['proposal'], job['decoder_proposal'])
+            self.assertFalse(record['factory_hardware_review']['reviewed_before_approval'])
+            self.assertFalse(record['generated_trial_hardware']['reviewed_before_approval'])
             self.assertEqual(self.request(job, data).respond.call_args.args[1], 400)
             submit.assert_called_once()
             decoder_trials._ACTIVE.clear()
@@ -116,3 +125,17 @@ class FactoryWorkbenchTest(unittest.TestCase):
             self.assertEqual(job['status'], 'failed')
             self.assertIn('Planner unavailable', job['error'])
             submit.assert_not_called()
+
+    def test_factory_feasibility_is_readonly_and_exact_review_is_retained_before_submission(self):
+        with tempfile.TemporaryDirectory() as temporary,patch.object(studio,'ROOT',Path(temporary)),patch.object(studio,'JOBS',{}),patch.object(studio,'ask',side_effect=self.proposal),patch.object(studio.inference.WORKER,'submit') as submit,patch.object(decoder_trials,'_ACTIVE',set()),patch.object(decoder_trials,'_CANCEL',{}):
+            job={'id':'e'*32,'prompt':'Create a local language model','recipe':None};studio.JOBS[job['id']]=job;studio.Handler.make_plan(job)
+            before={p:p.read_bytes() for p in studio.ROOT.rglob('*') if p.is_file()};revision=job['decoder_proposal']['revision']
+            handler=self.request(job,{'proposal_revision':revision},'decoder-feasibility');review=handler.respond.call_args.args[0]
+            self.assertTrue(review['feasible']);self.assertEqual(review['factory']['job_id'],job['id']);self.assertTrue(all(p.read_bytes()==value for p,value in before.items()))
+            submit.assert_not_called();self.assertEqual(job['status'],'factory_review')
+            stale=json.loads(json.dumps(review));stale['factory']['proposal_revision']='changed'
+            rejected=self.request(job,{'confirmed':True,'proposal_revision':revision,'reviewed_feasibility':stale})
+            self.assertEqual(rejected.respond.call_args.args[1],400);submit.assert_not_called();self.assertFalse((studio.ROOT/'decoder-trials').exists())
+            handler=self.request(job,{'confirmed':True,'proposal_revision':revision,'reviewed_feasibility':review})
+            self.assertEqual(handler.respond.call_args.args[1],202);record=decoder_trials.read(studio.ROOT,job['decoder_trial_id'])
+            self.assertEqual(record['factory_hardware_review']['approval'],review);self.assertTrue(record['factory_hardware_review']['reviewed_before_approval']);submit.assert_called_once()

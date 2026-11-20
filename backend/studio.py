@@ -2739,13 +2739,13 @@ class Handler(BaseHTTPRequestHandler):
                         store_job(job)
                         threading.Thread(target=self.make_factory_plan, args=(job, dataset), daemon=True).start()
                         return self.respond({'id': job['id']}, 202)
+                    if action == 'decoder-feasibility' and status == 'factory_review':
+                        return self.respond(decoder_trial_feasibility.factory_review(ROOT,job,data.get('proposal_revision')))
                     if action == 'approve-decoder-trial' and status == 'factory_review':
                         proposal = job['decoder_proposal']
                         if data.get('proposal_revision') != proposal['revision']:
                             raise ValueError('Review the current decoder approach before approval.')
-                        record = decoder_trials.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
-                                                      proposal_id=proposal['id'], proposal_revision=proposal['revision'],
-                                                      dataset=job.get('decoder_dataset'),
+                        record = decoder_trial_feasibility.factory_start(ROOT, job, data.get('confirmed'), inference.WORKER.submit, proposal['revision'], data.get('reviewed_feasibility'),
                                                       require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness, post_training=data.get('post_training'))
                         job.update(status='factory_trial', decoder_trial_id=record['id'], error=None)
                         store_job(job)
