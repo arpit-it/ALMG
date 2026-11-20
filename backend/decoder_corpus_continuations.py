@@ -7,9 +7,9 @@ import re
 import uuid
 import numpy as np
 if __package__:
-    from . import decoder_corpus_optimizer as training, decoder_corpus_cancellations as cancellation
+    from . import decoder_corpus_optimizer as training, decoder_corpus_cancellations as cancellation, decoder_corpus_continuation_feedback as measured_feedback
 else:
-    import decoder_corpus_optimizer as training, decoder_corpus_cancellations as cancellation
+    import decoder_corpus_optimizer as training, decoder_corpus_cancellations as cancellation, decoder_corpus_continuation_feedback as measured_feedback
 
 
 def _source(root, identifier):
@@ -38,7 +38,8 @@ def _partial_state(root, record):
     return model,{'step':data['step'],**{kind:{name:np.asarray(value,dtype=np.float32) for name,value in data[kind].items()} for kind in ('m','v')}}
 
 
-def review(root, identifier, resume_id=None):
+def review(root, identifier, resume_id=None, execution_mode='shared_backend'):
+    if execution_mode not in ('shared_backend','fresh_process'):raise ValueError('Choose a supported corpus continuation execution mode.')
     parent, _, corpus, admission, checkpoint = _source(root, identifier)
     c = admission['config']; partial=None if resume_id is None else read(root,resume_id)
     if partial is not None and (partial.get('status')!='canceled' or partial['review']['source']['record_id']!=identifier or _depth(partial)>=16):
@@ -49,7 +50,8 @@ def review(root, identifier, resume_id=None):
         raise ValueError('Saved corpus checkpoint dimensions/counters changed.')
     estimates = {**admission['estimates'], 'optimizer_updates': c['steps'] - restore_step,
                  'reference_comparison_optimizer_updates': 0, 'restore_step': restore_step}
-    record = {'format': 'almg-corpus-continuation-review-v1' if partial is None else 'almg-corpus-continuation-review-v2', 'schema_version': 1 if partial is None else 2,
+    record = {'format': ('almg-corpus-continuation-review-v3' if partial is None else 'almg-corpus-continuation-review-v4') if execution_mode=='fresh_process' else ('almg-corpus-continuation-review-v1' if partial is None else 'almg-corpus-continuation-review-v2'), 'schema_version': (3 if partial is None else 4) if execution_mode=='fresh_process' else (1 if partial is None else 2),
+              'execution_mode':execution_mode,
               'resume_from':None if partial is None else _snapshot(partial),
               'source': {'record_id': identifier, 'record_revision': parent['revision'],
                          'checkpoint_sha256': training.file_digest(checkpoint/'checkpoint.json'),
@@ -60,7 +62,13 @@ def review(root, identifier, resume_id=None):
               'hardware': admission['hardware'], 'feasible': admission['feasible'], 'blockers': admission['blockers'],
               'training_approved': False, 'release_approved': False,
               'scope': 'restore_saved_corpus_midpoint_and_complete_original_budget_in_new_private_artifacts' if partial is None else 'restore_retained_corpus_partial_and_complete_original_remaining_updates',
-              'implementation_sha256': training.digest({'continuation': training.file_digest(Path(__file__)), 'cancellation': training.file_digest(Path(__file__).with_name('decoder_corpus_cancellations.py')), 'trainer': admission['implementation_sha256']})}
+              'implementation_sha256': training.digest({'continuation': training.file_digest(Path(__file__)), 'cancellation': training.file_digest(Path(__file__).with_name('decoder_corpus_cancellations.py')), 'feedback':training.file_digest(Path(__file__).with_name('decoder_corpus_continuation_feedback.py')), 'trainer': admission['implementation_sha256']})}
+    estimates['calculated_memory_reserve_bytes']=estimates['required_available_memory_bytes']
+    memory,work=measured_feedback.feedback(history(root,identifier),record) if execution_mode=='fresh_process' else (None,None)
+    estimates['isolated_continuation_memory']=memory;estimates['corpus_continuation_work_estimate']=work
+    if memory is not None:estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],memory['calculated_memory_floor_bytes'])
+    if not training.hardware._fits(record['hardware'],estimates) and not any('memory/disk' in reason for reason in record['blockers']):record['blockers'].append('Current memory/disk does not cover isolated corpus continuation calibration reserves.')
+    record['feasible']=not record['blockers']
     record['revision'] = training.digest(record)
     return record
 
@@ -71,13 +79,13 @@ def _folder(root, identifier):
     return Path(root)/'decoder-corpus-continuations'/identifier
 
 
-def run(root, identifier, confirmed, approved, request_id=None, resume_id=None):
+def run(root, identifier, confirmed, approved, request_id=None, resume_id=None, execution_mode='shared_backend'):
     if confirmed is not True:
         raise ValueError('Explicitly confirm restoring the corpus checkpoint and completing its remaining updates.')
     if request_id is not None:
         cancellation.validate(request_id)
-    current = review(root, identifier, resume_id)
-    keys = ('format', 'schema_version', 'source', 'corpus_id', 'corpus_revision', 'config', 'restore_step', 'resume_from', 'runtime', 'estimates', 'implementation_sha256')
+    current = review(root, identifier, resume_id, execution_mode)
+    keys = ('format', 'schema_version', 'source', 'corpus_id', 'corpus_revision', 'config', 'restore_step', 'resume_from', 'runtime', 'estimates', 'implementation_sha256', 'execution_mode')
     if (not isinstance(approved, dict) or approved.get('revision') != training.digest({k:v for k,v in approved.items() if k != 'revision'})
             or any(approved.get(key) != current[key] for key in keys)):
         raise ValueError('Corpus continuation review changed. Reopen it before confirming.')
@@ -112,7 +120,8 @@ def run(root, identifier, confirmed, approved, request_id=None, resume_id=None):
     if (partial is not None and read(root,resume_id)!=partial) or training.read(root, identifier) != parent:
         raise ValueError('Source corpus run changed during continuation; new artifacts retained for review.')
     observed = observer.finish(); observed['scope'] = 'corpus_checkpoint_continuation_in_shared_backend'
-    observed['limitations'] = 'Shared backend time/RSS/Metal observations include restore, remaining updates, evaluation, model/state saving and CPU generation. There is no uninterrupted retraining trajectory here. Counters may include other work; no isolated peaks or future duration estimate.'
+    if execution_mode=='fresh_process':observed['scope']='phase_samples_inside_isolated_corpus_continuation'
+    observed['limitations'] = ('Synchronized phase samples inside one fresh recovery worker; lifetime peaks are reported separately when published. Sampling starts after admission and excludes bootstrap/lineage admission. Includes restore, remaining updates, saved state and CPU generation; no uninterrupted retraining trajectory or total wall-time estimate.' if execution_mode=='fresh_process' else 'Shared backend time/RSS/Metal observations include restore, remaining updates, evaluation, model/state saving and CPU generation. There is no uninterrupted retraining trajectory here. Counters may include other work; no isolated peaks or future duration estimate.')
     record = {'format': 'almg-corpus-continuation-v2' if partial is None else 'almg-corpus-continuation-v3', 'schema_version': 2 if partial is None else 3,
               'lineage_depth':1 if partial is None else _depth(partial)+1, 'id': continuation_id,
               'status': 'canceled' if canceled else 'completed', 'request_id': request_id,
@@ -206,6 +215,8 @@ def read(root, identifier, _seen=None):
             or training._generated(model,tokenizer)!=(record['generated_token_ids'],record['generated_text'])
             or (status=='completed' and record['generated_token_ids']!=parent['generated_token_ids'])):
         raise ValueError('Corpus continuation reference weights/tokenizer/inference changed.')
+    if 'isolated_workflow_measurements' in record:
+        if approved.get('execution_mode')!='fresh_process' or measured_feedback.measurements(record) is None:raise ValueError('Corpus continuation isolation measurements lack matching execution policy.')
     return record
 
 
@@ -215,12 +226,12 @@ def history(root, source_id):
     return sorted([record for record in records if record['review']['source']['record_id']==source_id],key=lambda record:record['created_at'])[-20:]
 
 
-def review_partial(root, identifier):
+def review_partial(root, identifier, execution_mode='shared_backend'):
     partial=read(root,identifier)
-    return review(root,partial['review']['source']['record_id'],identifier)
+    return review(root,partial['review']['source']['record_id'],identifier,execution_mode)
 
 
-def run_partial(root, identifier, confirmed, approved, request_id=None):
+def run_partial(root, identifier, confirmed, approved, request_id=None, execution_mode='shared_backend'):
     if confirmed is not True:raise ValueError('Explicitly confirm retained corpus partial resume.')
     partial=read(root,identifier)
-    return run(root,partial['review']['source']['record_id'],True,approved,request_id,identifier)
+    return run(root,partial['review']['source']['record_id'],True,approved,request_id,identifier,execution_mode)

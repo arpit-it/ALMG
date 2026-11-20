@@ -69,4 +69,17 @@ void main() {
     await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
   });
 
+  testWidgets('recovery estimates and isolated measured peaks are labeled separately', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: DecoderCorpusContinuationDialog(sourceId:'source',request:(path,body) async {
+      if(path.endsWith('/continue'))return {'restored_step':10,'completed_steps':20,'reference_parameter_max_error':0,'generated_text':'amber birch','isolated_workflow_measurements':{'elapsed_seconds':.4,'isolated_process_peak_rss_bytes':1000,'isolated_metal_peak_bytes':100}};
+      return {'feasible':true,'restore_step':10,'estimates':{'optimizer_updates':10,'isolated_continuation_memory':{'isolated_process_peak_rss_bytes':1000,'isolated_metal_peak_bytes':100,'calculated_memory_floor_bytes':1375},'corpus_continuation_work_estimate':{'estimated_seconds':.5,'sample_count':1}},'blockers':[]};
+    })));
+    await tester.tap(find.text('Review corpus continuation resources'));await tester.pumpAndSettle();
+    expect(find.textContaining('Estimated remaining recovery work: 0.500 s'),findsOneWidget);
+    expect(find.textContaining('Compatible recovery peaks: RSS 1000 bytes'),findsOneWidget);
+    await tester.tap(find.text('Confirm continue corpus checkpoint'));await tester.pump();await tester.pump(const Duration(milliseconds:300));
+    expect(find.text('Measured isolated corpus recovery time: 0.400 s.'),findsOneWidget);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
 }

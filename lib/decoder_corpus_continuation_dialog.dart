@@ -36,6 +36,11 @@ class _DecoderCorpusContinuationDialogState extends State<DecoderCorpusContinuat
         : 'Restored update ${record['restored_step']} · finished update ${record['completed_steps']} · reference weight difference ${record['reference_parameter_max_error']}.'),
       Text('Generated text: ${record['generated_text']}'),
       const Text('Separate private result; the original corpus run is preserved. No model release or broader language-quality acceptance is established.'),
+      if (record['isolated_workflow_measurements'] case final Map measured) ...[
+        Text('Measured isolated corpus recovery time: ${(measured['elapsed_seconds'] as num).toStringAsFixed(3)} s.'),
+        Text('Measured recovery-worker peak RSS: ${measured['isolated_process_peak_rss_bytes']} bytes · Metal peak: ${measured['isolated_metal_peak_bytes']} bytes.'),
+        const Text('Fresh-worker peaks include runtime and lineage overhead. Timing covers imports/admission, restore, remaining updates, evaluation/state saving and CPU inference; parent launch and queue/approval waits are excluded. No reference retraining trajectory or large-model feasibility claim.'),
+      ],
       SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
     ])), actions: [
       if (record['status'] == 'canceled' && record['id'] is String) TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusContinuationDialog(sourceId: widget.sourceId, partialId: record['id'] as String, request: widget.request)), child: const Text('Review retained corpus partial resume')),
@@ -70,13 +75,18 @@ class _DecoderCorpusContinuationDialogState extends State<DecoderCorpusContinuat
   });
   @override Widget build(BuildContext context) => AlertDialog(title: Text(_partial ? 'Review retained corpus partial resume' : 'Review corpus checkpoint continuation'), scrollable: true,
     content: SizedBox(width: 640, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      Text(_partial ? 'Restore this retained canceled model, FP32 moments and actual saved counter. Complete only the remaining original updates with the original configuration, preserving all ancestors. Resume cancellation retains another private partial; each further resume requires a new review. Arbitrary OS interruption recovery remains unverified.' : 'Restore the saved midpoint model, FP32 optimizer moments and scheduler counter. Complete only the remaining original updates using the original corpus windows and precision settings, then compare with the saved final model. Save a new private model, tokenizer and optimizer state. Original artifacts stay unchanged. Cancel requests stop between optimizer updates and retain private partial model/state. Retained partial resume requires separate approval; arbitrary interrupted-run recovery remains unverified.'),
+      Text(_partial ? 'Restore this retained canceled model in one isolated worker, FP32 moments and actual saved counter. Complete only the remaining original updates with the original configuration, preserving all ancestors. Resume cancellation retains another private partial; each further resume requires a new review. Arbitrary OS interruption recovery remains unverified.' : 'Restore the saved midpoint model, FP32 optimizer moments and scheduler counter. Complete only the remaining original updates using the original corpus windows and precision settings, then compare with the saved final model. Run in one isolated worker and save a new private model, tokenizer and optimizer state. Original artifacts stay unchanged. Cancel requests stop between optimizer updates and retain private partial model/state. Retained partial resume requires separate approval; arbitrary interrupted-run recovery remains unverified.'),
       if (_busy) const LinearProgressIndicator(),
       if (_running && _cancelPending) const Text('Cancellation requested. Waiting for a safe optimizer-update boundary and retained result.'),
       if (_error != null) Text(_error!),
       if (_review != null) ...[
         Text('Restore update ${_review!['restore_step']} · remaining updates ${_review!['estimates']['optimizer_updates']}.'),
         Text(_review!['feasible'] == true ? 'Resources cover corpus continuation reserves.' : 'Corpus continuation cannot start.'),
+        if (_review!['estimates']['isolated_continuation_memory'] case final Map memory)
+          Text('Compatible recovery peaks: RSS ${memory['isolated_process_peak_rss_bytes']} bytes · Metal ${memory['isolated_metal_peak_bytes']} bytes. Calculated floor: ${memory['calculated_memory_floor_bytes']} bytes; reserves never fall below the original calculation.'),
+        if (_review!['estimates']['corpus_continuation_work_estimate'] case final Map work)
+          Text('Estimated remaining recovery work: ${(work['estimated_seconds'] as num).toStringAsFixed(3)} s from ${work['sample_count']} compatible completed run(s). Exact restored source/update only; canceled samples excluded.')
+        else const Text('Remaining recovery estimate unavailable: complete a compatible restored-source run first.'),
         for (final reason in _review!['blockers'] as List) Text(reason as String),
         ExpansionTile(title: const Text('View corpus continuation review'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],

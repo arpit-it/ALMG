@@ -7328,6 +7328,71 @@ P3-LMF-05 partial progress · isolated reviewed-corpus peaks and scoped feedback
   50M–100M feasibility or general model quality. Unchanged hardware/user-action
   blockers remain open and skipped; P3-LMF-06 fresh-run cancellation also stays open.
 
+P3-LMF-05 partial progress · isolated corpus recovery peaks and exact-source feedback · 2026-11-21:
+- [ ] P3-LMF-05 remains open. App-approved original-midpoint continuation and
+  retained-partial resume now execute in fresh workers. Parent and child both check
+  current approval/resource bindings; nonce, actual child PID, recovery action,
+  original/partial source and exact reviewed payload are checked on return. Existing
+  completed/canceled lineage and source-bound cancellation receipts stay intact.
+- Version-1 recovery measurements distinguish original-midpoint and partial-resume
+  actions. RSS/Metal lifetime peaks include runtime/lineage overhead; module-entry
+  time covers imports/admission, restore, only the approved remaining updates,
+  evaluation/state saving and CPU generation. Parent launch/admission, pre-module
+  startup, queue/approval waits and final publication are excluded. No uninterrupted
+  retraining trajectory is executed. Shared phase samples stay separately labeled;
+  old shared and measured full-training records remain readable without rewriting.
+- Fresh recovery reviews select verified completed measurements matching exact
+  original run/checkpoint revision, retained-partial snapshot (when present), actual
+  restored update, corpus revision, configuration, runtime, execution mode and
+  producer. Highest matching time plus 25% headroom provides a labeled heuristic;
+  RSS/Metal sum plus 25% headroom can raise, never reduce, calculated reserves.
+  Canceled observations never calibrate forecasts or memory floors. A different
+  partial/update cannot inherit another source's feedback. Current calibrated
+  availability is checked before launch. Zero-update cancellation can legitimately
+  report zero Metal allocation while retaining valid CPU model/optimizer state.
+- Native verification: rebuilt/launched ALMG and reopened all eighteen prior records
+  exactly. Explicitly completed isolated midpoint recovery from update ten and
+  partial recovery from update eleven for legacy FP32 SGD and mixed FP16 AdamW.
+  Midpoint records e1e89976b8964bcb85857bdf24d8b67d (SGD) /
+  36fafa1f54cc42bb8b2db8f7bbe7c615 (AdamW) executed only updates eleven–twenty.
+  Completed partial records 71b9b3caf3574ff2a4f8ed438080d8ef /
+  2ca2ce30475e455eb1692ad83b176922 executed only twelve–twenty and matched source
+  weights within 1e-7 with identical CPU-generated tokens/text.
+- Native unpaced work times were .3516470 / .3592591 s (SGD midpoint/partial) and
+  .3936951 / .4105355 s (AdamW midpoint/partial). RSS peaks were 62816256 /
+  63668224 / 63553536 / 63438848 bytes; Metal peaks 21968 / 21968 / 40754 /
+  40754 bytes. Distinct workers had PIDs 6286/6360/6465/6536, separate from the
+  backend. Refreshed exact-source work estimates were .4395587 / .4490739 /
+  .4921189 / .5131694 s. Memory reserves stayed at their larger calculated levels:
+  268761408 bytes for SGD and 268789568 for AdamW.
+- Live Cancel also crossed the process boundary: local-only child pacing made
+  partial updates observable; actual app cancellation retained update twelve in
+  df967b8118724c8299fe9c234af6db36 (SGD) and
+  dddab56d284b40ea8f64f1b0a06e0f33 (AdamW). Their private state/own CPU inference
+  reopened correctly. Pacing was removed for completed measurements. Native reviews
+  proved these canceled samples did not enter feedback, midpoint samples did not
+  enter partial estimates, and new update-twelve partials had no inherited estimate.
+- After app/backend restart all twenty-four original/measured/completed/canceled
+  records and exact-source feedback reopened unchanged without retraining. All 255
+  original fixture files and all 283 retained files kept their hashes. Evidence:
+  /tmp/almg-corpus-recovery-peaks-native-qa/verification.json, midpoint/partial
+  before/result/feedback captures, after-cancel-feedback and different-partial-
+  feedback captures for SGD/AdamW, plus restarted native captures. No external
+  collection occurred; generated models, optimizer states, receipts and measurements
+  remain outside Git.
+- Validation: 632 Python tests passed with warnings as errors and Metal enabled,
+  79 Flutter tests passed, analysis clean. New tests cover actual isolated midpoint/
+  partial peaks, restored-source-only estimates, canceled/zero-update handling,
+  preserved source states and calibrated-memory rejection before worker creation.
+  UI tests distinguish recovery estimates and measured worker reports. Native tests
+  additionally verify live child cancellation and cold feedback for a different partial.
+- Remaining: broader model/budget profiling depends on expanded P3-LMF-06 engine
+  support; bounded corpus execution is still capped at 16384 parameters and ten/
+  twenty original updates. Windows/CUDA lacks an available host; physical power/
+  sleep/idle verification requires user action. These criteria stay open and skipped.
+  Independent P3-LMF-06 fresh-run cancellation and arbitrary interruption recovery
+  remain open; these measurements establish no 50M–100M feasibility or model quality.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
