@@ -5605,7 +5605,9 @@ class _StudioPageState extends State<StudioPage> {
         final approved = await showDialog<bool>(context: context, builder: (context) => _imageRecipe
           ? CpuTrainingFeasibilityDialog(report: report, title: 'CPU image recipe feasibility', approvalLabel: 'Approve CPU image training', recordLabel: 'View CPU image feasibility record',
             description: 'This experimental 48×48 image recipe fits on CPU with NumPy/Pillow, without Metal or CUDA. External image collection requires separate approval. This is not diffusion training.')
-          : CpuTrainingFeasibilityDialog(report: report));
+          : CpuTrainingFeasibilityDialog(report: report,
+              measure: (review) => _request('/jobs/$id/cpu-resource-trial', {...parameters, 'confirmed': true, 'reviewed_feasibility': review}),
+              history: () => _request('/jobs/$id/cpu-resource-trials')));
         if (approved != true || !mounted) return;
         parameters['reviewed_feasibility'] = report;
       } catch (error) {

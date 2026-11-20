@@ -5974,6 +5974,35 @@ P3-LMF-05 partial progress · prepared-image validation before feasibility and n
   hardware/user-action blockers remain open and skipped. No generated/private
   artifacts, weights or unrelated edits are included in the commit.
 
+P3-LMF-05 partial progress · discarded CPU classifier resource trials · 2026-11-20:
+- [ ] P3-LMF-05 remains open. The CPU classifier feasibility dialog now offers a
+  separately confirmed discarded fit of the reviewed prepared dataset, without
+  Qwen repair or idle scheduling. A fresh isolated process records fit/validation
+  time and process peak RSS, then discards fitted weights. Main training and
+  release remain unapproved. Fresh feasibility admission and dataset digest checks
+  bind the measurement to the reviewed input; failures/timeouts save no report.
+- Immutable versioned JSON history retains admission, settings, runtime, source
+  digest and implementation provenance. The app can reopen the saved history.
+  Measured RSS includes interpreter/imports and workspace; timed work excludes
+  interpreter/import startup, idle waits, repair and main candidate persistence.
+  These observations do not yet calibrate CPU estimates or predict future runs.
+- Verification: rebuilt and ran the native macOS app against an isolated local
+  48-row fruit/astronomy fixture. Cancel ran nothing; separate confirmation ran
+  the discarded CPU comparison and displayed 0.024029791937209666 seconds and
+  196165632 bytes peak RSS from worker PID 41457. History reopened exactly after
+  backend/app restart. The main job stayed dataset_ready without training
+  approval, both original prepared files retained their hashes, and no model
+  artifacts were created. Evidence: /tmp/almg-classifier-resource-trial-native-qa/
+  verification.json and native UI record captures (local evidence, not committed).
+- Validation: 563 Python tests with warnings treated as errors and Metal enabled,
+  52 Flutter tests, clean Flutter analysis; the final timestamp/history change
+  also passed both focused resource-trial tests. Tests cover real isolated fitting,
+  discarded weights, preserved input, tampered history, consent, failure and timeout.
+- Remaining: compatible CPU measurement calibration and duration estimates,
+  measured CPU image trials, broader neural/full-epoch feasibility, and suitable
+  Windows/CUDA hardware verification. Existing hardware blockers remain open and
+  skipped; P3-LMF-01 is already complete for its recorded architecture scope.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
