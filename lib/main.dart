@@ -1618,6 +1618,9 @@ class _StudioPageState extends State<StudioPage> {
     ));
   }
 
+  Object _losslessTokenCount(Map report) => report.containsKey('lossless_token_count')
+    ? report['lossless_token_count'] ?? 'unavailable' : report['token_count'] ?? report['bpe_tokens'] ?? 'unavailable';
+
   String _tokenizerAlgorithmLabel(String algorithm) => switch (algorithm) {
     'character_bpe' => 'Character BPE', 'unigram' => 'Unigram', _ => 'Byte BPE',
   };
@@ -1625,23 +1628,34 @@ class _StudioPageState extends State<StudioPage> {
   Future<void> _trainTokenizerExperiment(Map<String, dynamic> dataset, {String algorithm = 'byte_level_bpe'}) async {
     final byte = algorithm == 'byte_level_bpe';
     final label = _tokenizerAlgorithmLabel(algorithm);
+    final specialConfig = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+      title: const Text('Configure special tokens'), children: [
+        SimpleDialogOption(onPressed: () => Navigator.pop(context, <String, dynamic>{'special_tokens': <String, String>{}, 'unknown_policy': 'reject'}), child: const Text('No special tokens · reject uncovered characters')),
+        SimpleDialogOption(onPressed: () => Navigator.pop(context, <String, dynamic>{'special_tokens': {'bos': '<BOS>', 'eos': '<EOS>', 'pad': '<PAD>'}, 'unknown_policy': 'reject'}), child: const Text('BOS / EOS / PAD · reject uncovered characters')),
+        SimpleDialogOption(onPressed: () => Navigator.pop(context, <String, dynamic>{'special_tokens': {'bos': '<BOS>', 'eos': '<EOS>', 'pad': '<PAD>', 'unk': '<UNK>'}, 'unknown_policy': 'replace'}), child: const Text('BOS / EOS / PAD / UNK · replace uncovered characters')),
+      ]));
+    if (specialConfig == null || !mounted) return;
+    final reserved = (specialConfig['special_tokens'] as Map).length;
+
     final cap = await showDialog<int>(context: context, builder: (context) => SimpleDialog(
       title: Text('Choose $label vocabulary cap'), children: [
-        for (final size in (byte ? [256, 272, 320, 512] : [64, 128, 256, 512])) SimpleDialogOption(onPressed: () => Navigator.pop(context, size), child: Text('$size tokens maximum')),
+        for (final size in (byte ? (reserved == 0 ? [256, 272, 320, 512] : [272, 320, 512]) : [64, 128, 256, 512])) SimpleDialogOption(onPressed: () => Navigator.pop(context, size), child: Text('$size tokens maximum')),
       ]));
     if (cap == null || !mounted) return;
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: Text('Fit $label on the training split?'),
-      content: Text('${byte ? 'Byte BPE keeps the complete byte alphabet. ' : 'The alphabet is fitted from training only. Unseen characters reject encoding without refitting; ratios compare encodable records only. '}${algorithm == 'unigram' ? 'Fit a fixed-candidate Unigram model with five forward/backward EM updates, pieces up to eight characters and deterministic Viterbi encoding. Vocabulary pruning and segmentation sampling are unavailable. Fit' : 'Fit deterministic pair merges on'} ${dataset['splits']['train']} training records only, with a $cap-token vocabulary cap. '
+      content: Text('${byte ? 'Byte BPE keeps the complete byte alphabet. ' : 'The alphabet is fitted from training only; it never refits on held-out text. '}${algorithm == 'unigram' ? 'Fit a fixed-candidate Unigram model with five forward/backward EM updates, pieces up to eight characters and deterministic Viterbi encoding. Vocabulary pruning and segmentation sampling are unavailable. Fit' : 'Fit deterministic pair merges on'} ${dataset['splits']['train']} training records only, with a $cap-token total vocabulary cap including $reserved reserved IDs. '
         'Samples must fit 4096 UTF-8 bytes; this experiment supports at most 16 documents. Each unique training record contributes once; mixture weights are not expanded. Validation/test records are encoded for comparison and never fitted. '
-        'Check NFC Unicode round trips and compare token counts with the fixed byte alphabet. Learned tokens may encode private training phrases. '
-        'This saves a separate tokenizer experiment; the dataset tokenizer is preserved. Model training with this artifact and special tokens are unavailable.'),
+        'Configured BOS/EOS are added at document boundaries; PAD is reserved but never inserted automatically. Literal marker text is not treated as control IDs. '
+        '${specialConfig['unknown_policy'] == 'replace' ? 'Unknown characters are explicitly replaced with UNK and counted as lossy; original text cannot be recovered from those IDs. ' : 'Uncovered characters reject encoding. '}'
+        'Efficiency ratios use lossless records only and include boundary-token overhead. Learned tokens may encode private training phrases. '
+        'This saves a separate tokenizer experiment; the dataset tokenizer is preserved. Model training with this artifact is unavailable.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm tokenizer fitting'))]));
     if (confirmed != true || !mounted) return;
     try {
       final experiment = await _request('/decoder-datasets/${dataset['id']}/tokenizer-experiments',
-        {'confirmed': true, 'reviewed': dataset, 'config': {'vocabulary_cap': cap, 'algorithm': algorithm}}, const Duration(minutes: 2));
+        {'confirmed': true, 'reviewed': dataset, 'config': {'vocabulary_cap': cap, 'algorithm': algorithm, ...specialConfig}}, const Duration(minutes: 2));
       if (mounted) await _showTokenizerExperiment(experiment);
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
@@ -1651,10 +1665,10 @@ class _StudioPageState extends State<StudioPage> {
       title: Text('${_tokenizerAlgorithmLabel(experiment['algorithm'] as String)} experiment verified'), scrollable: true,
       content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('${experiment['vocabulary_size']} vocabulary entries · cap ${experiment['config']['vocabulary_cap']}'),
-        const Text('Training records only were fitted. Encodable records passed NFC round-trip checks. Coverage gaps are retained without refitting or substitution. This experiment does not enable model training.'),
+        const Text('Training records only were fitted. Lossless records passed NFC round-trip checks. Explicit UNK replacement is reported as lossy; efficiency excludes lossy records. This experiment does not enable model training.'),
         for (final split in ['train', 'validation', 'test']) ...[
-          Text('$split: ${experiment['comparison'][split]['documents_encoded'] ?? experiment['comparison'][split]['documents']}/${experiment['comparison'][split]['documents']} records encoded · ${experiment['comparison'][split]['uncovered_character_count'] ?? 0} uncovered characters'),
-          Text('Encodable records: ${experiment['comparison'][split]['encoded_baseline_byte_tokens'] ?? experiment['comparison'][split]['baseline_byte_tokens']} byte tokens → ${experiment['comparison'][split]['token_count'] ?? experiment['comparison'][split]['bpe_tokens'] ?? 'unavailable'} ${_tokenizerAlgorithmLabel(experiment['algorithm'] as String)} tokens'),
+          Text('$split: ${experiment['comparison'][split]['documents_encoded'] ?? experiment['comparison'][split]['documents']}/${experiment['comparison'][split]['documents']} records encoded · ${experiment['comparison'][split]['documents_lossless'] ?? experiment['comparison'][split]['documents_encoded'] ?? experiment['comparison'][split]['documents']}/${experiment['comparison'][split]['documents']} lossless · ${experiment['comparison'][split]['unknown_tokens'] ?? 'unavailable'} UNK tokens'),
+          Text('Lossless records: ${experiment['comparison'][split]['lossless_baseline_byte_tokens'] ?? experiment['comparison'][split]['encoded_baseline_byte_tokens'] ?? experiment['comparison'][split]['baseline_byte_tokens']} byte tokens → ${_losslessTokenCount(experiment['comparison'][split] as Map)} ${_tokenizerAlgorithmLabel(experiment['algorithm'] as String)} tokens'),
         ],
         SelectableText(const JsonEncoder.withIndent('  ').convert(experiment)),
       ])),

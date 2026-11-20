@@ -4096,6 +4096,52 @@ P3-LMF-03 partial progress · bounded Unigram EM tokenizer experiments · 2026-1
   No downloads, weight modifications, generated artifact commits or push; unrelated
   user edits preserved.
 
+P3-LMF-03 partial progress · explicit special-token IDs and lossy UNK policy · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Experimental byte-BPE, character-BPE and Unigram
+  tokenizers now support validated pad/bos/eos/unk definitions. Distinct bounded
+  ASCII marker labels are configurable through the API; native controls offer
+  none, BOS/EOS/PAD with rejection, or BOS/EOS/PAD/UNK with explicit replacement.
+  Reserved IDs are contiguous after actual base vocabulary entries, never collide
+  with base IDs, and count toward the selected total vocabulary cap. Invalid roles,
+  labels/collisions, replacement without UNK and insufficient capacity reject.
+- Defined BOS/EOS are added at document boundaries; PAD is never auto-inserted.
+  Literal marker strings in input remain ordinary text, not control IDs. Default
+  decoding skips BOS/EOS/PAD while preserving UTF-8 byte continuity and never
+  silently drops UNK. Replacement is opt-in, emits one UNK per uncovered NFC
+  codepoint, does not refit the alphabet or edit original data, and is explicitly
+  reported as lossy. Efficiency ratios and round-trip success use lossless records
+  only; total token counts separately include configured boundary/UNK overhead.
+- The versioned wrapper stores exact base artifact, definitions/IDs and encode/
+  decode/unknown policies. Reload/export enforce ID/config integrity; all three
+  legacy bare artifact types remain supported. Approval binds full configuration
+  and original dataset. Model pretraining remains unavailable for these experiments.
+- Local app verification: rebuilt native macOS ALMG on fixture port 28840. Cancel
+  created no new artifact. Explicit Unigram + four-role replacement approval made
+  experiment 66d2d600a9174ee9b9f0b1c86b3ccad3 with 98 entries under a 128 total cap:
+  PAD 94 / BOS 95 / EOS 96 / UNK 97. Three training records round-tripped with 131
+  tokens including six boundary tokens. Validation/test encoded 81/177 tokens with
+  56/112 UNKs, each reported one lossy / zero lossless record, false round-trip
+  status and unavailable efficiency ratios. Native display and independent counts
+  confirmed these distinctions; no PAD was inserted.
+- Native private ZIP restored exact IDs/policy. Backend/app restart reopened the
+  wrapper and all three legacy experiment manifests exactly without refitting.
+  All nine dataset/legacy artifact files stayed byte-identical; no model training
+  ran. Evidence: /tmp/almg-special-token-native-qa/ (fitting-consent-ui.txt,
+  experiment-ui.json, comparison-ui.txt, reopened-experiment-ui.json,
+  legacy-byte-ui.json, legacy-character-ui.json, legacy-unigram-ui.json,
+  export-consent-ui.txt, verification.json and build/restart/test logs).
+- Verification: 424 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed; Flutter analysis and diff checks passed. Added tests cover custom labels,
+  reserved-ID bounds, literal marker isolation, boundary opt-out, UTF-8-safe control
+  skipping, explicit replacement/no refit, invalid/nested/tampered artifacts,
+  total-cap admission, lossless-only efficiency, export and legacy compatibility.
+- Remaining: larger/streamed fitting, generated-model compatibility and tokenizer
+  configuration saved with a model stay open. Existing dataset/hardware/Windows/
+  scratch-space blockers remain open and were skipped without unchanged polling.
+  A completed prior QA backend was closed to free memory; current app and all
+  artifacts remain available. No downloads, weight changes, generated artifact
+  commits or push; unrelated user edits preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
