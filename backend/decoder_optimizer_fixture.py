@@ -19,18 +19,18 @@ DEFAULT={'schema_version':1,'optimizer':'sgd','learning_rate':.01,'schedule':'wa
 
 def configuration(values):
     if not isinstance(values,dict):raise ValueError('Provide every versioned optimizer fixture setting.')
-    keys=set(DEFAULT)|({'gradient_accumulation_steps'} if values.get('schema_version') in (2,3,4) else set())
-    if values.get('schema_version') in (3,4):keys|={'compute_precision','loss_scale'}
-    if values.get('schema_version')==4:keys|={'batch_size','sequence_length'}
+    keys=set(DEFAULT)|({'gradient_accumulation_steps'} if values.get('schema_version') in (2,3,4,5) else set())
+    if values.get('schema_version') in (3,4,5):keys|={'compute_precision','loss_scale'}
+    if values.get('schema_version')in (4,5):keys|={'batch_size','sequence_length'}
     if set(values)!=keys:raise ValueError('Provide every versioned optimizer fixture setting.')
     c=dict(values)
-    if type(c['schema_version']) is not int or c['schema_version'] not in (1,2,3,4) or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose supported versioned SGD or AdamW with warmup/cosine scheduling.')
+    if type(c['schema_version']) is not int or c['schema_version'] not in (1,2,3,4,5) or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose supported versioned SGD or AdamW with warmup/cosine scheduling.')
     if type(c.get('gradient_accumulation_steps',1)) is not int or c.get('gradient_accumulation_steps',1) not in (1,2):raise ValueError('Choose one or two microbatches per optimizer update.')
-    if c['schema_version']==4 and (type(c['batch_size']) is not int or c['batch_size'] not in (1,2) or type(c['sequence_length']) is not int or c['sequence_length'] not in (4,8)):raise ValueError('Choose a bounded batch of one/two rows and sequence length four/eight.')
+    if c['schema_version'] in (4,5) and (type(c['batch_size']) is not int or c['batch_size'] not in (1,2) or type(c['sequence_length']) is not int or c['sequence_length'] not in (4,8)):raise ValueError('Choose a bounded batch of one/two rows and sequence length four/eight.')
     if c.get('compute_precision','float32') not in ('float32','mixed_float16'):raise ValueError('Only FP32 or bounded mixed FP16 computation is supported.')
     scale=c.get('loss_scale',1.0);expected=128.0 if c.get('compute_precision')=='mixed_float16' else 1.0
     if type(scale) not in (int,float) or not math.isfinite(scale) or scale!=expected:raise ValueError('Use loss scale 128 for mixed FP16 or 1 for FP32.')
-    if type(c['steps']) is not int or c['steps']!=10 or type(c['warmup_steps']) is not int or not 0<=c['warmup_steps']<=3:raise ValueError('This fixture supports ten steps and zero to three warmup steps.')
+    if type(c['steps']) is not int or c['steps'] not in ((10,20) if c['schema_version']==5 else (10,)) or type(c['warmup_steps']) is not int or not 0<=c['warmup_steps']<=3:raise ValueError('Choose ten updates (or twenty with version-5 settings) and zero to three warmup updates.')
     for key,maximum in (('learning_rate',.1),('gradient_clip_norm',10),('weight_decay',.1)):
         value=c[key]
         if type(value) not in (float,int) or not math.isfinite(value) or not (0<=value<=maximum if key=='weight_decay' else 0<value<=maximum):raise ValueError('Invalid finite optimizer setting: '+key)
@@ -116,7 +116,7 @@ def review(root,plan_id,initialized,settings):
     estimates.update(optimizer_state_bytes=moments,optimizer_location='numpy_cpu_float32',required_available_memory_bytes=estimates['required_available_memory_bytes']+moments*4,
                      required_free_disk_bytes=estimates['required_free_disk_bytes']+max(2*1024**2,current['actual_weight_bytes']*128))
     effective_rows=c.get('batch_size',min(2,current['config']['batch_size']));length=c.get('sequence_length',min(8,current['config']['context_length']));accumulation=c.get('gradient_accumulation_steps',1)
-    estimates.update(sequence_length=length,target_tokens_per_update=effective_rows*length,effective_batch_rows=effective_rows,microbatch_rows=effective_rows//accumulation if effective_rows%accumulation==0 else None,gradient_accumulation_steps=accumulation,gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if accumulation>1 else 0)
+    estimates.update(optimizer_updates=c['steps'],checkpoint_step=c['steps']//2,recorded_microbatch_backward_calls=c['steps']*accumulation,reference_comparison_optimizer_updates=c['steps'],sequence_length=length,target_tokens_per_update=effective_rows*length,effective_batch_rows=effective_rows,microbatch_rows=effective_rows//accumulation if effective_rows%accumulation==0 else None,gradient_accumulation_steps=accumulation,gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if accumulation>1 else 0)
     estimates['required_available_memory_bytes']+=current['actual_weight_bytes']*2 if accumulation>1 else 0
     estimates.update(compute_precision=c.get('compute_precision','float32'),master_parameter_dtype='float32',optimizer_state_dtype='float32',loss_scale=c.get('loss_scale',1.0),precision_scope='FP32 conservative reserves are retained; mixed FP16 matrix products do not imply measured memory savings.')
     reasons=list(profile['errors'])
@@ -126,7 +126,7 @@ def review(root,plan_id,initialized,settings):
     if not hardware._fits(profile,estimates):reasons.append('Current memory/disk does not cover optimizer fixture reserves.')
     record={'format':'almg-optimizer-fixture-review-v1','schema_version':1,'source':{'plan_id':plan_id,'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
         'config':c,'model_config':current['config'],'hardware':profile,'estimates':estimates,'feasible':not reasons,'blockers':reasons,
-        'scope':'ten_synthetic_steps_with_durable_optimizer_and_scheduler_checkpoint_not_general_pretraining','training_approved':False,'release_approved':False,
+        'scope':'bounded_synthetic_updates_with_durable_optimizer_and_scheduler_checkpoint_not_general_pretraining','training_approved':False,'release_approved':False,
         'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
     record['revision']=digest(record);return record
 
@@ -181,10 +181,10 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
         altered=x.copy();cut=max(1,length//2);altered[:,cut:]=(altered[:,cut:]+1)%shape['vocab_size']
         causal_error=float(mx.max(mx.abs(logits(master,tx)[:,:cut]-logits(master,mx.array(altered))[:,:cut])).item())
         if abs(initial-reference_loss)>.05 or causal_error>1e-5:raise ValueError('Selected precision failed initial FP32-loss or causal-prefix compatibility.')
-        empty={'step':0,'m':{},'v':{}}
-        uninterrupted,reference_state,_=optimize(source,empty,10)
-        halfway,state,first=optimize(source,empty,5);model.parameters=halfway;checkpoint(directory/'step-5',model,state,c,current['revision'])
-        restored,state=restore(directory/'step-5',c,current['revision']);parameters,state,last=optimize(restored.parameters,state,10)
+        empty={'step':0,'m':{},'v':{}};midpoint=c['steps']//2;checkpoint_path=directory/f'step-{midpoint}'
+        uninterrupted,reference_state,_=optimize(source,empty,c['steps'])
+        halfway,state,first=optimize(source,empty,midpoint);model.parameters=halfway;checkpoint(checkpoint_path,model,state,c,current['revision'])
+        restored,state=restore(checkpoint_path,c,current['revision']);parameters,state,last=optimize(restored.parameters,state,c['steps'])
         resume_error=max(float(np.max(np.abs(parameters[name]-uninterrupted[name]))) for name in parameters)
         moment_error=max([0.0]+[float(np.max(np.abs(state[kind][name]-reference_state[kind][name]))) for kind in ('m','v') for name in state[kind]])
         final=score(parameters);validation_final=score(parameters,1)
@@ -194,7 +194,7 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
     if initializations.read(root,plan_id,initialized['id'])!=initialized or file_digest(initializations._folder(root,plan_id)/initialized['id']/'model.json')!=current['source']['model_sha256']:raise ValueError('Source initialization changed during optimizer training; retained artifacts need review.')
     record={'format':'almg-decoder-optimizer-fixture-v1','schema_version':1,'id':identifier,'created_at':datetime.now(timezone.utc).isoformat(),'review':current,'approved_review':approved,
         'initial_train_loss':initial,'final_train_loss':final,'initial_validation_loss':validation_initial,'final_validation_loss':validation_final,
-        'compute_precision':precision,'master_parameter_dtype':'float32','master_gradient_dtype':'float32','optimizer_state_dtype':'float32','loss_scale':scale,'initial_fp32_reference_loss':reference_loss,'initial_precision_loss_difference':abs(initial-reference_loss),'causal_prefix_max_error':causal_error,'full_batch_gradient_tolerance':gradient_tolerance,'optimizer':c,'gradient_accumulation_steps':accumulation,'effective_batch_rows':rows,'sequence_length':length,'target_tokens_per_update':int(mask.sum()),'microbatch_rows':rows//accumulation,'full_batch_gradient_max_error':gradient_error,'microbatch_backward_calls_in_recorded_trajectory':c['steps']*accumulation,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':first+last,'checkpoint_restored_steps':5,'checkpoint_optimizer_max_error':moment_error,'checkpoint_parameter_max_error':resume_error,
+        'compute_precision':precision,'master_parameter_dtype':'float32','master_gradient_dtype':'float32','optimizer_state_dtype':'float32','loss_scale':scale,'initial_fp32_reference_loss':reference_loss,'initial_precision_loss_difference':abs(initial-reference_loss),'causal_prefix_max_error':causal_error,'full_batch_gradient_tolerance':gradient_tolerance,'optimizer':c,'gradient_accumulation_steps':accumulation,'effective_batch_rows':rows,'sequence_length':length,'target_tokens_per_update':int(mask.sum()),'microbatch_rows':rows//accumulation,'full_batch_gradient_max_error':gradient_error,'microbatch_backward_calls_in_recorded_trajectory':c['steps']*accumulation,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':first+last,'checkpoint_restored_steps':midpoint,'checkpoint_optimizer_max_error':moment_error,'checkpoint_parameter_max_error':resume_error,
         'generated_token_ids':generated,'inference_runtime':'planned_decoder_numpy_cpu','pretrained_student_weights_loaded':False,'updated_weights_saved':True,'initialization_modified':False,'training_approved':True,'release_approved':False,
         'limitations':'Generated token-ID smoke fixture only; no text corpus/tokenizer, full-epoch training, general model quality, large-model or general mixed-precision claim. Mixed FP16 is validated only for this bounded fixture with fixed loss scaling. Cancellation and independent checkpoint continuation are not yet exposed.',
         'files':{str(path.relative_to(directory)):file_digest(path) for path in directory.rglob('*') if path.is_file()}}
@@ -204,11 +204,11 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
 def read(root,identifier):
     directory=_folder(root,identifier)
     if (directory/'record.json').stat().st_size>128000:raise ValueError('Optimizer fixture record exceeds size limit.')
-    record=json.loads((directory/'record.json').read_text())
+    record=json.loads((directory/'record.json').read_text());c=configuration(record['optimizer']);checkpoint_name=f"step-{c['steps']//2}"
     if (record.get('format')!='almg-decoder-optimizer-fixture-v1' or record.get('schema_version')!=1 or record.get('id')!=identifier or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
-        or set(record['files'])!={'step-5/model.json','step-5/optimizer.json','step-5/checkpoint.json','trained-model.json'}
+        or set(record['files'])!={f'{checkpoint_name}/model.json',f'{checkpoint_name}/optimizer.json',f'{checkpoint_name}/checkpoint.json','trained-model.json'}
         or any(file_digest(directory/name)!=sha for name,sha in record['files'].items()) or _generate(PlannedDecoder.load(directory/'trained-model.json'))!=record['generated_token_ids']):raise ValueError('Optimizer fixture artifact or inference binding changed.')
-    restore(directory/'step-5',configuration(record['optimizer']),record['review']['revision'])
+    restore(directory/checkpoint_name,c,record['review']['revision'])
     return record
 
 

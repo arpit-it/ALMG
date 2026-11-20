@@ -6528,6 +6528,48 @@ P3-LMF-06 partial progress · bounded configurable batch and sequence · 2026-11
   do not establish corpus quality or large-model feasibility. Unchanged hardware/
   user-action blockers stay open and skipped while independent work continues.
 
+P3-LMF-06 partial progress · reviewed bounded optimizer update budgets · 2026-11-20:
+- [ ] P3-LMF-06 remains open. Version-5 settings support ten or twenty optimizer
+  updates. Earlier version-1/2/3/4 settings retain their exact ten-update contract.
+  The selected budget drives warmup/cosine scheduling, complete update logs,
+  optimizer/scheduler counters and checkpoint restoration. Checkpoints are saved
+  at the budget midpoint (step five or ten); saved-history validation derives the
+  exact expected checkpoint paths from validated settings and checks their hashes.
+- The app exposes the budget and invalidates review when it changes. Preapproval
+  review reports optimizer updates, checkpoint step, recorded microbatch backward
+  calls and the separate uninterrupted comparison budget. The UI explains that
+  verification repeats the selected budget in that comparison; recorded step logs
+  cover the checkpointed trajectory. This remains a bounded synthetic fixture,
+  not an arbitrary-duration training or measured time-estimation claim.
+- Native verification: rebuilt and ran ALMG on this Mac with the isolated local
+  8704-parameter two-layer initialization and external collection disabled.
+  Reopened all eight copied v1/v2/v3/v4 records unchanged before writes. Reviewed
+  the default ten-update configuration, changed to twenty and verified the prior
+  train action disappeared pending renewed review. Explicitly approved/trained
+  two-row/eight-token, two-microbatch FP32 SGD record
+  f328cf128c9e4fe5a15a7e1f52b6630a and mixed FP16 AdamW record
+  b86d0e612dbd40bf898d5805a9272bf7. SGD loss fell 4.852477073669434 →
+  4.686117172241211; AdamW loss fell 4.852474212646484 → 2.6992383003234863.
+  Both recorded steps one through twenty, forty microbatch backward calls and
+  twenty optimizer/scheduler updates. Final scheduled learning rate was 0.001.
+- Both restored model/optimizer/scheduler state from step ten and matched the
+  uninterrupted twenty-update execution with 0.0 final parameter/moment errors.
+  After app/backend restart, all ten v1/v2/v3/v4/v5 records reopened exactly,
+  including checkpoint restoration and trained-model CPU generation. All fifty
+  optimizer files, three source files and 135 prior artifact files retained their
+  hashes. Evidence: /tmp/almg-budget-native-qa/verification.json and native UI
+  captures; generated datasets, checkpoints and weights remain outside Git.
+- Validation: 595 Python tests passed with warnings as errors and Metal enabled,
+  61 Flutter tests passed, and analysis was clean. New tests cover budget bounds,
+  legacy-version rejection of twenty updates, full scheduler cadence, actual FP32
+  and mixed FP16 twenty-update execution, exact midpoint restoration, changed-budget
+  checkpoint/approval rejection and app review invalidation.
+- Remaining: approved text-corpus/tokenizer integration, independent continuation
+  and cancellation, broader training budgets, general interruption/resource
+  monitoring and profiled 50M–100M training. Synthetic fixture loss reductions do
+  not establish general language quality. Unchanged hardware/user-action blockers
+  remain open and skipped while independent work continues.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

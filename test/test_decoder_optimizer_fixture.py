@@ -161,3 +161,36 @@ class DecoderOptimizerFixtureTests(unittest.TestCase):
                 self.assertEqual(fixture.read(root,report['id']),report)
                 with self.assertRaises(ValueError):fixture.restore(fixture._folder(root,report['id'])/'step-5',{**c,'sequence_length':8},report['review']['revision'])
                 with self.assertRaises(ValueError):fixture.run(root,plan['id'],True,source,{**c,'sequence_length':8},approved)
+
+    def test_v5_budget_is_bounded_and_legacy_versions_keep_ten_update_contract(self):
+        settings={**fixture.DEFAULT,'schema_version':5,'gradient_accumulation_steps':2,'compute_precision':'float32','loss_scale':1.,'batch_size':2,'sequence_length':8,'steps':20}
+        self.assertEqual(fixture.configuration(settings),settings)
+        for value in (True,0,11,100):
+            with self.assertRaises(ValueError):fixture.configuration({**settings,'steps':value})
+        for version in (1,2,3,4):
+            legacy={**fixture.DEFAULT,'schema_version':version,'steps':20}
+            if version>=2:legacy['gradient_accumulation_steps']=1
+            if version>=3:legacy.update(compute_precision='float32',loss_scale=1.)
+            if version>=4:legacy.update(batch_size=2,sequence_length=8)
+            with self.assertRaises(ValueError):fixture.configuration(legacy)
+        self.assertEqual(fixture.learning_rate(settings,0),.005);self.assertEqual(fixture.learning_rate(settings,1),.01)
+        self.assertAlmostEqual(fixture.learning_rate(settings,19),.001)
+        with self.assertRaises(ValueError):fixture.learning_rate(settings,20)
+
+    @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS')=='1','Requires budgeted Metal optimizer execution')
+    def test_twenty_updates_restore_step_ten_and_keep_complete_scheduler_trajectory(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);plan,source=self.source(root)
+            for optimizer,precision in [('sgd','float32'),('adamw','mixed_float16')]:
+                c={**fixture.DEFAULT,'schema_version':5,'gradient_accumulation_steps':2,'compute_precision':precision,'loss_scale':128. if precision=='mixed_float16' else 1.,'batch_size':2,'sequence_length':8,'steps':20,'optimizer':optimizer,'weight_decay':.01 if optimizer=='adamw' else 0.}
+                approved=fixture.review(root,plan['id'],source,c)
+                self.assertEqual(approved['estimates']['optimizer_updates'],20);self.assertEqual(approved['estimates']['checkpoint_step'],10);self.assertEqual(approved['estimates']['recorded_microbatch_backward_calls'],40)
+                report=fixture.run(root,plan['id'],True,source,c,approved)
+                self.assertEqual(report['completed_steps'],20);self.assertEqual(report['scheduler_completed_steps'],20);self.assertEqual(report['checkpoint_restored_steps'],10)
+                self.assertEqual(report['microbatch_backward_calls_in_recorded_trajectory'],40);self.assertEqual([entry['step'] for entry in report['step_log']],list(range(1,21)))
+                self.assertAlmostEqual(report['step_log'][-1]['learning_rate'],.001);self.assertLess(report['final_train_loss'],report['initial_train_loss'])
+                self.assertEqual(report['checkpoint_parameter_max_error'],0.);self.assertEqual(report['checkpoint_optimizer_max_error'],0.)
+                self.assertEqual(fixture.read(root,report['id']),report)
+                checkpoint=fixture._folder(root,report['id'])/'step-10';model,state=fixture.restore(checkpoint,c,report['review']['revision']);self.assertEqual(state['step'],10)
+                with self.assertRaises(ValueError):fixture.restore(checkpoint,{**c,'steps':10},report['review']['revision'])
+                with self.assertRaises(ValueError):fixture.run(root,plan['id'],True,source,{**c,'steps':10},approved)

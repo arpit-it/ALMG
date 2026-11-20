@@ -11,6 +11,7 @@ class DecoderOptimizerFixtureDialog extends StatefulWidget {
 class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureDialog> {
   String _optimizer = 'sgd';
   int _accumulation = 1;
+  int _steps = 10;
   int _batch = 2;
   int _length = 8;
   String _precision = 'float32';
@@ -18,8 +19,8 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
   Map<String, dynamic>? _review;
   bool _busy = false;
   String? _error;
-  Map<String, dynamic> get _settings => {'schema_version': 4, 'batch_size': _batch, 'sequence_length': _length, 'compute_precision': _precision, 'loss_scale': _precision == 'mixed_float16' ? 128.0 : 1.0, 'gradient_accumulation_steps': _accumulation, 'optimizer': _optimizer, 'learning_rate': double.tryParse(_rate.text),
-    'schedule': 'warmup_cosine', 'warmup_steps': 2, 'steps': 10, 'gradient_clip_norm': 1.0, 'weight_decay': _optimizer == 'adamw' ? 0.01 : 0.0};
+  Map<String, dynamic> get _settings => {'schema_version': 5, 'batch_size': _batch, 'sequence_length': _length, 'compute_precision': _precision, 'loss_scale': _precision == 'mixed_float16' ? 128.0 : 1.0, 'gradient_accumulation_steps': _accumulation, 'optimizer': _optimizer, 'learning_rate': double.tryParse(_rate.text),
+    'schedule': 'warmup_cosine', 'warmup_steps': 2, 'steps': _steps, 'gradient_clip_norm': 1.0, 'weight_decay': _optimizer == 'adamw' ? 0.01 : 0.0};
   String get _path => '/decoder-architecture-plans/${widget.initialized['plan_id']}';
   @override void dispose() { _rate.dispose(); super.dispose(); }
   Future<void> _load() async {
@@ -56,7 +57,7 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
   }
   @override Widget build(BuildContext context) => AlertDialog(title: const Text('Bounded optimizer training fixture'), scrollable: true,
     content: SizedBox(width: 640, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Train this fresh initialization on generated token IDs for ten steps. Save a step-five model, optimizer moments and scheduler counter, restore them and compare with uninterrupted execution. Retain the trained model privately; original initialization stays unchanged. No text-corpus, large-model or release approval is established.'),
+      const Text('Train this fresh initialization on generated token IDs for ten or twenty optimizer updates. Save a midpoint model, optimizer moments and scheduler counter, restore them and compare with uninterrupted execution. Retain the trained model privately; original initialization stays unchanged. No text-corpus, large-model or release approval is established.'),
       DropdownButton<String>(value: _optimizer, items: const [DropdownMenuItem(value: 'sgd', child: Text('SGD')), DropdownMenuItem(value: 'adamw', child: Text('AdamW'))],
         onChanged: _busy ? null : (value) => setState(() { _optimizer = value!; _review = null; })),
       DropdownButton<String>(value: _precision, items: const [DropdownMenuItem(value: 'float32', child: Text('FP32 compute')), DropdownMenuItem(value: 'mixed_float16', child: Text('Mixed FP16 compute'))],
@@ -68,6 +69,9 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
         onChanged: _busy ? null : (value) => setState(() { _batch = value!; _review = null; })),
       DropdownButton<int>(value: _length, items: const [DropdownMenuItem(value: 4, child: Text('Sequence length 4')), DropdownMenuItem(value: 8, child: Text('Sequence length 8'))],
         onChanged: _busy ? null : (value) => setState(() { _length = value!; _review = null; })),
+      DropdownButton<int>(value: _steps, items: const [DropdownMenuItem(value: 10, child: Text('10 optimizer updates')), DropdownMenuItem(value: 20, child: Text('20 optimizer updates'))],
+        onChanged: _busy ? null : (value) => setState(() { _steps = value!; _review = null; })),
+      const Text('A separate uninterrupted comparison repeats the selected budget to verify checkpoint recovery. Saved step logs describe only the checkpointed trajectory.'),
       const Text('Selected batch and sequence must fit the initialized plan. Two-way accumulation requires batch size 2. Resource review retains conservative reserves for the full initialized plan.'),
       const Text('Accumulation averages gradients by real target-token count, then clips and updates once. Optimizer/scheduler counters and checkpoint steps count updates, not microbatches.'),
       TextField(controller: _rate, enabled: !_busy, decoration: const InputDecoration(labelText: 'Learning rate (0 to 0.1, exclusive zero)'), onChanged: (_) => setState(() => _review = null)),
@@ -76,7 +80,7 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
       if (_error != null) Text(_error!),
       if (_review != null) ...[
         Text(_review!['feasible'] == true ? 'Resources cover calculated optimizer fixture reserves.' : 'Optimizer fixture cannot start.'),
-        Text('Batch rows: ${_review!['estimates']['effective_batch_rows']} · sequence length: ${_review!['estimates']['sequence_length']} · targets per update: ${_review!['estimates']['target_tokens_per_update']}. Calculated optimizer-state bytes: ${_review!['estimates']['optimizer_state_bytes']} · accumulation buffer: ${_review!['estimates']['gradient_accumulation_buffer_bytes']} · memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes.'),
+        Text('Optimizer updates: ${_review!['estimates']['optimizer_updates']} · checkpoint step: ${_review!['estimates']['checkpoint_step']}. Batch rows: ${_review!['estimates']['effective_batch_rows']} · sequence length: ${_review!['estimates']['sequence_length']} · targets per update: ${_review!['estimates']['target_tokens_per_update']}. Calculated optimizer-state bytes: ${_review!['estimates']['optimizer_state_bytes']} · accumulation buffer: ${_review!['estimates']['gradient_accumulation_buffer_bytes']} · memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes.'),
         for (final reason in _review!['blockers'] as List) Text(reason as String),
         ExpansionTile(title: const Text('View optimizer feasibility record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],
