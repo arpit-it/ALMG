@@ -4928,6 +4928,65 @@ P3-LMF-03 partial progress · resumable full-training-split Unigram EM and train
   RAM blockers stay open and skipped. No external collection, downloads, generated
   artifacts/weights in Git or push; unrelated edits and prior artifacts preserved.
 
+P3-LMF-03 partial progress · reviewed full-split Unigram model inputs and numerical checks · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed full-split Unigram codecs now qualify for
+  model-input preparation only after an exact lossless comparison of every saved
+  record, nonempty saved splits, matching exhaustive zero-cross-split lexical
+  overlap evidence and a supported actual vocabulary of 4–512 IDs. Frozen trained
+  probabilities, candidate/source/index/permission revisions and codec hashes stay
+  bound to the review. Coverage gaps or changed probability files block admission;
+  lexical evidence does not establish absence of short or semantic contamination.
+- Unigram inputs use v3 window, masked-batch and numerical-report contracts with
+  an explicit Unigram model-input profile. Existing byte v1 and character v2
+  contracts remain readable unchanged. Viterbi IDs preserve document boundaries,
+  split/group/line/byte/hash provenance, stride-16 targets and mandatory padding
+  masks; duplicate occurrences are not expanded. Every record must encode to at
+  least two valid IDs. Transactions and interrupted publication retain recoverable
+  counters/cursors. Profile scope grants no student-training or release approval.
+- The separately confirmed five-step diagnostic validates the exact v3 family,
+  batch and vocabulary before fresh decoder initialization. It checks every
+  parameter tensor, masked loss/gradient invariance with actually changed padded
+  targets, CPU inference agreement and complete token-weighted held-out evaluation.
+  No held-out optimizer updates occur. Model weights are discarded; only the
+  versioned diagnostic report persists. Older diagnostic schemas remain readable.
+- Native verification rebuilt/launched macOS on port 28856, reopened legacy v2
+  character batches, rejected a Unigram comparison with a held-out coverage gap
+  without creating windows, and cancelled clean-source consent without creating
+  work. Unigram preparation d6db3bbb64114d4fb7dda6fc80e58242 paused at 9/401 records.
+  Restarting backend/app restored the exact saved state; native resume completed
+  2,432 train / 298 validation / 273 test windows with 44,637 targets and 64 IDs /
+  architecture version 1. All split inspectors and pagination were exercised.
+  QA-only one-record steps/response latency made pause deterministic; production
+  batching is unchanged. Completed preparation reopened unchanged after restart.
+- Cancelling diagnostic consent saved nothing. Native diagnostic
+  85d8d88c818d4380bda9bb03a2aeccce changed all four padded targets and reduced batch
+  loss 4.158256530761719 → 3.988203525543213. Masked loss error was 0, gradient
+  error 1.4901161193847656e-08 and CPU/Metal error 3.9151893727051856e-08.
+  Evaluation covered all 298 validation windows / 4,404 targets in 19 batches and
+  all 273 test windows / 4,055 targets in 18 batches, with zero held-out updates.
+  Accuracy was approximately 0.136/0.146; numerical success establishes no model
+  quality or release target. A further backend/app restart reopened the exact
+  saved v3 report through the native diagnostic inventory.
+- Independent checks verified all 3,003 windows against fresh frozen-codec Viterbi
+  encodings, captured native arrays/masks/source references, exact batch/report
+  hashes, and all held-out populations/target totals. All 66 prior source/index/
+  candidate/tokenizer/comparison/window/diagnostic files stayed byte-identical.
+  No student model/trial was saved. Evidence remains outside Git at
+  /tmp/almg-unigram-input-native-qa/verification.json, *-ui.json/*-ui.txt, fingerprints
+  and native build/restart/test logs.
+- Validation: 501 Python tests with Metal checks and warnings as errors, 38 Flutter
+  tests, clean Flutter analysis/diff checks and successful native builds. New
+  cases cover exact v3 arrays/provenance, full split traversal, current probability
+  signatures, contamination rejection, publication recovery, actual source-bound
+  Unigram Metal execution and report reload. UI tests retain the distinct v3
+  family/review and explicitly label its diagnostic-only scope.
+- Remaining: durable approved streamed student training, checkpoint recovery and
+  model/tokenizer persistence for full-split codecs, plus broader acceptance.
+  Fixed-candidate Unigram pruning/sampling remain unsupported. Independent physical,
+  Windows and larger-than-RAM blockers stay open and skipped. No external collection,
+  downloads, generated artifacts/weights in Git or push; unrelated edits and prior
+  artifacts are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

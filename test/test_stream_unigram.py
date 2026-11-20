@@ -44,7 +44,6 @@ class FullSplitUnigramTests(unittest.TestCase):
             with self.assertRaises(ValueError):codec.encode('Ω')
             report=finish(scans,root,scans.begin(root,record['id'],True,record,'unigram'))
             self.assertEqual(report['fit_kind'],'unigram');self.assertEqual(report['processed_records'],index['unique_records']);self.assertFalse(report['tokenizer_refitted'])
-            with self.assertRaisesRegex(ValueError,'supported completed'):windows.review(root,report['id'],'a'*32)
             self.assertTrue(all(p.read_bytes()==data for p,data in before.items()))
             exported=fits.export(root,record['id'],True,record)
             with zipfile.ZipFile(io.BytesIO(base64.b64decode(exported['data']))) as archive:self.assertEqual(json.loads(archive.read('tokenizer.json')),codec.artifact())

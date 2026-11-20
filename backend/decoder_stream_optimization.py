@@ -52,15 +52,18 @@ def _run(root,window_id,confirmed,reviewed,reviewed_batch,cursor,batch_worker,le
     import mlx.core as mx
     import numpy as np
     if not mx.metal.is_available():raise ValueError('Metal is unavailable for the optimizer diagnostic.')
-    character=learned and reviewed.get('format')=='almg-stream-learned-windows-v2'
+    alphabet_based=learned and reviewed.get('format') in ('almg-stream-learned-windows-v2','almg-stream-learned-windows-v3')
+    unigram=learned and reviewed.get('format')=='almg-stream-learned-windows-v3'
+    family='unigram' if unigram else 'character_bpe'
+    report_version=3 if unigram else 2 if alphabet_based else 1
     vocabulary_size=train.get('vocabulary_size') if learned else 256
     if (type(vocabulary_size) is not int or not 4<=vocabulary_size<=512
-            or (learned and (reviewed.get('format') not in ('almg-stream-learned-windows-v1','almg-stream-learned-windows-v2')
+            or (learned and (reviewed.get('format') not in ('almg-stream-learned-windows-v1','almg-stream-learned-windows-v2','almg-stream-learned-windows-v3')
                              or vocabulary_size!=reviewed.get('vocabulary_size')))):
         raise ValueError('The inspected vocabulary does not match a supported model profile.')
-    if character and (reviewed.get('fit_kind')!='character_bpe' or train.get('tokenizer_kind')!='character_bpe'
-                      or train.get('schema_version')!=2):
-        raise ValueError('Character model-input contract changed. Reopen the reviewed batch.')
+    if alphabet_based and (reviewed.get('fit_kind')!=family or train.get('tokenizer_kind')!=family
+                           or train.get('schema_version')!=report_version):
+        raise ValueError('Learned model-input contract changed. Reopen the reviewed batch.')
     model=recipe_contracts.initialize_recipe('decoder_from_scratch',{'vocab_size':vocabulary_size,'seed':7})
     before={name:np.array(value).copy() for name,value in model.parameters.items()}
     with mx.stream(mx.gpu):
@@ -82,10 +85,10 @@ def _run(root,window_id,confirmed,reviewed,reviewed_batch,cursor,batch_worker,le
             return mx.sum((mx.logsumexp(scores,axis=-1)-correct)*weights)/mx.sum(weights)
         gradient=mx.grad(loss)
         initial=float(loss(parameters,x,y,mask).item())
-        altered=mx.where(mask==0,(y+(1 if character else 127))%vocabulary_size,y)
+        altered=mx.where(mask==0,(y+(1 if alphabet_based else 127))%vocabulary_size,y)
         padding_targets_changed=int(mx.sum((altered!=y)*(mask==0)).item())
-        if character and padding_targets_changed!=sum(16-length for length in train['sequence_lengths']):
-            raise ValueError('Character padding probe did not change every masked target.')
+        if alphabet_based and padding_targets_changed!=sum(16-length for length in train['sequence_lengths']):
+            raise ValueError('Learned padding probe did not change every masked target.')
         padding_loss_error=abs(float(loss(parameters,x,altered,mask).item())-initial)
         original_gradient=gradient(parameters,x,y,mask);altered_gradient=gradient(parameters,x,altered,mask)
         padding_gradient_error=max(float(mx.max(mx.abs(original_gradient[name]-altered_gradient[name])).item()) for name in parameters)
@@ -112,7 +115,6 @@ def _run(root,window_id,confirmed,reviewed,reviewed_batch,cursor,batch_worker,le
     # Recheck the exact source batch after GPU execution before writing evidence.
     if batch_worker.read_batch(root,window_id,True,reviewed,cursor,'train',4)!=train:
         raise ValueError('Source bindings changed during the diagnostic; no report published.')
-    report_version=2 if character else 1
     report={'format':f'almg-stream-learned-masked-optimizer-check-v{report_version}' if learned else 'almg-stream-masked-optimizer-check-v1','schema_version':report_version,'id':uuid.uuid4().hex,
             'windows_id':window_id,'windows_revision':reviewed['revision'],'training_batch_sha256':digest(train),
             'training_cursor':cursor,'training_provenance':train['provenance'],
@@ -125,10 +127,10 @@ def _run(root,window_id,confirmed,reviewed,reviewed_batch,cursor,batch_worker,le
             'masked_target_loss_error':padding_loss_error,'masked_target_gradient_error':padding_gradient_error,
             'evaluation':evaluation,'device':'Metal GPU','mlx_version':decoder_bundle.version('mlx'),
             'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in
-                (('decoder_stream_optimization.py','decoder_stream_learned_optimization.py','decoder_stream_learned_batches.py','decoder_stream_learned_windows.py','decoder_stream_fitted_tokenizer_evaluations.py','decoder_stream_bpe.py','decoder_stream_iterative_bpe.py','decoder_bpe.py','decoder_stream_character_bpe.py','decoder_character_bpe.py','decoder_recipe.py','recipe_contracts.py') if learned else ('decoder_stream_optimization.py','decoder_stream_batches.py','decoder_recipe.py','decoder_tokenizer.py'))}),
+                (('decoder_stream_optimization.py','decoder_stream_learned_optimization.py','decoder_stream_learned_batches.py','decoder_stream_learned_windows.py','decoder_stream_fitted_tokenizer_evaluations.py','decoder_stream_bpe.py','decoder_stream_iterative_bpe.py','decoder_bpe.py','decoder_stream_character_bpe.py','decoder_character_bpe.py','decoder_stream_unigram.py','decoder_stream_unigram_candidates.py','decoder_unigram.py','decoder_recipe.py','recipe_contracts.py') if learned else ('decoder_stream_optimization.py','decoder_stream_batches.py','decoder_recipe.py','decoder_tokenizer.py'))}),
             'model_saved':False,'training_approved':False,'release_approved':False,
             'limitations':'Five-step numerical diagnostic on one batch. All saved held-out windows are evaluated without optimizer updates. Five updates on one training batch do not establish usable model quality or release readiness.'}
-    if character:report.update(tokenizer_kind='character_bpe',padding_targets_changed=padding_targets_changed)
+    if alphabet_based:report.update(tokenizer_kind=family,padding_targets_changed=padding_targets_changed)
     report['revision']=digest(report)
     if learned:
         report.update(tokenizer_sha256=train['tokenizer_sha256'],vocabulary_size=vocabulary_size,model_architecture_version=2 if vocabulary_size>256 else 1)
@@ -153,9 +155,9 @@ def _list_reports(root,window_id,confirmed,learned):
         try:
             if path.stat().st_size>256*1024:continue
             report=json.loads(path.read_text(encoding='utf-8'))
-            version=2 if learned and report.get('format')=='almg-stream-learned-masked-optimizer-check-v2' else 1
+            version=({'almg-stream-learned-masked-optimizer-check-v2':2,'almg-stream-learned-masked-optimizer-check-v3':3}.get(report.get('format'),1) if learned else 1)
             if (report.get('format')!=(f'almg-stream-learned-masked-optimizer-check-v{version}' if learned else 'almg-stream-masked-optimizer-check-v1') or type(report.get('schema_version')) is not int
-                    or report['schema_version']!=version or (version==2 and report.get('tokenizer_kind')!='character_bpe') or report.get('id')!=path.stem or report.get('windows_id')!=window_id
+                    or report['schema_version']!=version or (version in (2,3) and report.get('tokenizer_kind')!=('unigram' if version==3 else 'character_bpe')) or report.get('id')!=path.stem or report.get('windows_id')!=window_id
                     or report.get('revision')!=digest({k:v for k,v in report.items() if k!='revision'})
                     or any(report.get(key) is not False for key in ('model_saved','training_approved','release_approved'))):
                 continue

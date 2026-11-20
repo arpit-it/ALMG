@@ -56,6 +56,7 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
         title: const Text('Masked optimizer diagnostic verified'), scrollable: true,
         content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
           if (report['vocabulary_size'] != null) Text('Learned vocabulary: ${report['vocabulary_size']} IDs · architecture version ${report['model_architecture_version']}'),
+          if (report['tokenizer_kind'] == 'unigram') const Text('Full-split Unigram numerical check · no saved model or training approval'),
           if (report['tokenizer_kind'] == 'character_bpe') const Text('Full-split character-BPE numerical check · no saved model or training approval'),
           Text('Training batch loss: ${report['initial_batch_loss']} → ${report['final_batch_loss']}'),
           const Text('Five-step numerical check only. The model was discarded; held-out evaluation does not establish usable model quality.'),

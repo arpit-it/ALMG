@@ -105,6 +105,24 @@ void main() {
     expect(find.text('Full-split character-BPE numerical check · no saved model or training approval'), findsOneWidget);
   });
 
+  testWidgets('Unigram version3 review reaches its distinct numerical report', (tester) async {
+    final review = {'id': 'unigram', 'format': 'almg-stream-learned-windows-v3', 'schema_version': 3, 'fit_kind': 'unigram'};
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(
+      reviewed: review, routePrefix: 'decoder-stream-learned-windows', request: (path, body) async {
+        expect(body['reviewed'], review);
+        if (path.endsWith('/optimization-check')) {
+          expect(body['reviewed_batch']['schema_version'], 3);
+          return {'schema_version': 3, 'tokenizer_kind': 'unigram', 'vocabulary_size': 64, 'model_architecture_version': 1,
+            'initial_batch_loss': 4.0, 'final_batch_loss': 3.0, 'evaluation': {}};
+        }
+        expect(path, '/decoder-stream-learned-windows/unigram/batch');
+        return {'schema_version': 3, 'rows': 1, 'real_target_tokens': 2, 'sequence_lengths': [2], 'next_cursor': null};
+      }))));
+    await tester.pumpAndSettle(); await tester.tap(find.text('Check masked optimization')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm five-step optimizer check')); await tester.pumpAndSettle();
+    expect(find.text('Full-split Unigram numerical check · no saved model or training approval'), findsOneWidget);
+  });
+
   testWidgets('batch inspector allows retry after a binding failure', (tester) async {
     var attempts = 0;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(reviewed: const {'id': 'fixture'}, request: (path, body) async {
