@@ -9,14 +9,14 @@ import numpy as np
 if __package__:
     from . import decoder_corpus_inputs as inputs, decoder_optimizer_fixture as optimizer
     from . import decoder_architecture_feasibility as hardware, decoder_architecture_backward as backward
-    from . import decoder_optimizer_measurements as measurements, decoder_optimizer_estimates as estimates, decoder_mixed_precision as mixed
+    from . import decoder_optimizer_measurements as measurements, decoder_optimizer_estimates as estimates, decoder_mixed_precision as mixed, decoder_corpus_feedback as feedback
     from .planned_decoder import PlannedDecoder
     from .decoder_tokenizer import Tokenizer
     from .run_manifest import digest, file_digest
 else:
     import decoder_corpus_inputs as inputs, decoder_optimizer_fixture as optimizer
     import decoder_architecture_feasibility as hardware, decoder_architecture_backward as backward
-    import decoder_optimizer_measurements as measurements, decoder_optimizer_estimates as estimates, decoder_mixed_precision as mixed
+    import decoder_optimizer_measurements as measurements, decoder_optimizer_estimates as estimates, decoder_mixed_precision as mixed, decoder_corpus_feedback as feedback
     from planned_decoder import PlannedDecoder
     from decoder_tokenizer import Tokenizer
     from run_manifest import digest, file_digest
@@ -111,7 +111,8 @@ def _source(root, initialized, reviewed_inputs):
     return saved, current, model_bytes, windows, tokenizer
 
 
-def review(root, initialized, reviewed_inputs, settings):
+def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_backend'):
+    if execution_mode not in ('shared_backend','fresh_process'):raise ValueError('Choose a supported corpus execution mode.')
     saved, current, model_bytes, windows, _ = _source(root, initialized, reviewed_inputs)
     c = configuration(settings, saved['review']['sequence_length'])
     profile = hardware.hardware(root)
@@ -139,14 +140,21 @@ def review(root, initialized, reviewed_inputs, settings):
         reasons.append('Corpus gradients require Apple silicon with MLX Metal.')
     if not hardware._fits(profile, reserve):
         reasons.append('Current memory/disk does not cover corpus optimizer reserves.')
-    result = {'format': 'almg-corpus-optimizer-review-v3', 'schema_version': 3,
+    result = {'format': 'almg-corpus-optimizer-review-v4' if execution_mode=='fresh_process' else 'almg-corpus-optimizer-review-v3', 'schema_version': 4 if execution_mode=='fresh_process' else 3,
+              'execution_mode':execution_mode,
               'source': saved['review']['source'], 'corpus_id': saved['id'], 'corpus_revision': saved['revision'],
               'config': c, 'model_config': current['config'], 'runtime': estimates.runtime(profile),
               'splits': saved['review']['splits'], 'estimates': reserve, 'hardware': profile,
               'feasible': not reasons, 'blockers': reasons, 'training_approved': False, 'release_approved': False,
               'implementation_sha256': digest({name: file_digest(Path(__file__).with_name(name)) for name in
-                  ('decoder_corpus_optimizer.py', 'decoder_corpus_inputs.py', 'decoder_optimizer_fixture.py',
+                  ('decoder_corpus_optimizer.py', 'decoder_corpus_inputs.py', 'decoder_optimizer_fixture.py', 'decoder_corpus_feedback.py', 'decoder_corpus_isolated.py', 'decoder_corpus_worker.py',
                    'decoder_architecture_backward.py', 'decoder_mixed_precision.py', 'planned_decoder.py', 'decoder_tokenizer.py')})}
+    reserve['calculated_memory_reserve_bytes']=reserve['required_available_memory_bytes']
+    memory,work=feedback.feedback(history(root,initialized,reviewed_inputs),result) if execution_mode=='fresh_process' else (None,None)
+    reserve['isolated_corpus_memory']=memory;reserve['corpus_work_estimate']=work
+    if memory is not None:reserve['required_available_memory_bytes']=max(reserve['required_available_memory_bytes'],memory['calculated_memory_floor_bytes'])
+    if not hardware._fits(profile,reserve) and not any('memory/disk' in reason for reason in reasons):reasons.append('Current memory/disk does not cover measured corpus worker calibration reserves.')
+    result['feasible']=not reasons
     result['revision'] = digest(result)
     return result
 
@@ -162,11 +170,11 @@ def _generated(model, tokenizer):
     return tokens, tokenizer.decode_preview(tokens) if hasattr(tokenizer, 'decode_preview') else tokenizer.decode(tokens)
 
 
-def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
+def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execution_mode='shared_backend'):
     if confirmed is not True:
         raise ValueError('Explicitly confirm corpus training and private checkpoint/model storage.')
-    current = review(root, initialized, reviewed_inputs, settings)
-    keys = ('format', 'schema_version', 'source', 'corpus_id', 'corpus_revision', 'config', 'model_config', 'runtime', 'splits', 'estimates', 'implementation_sha256')
+    current = review(root, initialized, reviewed_inputs, settings, execution_mode)
+    keys = ('format', 'schema_version', 'source', 'corpus_id', 'corpus_revision', 'config', 'model_config', 'runtime', 'splits', 'estimates', 'implementation_sha256', 'execution_mode')
     if (not isinstance(approved, dict) or approved.get('revision') != digest({k: v for k, v in approved.items() if k != 'revision'})
             or any(approved.get(key) != current[key] for key in keys)):
         raise ValueError('Corpus optimizer review changed. Reopen it before training.')
@@ -231,7 +239,8 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved):
         raise ValueError('Saved corpus model generation changed after reload; artifacts retained.')
     _source(root, initialized, reviewed_inputs)
     observed = observer.finish()
-    observed['scope'] = 'bounded_corpus_optimizer_in_shared_backend'
+    observed['scope'] = 'bounded_corpus_optimizer_in_shared_backend' if execution_mode=='shared_backend' else 'phase_samples_inside_isolated_corpus_worker'
+    if execution_mode=='fresh_process':observed['limitations']='Synchronized phase samples inside one fresh corpus worker, not its isolated lifetime peaks. See isolated_workflow_measurements when published. Sampling starts after admission and excludes worker bootstrap/history validation; no total wall-time or future-duration guarantee.'
     observed['limitations'] += ' Corpus scope: starts after admission/snapshot validation and includes model loading, both training trajectories, checkpoint restore, all split evaluations and tokenizer-backed CPU generation.'
     record = {'format': 'almg-corpus-optimizer-run-v3', 'schema_version': 3, 'id': identifier,
               'created_at': datetime.now(timezone.utc).isoformat(), 'review': approved, 'admission': current,
@@ -304,6 +313,8 @@ def read(root, identifier):
     model = PlannedDecoder.load(folder / 'trained-model.json')
     if model.config != approved['model_config'] or _generated(model, tokenizer) != (record['generated_token_ids'], record['generated_text']):
         raise ValueError('Saved corpus model inference changed.')
+    if 'isolated_workflow_measurements' in record:
+        if approved.get('execution_mode')!='fresh_process' or feedback.measurements(record) is None:raise ValueError('Corpus isolation measurements lack a matching execution policy.')
     return record
 
 

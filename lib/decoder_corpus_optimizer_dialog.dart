@@ -42,7 +42,13 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
       if (record['schema_version'] == 3) Text('Compute: ${record['compute_precision']} · loss scale: ${record['loss_scale']} · FP32 master weights, gradients and moments. Split losses use the saved FP32 master model.'),
       Text('Generated text: ${record['generated_text']}'),
       const Text('Held-out losses are diagnostics on this small corpus. This private result does not establish language quality or release approval.'),
-      const Text('Workflow time and memory observations share the backend process; these are not isolated training peaks.'),
+      if (record['isolated_workflow_measurements'] case final Map measured) ...[
+        Text('Measured isolated corpus worker time: ${(measured['elapsed_seconds'] as num).toStringAsFixed(3)} s.'),
+        Text('Measured fresh-worker peak RSS: ${measured['isolated_process_peak_rss_bytes']} bytes · Metal peak: ${measured['isolated_metal_peak_bytes']} bytes.'),
+        const Text('Includes worker imports/admission, both training trajectories, checkpoints and CPU inference. Excludes parent admission, process launch, queue/approval waits and final measurement publication. Peaks include runtime overhead; unified-memory RSS and Metal may overlap. No large-model feasibility or total wall-time guarantee.'),
+      ] else if (record['review'] is Map && record['review']['execution_mode'] == 'fresh_process')
+        const Text('Isolated worker measurements were not published; phase samples do not establish isolated peaks.')
+      else const Text('Workflow time and memory observations share the backend process; these are not isolated training peaks.'),
       SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
     ])), actions: [
       if (record['id'] is String) TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusContinuationDialog(sourceId: record['id'] as String, request: widget.request)), child: const Text('Review corpus checkpoint continuation')),
@@ -65,7 +71,7 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
   });
   @override Widget build(BuildContext context) => AlertDialog(title: const Text('Reviewed corpus optimizer training'), scrollable: true,
     content: SizedBox(width: 640, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Train fresh initialized weights using only these saved, permission-reviewed text windows. FP32 or bounded mixed FP16, one/two effective rows per update, learning rate 0.01, two warmup steps, cosine decay and clipping at 1.0. Save a midpoint checkpoint, restore optimizer/scheduler state and compare with a separate uninterrupted trajectory. Both trajectories execute the selected budget.'),
+      const Text('Train fresh initialized weights in one isolated local worker using only these saved, permission-reviewed text windows. FP32 or bounded mixed FP16, one/two effective rows per update, learning rate 0.01, two warmup steps, cosine decay and clipping at 1.0. Save a midpoint checkpoint, restore optimizer/scheduler state and compare with a separate uninterrupted trajectory. Both trajectories execute the selected budget.'),
       DropdownButton<String>(value: _optimizer, items: const [DropdownMenuItem(value: 'sgd', child: Text('Corpus SGD')), DropdownMenuItem(value: 'adamw', child: Text('Corpus AdamW'))],
         onChanged: _busy ? null : (value) => setState(() { _optimizer = value!; _review = null; })),
       DropdownButton<String>(value: _precision, items: const [DropdownMenuItem(value: 'float32', child: Text('Corpus FP32 compute')), DropdownMenuItem(value: 'mixed_float16', child: Text('Corpus mixed FP16 compute'))],
@@ -77,12 +83,17 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
         onChanged: _busy ? null : (value) => setState(() { _batch = value!; _review = null; })),
       DropdownButton<int>(value: _accumulation, items: const [DropdownMenuItem(value: 1, child: Text('1 corpus microbatch per update')), DropdownMenuItem(value: 2, child: Text('2 corpus microbatches per update'))],
         onChanged: _busy ? null : (value) => setState(() { _accumulation = value!; _review = null; })),
-      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. This bounded path Saved midpoint continuation requires separate approval; fresh-run cancellation is not exposed yet. Reported split losses evaluate the saved FP32 master model.'),
+      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. Saved midpoint continuation requires separate approval; fresh-run cancellation is not exposed yet. Reported split losses evaluate the saved FP32 master model.'),
       if (_busy) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
       if (_review != null) ...[
         Text(_review!['feasible'] == true ? 'Resources cover corpus optimizer reserves.' : 'Corpus optimizer cannot start.'),
         Text('Memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes · disk reserve: ${_review!['estimates']['required_free_disk_bytes']} bytes.'),
+        if (_review!['estimates']['isolated_corpus_memory'] case final Map memory)
+          Text('Compatible measured peaks: RSS ${memory['isolated_process_peak_rss_bytes']} bytes · Metal ${memory['isolated_metal_peak_bytes']} bytes. Calculated floor: ${memory['calculated_memory_floor_bytes']} bytes; the reserve never falls below the original calculation.'),
+        if (_review!['estimates']['corpus_work_estimate'] case final Map work)
+          Text('Estimated corpus workflow work: ${(work['estimated_seconds'] as num).toStringAsFixed(3)} s from ${work['sample_count']} compatible measured run(s). Heuristic includes both trajectories and worker setup; excludes parent launch and queue/approval waits.')
+        else const Text('Corpus workflow estimate unavailable: complete a compatible isolated run first.'),
         for (final reason in _review!['blockers'] as List) Text(reason as String),
         ExpansionTile(title: const Text('View corpus optimizer review'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],

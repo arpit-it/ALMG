@@ -7271,6 +7271,63 @@ P3-LMF-06 partial progress · approved retained-partial corpus resume · 2026-11
   with this bounded engine. Unchanged independent hardware/user-action blockers
   remain open and skipped.
 
+P3-LMF-05 partial progress · isolated reviewed-corpus peaks and scoped feedback · 2026-11-21:
+- [ ] P3-LMF-05 remains open. New app-approved corpus optimizer runs execute in a
+  fresh local process after parent admission, then recheck approval/resources inside
+  that worker. A nonce/actual child-PID/source/corpus/approval binding is checked
+  before returning the saved result. Worker failure or timeout retains any model/
+  checkpoint artifacts. Existing direct/shared corpus records remain readable;
+  corpus continuation and partial-resume execution stay on their existing path.
+- New version-1 isolated corpus measurements record module-entry workflow elapsed
+  time, process-lifetime RSS peak and Metal peak, including imports/admission/history
+  validation, model/corpus loading, both training verification trajectories,
+  checkpoint work, split evaluation and CPU generation. Timing excludes parent
+  admission, subprocess launch/pre-module startup, queue/approval waits and final
+  measurement publication. Peaks include runtime overhead and may overlap in unified
+  memory. No shared counters are reset; no large-model feasibility is inferred.
+- Version-4 isolated corpus reviews use only verified completed observations matching
+  exact initialization, corpus ID/revision, optimizer/batch/precision/budget, model
+  configuration, runtime/topology, execution policy and producer. Work estimates use
+  the largest compatible measured time plus 25% headroom and are explicitly heuristic.
+  Memory calibration calculates (RSS + Metal) with 25% headroom and can raise the
+  required reserve, never reduce its calculated baseline. Current availability is
+  rechecked against the resulting reserve before spawning a worker. Shared/legacy,
+  different-corpus/configuration/runtime/producer observations cannot enter feedback.
+- Native verification: rebuilt/launched ALMG and reopened all sixteen original/
+  canceled/resumed records exactly. Closing the first isolated review created no
+  output. Explicitly trained the retained 704-parameter local corpus with batch two,
+  two-way accumulation and twenty updates: FP32 SGD
+  d5be342535d2487e8ff0aa367cfaae78 and mixed FP16 AdamW
+  2ee480b75e8b44a8a62146dc5802dff2. Worker PIDs 86443/86654 differed from the
+  backend and each other. Checkpoint/CPU generation checks passed and training loss
+  decreased; models remained private and original initialization/corpus stayed intact.
+- Native measured work was .4804677920 s (SGD) / .4692642090 s (AdamW), peak RSS
+  64765952 / 66125824 bytes and Metal peak 41392 / 43570 bytes. Refreshed reviews
+  used exactly one matching sample each, producing .6005847400 / .5865802613 s
+  heuristic work estimates. Measured memory floors 81009180 / 82711743 bytes were
+  below calculated reserves; required reserves stayed 268767040 / 268789568 bytes.
+  The app distinguished measured results, calculated floors and future estimates.
+- After app/backend restart all eighteen legacy/measured records reopened exactly;
+  scoped memory/time feedback still selected the same saved observations without
+  retraining. All 241 original fixture files and all 255 retained files kept their
+  hashes. Evidence: /tmp/almg-corpus-peaks-native-qa/verification.json,
+  sgd-before-ui.json, adamw-before-ui.json, sgd-trained-ui.json,
+  adamw-trained-ui.json, sgd-feedback-ui.json, adamw-feedback-ui.json and restarted
+  native captures. No external collection occurred; generated artifacts and weights
+  remain outside Git.
+- Validation: 630 Python tests passed with warnings as errors and Metal enabled,
+  78 Flutter tests passed, analysis clean. New tests cover actual fresh-worker peaks,
+  exact compatible feedback, cross-corpus/configuration/runtime/producer rejection,
+  no-consent/stale-review prevention, calibrated-memory rejection before launch,
+  nonce/result binding and source preservation. UI tests distinguish measured peaks,
+  calculated reserves and heuristic estimates. The high-floor resource case uses
+  a local fixture profile and does not change or exhaust actual host memory.
+- Remaining: isolated corpus continuation/retained-partial profiling and scoped
+  feedback, broader budgets/model scales, arbitrary interruption and independent
+  Windows/CUDA/physical-host verification. These bounded reports do not establish
+  50M–100M feasibility or general model quality. Unchanged hardware/user-action
+  blockers remain open and skipped; P3-LMF-06 fresh-run cancellation also stays open.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

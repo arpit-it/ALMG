@@ -66,4 +66,18 @@ void main() {
     expect(find.text('Confirm train and save corpus model'), findsOneWidget);
   });
 
+  testWidgets('isolated corpus measurements and calibrated estimates are labeled separately', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
+      if(path.endsWith('train')) return {'initial_losses':{'train':2,'validation':2,'test':2},'final_losses':{'train':1,'validation':1.5,'test':1.6},'generated_text':'amber birch','isolated_workflow_measurements':{'elapsed_seconds':.5,'isolated_process_peak_rss_bytes':1000,'isolated_metal_peak_bytes':100}};
+      return {'feasible':true,'estimates':{'isolated_corpus_memory':{'isolated_process_peak_rss_bytes':1000,'isolated_metal_peak_bytes':100,'calculated_memory_floor_bytes':1375},'corpus_work_estimate':{'estimated_seconds':.625,'sample_count':1}},'blockers':[]};
+    })));
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await tester.ensureVisible(find.textContaining('Estimated corpus workflow work: 0.625 s'));
+    expect(find.textContaining('Compatible measured peaks: RSS 1000 bytes'),findsOneWidget);
+    await tester.tap(find.text('Confirm train and save corpus model'));await tester.pump();await tester.pump(const Duration(milliseconds:300));
+    expect(find.text('Measured isolated corpus worker time: 0.500 s.'),findsOneWidget);
+    expect(find.textContaining('these are not isolated training peaks'),findsNothing);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
 }
