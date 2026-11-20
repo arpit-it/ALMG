@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'decoder_optimizer_continuation_dialog.dart';
 
 class DecoderOptimizerFixtureDialog extends StatefulWidget {
   const DecoderOptimizerFixtureDialog({super.key, required this.initialized, required this.request});
@@ -40,7 +41,10 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
       ],
       SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
     ])),
-    actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    actions: [
+      if (record['format'] == 'almg-decoder-optimizer-fixture-v1' && record['id'] is String) TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderOptimizerContinuationDialog(sourceId: record['id'] as String, request: widget.request)), child: const Text('Review checkpoint continuation')),
+      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+    ]));
   Future<void> _train() async {
     setState(() { _busy = true; _error = null; });
     try {
@@ -81,7 +85,7 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
       const Text('Selected batch and sequence must fit the initialized plan. Two-way accumulation requires batch size 2. Resource review retains conservative reserves for the full initialized plan.'),
       const Text('Accumulation averages gradients by real target-token count, then clips and updates once. Optimizer/scheduler counters and checkpoint steps count updates, not microbatches.'),
       TextField(controller: _rate, enabled: !_busy, decoration: const InputDecoration(labelText: 'Learning rate (0 to 0.1, exclusive zero)'), onChanged: (_) => setState(() => _review = null)),
-      const Text('Metal gradients with FP32 master/NumPy optimizer state; two warmup steps, cosine decay and global gradient clipping at 1.0. This fixture supports at most 16,384 parameters. Cancellation and independent checkpoint continuation are not exposed yet.'),
+      const Text('Metal gradients with FP32 master/NumPy optimizer state; two warmup steps, cosine decay and global gradient clipping at 1.0. This fixture supports at most 16,384 parameters. Saved checkpoints support separately approved continuation of the original budget. Cancellation is not exposed yet.'),
       if (_busy) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
       if (_review != null) ...[

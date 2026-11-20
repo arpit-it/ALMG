@@ -6661,6 +6661,53 @@ P3-LMF-05 partial progress · compatible optimizer-work estimates · 2026-11-20:
   cancellation and profiled 50M–100M training. These bounded synthetic timings do
   not establish large-model feasibility. Unchanged blockers stay open and skipped.
 
+P3-LMF-06 partial progress · independently approved checkpoint continuation · 2026-11-20:
+- [ ] P3-LMF-06 remains open. A saved bounded optimizer run now offers separate
+  checkpoint-continuation review and explicit confirmation. It verifies the source
+  record/checkpoint/optimizer hashes, current runtime/implementation and conservative
+  hardware reserves, restores the midpoint model and SGD/AdamW state, and completes
+  the original configuration/budget without resetting scheduler counters. Changed
+  source/review, unsupported resources and malformed state cannot start. Full-run
+  work estimates are deliberately not reused for the shorter continuation scope.
+- A successful continuation writes a new private trained model, final optimizer
+  state and versioned lineage record under decoder-optimizer-continuations. The
+  original run, midpoint checkpoint and initialization stay unchanged. Final weights
+  and CPU token generation must match the original completed reference run; loss
+  must decrease from the restored checkpoint. Saved-history reads verify file hashes,
+  parent/checkpoint lineage, moments/counters and CPU inference. Legacy source
+  settings/checkpoints remain readable; UI history exposes retained continuations.
+- Native verification: rebuilt and ran ALMG on this Mac with the isolated local
+  8704-parameter two-layer initialization and external collection disabled.
+  Reopened all fourteen copied source records before writes. Opened and canceled
+  the first continuation review; no output directory/artifact was created. Then
+  separately approved continuation of FP32 SGD source
+  eb51f539b5334bbf90d1a3afd6a2d2b5 into 58b350c5d07848639d326a722519d079,
+  and mixed FP16 AdamW source d44d7cd3f2e246ba9dcf17ba9921ddcf into
+  1ffae4b267d34d55b30f5b9f8cc22da8. Both restored step ten and recorded exactly
+  steps eleven through twenty, including the original gradient norms/clipping,
+  learning rates and two-microbatch target counts. Final weights matched the
+  original source final model with 0.0 error and identical CPU-generated token IDs.
+- SGD loss fell from checkpoint loss 4.7254509925842285 to 4.686117172241211;
+  AdamW loss fell 3.1773459911346436 → 2.6992383003234863. Final optimizer and
+  scheduler counters were twenty. After app/backend restart all fourteen original
+  runs and both independent continuations reopened exactly, including optimizer
+  state validation and CPU inference. All six new continuation files, seventy
+  original optimizer files, three initialization/source files and 315 prior
+  artifact files retained their hashes. Evidence:
+  /tmp/almg-continuation-native-qa/verification.json and native UI captures;
+  generated datasets, checkpoints and weights remain outside Git.
+- Validation: 603 Python tests passed with warnings as errors and Metal enabled,
+  66 Flutter tests passed, and analysis was clean. Tests cover legacy ten-update
+  SGD/step-five and mixed twenty-update AdamW/step-ten independent continuation,
+  restored schedule cadence, immutable sources, explicit consent, changed-review/
+  low-resource rejection, tampered source/output state and blocked/confirmed UI.
+- Remaining: this verifies independent completion from an already verified saved
+  midpoint, not recovery from arbitrary OS/process interruption. General durable
+  interruption handling and graceful cancellation, approved text-corpus/tokenizer
+  integration, broader budgets/resource monitoring and profiled 50M–100M training
+  remain open. These synthetic runs do not establish language quality or release
+  approval. Unchanged hardware/user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
