@@ -103,8 +103,11 @@ def save(root,folder,identifier,initialized,corpus,approved,current,model,tokeni
             'generated_token_ids':generated,'generated_text':text,'inference_runtime':'planned_decoder_numpy_cpu',
             'workflow_measurements':observed,'reference_verified':False,'pretrained_student_weights_loaded':False,
             'training_approved':True,'release_approved':False,'source_initialization_modified':False,
-            'limitations':'Canceled active phase only; actual state/counters and any completed reference/checkpoint retained privately. No completed comparison, loss/quality gate, release approval or independent fresh-partial resume.',
+            'limitations':'Canceled active phase only; actual state/counters and any completed reference/checkpoint retained privately. No completed comparison, loss/quality gate or release approval. Reference-phase resume requires separate approval; recorded-training partial resume remains unavailable.',
             'files':{str(path.relative_to(folder)):file_digest(path) for path in folder.rglob('*') if path.is_file()}}
+    if __package__:from . import decoder_corpus_reference_resume
+    else:import decoder_corpus_reference_resume
+    record.update(decoder_corpus_reference_resume.metadata(approved,record['reference_completed_steps']))
     record['revision']=digest(record);temporary=folder/'.canceled.tmp';temporary.write_text(json.dumps(record,allow_nan=False,indent=2));temporary.replace(folder/'record.json')
     return read(root,folder,record)
 

@@ -7453,6 +7453,46 @@ P3-LMF-06 partial progress · phase-aware fresh corpus run cancellation · 2026-
   retained-partial recovery remains available. Unchanged independent hardware/user-
   action blockers remain open and skipped; these toy runs establish no model release.
 
+P3-LMF-06 partial progress · separately approved retained-reference resume · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Fresh corpus runs canceled during reference
+  verification now offer a separate resource review and explicit resume approval.
+  The review binds the exact retained record revision/files, original initialization,
+  corpus, optimizer/precision settings, phase and actual counter. It restores FP32
+  weights/moments and finishes only the missing reference updates, then executes
+  the original checkpointed training budget from the original fresh initialization.
+  Completed/training-phase sources, changed approvals and cyclic/excessive ancestry
+  are rejected. Reference re-cancellation retains a new immutable private partial;
+  further reference resume requires another review, with at most sixteen ancestors.
+- Records distinguish carried reference updates from newly executed updates and
+  preserve the carried reference log. Separate isolated-worker resume measurements
+  never calibrate full fresh-run time/memory feedback. Existing midpoint continuation,
+  cancellation receipts, completed/canceled histories and CPU generation remain valid.
+- Native verification on this Mac used the rebuilt ALMG app and offline fixture
+  backend at port 28913. Live SGD resume carried reference update 1, canceled again
+  at update 2, then completed using 18 new reference updates plus the original 20
+  recorded training updates. A live mixed FP16 AdamW reference cancellation at
+  update 2 likewise resumed with 18 new reference updates and 20 recorded updates.
+  Both completed models had zero checkpoint weight/moment difference, decreasing
+  full-split training loss and matching reloaded tokenizer-backed CPU generation.
+  Worker timings/peaks and carried/executed counters were observed in native results.
+- After app/backend restart, all 20 corpus optimizer records and three representative
+  legacy completed/canceled/chained continuations reopened exactly in native history;
+  backend readers verified all 36 corpus/continuation records. All 358 retained files
+  stayed byte-identical, including the original 312 and the first successful pass's
+  artifacts. Evidence: /tmp/almg-corpus-reference-resume-native-qa/verification.json,
+  native.log, restart.log and captured reviews/results. Nothing was collected externally.
+- Validation: 638 Python tests passed with Metal enabled and warnings as errors;
+  the final lineage/import/scope changes passed all 23 corpus tests. All 81 Flutter
+  tests passed; final analysis was clean. Tests verify actual executed update indices,
+  FP32 SGD/mixed AdamW state, re-cancellation, immutable parents, approval/cycle
+  rejection, isolated process identity and exclusion from fresh-run forecasts.
+- Remaining: independently approved resume after cancellation during recorded
+  checkpointed training, arbitrary durable OS/process interruption, broader model/
+  budget support and profiling, quality evaluation and profiled 50M–100M training.
+  P3-LMF-01 remains complete for its recorded architecture scope. Unchanged independent
+  hardware/user-action blockers remain open and skipped. This verifies bounded
+  private optimizer recovery, with no language-quality or release acceptance claim.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

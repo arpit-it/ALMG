@@ -9,8 +9,11 @@ else:
 def measurements(record):
     value=record.get('isolated_workflow_measurements')
     if not isinstance(value,dict):return None
-    if (value.get('format')!='almg-isolated-corpus-optimizer-measurements-v1' or value.get('schema_version')!=1
-            or value.get('scope')!='fresh_process_reviewed_corpus_optimizer' or value.get('measured') is not True
+    resumed=record.get('review',{}).get('reference_resume_from') is not None
+    expected_format='almg-isolated-corpus-reference-resume-measurements-v1' if resumed else 'almg-isolated-corpus-optimizer-measurements-v1'
+    expected_scope='fresh_process_corpus_reference_resume' if resumed else 'fresh_process_reviewed_corpus_optimizer'
+    if (value.get('format')!=expected_format or value.get('schema_version')!=1
+            or value.get('scope')!=expected_scope or value.get('measured') is not True
             or value.get('isolated_trial_peak_measured') is not True
             or type(value.get('process_id')) is not int or value['process_id']<=0
             or type(value.get('elapsed_seconds')) not in (float,int) or not math.isfinite(value['elapsed_seconds']) or value['elapsed_seconds']<=0
@@ -26,7 +29,7 @@ def feedback(records,current):
         try:
             saved=record['review'];c=current['config'];observed=measurements(record)
             keys=('source','corpus_id','corpus_revision','config','model_config','runtime','implementation_sha256','execution_mode')
-            if (observed is None or record.get('status','completed')!='completed' or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
+            if (saved.get('reference_resume_from') is not None or observed is None or record.get('status','completed')!='completed' or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
                     or any(saved.get(key)!=current.get(key) for key in keys) or saved.get('execution_mode')!='fresh_process'
                     or record.get('training_approved') is not True or record.get('completed_steps')!=c['steps']
                     or record.get('scheduler_completed_steps')!=c['steps'] or record.get('checkpoint_restored_steps')!=c['steps']//2):continue

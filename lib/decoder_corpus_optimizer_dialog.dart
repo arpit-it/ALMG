@@ -4,8 +4,9 @@ import 'decoder_corpus_continuation_dialog.dart';
 import 'package:flutter/material.dart';
 
 class DecoderCorpusOptimizerDialog extends StatefulWidget {
-  const DecoderCorpusOptimizerDialog({super.key, required this.initialized, required this.corpus, required this.request});
+  const DecoderCorpusOptimizerDialog({super.key, required this.initialized, required this.corpus, required this.request, this.referenceResumeId});
   final Map<String, dynamic> initialized, corpus;
+  final String? referenceResumeId;
   final Future<Map<String, dynamic>> Function(String, Map<String, dynamic>) request;
   @override State<DecoderCorpusOptimizerDialog> createState() => _DecoderCorpusOptimizerDialogState();
 }
@@ -21,6 +22,8 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
   String? _requestId;
   Map<String, dynamic>? _review;
   String? _error;
+  bool get _resume => widget.referenceResumeId != null;
+  String get _resumePath => '/decoder-corpus-optimizer-runs/${widget.referenceResumeId}';
   String get _path => '/decoder-architecture-plans/${widget.initialized['plan_id']}';
   Map<String, dynamic> get _settings => {'schema_version': 5, 'optimizer': _optimizer, 'learning_rate': 0.01,
     'schedule': 'warmup_cosine', 'warmup_steps': 2, 'steps': _steps, 'gradient_clip_norm': 1.0,
@@ -35,13 +38,14 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
   }
   Future<void> _load() => _perform(() async {
     setState(() => _review = null);
-    final result = await widget.request('$_path/corpus-optimizer-review', _body);
+    final result = await widget.request(_resume ? '$_resumePath/reference-resume-review' : '$_path/corpus-optimizer-review', _resume ? {} : _body);
     if (mounted) setState(() => _review = result);
   });
   Future<void> _show(Map<String, dynamic> record) => showDialog<void>(context: context, builder: (context) => AlertDialog(
     title: const Text('Saved corpus optimizer run'), scrollable: true,
     content: SizedBox(width: 650, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       if (record['status'] == 'canceled') Text('Fresh corpus run canceled in ${record['cancellation_phase']} at update ${record['completed_steps']}. Reference updates: ${record['reference_completed_steps']} · recorded training updates: ${record['recorded_training_updates']}. Private model, FP32 state and counter retained; no completed reference or quality claim.'),
+      if (record['reference_steps_carried'] != null) Text('Retained reference updates: ${record['reference_steps_carried']} · new reference updates executed: ${record['reference_updates_executed']}. Each recorded training trajectory starts from the original fresh initialization.'),
       for (final part in ['train', 'validation', 'test']) Text('$part loss: ${record['initial_losses'][part]} → ${record['final_losses'][part]}'),
       if ((record['schema_version'] as int? ?? 1) >= 2) Text('Effective batch rows: ${record['effective_batch_rows']} · microbatches per update: ${record['gradient_accumulation_steps']} · full-batch gradient difference: ${record['full_batch_gradient_max_error']}.'),
       if ((record['schema_version'] as int? ?? 1) >= 3) Text('Compute: ${record['compute_precision']} · loss scale: ${record['loss_scale']} · FP32 master weights, gradients and moments. Split losses use the saved FP32 master model.'),
@@ -50,19 +54,20 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
       if (record['isolated_workflow_measurements'] case final Map measured) ...[
         Text('Measured isolated corpus worker time: ${(measured['elapsed_seconds'] as num).toStringAsFixed(3)} s.'),
         Text('Measured fresh-worker peak RSS: ${measured['isolated_process_peak_rss_bytes']} bytes · Metal peak: ${measured['isolated_metal_peak_bytes']} bytes.'),
-        const Text('Includes worker imports/admission, both training trajectories, checkpoints and CPU inference. Excludes parent admission, process launch, queue/approval waits and final measurement publication. Peaks include runtime overhead; unified-memory RSS and Metal may overlap. No large-model feasibility or total wall-time guarantee.'),
+        Text(record['reference_steps_carried'] != null ? 'Includes worker setup, only the remaining reference updates, original recorded training, checkpoints and CPU inference. Separate resume measurements are excluded from fresh-run forecasts.' : 'Includes worker imports/admission, both training trajectories, checkpoints and CPU inference. Excludes parent admission, process launch, queue/approval waits and final measurement publication. Peaks include runtime overhead; unified-memory RSS and Metal may overlap. No large-model feasibility or total wall-time guarantee.'),
       ] else if (record['review'] is Map && record['review']['execution_mode'] == 'fresh_process')
         const Text('Isolated worker measurements were not published; phase samples do not establish isolated peaks.')
       else const Text('Workflow time and memory observations share the backend process; these are not isolated training peaks.'),
       SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
     ])), actions: [
       if (record['id'] is String && record['status'] != 'canceled') TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusContinuationDialog(sourceId: record['id'] as String, request: widget.request)), child: const Text('Review corpus checkpoint continuation')),
+      if (record['id'] is String && record['status'] == 'canceled' && record['cancellation_phase'] == 'reference_verification') TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusOptimizerDialog(initialized: widget.initialized, corpus: widget.corpus, request: widget.request, referenceResumeId: record['id'] as String)), child: const Text('Review retained corpus reference resume')),
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   Future<void> _train() => _perform(() async {
     final random=Random.secure();final token=List.generate(16,(_)=>random.nextInt(256).toRadixString(16).padLeft(2,'0')).join();
     setState(() { _running=true;_cancelPending=false;_requestId=token; });
     try {
-      final record = await widget.request('$_path/corpus-optimizer-train', {..._body, 'confirmed': true, 'reviewed_feasibility': _review, 'request_id':token});
+      final record = await widget.request(_resume ? '$_resumePath/reference-resume' : '$_path/corpus-optimizer-train', {..._body, 'reviewed': _resume ? _review : widget.initialized, 'confirmed': true, 'reviewed_feasibility': _review, 'request_id':token});
       if (mounted) { setState(() { _running=false;_requestId=null; });await _show(record); }
     } finally { if(mounted)setState(() { _running=false;_requestId=null; }); }
   });
@@ -84,8 +89,10 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
       ]));
     if (selected != null && mounted) await _show(selected);
   });
-  @override Widget build(BuildContext context) => AlertDialog(title: const Text('Reviewed corpus optimizer training'), scrollable: true,
+  @override Widget build(BuildContext context) => AlertDialog(title: Text(_resume ? 'Review retained corpus reference resume' : 'Reviewed corpus optimizer training'), scrollable: true,
     content: SizedBox(width: 640, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (_resume) const Text('Restore the saved reference model, FP32 optimizer moments and actual counter. Finish its remaining original reference updates, then start the separately recorded checkpointed training trajectory from the original fresh initialization. Preserve the canceled source and save a new private result. Cancellation remains available at update boundaries. Resume during recorded training and arbitrary process interruption remain unavailable.')
+      else ...[
       const Text('Train fresh initialized weights in one isolated local worker using only these saved, permission-reviewed text windows. FP32 or bounded mixed FP16, one/two effective rows per update, learning rate 0.01, two warmup steps, cosine decay and clipping at 1.0. Save a midpoint checkpoint, restore optimizer/scheduler state and compare with a separate uninterrupted trajectory. Both trajectories execute the selected budget.'),
       DropdownButton<String>(value: _optimizer, items: const [DropdownMenuItem(value: 'sgd', child: Text('Corpus SGD')), DropdownMenuItem(value: 'adamw', child: Text('Corpus AdamW'))],
         onChanged: _busy ? null : (value) => setState(() { _optimizer = value!; _review = null; })),
@@ -98,11 +105,13 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
         onChanged: _busy ? null : (value) => setState(() { _batch = value!; _review = null; })),
       DropdownButton<int>(value: _accumulation, items: const [DropdownMenuItem(value: 1, child: Text('1 corpus microbatch per update')), DropdownMenuItem(value: 2, child: Text('2 corpus microbatches per update'))],
         onChanged: _busy ? null : (value) => setState(() { _accumulation = value!; _review = null; })),
-      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. Saved midpoint continuation requires separate approval; Cancel stops at optimizer-update boundaries in either phase, retaining the active model/state and any completed reference/checkpoint. Independent fresh-partial resume remains unavailable. Reported split losses evaluate the saved FP32 master model.'),
+      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. Saved midpoint continuation requires separate approval; Cancel stops at optimizer-update boundaries in either phase, retaining the active model/state and any completed reference/checkpoint. Reference-phase partial resume requires separate approval; recorded-training partial resume remains unavailable. Reported split losses evaluate the saved FP32 master model.'),
+      ],
       if (_busy) const LinearProgressIndicator(),
       if(_running && _cancelPending)const Text('Cancellation requested. Waiting for a safe phase update boundary and retained result.'),
       if (_error != null) Text(_error!),
       if (_review != null) ...[
+        if (_resume) Text('Restore reference update ${_review!['reference_resume_from']['completed_steps']} · remaining reference updates ${_review!['estimates']['reference_optimizer_updates']} · recorded training updates ${_review!['estimates']['recorded_training_optimizer_updates']}.'),
         Text(_review!['feasible'] == true ? 'Resources cover corpus optimizer reserves.' : 'Corpus optimizer cannot start.'),
         Text('Memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes · disk reserve: ${_review!['estimates']['required_free_disk_bytes']} bytes.'),
         if (_review!['estimates']['isolated_corpus_memory'] case final Map memory)
@@ -116,8 +125,8 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
     ])), actions: [
       if(_running)TextButton(onPressed:_cancelPending ? null : _cancel,child:const Text('Cancel fresh corpus run')),
       TextButton(onPressed: _busy ? null : _history, child: const Text('Saved corpus optimizer runs')),
-      TextButton(onPressed: _busy ? null : _load, child: const Text('Review corpus training resources')),
-      if (_review?['feasible'] == true) TextButton(onPressed: _busy ? null : _train, child: const Text('Confirm train and save corpus model')),
+      TextButton(onPressed: _busy ? null : _load, child: Text(_resume ? 'Review reference resume resources' : 'Review corpus training resources')),
+      if (_review?['feasible'] == true) TextButton(onPressed: _busy ? null : _train, child: Text(_resume ? 'Confirm resume retained corpus reference' : 'Confirm train and save corpus model')),
       TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Close')),
     ]);
 }
