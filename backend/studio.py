@@ -2383,11 +2383,10 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/decoder-imports':
                 return self.respond(decoder_trials.import_private(ROOT, data.get('confirmed'), data.get('source_name'), data.get('data')), 201)
             if self.path == '/decoder-trials/feasibility':
-                return self.respond(decoder_trial_feasibility.review(ROOT))
+                return self.respond(decoder_trial_feasibility.review(ROOT,data.get('dataset')))
             if self.path == '/decoder-trials':
-                start = decoder_trials.start if data.get('dataset') is not None else decoder_trial_feasibility.start
-                extra = {} if data.get('dataset') is not None else {'approved': data.get('reviewed_feasibility')}
-                record = start(ROOT, data.get('confirmed'), inference.WORKER.submit,
+                extra = {'approved': data.get('reviewed_feasibility')}
+                record = decoder_trial_feasibility.start(ROOT, data.get('confirmed'), inference.WORKER.submit,
                                               proposal_id=data.get('proposal_id'), proposal_revision=data.get('proposal_revision'), dataset=data.get('dataset'),
                                               require_idle_ac=data.get('require_idle_ac'), readiness=training_readiness, post_training=data.get('post_training'), **extra)
                 return self.respond({'id': record['id']}, 202)

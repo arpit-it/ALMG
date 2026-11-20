@@ -6208,6 +6208,42 @@ P3-LMF-05 partial progress · feasibility before saved generated-decoder trial a
   suitable Windows/CUDA hardware verification. Unchanged hardware/user-action
   blockers remain open and skipped.
 
+P3-LMF-05 partial progress · reviewed-local-data decoder feasibility before approval · 2026-11-20:
+- [ ] P3-LMF-05 remains open. New saved trials on explicitly reviewed local
+  decoder datasets now receive a distinct hardware report and final approval
+  dialog. The read-only report uses the validated dataset/tokenizer manifest,
+  exact vocabulary size, train/validation/test window counts and stored data size.
+  FP32 budgets include vocabulary-dependent parameters/logits and all training-
+  window graphs retained by the existing bounded loss function. Data quality,
+  contamination, tokenizer and trial-size preflight still precede admission.
+- Review/admission bind the dataset ID, manifest/content hashes, tokenizer
+  fingerprint and unchanged training specification. Fresh checks run before
+  creating the trial and at submission; reviewed approval and admission evidence
+  is retained as optional local_dataset_trial_hardware metadata before fitting.
+  New public local-data requests without an explicit hardware review still get
+  fresh admission and are labeled accordingly. Engine/checkpoint/bundle formats
+  and source-pinned training specifications remain unchanged.
+- Native verification: rebuilt and ran ALMG with six local four-word documents,
+  saved dataset 072c37c8c9fe42cb9a27f15d60db921f, vocabulary four, and split window
+  counts 4/1/1. Cancelled hardware review created no trial. Explicit approval of
+  calculated 269555712-byte memory and 67710976-byte disk reserves completed
+  trial b5ef56c1fb284cb8b36111fa84074574 with a step-50 checkpoint. Training loss
+  fell from 1.365828275680542 to 0.06752631813287735; validation/test next-token
+  accuracy was 1.0/1.0 on this contrived fixture, not a general quality claim.
+  The exact reviewed profile survived training and app/backend restart. All three
+  dataset files, seven trial/checkpoint/bundle files and 25 prior artifact files
+  retained their hashes. Local evidence: /tmp/almg-local-feasibility-native-qa/
+  verification.json and native UI captures; generated data/weights remain outside Git.
+- Validation: 576 Python tests passed with warnings as errors and Metal enabled,
+  57 Flutter tests passed, and analysis was clean. Added coverage checks read-only
+  exact data/tokenizer binding, larger byte-tokenizer/window resource accounting,
+  incompatible/generated-versus-local and stale dataset reviews, and actual local
+  Metal training with saved pre-worker profiles and unchanged prepared files.
+- Remaining: dedicated resume and automatic factory-handoff feasibility profiles,
+  total wall-time estimates, broader neural/full-epoch feasibility and suitable
+  Windows/CUDA verification. Unchanged hardware/user-action blockers stay open
+  and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
