@@ -37,6 +37,7 @@ class CpuTrainingFeasibilityDialog extends StatelessWidget {
       Text(report['feasible'] == true ? 'Current resources cover estimated recipe reserves.' : 'This recipe cannot start with current resources.'),
       Text('Estimated memory reserve: ${report['estimates']['required_available_memory_bytes']} bytes · additional disk reserve: ${report['estimates']['required_free_disk_bytes']} bytes.'),
       const Text('Calculated recipe-specific buffer/model budgets, not measured peak memory. No duration prediction is available. Resources are checked again before fitting.'),
+      if (report['calibration'] != null) Text('Compatible discarded CPU trial: ${report['calibration']['measured_fit_and_validation_seconds']} s fit/validation; ${report['calibration']['measured_process_peak_rss_bytes']} bytes peak process memory. Memory reserve includes 25% headroom and never lowers the calculated minimum. This is not total training time.'),
       for (final reason in report['blockers'] as List) Text(reason as String),
       ExpansionTile(title: Text(recordLabel), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(report))]),
     ])), actions: [

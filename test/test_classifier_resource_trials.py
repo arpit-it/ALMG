@@ -28,6 +28,33 @@ class ClassifierResourceTrialTests(unittest.TestCase):
             path=trials._folder(root,job['id'])/(result['id']+'.json');path.write_text(path.read_text().replace('"weights_retained": false','"weights_retained": true'))
             self.assertEqual(trials.read(root,job['id'])['records'],[])
 
+    def test_compatible_measurements_raise_reserves_and_require_fresh_approval(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);job,rows,settings,approved=self.fixture(root)
+            record=trials.run(root,job,rows,settings,True,approved)
+            updated=feasibility.review(root,job,rows,settings)
+            self.assertEqual(updated['calibration']['trial_ids'],[record['id']])
+            self.assertGreaterEqual(updated['estimates']['required_available_memory_bytes'],approved['estimates']['required_available_memory_bytes'])
+            self.assertFalse(updated['estimates']['measured'])
+            self.assertIsNone(updated['estimates']['duration_estimate_seconds'])
+            with self.assertRaisesRegex(ValueError,'review changed'):feasibility.admit(root,job,rows,settings,approved)
+            # A high-water observation must raise the admission floor and block insufficient RAM.
+            record['measurements']['process_peak_rss_bytes']=2*1024**3
+            record['revision']=trials.digest({k:v for k,v in record.items() if k!='revision'})
+            path=trials._folder(root,job['id'])/(record['id']+'.json');path.write_text(json.dumps(record))
+            with patch.object(feasibility.training_resources,'available_memory',return_value=2*1024**3):
+                high=feasibility.review(root,job,rows,settings)
+            self.assertEqual(high['estimates']['required_available_memory_bytes'],int(2.5*1024**3));self.assertFalse(high['feasible'])
+            for change in ('runtime','dataset','settings','implementation','topology'):
+                changed=json.loads(json.dumps(record))
+                if change=='runtime':changed['measurements']['runtime']['python']='incompatible'
+                elif change=='dataset':changed['dataset_sha256']='other'
+                elif change=='settings':changed['settings']['target']=.99
+                elif change=='implementation':changed['implementation_sha256']='other'
+                else:changed['admission']['hardware']['logical_cpu_count']=9999
+                changed['revision']=trials.digest({k:v for k,v in changed.items() if k!='revision'});path.write_text(json.dumps(changed))
+                self.assertIsNone(feasibility.review(root,job,rows,settings)['calibration'],change)
+
     def test_consent_failure_and_timeout_create_no_trial_report_or_model(self):
         with TemporaryDirectory() as temporary:
             root=Path(temporary);job,rows,settings,approved=self.fixture(root)

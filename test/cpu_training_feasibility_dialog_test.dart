@@ -3,6 +3,14 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/cpu_training_feasibility_dialog.dart';
 
 void main() {
+  testWidgets('compatible measured fit is distinguished from total training time', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: CpuTrainingFeasibilityDialog(
+      report: {'feasible': true, 'estimates': <String, dynamic>{}, 'blockers': <String>[],
+        'calibration': {'measured_fit_and_validation_seconds': 1.5, 'measured_process_peak_rss_bytes': 123456}},
+    )));
+    expect(find.textContaining('1.5 s fit/validation'), findsOneWidget);
+    expect(find.textContaining('not total training time'), findsOneWidget);
+  });
   testWidgets('discarded CPU fit requires its own confirmation', (tester) async {
     var runs = 0;
     await tester.pumpWidget(MaterialApp(home: CpuTrainingFeasibilityDialog(

@@ -6003,6 +6003,38 @@ P3-LMF-05 partial progress · discarded CPU classifier resource trials · 2026-1
   Windows/CUDA hardware verification. Existing hardware blockers remain open and
   skipped; P3-LMF-01 is already complete for its recorded architecture scope.
 
+P3-LMF-05 partial progress · compatible CPU trial measurements update feasibility · 2026-11-20:
+- [ ] P3-LMF-05 remains open. The next CPU classifier feasibility review now
+  incorporates saved discarded-fit observations only when dataset, settings,
+  labels, runtime, CPU topology and implementation match. The memory reserve is
+  the greater of the calculated floor and the highest compatible process peak
+  RSS with 25% headroom. Measured fit/validation time is displayed separately;
+  calculated disk and total-duration fields are not relabeled as measurements.
+- Calibration retains exact trial IDs and observations in the feasibility record
+  and therefore in existing approval/admission/execution snapshots. A changed
+  calibration requires reopening the review before approving training. Older or
+  incompatible trials remain in history but do not calibrate current admission.
+- Local native verification: rebuilt and ran ALMG with an isolated local 48-row
+  classifier fixture; the initial report had no calibration. Separately confirmed
+  discarded trial 0b0851df13e943549d9b90558afaa8f6 measured 0.026368999970145524
+  seconds and 196083712 bytes peak process RSS. Reopening feasibility displayed
+  these exact observations. The calculated 283831424-byte reserve remained larger
+  than the measured peak plus headroom, so was preserved. After restarting app
+  and backend, calibration reopened exactly; main training remained unapproved,
+  both prepared files and all three prior trial-fixture files retained their
+  hashes, and no fitted model artifacts were created. Local evidence is in
+  /tmp/almg-cpu-calibration-native-qa/verification.json and native UI captures;
+  generated evidence is not committed.
+- Validation: 564 Python tests passed with warnings as errors and Metal enabled;
+  52 Flutter suite tests passed and all four focused feasibility-dialog tests
+  passed after adding the measured-label assertion; Flutter analysis was clean.
+  Coverage includes increased admission reserves, insufficient-memory blocking,
+  stale approval rejection, and incompatible runtime/data/settings/producer/CPU
+  topology exclusion, using real isolated fitting with local fixtures.
+- Remaining: CPU total-training duration forecasting, measured CPU image trials,
+  broader neural/full-epoch feasibility and suitable Windows/CUDA verification.
+  Unchanged hardware/user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
