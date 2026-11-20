@@ -7012,6 +7012,56 @@ P3-LMF-06 partial progress · approved reviewed-corpus optimizer training · 202
   P3-LMF-01 is already complete for its recorded architecture scope. Unchanged
   hardware/user-action blockers remain open and skipped.
 
+P3-LMF-06 partial progress · token-weighted corpus gradient accumulation · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Reviewed text-corpus training now offers effective
+  batch sizes one/two and one/two microbatches per optimizer update. Changes clear
+  approval and require a fresh resource review. Two microbatches require batch two;
+  selected batch must fit the initialized plan. Admission includes accumulation
+  buffers and requires enough updates to visit every saved training window.
+- Window selection derives from restored optimizer step and selected effective
+  batch, preserving the same corpus schedule through checkpoint restore. Gradients
+  from unequal masked windows are averaged by real target-token count, then clipped
+  and applied once. Every two-way accumulated update is checked against its full
+  effective-batch gradient within FP32 tolerance 1e-5. Checkpointed execution must
+  still match uninterrupted weights/moments within 1e-7; scheduler counters count
+  optimizer updates rather than microbatches.
+- New version-2 reviews/results record effective rows, accumulation count, gradient
+  comparison/tolerance and exact per-update window indices/target counts. Saved
+  reads verify counters and window bindings against the immutable corpus snapshot.
+  Version-1 single-row records retain their exact read behavior and original files;
+  no stored artifact is rewritten or silently migrated.
+- Native verification: rebuilt/launched ALMG with the retained four-word corpus,
+  six unequal training windows and fresh 704-parameter initialization. Reopened
+  both existing v1 SGD/AdamW records exactly. The app blocked batch one with two
+  microbatches, accepted batch two/two microbatches after a new review, and closing
+  before training confirmation created no output. Explicitly completed twenty-update
+  SGD 9402ab563e10473cbc660aa7386926d3 and AdamW
+  dd58589860a3419483c61d299ced6f68. Each first batch combined eight/four real
+  targets (twelve total); update logs retained both window indices and microbatches.
+  Maximum full/accumulated gradient differences were 8.9406967e-8 / 1.1920929e-7.
+- Both native runs restored midpoint update ten, finished optimizer/scheduler update
+  twenty and matched uninterrupted final weights and moments with 0.0 error. Train
+  loss 1.3801190426 decreased to 1.2491788146 (SGD) / 0.7765748561 (AdamW);
+  validation/test losses also decreased. Reloaded private models generated corpus
+  words through their own CPU runtime/tokenizer. These are toy-corpus engineering
+  diagnostics and establish no language-quality or release acceptance.
+- After app/backend restart all four v1/v2 records, checkpoint state, generated text
+  and window/update metadata reopened exactly without further training. All 163
+  original fixture files retained their hashes. Evidence:
+  /tmp/almg-corpus-accumulation-native-qa/verification.json, incompatible-ui.json,
+  compatible-ui.json, sgd-trained-ui.json, adamw-trained-ui.json and restarted
+  native captures. No external collection occurred; generated artifacts/weights
+  remain outside Git.
+- Validation: 621 Python tests passed with warnings as errors and Metal enabled,
+  73 Flutter tests passed, analysis clean. Real SGD/AdamW tests compare batch-two
+  full and accumulated execution over unequal padding, restore optimizer/scheduler
+  state, verify per-update target counts and reject modified saved update bindings.
+  UI tests cover incompatible configuration, fresh approval and selection changes.
+- Remaining: corpus mixed precision, independently approved corpus checkpoint
+  continuation/cancellation, durable OS/process interruption, larger budgets,
+  broader quality evaluation and profiled 50M–100M training. Unchanged independent
+  hardware/user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

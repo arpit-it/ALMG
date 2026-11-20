@@ -10,14 +10,16 @@ class DecoderCorpusOptimizerDialog extends StatefulWidget {
 class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDialog> {
   String _optimizer = 'sgd';
   int _steps = 20;
+  int _batch = 1;
+  int _accumulation = 1;
   bool _busy = false;
   Map<String, dynamic>? _review;
   String? _error;
   String get _path => '/decoder-architecture-plans/${widget.initialized['plan_id']}';
   Map<String, dynamic> get _settings => {'schema_version': 5, 'optimizer': _optimizer, 'learning_rate': 0.01,
     'schedule': 'warmup_cosine', 'warmup_steps': 2, 'steps': _steps, 'gradient_clip_norm': 1.0,
-    'weight_decay': _optimizer == 'adamw' ? 0.01 : 0.0, 'batch_size': 1,
-    'sequence_length': widget.corpus['review']['sequence_length'], 'gradient_accumulation_steps': 1,
+    'weight_decay': _optimizer == 'adamw' ? 0.01 : 0.0, 'batch_size': _batch,
+    'sequence_length': widget.corpus['review']['sequence_length'], 'gradient_accumulation_steps': _accumulation,
     'compute_precision': 'float32', 'loss_scale': 1.0};
   Map<String, dynamic> get _body => {'reviewed': widget.initialized, 'corpus': widget.corpus, 'settings': _settings};
   Future<void> _perform(Future<void> Function() action) async {
@@ -34,6 +36,7 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
     title: const Text('Saved corpus optimizer run'), scrollable: true,
     content: SizedBox(width: 650, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       for (final part in ['train', 'validation', 'test']) Text('$part loss: ${record['initial_losses'][part]} → ${record['final_losses'][part]}'),
+      if (record['schema_version'] == 2) Text('Effective batch rows: ${record['effective_batch_rows']} · microbatches per update: ${record['gradient_accumulation_steps']} · full-batch gradient difference: ${record['full_batch_gradient_max_error']}.'),
       Text('Generated text: ${record['generated_text']}'),
       const Text('Held-out losses are diagnostics on this small corpus. This private result does not establish language quality or release approval.'),
       const Text('Workflow time and memory observations share the backend process; these are not isolated training peaks.'),
@@ -57,12 +60,16 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
   });
   @override Widget build(BuildContext context) => AlertDialog(title: const Text('Reviewed corpus optimizer training'), scrollable: true,
     content: SizedBox(width: 640, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Train fresh initialized weights using only these saved, permission-reviewed text windows. FP32, one row per update, learning rate 0.01, two warmup steps, cosine decay and clipping at 1.0. Save a midpoint checkpoint, restore optimizer/scheduler state and compare with a separate uninterrupted trajectory. Both trajectories execute the selected budget.'),
+      const Text('Train fresh initialized weights using only these saved, permission-reviewed text windows. FP32, one/two effective rows per update, learning rate 0.01, two warmup steps, cosine decay and clipping at 1.0. Save a midpoint checkpoint, restore optimizer/scheduler state and compare with a separate uninterrupted trajectory. Both trajectories execute the selected budget.'),
       DropdownButton<String>(value: _optimizer, items: const [DropdownMenuItem(value: 'sgd', child: Text('Corpus SGD')), DropdownMenuItem(value: 'adamw', child: Text('Corpus AdamW'))],
         onChanged: _busy ? null : (value) => setState(() { _optimizer = value!; _review = null; })),
       DropdownButton<int>(value: _steps, items: const [DropdownMenuItem(value: 10, child: Text('10 corpus optimizer updates')), DropdownMenuItem(value: 20, child: Text('20 corpus optimizer updates'))],
         onChanged: _busy ? null : (value) => setState(() { _steps = value!; _review = null; })),
-      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. This bounded path does not expose cancellation, independent continuation, mixed precision or accumulation yet.'),
+      DropdownButton<int>(value: _batch, items: const [DropdownMenuItem(value: 1, child: Text('Corpus batch size 1')), DropdownMenuItem(value: 2, child: Text('Corpus batch size 2'))],
+        onChanged: _busy ? null : (value) => setState(() { _batch = value!; _review = null; })),
+      DropdownButton<int>(value: _accumulation, items: const [DropdownMenuItem(value: 1, child: Text('1 corpus microbatch per update')), DropdownMenuItem(value: 2, child: Text('2 corpus microbatches per update'))],
+        onChanged: _busy ? null : (value) => setState(() { _accumulation = value!; _review = null; })),
+      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. This bounded path does not expose cancellation, independent continuation or mixed precision yet.'),
       if (_busy) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
       if (_review != null) ...[

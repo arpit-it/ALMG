@@ -29,10 +29,13 @@ class CorpusOptimizerTest(unittest.TestCase):
                 with self.assertRaises(ValueError): training.run(root, False, source, saved, settings, approved)
                 changed = deepcopy(approved); changed['config']['steps'] = 10
                 with self.assertRaises(ValueError): training.run(root, True, source, saved, settings, changed)
+                blocked = training.review(root, source, saved, {**settings, 'gradient_accumulation_steps': 2})
+                self.assertFalse(blocked['feasible'])
+                self.assertTrue(any('effective batch of two' in reason for reason in blocked['blockers']))
                 profile['available_memory_bytes'] = 1
                 with self.assertRaises(ValueError): training.run(root, True, source, saved, settings, approved)
             self.assertFalse((root/'decoder-corpus-optimizer-runs').exists())
-            for values in ({'compute_precision': 'mixed_float16', 'loss_scale': 128.0}, {'batch_size': 2}, {'gradient_accumulation_steps': 2}, {'sequence_length': 4}):
+            for values in ({'compute_precision': 'mixed_float16', 'loss_scale': 128.0}, {'sequence_length': 4}):
                 with self.assertRaises(ValueError): training.configuration({**settings, **values}, 8)
             changed = deepcopy(saved); changed['review']['sequence_length'] = 4
             with self.assertRaises(ValueError): training.review(root, source, changed, settings)
@@ -65,3 +68,37 @@ class CorpusOptimizerTest(unittest.TestCase):
             path = root/'decoder-corpus-optimizer-runs'/records[0]['id']/'tokenizer.json'
             path.write_text('{}')
             with self.assertRaises(ValueError): training.read(root, records[0]['id'])
+
+    @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS') == '1', 'Requires real masked Metal gradients')
+    def test_unequal_masked_windows_accumulate_by_tokens_and_resume_exactly(self):
+        import numpy as np
+        with TemporaryDirectory() as temporary:
+            root = Path(temporary); source, saved, settings = corpus(root)
+            windows = json.loads((root/'decoder-corpus-inputs'/saved['id']/'windows.json').read_text())['train']
+            indices, arrays = training.batch_arrays(windows, 0, 2)
+            self.assertEqual(indices, [0, 1])
+            self.assertNotEqual(int(arrays[2][0].sum()), int(arrays[2][1].sum()))
+            for kind in ('sgd', 'adamw'):
+                results = []
+                for accumulation in (1, 2):
+                    c = {**settings, 'optimizer': kind, 'weight_decay': .01 if kind == 'adamw' else 0., 'batch_size': 2, 'gradient_accumulation_steps': accumulation}
+                    approved = training.review(root, source, saved, c)
+                    self.assertTrue(approved['feasible'])
+                    record = training.run(root, True, source, saved, c, approved); results.append(record)
+                    self.assertEqual(record['schema_version'], 2)
+                    self.assertLessEqual(record['full_batch_gradient_max_error'], 1e-5)
+                    self.assertLessEqual(record['checkpoint_parameter_max_error'], 1e-7)
+                    self.assertLessEqual(record['checkpoint_optimizer_max_error'], 1e-7)
+                    self.assertEqual(record['scheduler_completed_steps'], 20)
+                    for step, entry in enumerate(record['step_log']):
+                        indices, arrays = training.batch_arrays(windows, step, 2)
+                        self.assertEqual(entry['window_indices'], indices)
+                        self.assertEqual(entry['target_tokens'], int(arrays[2].sum()))
+                        self.assertEqual(entry['microbatches'], accumulation)
+                    self.assertEqual(training.read(root, record['id']), record)
+                models = [training.PlannedDecoder.load(training._folder(root, record['id'])/'trained-model.json') for record in results]
+                self.assertLess(max(float(np.max(np.abs(models[0].parameters[name]-models[1].parameters[name]))) for name in models[0].parameters), 1e-5)
+                record = deepcopy(results[-1]); record['step_log'][0]['target_tokens'] += 1
+                record['revision'] = training.digest({k:v for k,v in record.items() if k != 'revision'})
+                (training._folder(root, record['id'])/'record.json').write_text(json.dumps(record))
+                with self.assertRaises(ValueError): training.read(root, record['id'])

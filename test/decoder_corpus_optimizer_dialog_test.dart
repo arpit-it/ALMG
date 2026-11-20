@@ -28,4 +28,26 @@ void main() {
     await tester.tap(find.text('10 corpus optimizer updates').last); await tester.pumpAndSettle();
     expect(find.text('Confirm train and save corpus model'), findsNothing);
   });
+  testWidgets('corpus batch and microbatch changes require a new compatible review', (tester) async {
+    final settings = <Map<String, dynamic>>[];
+    await tester.pumpWidget(MaterialApp(home: DecoderCorpusOptimizerDialog(initialized: const {'id': 'init', 'plan_id': 'plan'}, corpus: const {'id': 'corpus', 'review': {'sequence_length': 8}}, request: (path, body) async {
+      final c = Map<String, dynamic>.from(body['settings'] as Map); settings.add(c);
+      final feasible = c['batch_size'] == 2 || c['gradient_accumulation_steps'] == 1;
+      return {'feasible': feasible, 'estimates': {}, 'blockers': feasible ? [] : ['Two microbatches require two effective rows.']};
+    })));
+    await tester.tap(find.text('Review corpus training resources')); await tester.pumpAndSettle();
+    expect(find.text('Confirm train and save corpus model'), findsOneWidget);
+    await tester.ensureVisible(find.text('1 corpus microbatch per update')); await tester.tap(find.text('1 corpus microbatch per update')); await tester.pumpAndSettle();
+    await tester.tap(find.text('2 corpus microbatches per update').last); await tester.pumpAndSettle();
+    expect(find.text('Confirm train and save corpus model'), findsNothing);
+    await tester.tap(find.text('Review corpus training resources')); await tester.pumpAndSettle();
+    expect(find.text('Two microbatches require two effective rows.'), findsOneWidget);
+    expect(find.text('Confirm train and save corpus model'), findsNothing);
+    await tester.ensureVisible(find.text('Corpus batch size 1')); await tester.tap(find.text('Corpus batch size 1')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Corpus batch size 2').last); await tester.pumpAndSettle();
+    await tester.tap(find.text('Review corpus training resources')); await tester.pumpAndSettle();
+    expect(find.text('Confirm train and save corpus model'), findsOneWidget);
+    expect(settings.last['batch_size'], 2); expect(settings.last['gradient_accumulation_steps'], 2);
+  });
+
 }
