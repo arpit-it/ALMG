@@ -3,6 +3,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/cpu_training_feasibility_dialog.dart';
 
 void main() {
+  testWidgets('fit work forecast displays its basis and excluded work', (tester) async {
+    await tester.pumpWidget(const MaterialApp(home: CpuTrainingFeasibilityDialog(report: {
+      'feasible': true, 'blockers': <String>[], 'estimates': {
+        'fit_work_estimate': {'estimated_seconds': 2.5, 'sample_count': 2}},
+    })));
+    expect(find.textContaining('Estimated CPU fit/validation work: 2.5 s'), findsOneWidget);
+    expect(find.textContaining('not an upper bound'), findsOneWidget);
+    expect(find.textContaining('checkpoint/model saving and export'), findsOneWidget);
+  });
   testWidgets('compatible measured fit is distinguished from total training time', (tester) async {
     await tester.pumpWidget(const MaterialApp(home: CpuTrainingFeasibilityDialog(
       report: {'feasible': true, 'estimates': <String, dynamic>{}, 'blockers': <String>[],

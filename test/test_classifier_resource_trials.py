@@ -55,6 +55,24 @@ class ClassifierResourceTrialTests(unittest.TestCase):
                 changed['revision']=trials.digest({k:v for k,v in changed.items() if k!='revision'});path.write_text(json.dumps(changed))
                 self.assertIsNone(feasibility.review(root,job,rows,settings)['calibration'],change)
 
+    def test_fit_work_estimate_uses_compatible_history_without_claiming_total_duration(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);job,rows,settings,approved=self.fixture(root)
+            self.assertIsNone(approved['estimates']['fit_work_estimate'])
+            first=trials.run(root,job,rows,settings,True,approved)
+            second=trials.run(root,job,rows,settings,True,feasibility.review(root,job,rows,settings))
+            report=feasibility.review(root,job,rows,settings);forecast=report['estimates']['fit_work_estimate']
+            self.assertEqual(forecast['sample_count'],2)
+            self.assertEqual(set(forecast['trial_ids']),{first['id'],second['id']})
+            observed=[entry['measurements']['fit_and_validation_seconds'] for entry in (first,second)]
+            self.assertEqual(forecast['observed_min_seconds'],min(observed));self.assertEqual(forecast['observed_max_seconds'],max(observed))
+            self.assertGreater(forecast['estimated_seconds'],forecast['observed_max_seconds'])
+            self.assertFalse(forecast['measured']);self.assertIsNone(report['estimates']['duration_estimate_seconds'])
+            self.assertIn('checkpoint_and_candidate_persistence',forecast['excludes'])
+            self.assertIn('not a confidence interval or upper bound',forecast['limitations'])
+            changed={**settings,'target':.9}
+            self.assertIsNone(feasibility.review(root,job,rows,changed)['estimates']['fit_work_estimate'])
+
     def test_consent_failure_and_timeout_create_no_trial_report_or_model(self):
         with TemporaryDirectory() as temporary:
             root=Path(temporary);job,rows,settings,approved=self.fixture(root)

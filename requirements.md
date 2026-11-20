@@ -6035,6 +6035,36 @@ P3-LMF-05 partial progress · compatible CPU trial measurements update feasibili
   broader neural/full-epoch feasibility and suitable Windows/CUDA verification.
   Unchanged hardware/user-action blockers remain open and skipped.
 
+P3-LMF-05 partial progress · bounded CPU fit-work duration estimate · 2026-11-20:
+- [ ] P3-LMF-05 remains open. CPU classifier feasibility now estimates fresh
+  fit/validation work from the highest compatible discarded-trial time plus
+  explicit 25% heuristic headroom. The versioned report includes measured range,
+  sample count, exact source trial IDs, method, scope and exclusions. Without
+  compatible observations, the estimate stays unavailable. Total training time
+  remains unknown; startup, idle/power waits, Qwen repair, checkpoint/model saving
+  and export are excluded. This is not an upper bound, confidence interval,
+  checkpoint-resume estimate or extrapolation to other datasets/recipes.
+- Native verification: rebuilt and ran ALMG with an isolated local 48-row
+  fruit/astronomy fixture. Initial review showed no fit-work estimate. Two
+  separately confirmed discarded trials measured 0.03619020897895098 and
+  0.020518208970315754 seconds. Reopened feasibility displayed the calculated
+  0.04523776122368872-second estimate with both source trials and exclusions.
+  Explicitly approved main CPU training then completed; approval, admission and
+  execution snapshots retained that exact forecast in the run manifest. The
+  contrived fixture achieved validation/test macro-F1 1.0/1.0, without implying
+  general model quality. After app/backend restart the manifest reopened exactly;
+  all six prior fixture files and seven new candidate files retained their hashes.
+  Local evidence: /tmp/almg-cpu-duration-native-qa/verification.json and native UI
+  captures (generated artifacts remain outside Git).
+- Validation: 565 Python tests passed with warnings treated as errors and Metal
+  enabled, 54 Flutter tests passed, and Flutter analysis was clean. Coverage
+  includes absent/incompatible history, real isolated multi-trial observations,
+  forecast provenance and uncertainty, and visible excluded-work labels.
+- Remaining: total wall-time forecasting including scheduling/persistence, measured
+  CPU image trials, broader neural/full-epoch feasibility and suitable Windows/
+  CUDA verification. Unchanged hardware/user-action blockers remain open and
+  skipped; this bounded estimate does not close the entire requirement.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

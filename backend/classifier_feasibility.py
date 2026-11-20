@@ -50,6 +50,16 @@ def _calibrate(root, job, rows, settings, hardware, estimates):
     peak = max(record['measurements']['process_peak_rss_bytes'] for record in compatible)
     seconds = max(record['measurements']['fit_and_validation_seconds'] for record in compatible)
     estimates['required_available_memory_bytes'] = max(estimates['required_available_memory_bytes'], math.ceil(peak * 1.25))
+    times = [record['measurements']['fit_and_validation_seconds'] for record in compatible]
+    estimates['fit_work_estimate'] = {
+        'estimated_seconds': seconds * 1.25, 'measured': False, 'sample_count': len(times),
+        'observed_min_seconds': min(times), 'observed_max_seconds': seconds,
+        'headroom_multiplier': 1.25, 'method': 'maximum_compatible_discarded_fit_with_25_percent_headroom',
+        'trial_ids': [record['id'] for record in compatible],
+        'scope': 'Prepared-file load, validation and fresh classifier comparison on the same dataset/settings/runtime/CPU topology/implementation only.',
+        'excludes': ['interpreter_and_import_startup', 'idle_or_power_waits', 'qwen_repair', 'checkpoint_and_candidate_persistence', 'export'],
+        'limitations': 'Heuristic work estimate, not a confidence interval or upper bound. Shared CPU load may change. Does not predict total training wall time, checkpoint resume, larger datasets or other recipes.'}
+
     return {'trial_ids': [record['id'] for record in compatible], 'measured_process_peak_rss_bytes': peak,
             'memory_reserve_multiplier': 1.25, 'measured_fit_and_validation_seconds': seconds,
             'scope': 'Same prepared dataset/settings, CPU topology, runtime and implementation only. Highest observed discarded fit; not a full training duration or exhaustion guarantee. Memory reserves only increase; disk remains calculated. Repair, idle waits, imports and candidate persistence are excluded from measured time.'}
@@ -64,7 +74,7 @@ def review(root,job,rows,parameters):
     estimates={'dataset_encoded_bytes':encoded,'coefficient_comparison_budget_bytes':coefficients,
                'required_available_memory_bytes':256*1024**2+encoded*8+coefficients,
                'required_free_disk_bytes':64*1024**2+encoded*4+coefficients*2,
-               'measured':False,'duration_estimate_seconds':None,
+               'measured':False,'duration_estimate_seconds':None,'fit_work_estimate':None,
                'assumptions':'CPU scikit-learn sparse TF-IDF comparison with at most 30,000 features per candidate. A 32-copy coefficient allowance includes solver history/workspace and retained candidates; dataset expansion and vocabulary overhead are estimated, not measured. Optional Qwen repair planning is separate. Not an exhaustion guarantee.'}
     info={'system':platform.system(),'machine':platform.machine(),'logical_cpu_count':os.cpu_count(),
           'training_device':'CPU','accelerator_required':False,'gpu_fallback_required':False,

@@ -36,8 +36,9 @@ class CpuTrainingFeasibilityDialog extends StatelessWidget {
       Text(description),
       Text(report['feasible'] == true ? 'Current resources cover estimated recipe reserves.' : 'This recipe cannot start with current resources.'),
       Text('Estimated memory reserve: ${report['estimates']['required_available_memory_bytes']} bytes · additional disk reserve: ${report['estimates']['required_free_disk_bytes']} bytes.'),
-      const Text('Calculated recipe-specific buffer/model budgets, not measured peak memory. No duration prediction is available. Resources are checked again before fitting.'),
+      const Text('Calculated recipe-specific buffer/model budgets, not measured peak memory. Total training time is unknown. Resources are checked again before fitting.'),
       if (report['calibration'] != null) Text('Compatible discarded CPU trial: ${report['calibration']['measured_fit_and_validation_seconds']} s fit/validation; ${report['calibration']['measured_process_peak_rss_bytes']} bytes peak process memory. Memory reserve includes 25% headroom and never lowers the calculated minimum. This is not total training time.'),
+      if (report['estimates']['fit_work_estimate'] != null) Text('Estimated CPU fit/validation work: ${report['estimates']['fit_work_estimate']['estimated_seconds']} s, based on ${report['estimates']['fit_work_estimate']['sample_count']} compatible discarded trial(s), using the highest measured time plus 25%. This is a heuristic, not an upper bound. Excludes startup, idle/power waits, Qwen repair, checkpoint/model saving and export; does not predict total training time.'),
       for (final reason in report['blockers'] as List) Text(reason as String),
       ExpansionTile(title: Text(recordLabel), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(report))]),
     ])), actions: [
