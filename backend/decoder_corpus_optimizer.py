@@ -24,8 +24,8 @@ else:
 
 def configuration(settings, length):
     c = optimizer.configuration(settings)
-    if c['schema_version'] != 5 or c['sequence_length'] != length:
-        raise ValueError('Corpus training currently requires version-5 precision settings and the saved sequence length.')
+    if c['schema_version'] not in (5,6) or c['sequence_length'] != length:
+        raise ValueError('Corpus training currently requires version-5 or version-6 precision settings and the saved sequence length.')
     return c
 
 

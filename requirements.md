@@ -7584,6 +7584,53 @@ P3-LMF-05 partial progress · exact-source fresh corpus phase-resume feedback ·
   action. These unchanged blockers remain open and skipped. Arbitrary durable process/
   OS interruption recovery and broader quality/50M–100M acceptance remain in P3-LMF-06.
 
+P3-LMF-06 partial progress · reviewed forty-update corpus budget · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Reviewed corpus training now offers forty original
+  optimizer updates through explicit version-6 settings and a new resource review.
+  Version-6 accepts exactly forty updates, retains the original warmup/cosine,
+  clipping, batch/microbatch and FP32/mixed precision contracts, and checkpoints at
+  update twenty. Version-5 ten/twenty-update settings keep their original meaning.
+  Synthetic fixture admission rejects version-6 before loading weights; this expanded
+  budget is available through the separately confirmed reviewed-corpus workflow only.
+- Full comparison trajectories, optimizer/scheduler counters, saved histories,
+  reference/recorded-training partial recovery and independent midpoint continuation
+  all use the approved forty-update budget. Resumes keep their original budget and
+  actual counter; the new setting cannot silently extend an existing twenty-update
+  run. Feasibility profiles/forecasts remain configuration-specific, and forty-update
+  observations cannot calibrate twenty-update reviews. Conservative reserves remain.
+- Native verification used the rebuilt ALMG app and offline fixture backend on port
+  28916 with the existing 704-parameter, eight-token reviewed corpus fixture, two
+  effective rows and two token-weighted microbatches. FP32 SGD completed both forty-
+  update comparison trajectories, saved/restored update twenty and generated text
+  from its reloaded private model. Mixed FP16 AdamW completed its forty-update
+  reference, canceled recorded training at update 21 with the update-20 checkpoint,
+  then resumed exactly nineteen training updates with zero reference retraining.
+  Both completed results had zero checkpoint weight/moment difference and decreasing
+  full-split training loss. Each also completed separately approved midpoint
+  continuation from update twenty to forty with zero reference weight difference.
+- The native forty-update SGD review acquired one compatible measured sample; the
+  twenty-update review stayed cold. After app/backend restart, the latest twenty
+  saved corpus records and both new midpoint continuations reopened exactly, and
+  forty-update feedback remained available. Backend readers verified all 54 corpus/
+  continuation records, including older twenty-update records outside UI history.
+  All 477 retained files, including the original 445, stayed byte-identical. Evidence:
+  /tmp/almg-corpus-forty-native-qa/verification.json, native.log, restart.log and captured
+  reviews/completed/canceled/resumed/midpoint/history/feedback results. No external
+  collection occurred; generated models, receipts and QA files remain outside Git.
+- Validation: 644 Python tests passed with warnings as errors and Metal enabled;
+  all 84 Flutter tests passed and analysis was clean. New tests reject wrong-version,
+  unsupported/noninteger budgets and synthetic version-6 admission; exercise actual
+  isolated SGD/mixed AdamW forty-update optimization, final cosine rate, twenty-step
+  checkpoints, independent continuation, both fresh-run phase resumes, immutable
+  ancestors, and budget-specific forecasts. UI tests require a fresh approval after
+  selecting forty updates and verify version-6/forty-update submission.
+- Remaining: arbitrary durable OS/process interruption recovery, model/sequence/
+  batch expansion beyond the current bounded engine, broader budget/resource
+  profiling and quality evaluation, and profiled 50M–100M training. Forty updates
+  on a tiny fixture do not establish language quality or production-scale feasibility.
+  Unchanged independent hardware/user-action blockers remain open and skipped;
+  P3-LMF-01 remains complete for its recorded architecture scope.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
