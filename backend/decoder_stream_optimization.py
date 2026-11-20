@@ -18,9 +18,8 @@ else:
 def evaluate_split(root,window_id,reviewed,split,score):
     """Forward-only complete split evaluation, with bounded batches and token weighting."""
     if split not in ('validation','test'):raise ValueError('Evaluate a held-out split.')
-    cursor=None;seen_windows=targets=correct=0;loss_sum=0.0;page_count=0
-    while True:
-        batch=batches.read_batch(root,window_id,True,reviewed,cursor,split,16)
+    seen_windows=targets=correct=0;loss_sum=0.0;page_count=0
+    for batch in batches.iter_batches(root,window_id,True,reviewed,split,16):
         if not batch['rows'] or batch['real_target_tokens']<=0:
             raise ValueError('Held-out evaluation encountered an empty batch.')
         page_loss,page_correct=score(batch)
@@ -29,17 +28,14 @@ def evaluate_split(root,window_id,reviewed,split,score):
             raise ValueError('Held-out evaluation produced invalid metrics.')
         seen_windows+=batch['rows'];targets+=batch['real_target_tokens'];page_count+=1
         loss_sum+=page_loss;correct+=page_correct
-        following=batch['next_cursor']
-        if following is None:break
-        if following==cursor:raise ValueError('Held-out evaluation cursor did not advance.')
-        cursor=following
     if seen_windows!=reviewed['window_counts'][split]:
         raise ValueError('Held-out evaluation did not cover the saved split population.')
     return {'windows':seen_windows,'target_tokens':targets,'correct_target_tokens':correct,
             'loss':loss_sum/targets,'next_token_accuracy':correct/targets,
             'batches':page_count,'maximum_batch_windows':16,'scope':'all_saved_split_windows',
             'aggregation':'sum_masked_token_losses_and_correct_predictions_divided_by_real_targets',
-            'source_occurrences_expanded':False,'optimizer_updates':0}
+            'source_occurrences_expanded':False,'optimizer_updates':0,
+            'integrity_policy':'full_hashes_at_split_start_and_end_stat_guards_each_batch'}
 
 
 def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):

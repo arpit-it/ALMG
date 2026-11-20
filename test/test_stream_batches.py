@@ -3,6 +3,7 @@ import hashlib
 from pathlib import Path
 from tempfile import TemporaryDirectory
 import unittest
+from unittest.mock import patch
 from backend import decoder_streams as streams,decoder_stream_indexes as indexes,decoder_stream_token_stats as stats,decoder_stream_tokenizers as tokenizers,decoder_stream_overlap as overlap,decoder_stream_windows as windows,decoder_stream_batches as batches
 from backend.decoder_tokenizer import ByteTokenizer
 
@@ -64,6 +65,39 @@ class StreamBatchTests(unittest.TestCase):
         with database.open('ab') as output:output.write(b'changed')
         with self.assertRaises(ValueError):batches.read_batch(self.root,self.record['id'],True,self.record)
         self.assertEqual(before,{p.name:p.read_bytes() for p in folder.iterdir()})
+
+    def test_split_iterator_matches_pages_and_full_binding_checks_are_constant(self):
+        expected=[];cursor=None
+        while True:
+            batch=batches.read_batch(self.root,self.record['id'],True,self.record,cursor,'validation',16)
+            expected.append(batch);cursor=batch['next_cursor']
+            if cursor is None:break
+        with patch.object(windows,'read',wraps=windows.read) as read,patch.object(windows,'_bindings',wraps=windows._bindings) as bindings:
+            actual=list(batches.iter_batches(self.root,self.record['id'],True,self.record,'validation',16))
+            self.assertEqual(read.call_count,2);self.assertEqual(bindings.call_count,2)
+        self.assertEqual(actual,expected);self.assertGreater(len(actual),1)
+
+    def test_split_iterator_detects_mid_scan_and_final_page_changes(self):
+        iterator=batches.iter_batches(self.root,self.record['id'],True,self.record,'train',16)
+        next(iterator)
+        path=windows._folder(self.root,self.record['id'])/'manifest.json'
+        original=path.read_bytes();path.write_bytes(original+b' ')
+        with self.assertRaisesRegex(ValueError,'source files changed'):next(iterator)
+        path.write_bytes(original)
+        iterator=batches.iter_batches(self.root,self.record['id'],True,self.record,'test',16)
+        while True:
+            batch=next(iterator)
+            if batch['next_cursor'] is None:break
+        path.write_bytes(original+b' ')
+        with self.assertRaisesRegex(ValueError,'source files changed'):next(iterator)
+
+    def test_split_iterator_final_full_hash_rejects_corruption_even_when_stat_guard_is_mocked(self):
+        with patch.object(batches,'_signatures',return_value=[]):
+            iterator=batches.iter_batches(self.root,self.record['id'],True,self.record,'test',16)
+            while next(iterator)['next_cursor'] is not None:pass
+            database=indexes._folder(self.root,self.index['id'])/'records.sqlite3'
+            with database.open('ab') as output:output.write(b'changed')
+            with self.assertRaises(ValueError):next(iterator)
 
 
 if __name__=='__main__':unittest.main()

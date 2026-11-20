@@ -3805,6 +3805,43 @@ P3-LMF-02 partial progress · restart-safe JSONL preparation drafts · 2026-11-2
   repeated polling. User edits, training artifacts and weights were preserved;
   no external collection, generated artifact commit or push.
 
+P3-LMF-02 partial progress · bounded complete-split reader integrity sessions · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Complete streamed diagnostic evaluation now uses a
+  bounded split iterator with full window/source/tokenizer/overlap validation at
+  both split boundaries, rather than rehashing every artifact for every small
+  batch. File size, modification/change timestamps and inode guards cover all
+  eight immutable data/manifest files before/after each page and after scoring.
+  There is no global trusted cache; callers must exhaust the iterator before
+  publishing complete metrics. Interactive batch review retains its full checks.
+- SQL pages retain at most seventeen rows for sixteen model windows, share the
+  existing target/mask/provenance formatter and preserve deterministic split order.
+  Source changes at initial verification, between pages, after the final yielded
+  page or at final full-hash verification reject complete evaluation. No report is
+  published on failure. Report metrics record this boundary verification policy;
+  full target weighting and zero held-out optimizer updates remain unchanged.
+- Local app verification: rebuilt and ran native macOS ALMG on isolated fixture
+  port 28833. Explicit diagnostic confirmation created report
+  a8fafa21a959482f8d0ef89ec84a51cc over all 764 validation and 702 test windows /
+  11,852 and 10,908 targets in 48 and 44 batches. Instrumented fixture observed
+  six full binding checks for the diagnostic (two each for validation/test plus
+  the initial/final training batch), versus 94 calls with the prior per-batch
+  path. This verifies scan-count reduction, not a wall-time benchmark. Independent
+  unpadded CPU evaluation matched all target/correct counts and loss within 1.7e-7.
+  All 18 source fixture files stayed byte-identical; saved native report reopened
+  exactly without rerunning; only one diagnostic JSON and no model were saved.
+  Evidence: /tmp/almg-stream-scan-native-qa/ (report-ui.json,
+  reopened-report-ui.json, binding-count-verification.json, verification.json,
+  binding-checks.jsonl, build and regression logs); generated evidence is untracked.
+- Verification: 403 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed, Flutter analysis and diff checks passed. New tests compare iterator and
+  existing paged batches exactly, assert constant boundary checks, reject mid-scan
+  and final-page changes and demonstrate final full hashes reject corruption even
+  with the stat guard mocked unchanged. Existing consent/source-change tests pass.
+- Remaining: larger-than-RAM acceptance, synchronous evaluation recovery, full
+  streamed training/planning/checkpoint binding and broader mixing/incremental
+  policies stay open. Unchanged hardware/Windows and scratch-space blockers were
+  skipped without polling. No external collection, artifact/weight changes or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

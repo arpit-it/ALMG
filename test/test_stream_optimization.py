@@ -31,7 +31,7 @@ class StreamOptimizationTests(unittest.TestCase):
 
     @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS')=='1' and platform.system()=='Darwin' and platform.machine()=='arm64','Requires explicit local Metal tests')
     def test_real_masked_sgd_updates_all_tensors_and_ignores_padded_targets_without_saving_model(self):
-        with TemporaryDirectory() as root,patch.object(optimization.batches,'read_batch',side_effect=read_fixture),patch.object(optimization.decoder_bundle,'save') as save:
+        with TemporaryDirectory() as root,patch.object(optimization.batches,'read_batch',side_effect=read_fixture),patch.object(optimization.batches,'iter_batches',side_effect=lambda root,wid,confirmed,reviewed,split,size:iter([fixture_batch(split)])),patch.object(optimization.decoder_bundle,'save') as save:
             report=optimization.run(root,'a'*32,True,{'revision':'r','window_counts':{'validation':4,'test':4}},fixture_batch())
             self.assertLess(report['final_batch_loss'],report['initial_batch_loss'])
             self.assertEqual(len(report['changed_parameter_tensors']),report['parameter_tensors'])
@@ -54,8 +54,8 @@ class StreamOptimizationTests(unittest.TestCase):
         calls=[]
         def changed(*args,**kwargs):
             calls.append(1);batch=read_fixture(*args,**kwargs)
-            return {**batch,'changed':True} if len(calls)==4 else batch
-        with TemporaryDirectory() as root,patch.object(optimization.batches,'read_batch',side_effect=changed):
+            return {**batch,'changed':True} if len(calls)==2 else batch
+        with TemporaryDirectory() as root,patch.object(optimization.batches,'read_batch',side_effect=changed),patch.object(optimization.batches,'iter_batches',side_effect=lambda root,wid,confirmed,reviewed,split,size:iter([fixture_batch(split)])):
             with self.assertRaisesRegex(ValueError,'Source bindings changed'):
                 optimization.run(root,'a'*32,True,{'revision':'r','window_counts':{'validation':4,'test':4}},fixture_batch())
             self.assertEqual(list(Path(root).iterdir()),[])
@@ -67,19 +67,19 @@ class CompleteSplitEvaluationTests(unittest.TestCase):
                {'rows':1,'real_target_tokens':3,'next_cursor':None}]
         calls=[]
         def read(*args):
-            calls.append(args);return pages[len(calls)-1]
+            calls.append(args);return iter(pages)
         def score(batch):
             return (512.0,128) if batch['rows']==16 else (12.0,3)
-        with patch.object(optimization.batches,'read_batch',side_effect=read):
+        with patch.object(optimization.batches,'iter_batches',side_effect=read):
             result=optimization.evaluate_split(None,'a'*32,{'window_counts':{'test':17}},'test',score)
         self.assertEqual(result['windows'],17);self.assertEqual(result['target_tokens'],259)
         self.assertAlmostEqual(result['loss'],524/259);self.assertAlmostEqual(result['next_token_accuracy'],131/259)
-        self.assertEqual(calls[0][-3:],(None,'test',16));self.assertEqual(calls[1][-3:],({'after':16},'test',16))
+        self.assertEqual(calls[0][-2:],('test',16));self.assertEqual(len(calls),1)
         self.assertEqual(result['optimizer_updates'],0)
 
     def test_incomplete_population_and_nonfinite_metrics_fail_closed(self):
         page={'rows':1,'real_target_tokens':3,'next_cursor':None}
-        with patch.object(optimization.batches,'read_batch',return_value=page):
+        with patch.object(optimization.batches,'iter_batches',side_effect=lambda *args:iter([page])):
             with self.assertRaisesRegex(ValueError,'population'):
                 optimization.evaluate_split(None,'a'*32,{'window_counts':{'test':2}},'test',lambda batch:(3.0,1))
             with self.assertRaisesRegex(ValueError,'invalid metrics'):
