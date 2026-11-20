@@ -5226,6 +5226,75 @@ P3-LMF-03 partial progress · reviewed private streamed-checkpoint ZIP export ·
   oversized-fixture blockers stay open and skipped. Unrelated edits and weights
   are preserved; no external collection, pretrained downloads or push occurred.
 
+P3-LMF-03 acceptance complete · isolated streamed-archive import and CPU preview · 2026-11-20:
+- [x] P3-LMF-03 — Tokenizer Engine acceptance is complete for the implemented,
+  explicitly bounded configurable profiles and reviewed streamed workflows.
+  Earlier partial-progress entries above remain historical evidence. Production-
+  scale pretraining, scheduling, broader architecture generation and Model Library
+  integration are separate requirements, rather than additional tokenizer-engine
+  acceptance criteria. Existing vocabulary/context/source-size limits remain explicit.
+- Delivered this change: recipe details and learned-input inspectors now offer
+  “Import private streamed archive”. Native selection alone imports nothing; an
+  explicit confirmation copies a validated archive into a new isolated namespace.
+  The UI labels archived evaluation claims as unverified because source documents
+  are excluded. Training and release remain unavailable. CPU previews preserve exact
+  prompt whitespace, enforce the saved 16-token context, generate 1–32 IDs (12 in
+  the UI), use the saved byte-display policy, and save at most five private previews.
+- The importer admits exactly the six versioned streamed ZIP members, limits the
+  archive to 8 MiB and each expanded member separately, and rejects extra/traversing
+  paths, links, encryption, unsupported compression, changed hashes/receipts and
+  non-reproducing archived previews. It validates the tokenization-v4 completed
+  checkpoint, matching model/tokenizer/receipt bindings and archived metric shape,
+  without treating those archived scores as a fresh dataset evaluation. Publication
+  is atomic; failed imports leave no published record. Reload verifies payload
+  hashes and configuration; bounded preview state updates are atomic and serialized.
+- Local app verification: rebuilt and ran ALMG on this Mac using backend port
+  28862. Canceled native selection without creating an import, selected the real
+  52,315-byte private-stream-decoder-897f8817.zip, verified the pending confirmation,
+  then explicitly imported it as 5bff22e5bf8c48cb8923f039565efaae. Archive SHA-256
+  remained 2686ecb41cefcaf81049eefdc7f480139efa7df38318e9520cc39b386a9223f2.
+  Generated twelve CPU IDs from the exact prompt “ aaaa ”, including both spaces.
+- Restarted the app/backend using a fresh receiver directory containing only the
+  imported model plus UI fixture carriers: no original training run or source text
+  index existed there. Native saved-import history reopened the exact prior record;
+  a second preview produced identical IDs/text and saved the second history entry.
+  All six imported payloads retained their hashes, all 186 prior stream/source/model/
+  checkpoint/preview/report/export files stayed byte-identical, and the first
+  imported copy stayed unchanged. Import status remained
+  archived_claims_not_re_evaluated_source_excluded, training_approved=false and
+  release_approved=false. No external collection, model download or release ran.
+- Acceptance audit (all five criteria verified):
+  1. User-approved tokenizer fitting: native bounded BPE/character-BPE/Unigram
+     experiments and separately approved resumable full-training-split fits were
+     verified in the preceding tokenizer fitting/comparison entries.
+  2. Representative encoding/decoding: multilingual/Unicode round trips, explicit
+     unknown-token behavior and lossless-only statistics/comparisons passed; special
+     PAD/BOS/EOS/UNK definitions and lossy UNK disclosure were verified in
+     /tmp/almg-special-token-native-qa/verification.json and current regression tests.
+  3. Configuration saved with a model: the special-token adoption dataset,
+     100-step trained model and step-50 checkpoint currently reload with identical
+     tokenizer SHA-256 a58efbf6a64236b01346353eedbfde0a7d4f4eeba1a8bbb5895f1a01ecafb634
+     and PAD/BOS/EOS IDs 57/58/59. All three trained full-split codec families also
+     reload exact tokenization-v4 artifacts with their actual vocabularies.
+  4. Invalid/incompatible configurations rejected before pretraining: native
+     compatibility/adoption rejection evidence and current tests cover stale/source
+     changes, lossy/unknown coverage, vocabulary/capacity, special-ID collisions,
+     model dimensions, permissions and contaminated held-outs.
+  5. Restart reload: earlier native bounded/special-token and all three streamed
+     codec/model restart checks passed; this change additionally verified source-
+     independent streamed archive import and inference after native app restart.
+- Verification: 520 Python tests passed with real Metal fixture training and
+  warnings as errors; 44 Flutter tests passed; Flutter analysis and diff checks
+  were clean. Added tests cover consent/limits, isolated restart/exact prompts,
+  corrupt payloads, self-consistent but non-reproducing receipts, linked/extra/
+  oversized members, integrity failure and failed atomic publication. Evidence:
+  /tmp/almg-stream-import-native-qa/ (verification.json, tokenizer-acceptance-audit.json,
+  native selection/confirmation/preview/restart captures and build/test logs).
+  Private files and generated weights remain outside Git. Unrelated user edits,
+  old imports/exports and downloaded weights are preserved. P3-LMF-02 physical
+  power/Windows/oversized-fixture blockers remain open and skipped; continue with
+  the next independently actionable requirement in document order.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'stream_trial_preview_dialog.dart';
 import 'stream_trial_evaluation_dialog.dart';
 import 'stream_trial_export_dialog.dart';
+import 'stream_archive_import_dialog.dart';
 
 typedef ModelBatchRequest = Future<Map<String, dynamic>> Function(String, Map<String, dynamic>);
 
@@ -213,6 +214,7 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
         ? SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [Text(_error!), TextButton(onPressed: _load, child: const Text('Retry input batch'))]))
         : SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           if (widget.allowPersistence) Wrap(spacing: 8, children: [
+            TextButton(onPressed: () => showDialog<void>(context: context, builder: (context) => StreamArchiveImportDialog(request: widget.request)), child: const Text('Import private streamed archive')),
             if (_split == 'train') TextButton(onPressed: _beginTraining, child: const Text('Approve manual streamed trial')),
             TextButton(onPressed: _savedTraining, child: const Text('Saved manual streamed trials')),
           ]),

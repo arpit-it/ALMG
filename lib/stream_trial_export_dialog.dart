@@ -48,7 +48,7 @@ class _StreamTrialExportDialogState extends State<StreamTrialExportDialog> {
       const Text('Export a private experimental model, exact tokenizer, passing CPU evaluation and saved prompt/output. '
         'Tokenizer pieces, weights and prompts may contain private information. Source documents and training databases are excluded. '
         'The saved evaluation must pass the 80% target and both evaluation and preview must reproduce before export. '
-        'This is a private archive, not a model release. Import of this streamed archive is not yet available.'),
+        'This is a private archive, not a model release. Streamed archives can be imported separately for private CPU preview; archived quality claims remain unverified.'),
       if (_busy) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
       if (_saved != null) Text('Private ZIP saved: $_saved'),

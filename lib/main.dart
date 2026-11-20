@@ -21,6 +21,7 @@ import 'stream_index_records_dialog.dart';
 import 'stream_index_export_client.dart';
 import 'local_text_documents.dart';
 import 'stream_model_batches_dialog.dart';
+import 'stream_archive_import_dialog.dart';
 
 /// Starts the Flutter desktop application.
 void main() {
@@ -3885,6 +3886,10 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
+  Future<void> _showStreamArchiveImports() async {
+    await showDialog<void>(context: context, builder: (context) => StreamArchiveImportDialog(request: (path, body) => _request(path, body)));
+  }
+
   Future<void> _showImportedDecoders() async {
     try {
       final imports = (await _request('/decoder-imports'))['imports'] as List;
@@ -4023,6 +4028,7 @@ class _StudioPageState extends State<StudioPage> {
           }, child: const Text('View prepared decoder datasets')),
 
           TextButton(onPressed: () { Navigator.pop(context); _importPrivateDecoder(); }, child: const Text('Import private decoder bundle')),
+          TextButton(onPressed: () { Navigator.pop(context); _showStreamArchiveImports(); }, child: const Text('Import private streamed archive')),
           TextButton(onPressed: () { Navigator.pop(context); _showImportedDecoders(); }, child: const Text('View imported private decoders')),
           const Text('Optional CPU initialization check uses fresh weights without downloads.'),
           TextButton(onPressed: () {

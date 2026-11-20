@@ -1,0 +1,87 @@
+import 'dart:convert';
+import 'dart:typed_data';
+import 'package:file_selector/file_selector.dart';
+import 'package:flutter/material.dart';
+
+class StreamArchiveImportDialog extends StatefulWidget {
+  const StreamArchiveImportDialog({super.key, required this.request, this.chooseFile});
+  final Future<Map<String, dynamic>> Function(String, Map<String, dynamic>) request;
+  final Future<XFile?> Function()? chooseFile;
+  @override State<StreamArchiveImportDialog> createState() => _StreamArchiveImportDialogState();
+}
+
+class _StreamArchiveImportDialogState extends State<StreamArchiveImportDialog> {
+  final _prompt = TextEditingController();
+  Uint8List? _bytes;
+  String? _name;
+  Map<String, dynamic>? _record;
+  Map<String, dynamic>? _result;
+  String? _error;
+  bool _busy = false;
+  @override void dispose() { _prompt.dispose(); super.dispose(); }
+  Future<void> _choose() async {
+    try {
+      final file = widget.chooseFile != null ? await widget.chooseFile!() : await openFile(acceptedTypeGroups: [const XTypeGroup(label: 'Private streamed model ZIP', extensions: ['zip'])]);
+      if (file == null) return;
+      if (await file.length() > 8 * 1024 * 1024) throw const FormatException('Archives must fit 8 MiB.');
+      final bytes = await file.readAsBytes();
+      if (bytes.length > 8 * 1024 * 1024) throw const FormatException('Archives must fit 8 MiB.');
+      if (mounted) setState(() { _bytes = bytes; _name = file.name; _record = null; _result = null; _error = null; });
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+  Future<void> _import() async {
+    if (_bytes == null) return;
+    setState(() { _busy = true; _error = null; });
+    try {
+      final record = await widget.request('/decoder-stream-imports', {'confirmed': true, 'source_name': _name, 'data': base64Encode(_bytes!)});
+      if (mounted) setState(() { _record = record; _bytes = null; _busy = false; });
+    } catch (error) { if (mounted) setState(() { _error = error.toString(); _busy = false; }); }
+  }
+  Future<void> _history() async {
+    setState(() { _busy = true; _error = null; });
+    try {
+      final records = (await widget.request('/decoder-stream-imports/list', {'confirmed': true}))['imports'] as List;
+      if (!mounted) return;
+      setState(() => _busy = false);
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved private streamed imports'), children: [
+          if (records.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved streamed imports.')),
+          for (final record in records) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(record as Map)),
+            child: Text('${(record['id'] as String).substring(0, 8)} · ${record['source_name']}')),
+        ]));
+      if (selected != null && mounted) setState(() { _record = selected; _result = null; _bytes = null; });
+    } catch (error) { if (mounted) setState(() { _error = error.toString(); _busy = false; }); }
+  }
+  Future<void> _generate() async {
+    setState(() { _busy = true; _error = null; _result = null; });
+    try {
+      final result = await widget.request('/decoder-stream-imports/${_record!['id']}/preview', {'confirmed': true, 'prompt': _prompt.text, 'max_new_tokens': 12});
+      final record = await widget.request('/decoder-stream-imports/${_record!['id']}/read', {});
+      if (mounted) setState(() { _result = result; _record = record; _busy = false; });
+    } catch (error) { if (mounted) setState(() { _error = error.toString(); _busy = false; }); }
+  }
+  @override Widget build(BuildContext context) => AlertDialog(
+    title: const Text('Private streamed archive import'), scrollable: true,
+    content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      const Text('Copy a private streamed-model ZIP into isolated local storage for CPU preview. Weights, tokenizer pieces and saved prompts may be private. '
+        'Archived evaluation claims are unverified: the source dataset is excluded and cannot be re-evaluated. File hashes and the archived preview are checked. '
+        'Training and release are unavailable. No external requests run.'),
+      if (_name != null && _bytes != null) Text('Selected archive: $_name · awaiting import confirmation'),
+      if (_busy) const LinearProgressIndicator(),
+      if (_error != null) Text(_error!),
+      if (_record != null) ...[
+        Text('Imported: ${_record!['source_name']} · CPU preview only'),
+        Text('Saved private previews: ${(_record!['previews'] as List).length}'),
+        TextField(controller: _prompt, enabled: !_busy, maxLength: 4096, decoration: const InputDecoration(labelText: 'Exact imported-model prompt (up to 16 tokens)')),
+        const Text('Generate saves the exact prompt and twelve greedy output IDs locally. Generated byte sequences may use replacement characters for display.'),
+        if (_result != null) SelectableText((_result!['completion'] as String).trim().isEmpty ? '(Whitespace-only output)' : _result!['completion'] as String),
+        ExpansionTile(title: const Text('View imported model and preview record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert({'import': _record, 'preview': _result}))]),
+      ],
+    ])), actions: [
+      TextButton(onPressed: _busy ? null : _choose, child: const Text('Choose streamed archive ZIP')),
+      if (_bytes != null) TextButton(onPressed: _busy ? null : _import, child: const Text('Confirm private streamed import')),
+      TextButton(onPressed: _busy ? null : _history, child: const Text('Saved streamed imports')),
+      if (_record != null) TextButton(onPressed: _busy ? null : _generate, child: const Text('Generate imported-model preview')),
+      TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Close')),
+    ]);
+}
