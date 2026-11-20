@@ -30,13 +30,24 @@ class ArchitectureBackwardTests(unittest.TestCase):
                 root=Path(temporary);record=self.fixture(root,{**plans.DEFAULT,'layers':layers,'hidden_size':width,'attention_heads':heads,'head_dim':width//heads,'feed_forward_size':ff})
                 before={p:p.read_bytes() for p in root.rglob('*') if p.is_file()}
                 result=backward.run(root,record['plan_id'],True,record)
+                observed=result['diagnostic_measurements']
+                self.assertGreater(observed['elapsed_seconds'],0)
+                self.assertEqual(len(observed['samples']),7)
+                self.assertGreater(observed['sampled_active_metal_max_bytes'],0)
+                self.assertGreaterEqual(observed['conservative_observed_gpu_budget_bytes'],observed['estimated_gpu_working_bytes'])
+                self.assertFalse(observed['isolated_trial_peak_measured'])
                 self.assertLess(result['final_loss'],result['initial_loss']);self.assertEqual(len(result['changed_parameter_tensors']),result['parameter_tensors'])
                 self.assertTrue(result['padding_check_applicable']);self.assertGreater(result['padded_targets_changed'],0)
                 self.assertLessEqual(result['padding_gradient_error'],1e-6);self.assertLessEqual(result['padding_loss_error'],1e-6)
                 self.assertTrue(all(item['absolute_error']<=item['tolerance'] for item in result['finite_difference_probes']))
                 self.assertFalse(result['updated_weights_saved']);self.assertFalse(result['training_approved']);self.assertFalse(result['release_approved'])
                 importlib.reload(backward);self.assertEqual(backward.list_reports(root,record['plan_id'],True),[result])
-                legacy={k:v for k,v in result.items() if k not in ('hardware_feasibility','approved_feasibility_revision')}
+                previous={k:v for k,v in result.items() if k!='diagnostic_measurements'}
+                previous.update(format='almg-planned-decoder-backward-check-v2',schema_version=2,id='1'*32)
+                previous['revision']=digest({k:v for k,v in previous.items() if k!='revision'})
+                (backward._folder(root,record['plan_id'])/('1'*32+'.json')).write_text(json.dumps(previous))
+                self.assertIn(previous,backward.list_reports(root,record['plan_id'],True))
+                legacy={k:v for k,v in result.items() if k not in ('hardware_feasibility','approved_feasibility_revision','diagnostic_measurements')}
                 legacy.update(format='almg-planned-decoder-backward-check-v1',schema_version=1,id='0'*32)
                 legacy['revision']=digest({k:v for k,v in legacy.items() if k!='revision'})
                 (backward._folder(root,record['plan_id'])/('0'*32+'.json')).write_text(json.dumps(legacy))

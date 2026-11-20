@@ -5508,6 +5508,39 @@ P3-LMF-05 partial progress · hardware review for planned-model backward diagnos
   bounded architecture scope. Unchanged blocked items remain open and skipped.
   No external collection, downloads, generated artifacts or weights are committed.
 
+P3-LMF-05 partial progress · synchronized diagnostic memory and timing observations · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Five-step planned-decoder backward diagnostics now
+  save synchronized active Metal memory samples, baseline/incremental values,
+  process peak counters before/after, and elapsed diagnostic time. Shared peak
+  counters are not reset or attributed solely to this diagnostic. Samples exclude
+  cached buffers and CPU memory and may miss transient peaks; elapsed time includes
+  CPU numerical checks and must not be interpreted as optimizer throughput.
+- Compare sampled incremental memory with the original calculated GPU estimate,
+  flag observed overruns and retain a conservative observed budget that never
+  falls below that estimate. This is saved diagnostic feedback; no automatic
+  admission relaxation, isolated trial peak or full-training prediction is claimed.
+- New v3 diagnostic records include these observations. Existing v1 and v2 formats
+  remain readable without rewriting historical reports or source model weights.
+- Native local evidence: rebuilt macOS ALMG on Apple M4 Max, reviewed feasibility
+  and explicitly confirmed five synthetic Metal steps. Report b9a7de8599db4957a99690f90e6e4d68
+  recorded seven synchronized samples, 0.10714379092678428 seconds elapsed,
+  139728 sampled incremental active Metal bytes, and process peak 0 -> 248048
+  bytes, versus a calculated 167936-byte GPU working estimate. The UI showed the
+  measurements, comparison and limitations. Loss fell 4.831958293914795 ->
+  4.393815040588379; updated weights were discarded. After app and fixture backend
+  restart, new v3 and existing v1/v2 reports reopened with exact saved-record
+  equality; all 23 pre-existing architecture fixture files retained their hashes.
+- Verification: 538 Python tests passed with actual Metal enabled and warnings as
+  errors; 48 Flutter tests passed; Flutter analysis and diff checks clean. Added
+  tests cover shared-counter semantics, estimate overruns, nonnegative increments,
+  retaining conservative estimates, actual Metal samples and v1/v2 compatibility.
+  Evidence: /tmp/almg-diagnostic-measurements-native-qa/verification.json and logs.
+- Remaining: isolated per-trial peak measurement including CPU/loading overhead,
+  measured calibration for full dataset training and duration prediction, training
+  approval integration, and Windows/CUDA verification on suitable hardware. Existing
+  hardware/user-action blockers remain open and skipped. No generated artifacts,
+  private data, weights or unrelated user edits are included in this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

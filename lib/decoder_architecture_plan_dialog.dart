@@ -84,6 +84,14 @@ class _DecoderArchitecturePlanDialogState extends State<DecoderArchitecturePlanD
         if (report['hardware_feasibility'] != null) Text('Saved hardware snapshot: ${report['hardware_feasibility']['hardware']['metal_device']?['device_name'] ?? 'unknown'} · '
           '${report['hardware_feasibility']['precision']} · estimated memory reserve ${report['hardware_feasibility']['estimates']['required_available_memory_bytes']} bytes. This is the recorded snapshot, not current availability.')
         else const Text('Legacy report: no hardware feasibility snapshot was captured.'),
+        if (report['diagnostic_measurements'] != null) ...[
+          Text('Measured diagnostic time: ${report['diagnostic_measurements']['elapsed_seconds']} seconds · '
+            'sampled incremental Metal memory: ${report['diagnostic_measurements']['sampled_incremental_metal_bytes']} bytes.'),
+          Text('Estimate comparison: ${report['diagnostic_measurements']['observed_increment_exceeds_estimate'] == true ? 'sampled increment exceeded the estimate' : 'sampled increment stayed within the estimate'}. '
+            'Conservative observed GPU budget: ${report['diagnostic_measurements']['conservative_observed_gpu_budget_bytes']} bytes.'),
+          const Text('Memory observations share the backend process and may include other work. Samples can miss transient peaks and exclude cached buffers and CPU memory. '
+            'Process peak counters are retained without resetting. Diagnostic time includes CPU checks; no isolated trial peak or full-training duration is claimed.'),
+        ] else const Text('Legacy report: diagnostic timing and memory samples were not captured.'),
         Text(report['padding_check_applicable'] == true ? 'Masked padding loss and gradients were invariant.' : 'Padding check not applicable to this minimum batch/context; both real targets were retained.'),
         const Text('The initialized model is unchanged. Updated diagnostic weights were discarded; only this report was saved. '
           'Selected CPU finite-difference gradients were checked. This synthetic numerical check establishes no model quality, training approval or release.'),

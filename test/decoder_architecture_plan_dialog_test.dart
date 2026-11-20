@@ -18,6 +18,7 @@ void main() {
       }
       checks++; expect(body['confirmed'], true); expect(body['reviewed'], initialized);
       return {'initial_loss': 4.0, 'final_loss': 3.0, 'changed_parameter_tensors': ['head'], 'parameter_tensors': 1,
+        'diagnostic_measurements': {'elapsed_seconds': 2.5, 'sampled_incremental_metal_bytes': 160, 'observed_increment_exceeds_estimate': true, 'conservative_observed_gpu_budget_bytes': 160},
         'cpu_metal_max_error_before': 0, 'cpu_metal_max_error_after': 0, 'padding_check_applicable': true};
     }))));
     await tester.pumpAndSettle(); await tester.tap(find.text('Review architecture estimate')); await tester.pumpAndSettle();
@@ -29,6 +30,8 @@ void main() {
     await tester.tap(find.text('Check planned-model backward pass')); await tester.pumpAndSettle();
     await tester.tap(find.text('Confirm planned-model backward check')); await tester.pumpAndSettle();
     expect(checks, 1); expect(find.text('Planned-model backward diagnostic'), findsOneWidget);
+    expect(find.textContaining('Measured diagnostic time: 2.5 seconds'), findsOneWidget);
+    expect(find.textContaining('sampled increment exceeded the estimate'), findsOneWidget);
     expect(find.textContaining('Updated diagnostic weights were discarded'), findsOneWidget);
   });
 
