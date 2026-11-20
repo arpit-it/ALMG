@@ -7,11 +7,11 @@ from tempfile import NamedTemporaryFile
 import uuid
 import numpy as np
 if __package__:
-    from . import decoder_architecture_initializations as initializations,training_resources
+    from . import decoder_architecture_initializations as initializations,decoder_architecture_feasibility as feasibility,training_resources
     from .planned_decoder import PlannedDecoder
     from .run_manifest import digest,file_digest
 else:
-    import decoder_architecture_initializations as initializations,training_resources
+    import decoder_architecture_initializations as initializations,decoder_architecture_feasibility as feasibility,training_resources
     from planned_decoder import PlannedDecoder
     from run_manifest import digest,file_digest
 
@@ -45,9 +45,10 @@ def cpu_loss(model,x,y,mask):
 def _folder(root,plan_id):return Path(root)/'decoder-architecture-backward-checks'/plan_id
 
 
-def run(root,plan_id,confirmed,reviewed):
+def run(root,plan_id,confirmed,reviewed,reviewed_feasibility=None):
     if confirmed is not True:raise ValueError('Confirm five synthetic Metal optimizer steps; updated weights will be discarded and no training/release is approved.')
     if not isinstance(reviewed,dict):raise ValueError('Reopen the exact saved initialized architecture.')
+    admission=feasibility.admit(root,plan_id,reviewed,reviewed_feasibility)
     current=initializations.read(root,plan_id,reviewed.get('id'))
     if current!=reviewed:raise ValueError('Initialized architecture review changed.')
     if platform.system()!='Darwin' or platform.machine()!='arm64':raise ValueError('This bounded backward check requires Apple silicon Metal.')
@@ -90,16 +91,17 @@ def run(root,plan_id,confirmed,reviewed):
         if (not np.isfinite([initial,final,cpu_error,final_cpu_error,padding_loss_error,padding_gradient_error]).all()
                 or final>=initial or len(changed)!=len(p) or max(cpu_error,final_cpu_error)>=1e-5 or padding_loss_error>1e-6 or padding_gradient_error>1e-6):raise ValueError('Planned-model backward numerical checks failed; no report saved.')
     if initializations.read(root,plan_id,current['id'])!=current:raise ValueError('Initialized model changed during the backward check; no report saved.')
-    report={'format':'almg-planned-decoder-backward-check-v1','schema_version':1,'id':uuid.uuid4().hex,'plan_id':plan_id,'initialization_id':current['id'],
+    report={'format':'almg-planned-decoder-backward-check-v2','schema_version':2,'id':uuid.uuid4().hex,'plan_id':plan_id,'initialization_id':current['id'],
             'initialization_revision':current['revision'],'model_sha256':current['model_sha256'],'config':c,'steps':5,'learning_rate':.05,
             'batch_shape':list(x.shape),'real_target_tokens':int(mask.sum()),'padding_check_applicable':bool(padding),'padded_targets_changed':int(np.sum(altered!=y)),
             'initial_loss':initial,'final_loss':final,'cpu_metal_max_error_before':cpu_error,'cpu_metal_max_error_after':final_cpu_error,
             'padding_loss_error':padding_loss_error,'padding_gradient_error':padding_gradient_error,'gradient_norms':norms,'finite_difference_probes':probes,
             'parameter_tensors':len(p),'changed_parameter_tensors':changed,'backward_checked':True,'updated_weights_saved':False,
             'source_initialization_unchanged':True,'training_approved':False,'release_approved':False,'resources':resources,
+            'hardware_feasibility':admission,'approved_feasibility_revision':reviewed_feasibility['revision'] if isinstance(reviewed_feasibility,dict) else None,
             'runtime':{'device':'Metal GPU','mlx':version('mlx'),'numpy':np.__version__},
             'scope':'five_step_synthetic_numerical_diagnostic_only_no_model_quality_claim',
-            'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_architecture_backward.py','planned_decoder.py')})}
+            'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_architecture_backward.py','decoder_architecture_feasibility.py','planned_decoder.py')})}
     report['revision']=digest(report);parent=_folder(root,plan_id);parent.mkdir(parents=True,exist_ok=True);temporary=None
     try:
         with NamedTemporaryFile(mode='w',encoding='utf-8',dir=parent,prefix='.check-',suffix='.tmp',delete=False) as stream:
@@ -117,10 +119,15 @@ def list_reports(root,plan_id,confirmed):
         try:
             if path.stat().st_size>128000:continue
             report=json.loads(path.read_text(encoding='utf-8'));source=initializations.read(root,plan_id,report['initialization_id'])
-            if (report.get('format')!='almg-planned-decoder-backward-check-v1' or type(report.get('schema_version')) is not int or report['schema_version']!=1
+            version={'almg-planned-decoder-backward-check-v1':1,'almg-planned-decoder-backward-check-v2':2}.get(report.get('format'))
+            if (version is None or type(report.get('schema_version')) is not int or report['schema_version']!=version
                     or report.get('id')!=path.stem or report.get('plan_id')!=plan_id or report.get('revision')!=digest({k:v for k,v in report.items() if k!='revision'})
                     or report.get('initialization_revision')!=source['revision'] or report.get('model_sha256')!=source['model_sha256']
                     or report.get('backward_checked') is not True or any(report.get(key) is not False for key in ('updated_weights_saved','training_approved','release_approved'))):continue
+            if version==2:
+                profile=report['hardware_feasibility']
+                if (profile.get('revision')!=digest({k:v for k,v in profile.items() if k!='revision'}) or profile.get('feasible') is not True
+                        or profile.get('source',{}).get('initialization_revision')!=source['revision'] or profile['source'].get('model_sha256')!=source['model_sha256']):continue
             reports.append(report)
         except (OSError,ValueError,TypeError,KeyError):continue
     return reports[-20:]

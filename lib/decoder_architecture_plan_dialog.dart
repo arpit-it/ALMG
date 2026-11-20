@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'architecture_feasibility_dialog.dart';
 
 class DecoderArchitecturePlanDialog extends StatefulWidget {
   const DecoderArchitecturePlanDialog({super.key, required this.request});
@@ -80,6 +81,9 @@ class _DecoderArchitecturePlanDialogState extends State<DecoderArchitecturePlanD
         Text('Five-step synthetic loss: ${report['initial_loss']} → ${report['final_loss']}'),
         Text('Finite gradients and changed tensors: ${(report['changed_parameter_tensors'] as List).length} / ${report['parameter_tensors']}'),
         Text('CPU/Metal output difference: ${report['cpu_metal_max_error_before']} before · ${report['cpu_metal_max_error_after']} after'),
+        if (report['hardware_feasibility'] != null) Text('Saved hardware snapshot: ${report['hardware_feasibility']['hardware']['metal_device']?['device_name'] ?? 'unknown'} · '
+          '${report['hardware_feasibility']['precision']} · estimated memory reserve ${report['hardware_feasibility']['estimates']['required_available_memory_bytes']} bytes. This is the recorded snapshot, not current availability.')
+        else const Text('Legacy report: no hardware feasibility snapshot was captured.'),
         Text(report['padding_check_applicable'] == true ? 'Masked padding loss and gradients were invariant.' : 'Padding check not applicable to this minimum batch/context; both real targets were retained.'),
         const Text('The initialized model is unchanged. Updated diagnostic weights were discarded; only this report was saved. '
           'Selected CPU finite-difference gradients were checked. This synthetic numerical check establishes no model quality, training approval or release.'),
@@ -87,19 +91,13 @@ class _DecoderArchitecturePlanDialogState extends State<DecoderArchitecturePlanD
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   }
   Future<void> _backward(Map<String, dynamic> initialized) async {
-    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: const Text('Check five synthetic backward steps?'),
-      content: const Text('Load these saved fresh weights and run five temporary SGD updates on a bounded synthetic batch using Metal. '
-        'Check gradients, masked padding, CPU/Metal outputs and selected CPU finite differences. Updated weights are discarded; a private numerical report is saved. '
-        'The saved initialized model stays unchanged. No dataset training or model release is approved.'),
-      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm planned-model backward check'))]));
-    if (confirmed != true || !mounted) return;
+    final feasibility = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => ArchitectureFeasibilityDialog(initialized: initialized, request: widget.request));
+    if (feasibility == null || !mounted) return;
     setState(() { _busy = true; _error = null; });
     showDialog<void>(context: context, barrierDismissible: false, builder: (context) => const PopScope(canPop: false,
       child: AlertDialog(title: Text('Checking Metal backward pass'), content: SizedBox(height: 48, child: Center(child: CircularProgressIndicator())))));
     try {
-      final report = await widget.request('/decoder-architecture-plans/${initialized['plan_id']}/backward-check', {'confirmed': true, 'reviewed': initialized});
+      final report = await widget.request('/decoder-architecture-plans/${initialized['plan_id']}/backward-check', {'confirmed': true, 'reviewed': initialized, 'reviewed_feasibility': feasibility});
       if (!mounted) return;
       Navigator.of(context, rootNavigator: true).pop(); setState(() => _busy = false); await _showBackward(report);
     } catch (error) { if (mounted) {

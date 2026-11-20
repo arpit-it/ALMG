@@ -1,4 +1,5 @@
 import importlib
+import json
 import os
 from pathlib import Path
 from tempfile import TemporaryDirectory
@@ -6,6 +7,7 @@ import unittest
 from unittest.mock import patch
 import numpy as np
 from backend import decoder_architecture_plans as plans,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward
+from backend.run_manifest import digest
 
 
 class ArchitectureBackwardTests(unittest.TestCase):
@@ -34,6 +36,12 @@ class ArchitectureBackwardTests(unittest.TestCase):
                 self.assertTrue(all(item['absolute_error']<=item['tolerance'] for item in result['finite_difference_probes']))
                 self.assertFalse(result['updated_weights_saved']);self.assertFalse(result['training_approved']);self.assertFalse(result['release_approved'])
                 importlib.reload(backward);self.assertEqual(backward.list_reports(root,record['plan_id'],True),[result])
+                legacy={k:v for k,v in result.items() if k not in ('hardware_feasibility','approved_feasibility_revision')}
+                legacy.update(format='almg-planned-decoder-backward-check-v1',schema_version=1,id='0'*32)
+                legacy['revision']=digest({k:v for k,v in legacy.items() if k!='revision'})
+                (backward._folder(root,record['plan_id'])/('0'*32+'.json')).write_text(json.dumps(legacy))
+                self.assertIn(legacy,backward.list_reports(root,record['plan_id'],True))
+                self.assertIn(result,backward.list_reports(root,record['plan_id'],True))
                 self.assertTrue(all(p.read_bytes()==data for p,data in before.items()))
 
     @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS')=='1','Requires real Metal autodiff')

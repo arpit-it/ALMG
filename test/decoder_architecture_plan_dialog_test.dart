@@ -12,6 +12,10 @@ void main() {
       if (path.endsWith('/review')) return review;
       if (path.endsWith('/save')) return saved;
       if (path.endsWith('/initialize')) return initialized;
+      if (path.endsWith('/feasibility')) {
+        return {'feasible': true, 'hardware': {'metal_device': {'device_name': 'Fixture Metal'}, 'mlx_version': 'fixture'},
+          'estimates': <String, dynamic>{}, 'blockers': <dynamic>[], 'recommendation': null};
+      }
       checks++; expect(body['confirmed'], true); expect(body['reviewed'], initialized);
       return {'initial_loss': 4.0, 'final_loss': 3.0, 'changed_parameter_tensors': ['head'], 'parameter_tensors': 1,
         'cpu_metal_max_error_before': 0, 'cpu_metal_max_error_after': 0, 'padding_check_applicable': true};

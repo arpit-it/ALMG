@@ -5476,6 +5476,38 @@ P3-LMF-04 acceptance complete · configurable architecture backward validation �
   Continue with the next independently actionable requirement in document order;
   unrelated user changes, old artifacts and downloaded weights are preserved.
 
+P3-LMF-05 partial progress · hardware review for planned-model backward diagnostics · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Added a local hardware feasibility report before
+  confirming the bounded synthetic architecture backward check. It records Apple
+  silicon memory, available memory/disk, MLX/Metal device information and the
+  selected precision. Unsupported precision/device choices cannot execute, and
+  resources are checked again immediately before model loading/execution.
+- Calculated FP32 parameters, gradients, transient copies, activation layout,
+  CPU reference/loading and disk reserves are explicitly estimates. SGD moment
+  storage and imported dataset storage are zero for this synthetic-only scope.
+  Low-memory fixtures produce a smaller valid plan suggestion without changing
+  the approved plan. No measured peak memory or duration prediction is claimed.
+- New v2 diagnostic records retain the observed hardware/feasibility snapshot
+  and approval revision; existing v1 records remain readable and immutable.
+- Local verification: rebuilt and exercised the native macOS ALMG app on Apple
+  M4 Max using isolated local fixtures. Opened a supported float32 report,
+  selected float16 and observed the blocker with no confirmation action, cancelled,
+  reopened float32 and explicitly approved five Metal steps. Loss decreased from
+  4.831958293914795 to 4.393815040588379; updated weights were discarded. Restarted
+  both app and fixture backend, then reopened new report f579a7efd4ca4bfb820c92d294eec1aa
+  and legacy report 06509fb756994f54af127c2e78f57fd9 with exact saved-record equality.
+  All 22 pre-existing architecture fixture files retained their SHA-256 hashes.
+- Regression evidence: 536 Python tests passed with actual Metal enabled and
+  warnings treated as errors; 48 Flutter tests passed; Flutter analysis clean.
+  Tests include read-only preflight, low-memory recommendations, unsupported
+  precision/device rejection, stale approvals and changing resource availability.
+  Local evidence: /tmp/almg-architecture-feasibility-native-qa/verification.json.
+- Remaining: full dataset-training feasibility/approval integration, measured
+  peak-memory trials that update estimates, duration prediction, and Windows/CUDA
+  verification on suitable hardware. P3-LMF-01 is already complete for its recorded
+  bounded architecture scope. Unchanged blocked items remain open and skipped.
+  No external collection, downloads, generated artifacts or weights are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
