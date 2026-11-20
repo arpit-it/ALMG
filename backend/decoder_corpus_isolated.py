@@ -15,19 +15,20 @@ def review(root,initialized,corpus,settings):
     return training.review(root,initialized,corpus,settings,'fresh_process')
 
 
-def run(root,confirmed,initialized,corpus,settings,approved):
+def run(root,confirmed,initialized,corpus,settings,approved,request_id=None):
     if confirmed is not True:raise ValueError('Explicitly confirm corpus training before launching a worker.')
+    if request_id is not None:training.run_cancellation.validate(request_id)
     current=review(root,initialized,corpus,settings)
     keys=('format','schema_version','source','corpus_id','corpus_revision','config','model_config','runtime','estimates','implementation_sha256','execution_mode')
     if (not isinstance(approved,dict) or approved.get('revision')!=training.digest({k:v for k,v in approved.items() if k!='revision'})
             or any(approved.get(key)!=current[key] for key in keys)):
         raise ValueError('Corpus worker review changed; reopen it before training.')
     if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Isolated corpus training is blocked by current resources.')
-    return _execute(root,{'initialized':initialized,'corpus':corpus,'settings':settings},approved,'full')
+    return _execute(root,{'initialized':initialized,'corpus':corpus,'settings':settings,'request_id':request_id},approved,'full')
 
 
 def _execute(root,payload,approved,action):
-    nonce=uuid.uuid4().hex
+    nonce=uuid.uuid4().hex;expected_token=payload.get('request_id')
     payload=json.dumps({**payload,'root':str(Path(root).resolve()),'approved':approved,'nonce':nonce,'action':action},allow_nan=False)
     process=subprocess.Popen([sys.executable,'-m','backend.decoder_corpus_worker'],cwd=str(Path(__file__).resolve().parent.parent),
                              stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True)
@@ -43,7 +44,7 @@ def _execute(root,payload,approved,action):
     expected=approved['corpus_id'] if action=='full' else (approved['source']['record_id'] if action=='continuation' else approved['resume_from']['record_id'])
     actual=record['review']['corpus_id'] if action=='full' else (record['review']['source']['record_id'] if action=='continuation' else record['review']['resume_from']['record_id'])
     if (response.get('nonce')!=nonce or response.get('process_id')!=process.pid or process.pid==os.getpid()
-            or observed is None or observed['process_id']!=process.pid or record['review']!=approved
+            or observed is None or observed['process_id']!=process.pid or record['review']!=approved or record.get('request_id')!=expected_token
             or record['review']['execution_mode']!='fresh_process' or actual!=expected):
         raise ValueError('Isolated corpus result binding changed; retained artifacts require review.')
     return record

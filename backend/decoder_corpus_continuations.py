@@ -14,6 +14,7 @@ else:
 
 def _source(root, identifier):
     parent = training.read(root, identifier)
+    if parent.get('status','completed')!='completed':raise ValueError('A canceled fresh corpus run does not support midpoint continuation yet.')
     origin = parent['review']['source']
     initialized = training.hardware.initializations.read(root, origin['plan_id'], origin['initialization_id'])
     corpus = training.inputs.read(root, parent['review']['corpus_id'])

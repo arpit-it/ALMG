@@ -14,7 +14,8 @@ def measurements(record):
             or value.get('isolated_trial_peak_measured') is not True
             or type(value.get('process_id')) is not int or value['process_id']<=0
             or type(value.get('elapsed_seconds')) not in (float,int) or not math.isfinite(value['elapsed_seconds']) or value['elapsed_seconds']<=0
-            or any(type(value.get(key)) is not int or value[key]<=0 for key in ('isolated_process_peak_rss_bytes','isolated_metal_peak_bytes'))):
+            or type(value.get('isolated_process_peak_rss_bytes')) is not int or value['isolated_process_peak_rss_bytes']<=0
+            or type(value.get('isolated_metal_peak_bytes')) is not int or value['isolated_metal_peak_bytes']<0):
         raise ValueError('Invalid isolated corpus optimizer measurements.')
     return value
 
@@ -25,7 +26,7 @@ def feedback(records,current):
         try:
             saved=record['review'];c=current['config'];observed=measurements(record)
             keys=('source','corpus_id','corpus_revision','config','model_config','runtime','implementation_sha256','execution_mode')
-            if (observed is None or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
+            if (observed is None or record.get('status','completed')!='completed' or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
                     or any(saved.get(key)!=current.get(key) for key in keys) or saved.get('execution_mode')!='fresh_process'
                     or record.get('training_approved') is not True or record.get('completed_steps')!=c['steps']
                     or record.get('scheduler_completed_steps')!=c['steps'] or record.get('checkpoint_restored_steps')!=c['steps']//2):continue

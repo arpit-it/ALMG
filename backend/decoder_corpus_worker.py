@@ -13,7 +13,7 @@ def main():
     request=json.load(sys.stdin);root=Path(request['root'])
     action=request.get('action','full')
     if action=='full':
-        record=training.run(root,True,request['initialized'],request['corpus'],request['settings'],request['approved'],'fresh_process');folder=training._folder(root,record['id'])
+        record=training.run(root,True,request['initialized'],request['corpus'],request['settings'],request['approved'],'fresh_process',request.get('request_id'));folder=training._folder(root,record['id'])
     elif action in ('continuation','partial_resume'):
         from . import decoder_corpus_continuations as continuations
         runner=continuations.run if action=='continuation' else continuations.run_partial

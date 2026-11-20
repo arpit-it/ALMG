@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:math';
 import 'decoder_corpus_continuation_dialog.dart';
 import 'package:flutter/material.dart';
 
@@ -15,6 +16,9 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
   int _batch = 1;
   int _accumulation = 1;
   bool _busy = false;
+  bool _running = false;
+  bool _cancelPending = false;
+  String? _requestId;
   Map<String, dynamic>? _review;
   String? _error;
   String get _path => '/decoder-architecture-plans/${widget.initialized['plan_id']}';
@@ -37,9 +41,10 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
   Future<void> _show(Map<String, dynamic> record) => showDialog<void>(context: context, builder: (context) => AlertDialog(
     title: const Text('Saved corpus optimizer run'), scrollable: true,
     content: SizedBox(width: 650, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (record['status'] == 'canceled') Text('Fresh corpus run canceled in ${record['cancellation_phase']} at update ${record['completed_steps']}. Reference updates: ${record['reference_completed_steps']} · recorded training updates: ${record['recorded_training_updates']}. Private model, FP32 state and counter retained; no completed reference or quality claim.'),
       for (final part in ['train', 'validation', 'test']) Text('$part loss: ${record['initial_losses'][part]} → ${record['final_losses'][part]}'),
       if ((record['schema_version'] as int? ?? 1) >= 2) Text('Effective batch rows: ${record['effective_batch_rows']} · microbatches per update: ${record['gradient_accumulation_steps']} · full-batch gradient difference: ${record['full_batch_gradient_max_error']}.'),
-      if (record['schema_version'] == 3) Text('Compute: ${record['compute_precision']} · loss scale: ${record['loss_scale']} · FP32 master weights, gradients and moments. Split losses use the saved FP32 master model.'),
+      if ((record['schema_version'] as int? ?? 1) >= 3) Text('Compute: ${record['compute_precision']} · loss scale: ${record['loss_scale']} · FP32 master weights, gradients and moments. Split losses use the saved FP32 master model.'),
       Text('Generated text: ${record['generated_text']}'),
       const Text('Held-out losses are diagnostics on this small corpus. This private result does not establish language quality or release approval.'),
       if (record['isolated_workflow_measurements'] case final Map measured) ...[
@@ -51,12 +56,22 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
       else const Text('Workflow time and memory observations share the backend process; these are not isolated training peaks.'),
       SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
     ])), actions: [
-      if (record['id'] is String) TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusContinuationDialog(sourceId: record['id'] as String, request: widget.request)), child: const Text('Review corpus checkpoint continuation')),
+      if (record['id'] is String && record['status'] != 'canceled') TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusContinuationDialog(sourceId: record['id'] as String, request: widget.request)), child: const Text('Review corpus checkpoint continuation')),
       TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   Future<void> _train() => _perform(() async {
-    final record = await widget.request('$_path/corpus-optimizer-train', {..._body, 'confirmed': true, 'reviewed_feasibility': _review});
-    if (mounted) await _show(record);
+    final random=Random.secure();final token=List.generate(16,(_)=>random.nextInt(256).toRadixString(16).padLeft(2,'0')).join();
+    setState(() { _running=true;_cancelPending=false;_requestId=token; });
+    try {
+      final record = await widget.request('$_path/corpus-optimizer-train', {..._body, 'confirmed': true, 'reviewed_feasibility': _review, 'request_id':token});
+      if (mounted) { setState(() { _running=false;_requestId=null; });await _show(record); }
+    } finally { if(mounted)setState(() { _running=false;_requestId=null; }); }
   });
+  Future<void> _cancel() async {
+    final token=_requestId;if(token==null || !_running || _cancelPending)return;
+    setState(() { _cancelPending=true;_error=null; });
+    try { await widget.request('$_path/corpus-optimizer-cancel',{'confirmed':true,'reviewed_feasibility':_review,'request_id':token}); }
+    catch(error) { if(mounted)setState(() { _cancelPending=false;_error='$error'; }); }
+  }
   Future<void> _history() => _perform(() async {
     final result = await widget.request('$_path/corpus-optimizer-history', {'reviewed': widget.initialized, 'corpus': widget.corpus});
     if (!mounted) return;
@@ -65,7 +80,7 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
       title: const Text('Saved corpus optimizer runs'), children: [
         if ((result['records'] as List).isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No corpus optimizer runs saved.')),
         for (final record in result['records'] as List) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(record as Map)),
-          child: Text('${(record['id'] as String).substring(0, 8)} · ${record['review']['config']['optimizer']} · step ${record['completed_steps']}')),
+          child: Text('${(record['id'] as String).substring(0, 8)} · ${record['status'] ?? 'completed'} · ${record['review']['config']['optimizer']} · step ${record['completed_steps']}')),
       ]));
     if (selected != null && mounted) await _show(selected);
   });
@@ -83,8 +98,9 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
         onChanged: _busy ? null : (value) => setState(() { _batch = value!; _review = null; })),
       DropdownButton<int>(value: _accumulation, items: const [DropdownMenuItem(value: 1, child: Text('1 corpus microbatch per update')), DropdownMenuItem(value: 2, child: Text('2 corpus microbatches per update'))],
         onChanged: _busy ? null : (value) => setState(() { _accumulation = value!; _review = null; })),
-      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. Saved midpoint continuation requires separate approval; fresh-run cancellation is not exposed yet. Reported split losses evaluate the saved FP32 master model.'),
+      const Text('Document boundaries and masked padding are preserved. Train/validation/test losses use all saved windows weighted by real target tokens. Microbatch gradients are averaged by real target-token counts before clipping and one optimizer/scheduler update. Two microbatches require two effective rows. Saved midpoint continuation requires separate approval; Cancel stops at optimizer-update boundaries in either phase, retaining the active model/state and any completed reference/checkpoint. Independent fresh-partial resume remains unavailable. Reported split losses evaluate the saved FP32 master model.'),
       if (_busy) const LinearProgressIndicator(),
+      if(_running && _cancelPending)const Text('Cancellation requested. Waiting for a safe phase update boundary and retained result.'),
       if (_error != null) Text(_error!),
       if (_review != null) ...[
         Text(_review!['feasible'] == true ? 'Resources cover corpus optimizer reserves.' : 'Corpus optimizer cannot start.'),
@@ -98,6 +114,7 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
         ExpansionTile(title: const Text('View corpus optimizer review'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],
     ])), actions: [
+      if(_running)TextButton(onPressed:_cancelPending ? null : _cancel,child:const Text('Cancel fresh corpus run')),
       TextButton(onPressed: _busy ? null : _history, child: const Text('Saved corpus optimizer runs')),
       TextButton(onPressed: _busy ? null : _load, child: const Text('Review corpus training resources')),
       if (_review?['feasible'] == true) TextButton(onPressed: _busy ? null : _train, child: const Text('Confirm train and save corpus model')),

@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/decoder_corpus_optimizer_dialog.dart';
@@ -77,6 +78,24 @@ void main() {
     await tester.tap(find.text('Confirm train and save corpus model'));await tester.pump();await tester.pump(const Duration(milliseconds:300));
     expect(find.text('Measured isolated corpus worker time: 0.500 s.'),findsOneWidget);
     expect(find.textContaining('these are not isolated training peaks'),findsNothing);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
+  testWidgets('fresh run cancellation uses the reviewed token and labels the retained phase', (tester) async {
+    final result=Completer<Map<String,dynamic>>();String? active,canceled;
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
+      if(path.endsWith('train')) { active=body['request_id'] as String;return result.future; }
+      if(path.endsWith('cancel')) { canceled=body['request_id'] as String;expect(body['reviewed_feasibility'],isNotNull);return {'cancel_requested':true}; }
+      return {'feasible':true,'estimates':{},'blockers':[]};
+    })));
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm train and save corpus model'));await tester.pump();
+    await tester.tap(find.text('Cancel fresh corpus run'));await tester.pump();
+    expect(canceled,active);expect(RegExp(r'^[a-f0-9]{32}$').hasMatch(active!),true);
+    result.complete({'status':'canceled','schema_version':4,'cancellation_phase':'reference_verification','completed_steps':1,'reference_completed_steps':1,'recorded_training_updates':0,'initial_losses':{'train':2,'validation':2,'test':2},'final_losses':{'train':1.9,'validation':1.9,'test':1.9},'generated_text':'amber birch'});
+    await tester.pump();await tester.pump(const Duration(milliseconds:300));
+    expect(find.textContaining('Fresh corpus run canceled in reference_verification at update 1'),findsOneWidget);
+    expect(find.text('Review corpus checkpoint continuation'),findsNothing);
     await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
   });
 

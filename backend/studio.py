@@ -2396,12 +2396,16 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond({'records':decoder_corpus_continuations.history(ROOT,corpus_parts[1])})
             architecture_parts = self.path.strip('/').split('/')
             if len(architecture_parts) == 3 and architecture_parts[0] == 'decoder-architecture-plans':
-                if architecture_parts[2].startswith('corpus-optimizer-') and (not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id') != architecture_parts[1]):
+                if architecture_parts[2].startswith('corpus-optimizer-') and architecture_parts[2]!='corpus-optimizer-cancel' and (not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id') != architecture_parts[1]):
                     raise ValueError('Reopen the initialized model belonging to this architecture plan.')
                 if architecture_parts[2] == 'corpus-optimizer-review':
                     return self.respond(decoder_corpus_isolated.review(ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings')))
+                if architecture_parts[2] == 'corpus-optimizer-cancel':
+                    reviewed=data.get('reviewed_feasibility')
+                    if not isinstance(reviewed,dict) or reviewed.get('source',{}).get('plan_id')!=architecture_parts[1]:raise ValueError('Cancellation review belongs to another architecture.')
+                    return self.respond(decoder_corpus_optimizer.run_cancellation.request(ROOT,reviewed,data.get('request_id'),data.get('confirmed')))
                 if architecture_parts[2] == 'corpus-optimizer-train':
-                    return self.respond(inference.WORKER.submit(decoder_corpus_isolated.run,ROOT,data.get('confirmed'),data.get('reviewed'),data.get('corpus'),data.get('settings'),data.get('reviewed_feasibility')).result())
+                    return self.respond(inference.WORKER.submit(decoder_corpus_isolated.run,ROOT,data.get('confirmed'),data.get('reviewed'),data.get('corpus'),data.get('settings'),data.get('reviewed_feasibility'),data.get('request_id')).result())
                 if architecture_parts[2] == 'corpus-optimizer-history':
                     return self.respond({'records':decoder_corpus_optimizer.history(ROOT,data.get('reviewed'),data.get('corpus'))})
                 if architecture_parts[2] == 'corpus-input-datasets':

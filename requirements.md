@@ -7393,6 +7393,66 @@ P3-LMF-05 partial progress · isolated corpus recovery peaks and exact-source fe
   Independent P3-LMF-06 fresh-run cancellation and arbitrary interruption recovery
   remain open; these measurements establish no 50M–100M feasibility or model quality.
 
+P3-LMF-06 partial progress · phase-aware fresh corpus run cancellation · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Fresh corpus training now exposes live Cancel with a
+  new random token bound to the exact frozen approval/source/corpus review. The
+  receipt is handled outside the GPU queue and checked between complete optimizer
+  updates during both uninterrupted reference verification and recorded checkpointed
+  training. No worker is killed and no original initialization or artifact is deleted.
+- New version-4 canceled-run records retain the active phase, its actual model,
+  FP32 optimizer state/counter, executed window/schedule logs and own CPU text. They
+  separately record reference and recorded-training progress and never claim a
+  completed reference comparison or quality/release acceptance. A cancellation in
+  recorded training also retains the completed reference model/moments/log and any
+  saved midpoint checkpoint. Cancellation before the first update retains initial
+  state. Completed runs preserve their existing model/checkpoint contracts.
+- Reads verify phase/counter ranges, receipt/review bindings, exact file sets and
+  hashes, finite optimizer moments, original corpus/tokenizer, executed target/window/
+  learning-rate traces and private CPU inference. Canceled observations cannot enter
+  time/memory feedback and are rejected as ordinary midpoint-continuation sources;
+  independent phase-aware fresh-partial resume remains unimplemented. The app labels
+  phase progress and suppresses the inappropriate continuation action.
+- Native verification found an initial HTTP-400 cancellation routing bug: a shared
+  architecture guard expected the launch initialization body. Cancel now uses its
+  own frozen-review architecture/source check without requiring that launch body.
+  Added an API regression proving valid frozen-review cancellation bypasses the GPU
+  queue while a different architecture is rejected. The failed paced attempt and
+  its artifacts remain preserved separately in /tmp/almg-corpus-fresh-cancel-native-qa;
+  they are documented as failure evidence, not production timing samples.
+- Rebuilt/relaunched ALMG against clean local fixtures and the corrected route.
+  Real app Cancel stopped FP32 SGD reference verification at update one in private
+  record 11fc676ab1f54d47a4aac0a8e29245e3: reference count one, recorded training
+  count zero and no midpoint. Mixed FP16 AdamW stopped recorded training at update
+  twelve in f56e58d0f8aa4ba9b0124e7bcaf64d5c, retaining the completed twenty-update
+  reference model/moments, actual training model/state twelve and restored midpoint
+  ten. Local-only phase pacing made the short live actions observable; gradients,
+  updates, receipts and persistence were real.
+- Removed pacing and explicitly approved new-token runs. SGD
+  9c2098234bc549908579972658c7eba7 and AdamW
+  d81fbd1f70a04137962bf9ab2a0e4ef0 completed all twenty recorded updates and passed
+  their original checkpoint/reference/inference checks. Old cancellation tokens did
+  not affect these runs. Native resource reviews after each canceled run had no
+  measured forecast, proving incomplete observations were excluded.
+- After app/backend restart all twenty-eight legacy/completed/phase-canceled records,
+  active/reference optimizer states, midpoint files and own CPU text reopened exactly.
+  All 283 original fixture files and all 312 retained files kept their hashes.
+  Evidence: /tmp/almg-corpus-fresh-cancel-native-verified/verification.json,
+  sgd-canceled-ui.json, adamw-canceled-ui.json, canceled-reopened and after-cancel-
+  feedback captures, completed/restarted captures, plus preserved initial failure
+  diagnostics. No external collection occurred; artifacts, receipts and weights stay
+  outside Git.
+- Validation: final 636 Python tests passed with warnings as errors and Metal enabled;
+  80 Flutter tests passed and analysis was clean. New real SGD/mixed AdamW tests
+  cancel in reference, pre-midpoint and post-restore training phases, verify retained
+  reference/checkpoint/state/counters, reject modified state and token/review reuse,
+  preserve original files and exclude incomplete feedback. UI tests cover the active
+  token and phase labeling; the API regression covers the native-discovered bug.
+- Remaining: independently approved resume of phase-aware fresh canceled runs,
+  arbitrary durable OS/process interruption, larger model/budget support and profiling,
+  broader quality evaluation and profiled 50M–100M training. Existing continuation/
+  retained-partial recovery remains available. Unchanged independent hardware/user-
+  action blockers remain open and skipped; these toy runs establish no model release.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
