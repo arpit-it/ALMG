@@ -36,6 +36,45 @@ class ImageResourceTrialTests(unittest.TestCase):
                 saved=trials._folder(root,job['id'])/(record['id']+'.json');saved.write_text(saved.read_text().replace('"weights_retained": false','"weights_retained": true'))
                 self.assertEqual(trials.read(root,job['id'])['records'],[])
 
+    def test_image_measurements_calibrate_both_variants_and_preserve_legacy_profiles(self):
+        for mode in ('local','web_images'):
+            with self.subTest(mode=mode),TemporaryDirectory() as temporary:
+                root=Path(temporary);job,rows,settings,approved=self.fixture(root,mode)
+                self.assertIsNone(approved['calibration']);self.assertIsNone(approved['estimates']['fit_work_estimate'])
+                record=trials.run(root,job,rows,settings,True,approved);review=feasibility.review(root,job,rows,settings)
+                self.assertEqual(review['calibration']['trial_ids'],[record['id']])
+                self.assertGreaterEqual(review['estimates']['required_available_memory_bytes'],approved['estimates']['required_available_memory_bytes'])
+                forecast=review['estimates']['fit_work_estimate'];self.assertEqual(forecast['sample_count'],1)
+                self.assertEqual(forecast['trial_ids'],[record['id']]);self.assertGreater(forecast['estimated_seconds'],record['measurements']['fit_and_validation_seconds'])
+                self.assertFalse(forecast['measured']);self.assertIsNone(review['estimates']['duration_estimate_seconds'])
+                with self.assertRaisesRegex(ValueError,'review changed'):feasibility.admit(root,job,rows,settings,approved)
+                legacy=json.loads(json.dumps(approved));legacy.pop('calibration');legacy['estimates'].pop('fit_work_estimate');legacy['revision']=trials.digest({k:v for k,v in legacy.items() if k!='revision'})
+                manifest={'job_id':job['id'],'dataset':{'sha256':approved['dataset_sha256']},'image_hardware':{'approval':legacy}}
+                self.assertEqual(feasibility.validate_manifest(manifest)['image_hardware']['approval'],legacy)
+
+    def test_image_calibration_blocks_insufficient_ram_and_excludes_incompatible_evidence(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);job,rows,settings,approved=self.fixture(root,'local');record=trials.run(root,job,rows,settings,True,approved)
+            path=trials._folder(root,job['id'])/(record['id']+'.json');record['measurements']['process_peak_rss_bytes']=2*1024**3
+            def save(value):
+                value['revision']=trials.digest({k:v for k,v in value.items() if k!='revision'});path.write_text(json.dumps(value))
+            save(record)
+            with patch.object(feasibility.training_resources,'available_memory',return_value=2*1024**3):
+                review=feasibility.review(root,job,rows,settings)
+                self.assertFalse(review['feasible']);self.assertGreater(review['estimates']['required_available_memory_bytes'],2*1024**3)
+            for case in ('mode','variant','runtime','dataset','settings','producer','topology','nonpositive'):
+                value=json.loads(json.dumps(record))
+                if case=='mode':value['mode']='web_images'
+                elif case=='variant':value['variant']='Commons captions'
+                elif case=='runtime':value['measurements']['runtime']['numpy']='other'
+                elif case=='dataset':value['dataset_sha256']='other'
+                elif case=='settings':value['settings']['target']=.9
+                elif case=='producer':value['implementation_sha256']='other'
+                elif case=='topology':value['admission']['hardware']['logical_cpu_count']=999
+                else:value['measurements']['fit_and_validation_seconds']=0
+                save(value);review=feasibility.review(root,job,rows,settings)
+                self.assertIsNone(review['calibration'],case);self.assertIsNone(review['estimates']['fit_work_estimate'],case)
+
     def test_consent_stale_input_failure_and_timeout_save_no_report(self):
         with TemporaryDirectory() as temporary:
             root=Path(temporary);job,rows,settings,approved=self.fixture(root,'local')

@@ -6099,6 +6099,44 @@ P3-LMF-05 partial progress · discarded CPU image resource trials · 2026-11-20:
   and suitable Windows/CUDA hardware verification. Unchanged hardware/user-action
   blockers remain open and skipped.
 
+P3-LMF-05 partial progress · measured CPU image calibration and bounded fit estimate · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Saved discarded image trials now calibrate the next
+  CPU image feasibility review only when prepared data, settings, mode/variant,
+  runtime, CPU topology and implementation match. Admission takes the greater of
+  the calculated memory floor and highest compatible process peak RSS plus 25%
+  headroom; incompatible evidence cannot lower or replace calculated reserves.
+  Newly observed calibration requires a fresh review before training approval.
+- The same report supplies a bounded fit/validation work estimate using highest
+  compatible measured time plus explicit 25% heuristic headroom, retaining sample
+  count, observed range, source trial IDs, method and exclusions. It is not an
+  upper bound or total wall-time prediction. Startup/imports, idle/power waits,
+  Qwen repair, checkpoint/model saving and export remain excluded. Existing saved
+  image hardware profiles without the optional calibration fields remain readable.
+- Native verification: rebuilt and ran ALMG against 45 local shape examples and
+  15 locally generated captioned PNGs with external reads disabled. Each initial
+  review had no calibration; a separately approved discarded trial populated the
+  reopened report. Shapes measured 0.01902041700668633 seconds and 39944192 bytes
+  peak process RSS, estimating 0.023775521258357912 seconds of fit work. Caption
+  ridge measured 0.032490332960151136 seconds and 49922048 bytes, estimating
+  0.04061291620018892 seconds. Both retained the larger calculated memory floors
+  (272314648 and 274919440 bytes respectively).
+- Explicitly approved both main CPU runs in the app. Shape held-out pixel accuracy
+  was 1.0 and caption pixel similarity 0.901801924473493 on these local fixtures;
+  this is not evidence of general image-generation quality. Approval, admission
+  and execution snapshots retained the exact reviewed calibration/estimate. Both
+  run manifests reopened exactly after app/backend restart; all 23 prior fixture/
+  artifact files and 10 new candidate files retained their hashes. Local evidence:
+  /tmp/almg-image-calibration-native-qa/verification.json and native UI captures;
+  generated evidence and weights stay outside Git.
+- Validation: 569 Python tests passed with warnings as errors and Metal enabled,
+  55 Flutter tests passed, and analysis was clean. Coverage includes both actual
+  isolated image variants, stale approval rejection, insufficient-memory blocking,
+  incompatible mode/variant/runtime/data/settings/producer/CPU exclusion, invalid
+  timing, and legacy profile readability.
+- Remaining: total wall-time forecasting including scheduling/persistence, broader
+  neural/full-epoch feasibility and suitable Windows/CUDA verification. Unchanged
+  hardware/user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
