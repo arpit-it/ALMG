@@ -27,26 +27,33 @@ def _read(path):
     return record
 
 
-def request(root,source_id,identifier,confirmed):
+def request(root,source_id,identifier,confirmed,source_kind='fixture'):
     if confirmed is not True:raise ValueError('Explicitly request cancellation of this continuation.')
-    path=_path(root,identifier);parent=fixture.read(root,source_id)
+    path=_path(root,identifier)
+    if source_kind=='fixture':parent=fixture.read(root,source_id)
+    elif source_kind=='continuation':
+        if __package__:from .decoder_optimizer_continuations import read
+        else:from decoder_optimizer_continuations import read
+        parent=read(root,source_id)
+        if parent.get('status')!='canceled':raise ValueError('Only a canceled partial checkpoint can have a resume canceled.')
+    else:raise ValueError('Unsupported cancellation source kind.')
     with _LOCK:
         if path.exists():
             record=_read(path)
-            if record['source_id']!=source_id or record['source_revision']!=parent['revision']:raise ValueError('Cancellation token belongs to another source.')
+            if record['source_id']!=source_id or record['source_revision']!=parent['revision'] or record.get('source_kind','fixture')!=source_kind:raise ValueError('Cancellation token belongs to another source.')
             return record
         record={'format':'almg-optimizer-continuation-cancel-v1','schema_version':1,'request_id':identifier,'source_id':source_id,
-            'source_revision':parent['revision'],'cancel_requested':True,'created_at':datetime.now(timezone.utc).isoformat()}
+            'source_revision':parent['revision'],'source_kind':source_kind,'cancel_requested':True,'created_at':datetime.now(timezone.utc).isoformat()}
         record['revision']=fixture.digest(record);path.parent.mkdir(parents=True,exist_ok=True)
         with NamedTemporaryFile(mode='w',encoding='utf-8',dir=path.parent,prefix='.cancel-',delete=False) as output:
             json.dump(record,output,allow_nan=False);temporary=Path(output.name)
         temporary.replace(path);return record
 
 
-def requested(root,source_id,source_revision,identifier):
+def requested(root,source_id,source_revision,identifier,source_kind='fixture'):
     if identifier is None:return False
     path=_path(root,identifier)
     if not path.exists():return False
     record=_read(path)
-    if record['request_id']!=identifier or record['source_id']!=source_id or record['source_revision']!=source_revision:raise ValueError('Cancellation token/source binding changed.')
+    if record['request_id']!=identifier or record['source_id']!=source_id or record['source_revision']!=source_revision or record.get('source_kind','fixture')!=source_kind:raise ValueError('Cancellation token/source binding changed.')
     return True

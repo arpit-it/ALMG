@@ -2361,6 +2361,13 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/decoder-architecture-plans/list':
                 return self.respond({'plans': decoder_architecture_plans.list_plans(ROOT, data.get('confirmed'))})
             optimizer_parts = self.path.strip('/').split('/')
+            if len(optimizer_parts) == 3 and optimizer_parts[0] == 'decoder-optimizer-continuations':
+                if optimizer_parts[2] == 'resume-review':
+                    return self.respond(decoder_optimizer_continuations.review_partial(ROOT,optimizer_parts[1]))
+                if optimizer_parts[2] == 'cancel-resume':
+                    return self.respond(decoder_optimizer_continuations.cancellation.request(ROOT,optimizer_parts[1],data.get('request_id'),data.get('confirmed'),'continuation'))
+                if optimizer_parts[2] == 'resume':
+                    return self.respond(inference.WORKER.submit(decoder_optimizer_isolated.run_partial,ROOT,optimizer_parts[1],data.get('confirmed'),data.get('reviewed'),data.get('request_id')).result())
             if len(optimizer_parts) == 3 and optimizer_parts[0] == 'decoder-optimizer-fixtures':
                 if optimizer_parts[2] == 'continuation-review':
                     return self.respond(decoder_optimizer_continuations.review(ROOT,optimizer_parts[1]))

@@ -25,14 +25,25 @@ def run_continuation(root,identifier,confirmed,approved,request_id=None):
     else:import decoder_optimizer_continuations as continuations
     if request_id is not None:continuations.cancellation.validate(request_id)
     current=continuations.review(root,identifier)
-    if not isinstance(approved,dict) or approved.get('revision')!=fixture.digest({k:v for k,v in approved.items() if k!='revision'}) or any(approved.get(key)!=current[key] for key in ('format','schema_version','source','config','runtime','estimates','implementation_sha256')):raise ValueError('Checkpoint continuation review changed; reopen it before approval.')
+    if not isinstance(approved,dict) or approved.get('revision')!=fixture.digest({k:v for k,v in approved.items() if k!='revision'}) or any(approved.get(key)!=current[key] for key in ('format','schema_version','source','resume_from','restore_step','config','runtime','estimates','implementation_sha256')):raise ValueError('Checkpoint continuation review changed; reopen it before approval.')
     if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Isolated checkpoint continuation is blocked by hardware/resources.')
     return _execute(root,{'identifier':identifier,'request_id':request_id},approved,continuations.read,'record_id',identifier,'continuation')
 
 
+def run_partial(root,identifier,confirmed,approved,request_id=None):
+    if confirmed is not True:raise ValueError('Explicitly approve resuming the retained partial checkpoint.')
+    if __package__:from . import decoder_optimizer_continuations as continuations
+    else:import decoder_optimizer_continuations as continuations
+    if request_id is not None:continuations.cancellation.validate(request_id)
+    current=continuations.review_partial(root,identifier)
+    if not isinstance(approved,dict) or approved.get('revision')!=fixture.digest({k:v for k,v in approved.items() if k!='revision'}) or any(approved.get(key)!=current[key] for key in ('format','schema_version','source','resume_from','restore_step','config','runtime','estimates','implementation_sha256')):raise ValueError('Partial checkpoint review changed; reopen it before approval.')
+    if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Partial checkpoint resume is blocked by hardware/resources.')
+    return _execute(root,{'identifier':identifier,'request_id':request_id},approved,continuations.read,'record_id',identifier,'partial_resume')
+
+
 def _execute(root,payload,approved,reader,source_key,source_id,kind):
-    expected_format='almg-isolated-optimizer-continuation-measurements-v1' if kind=='continuation' else 'almg-isolated-optimizer-measurements-v1'
-    expected_scope='fresh_process_optimizer_checkpoint_continuation' if kind=='continuation' else 'fresh_process_bounded_optimizer_fixture'
+    expected_format='almg-isolated-optimizer-continuation-measurements-v1' if kind in ('continuation','partial_resume') else 'almg-isolated-optimizer-measurements-v1'
+    expected_scope='fresh_process_optimizer_checkpoint_continuation' if kind in ('continuation','partial_resume') else 'fresh_process_bounded_optimizer_fixture'
     nonce=uuid.uuid4().hex
     payload={**payload,'root':str(Path(root).resolve()),'approved':approved,'nonce':nonce,'action':kind}
     serialized=json.dumps(payload,allow_nan=False)
@@ -43,8 +54,9 @@ def _execute(root,payload,approved,reader,source_key,source_id,kind):
         raise ValueError('Isolated optimizer worker timed out; any saved artifacts were retained.')
     if process.returncode:raise ValueError('Isolated optimizer worker failed; any saved artifacts were retained. '+stderr[-600:])
     response=json.loads(stdout);record=reader(root,response['record_id']);observed=record.get('isolated_workflow_measurements',{})
+    bound_source=record['review']['resume_from'] if kind=='partial_resume' else record['review']['source']
     if (response.get('nonce')!=nonce or response.get('process_id')!=process.pid or process.pid==os.getpid()
         or observed.get('format')!=expected_format or observed.get('scope')!=expected_scope
         or observed.get('process_id')!=process.pid or observed.get('isolated_trial_peak_measured') is not True
-        or record.get('approved_review')!=approved or record['review']['source'][source_key]!=source_id):raise ValueError('Isolated optimizer result binding failed; retained artifacts need review.')
+        or record.get('approved_review')!=approved or bound_source[source_key]!=source_id):raise ValueError('Isolated optimizer result binding failed; retained artifacts need review.')
     return record

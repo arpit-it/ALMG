@@ -6865,6 +6865,60 @@ P3-LMF-06 partial progress · cooperative continuation cancellation · 2026-11-2
   hardware/user-action blockers stay open and skipped; language quality and release
   acceptance are not established by these fixture checks.
 
+P3-LMF-06 partial progress · approved retained-partial checkpoint resume · 2026-11-21:
+- [ ] P3-LMF-06 remains open. A canceled private checkpoint now offers a separate
+  partial-resume review and explicit approval. The review binds the exact partial
+  record/model/optimizer hashes, actual retained update, original configuration,
+  runtime, producer and conservative reserves. Resume restores the retained model,
+  moments and scheduler counter rather than restarting at the original midpoint.
+  Only canceled sources with remaining original work can resume; completed sources,
+  changed state/review, cyclic lineage and over-depth ancestry are rejected.
+- Version-3 continuation records retain immutable ancestry through repeated
+  cancel/resume steps while preserving version-1/2 reads. Every new result stays
+  private and validates its ancestor chain, saved counters/moments/configuration,
+  file hashes and own CPU inference. Completed results must match the original
+  reference final weights and CPU token output. Partial-resume cancellation is
+  separately token-bound to the partial source kind/ID/revision. Remaining-work
+  feedback matches the exact retained source and restore step and cannot leak into
+  original-midpoint estimates. Canceled samples remain excluded from forecasts.
+- Native verification: rebuilt and ran ALMG with the isolated local 8704-parameter
+  two-layer initialization and external collection disabled. Reopened all twenty-
+  four retained records before writes. Reviewed saved step-eleven canceled sources
+  f700a12756864ffb8983f7629acf15df (FP32 SGD) and
+  892d76ba946741d880e3dc303e110a9e (mixed FP16 AdamW); the app correctly showed
+  restore step eleven and nine remaining updates. Closing the first review created
+  no output. Explicitly resumed both, then used local pacing only to exercise live
+  re-cancellation: new canceled records 63916dba38c047cea204d90d5e16ca7f and
+  a8d0eaa53a0d4ca192e7a08e1ef7e2c1 stopped safely at update twelve, preserving
+  the exact original step-twelve gradient/clipping/scheduler trace and private state.
+- Separately approved those new step-twelve checkpoints and resumed without pacing
+  into 535648f8eacf4cd4840f48a02db34f0e (SGD) and
+  bd3d0325edb2466e8da7998e22bd2217 (AdamW). Both restored counter twelve,
+  recorded exactly steps thirteen through twenty, finished scheduler/optimizer
+  counter twenty and matched every original final parameter with 0.0 error and
+  identical CPU-generated token IDs. Final losses were 4.686117172241211 (SGD)
+  and 2.6992383003234863 (AdamW). All partial ancestors and original sources stayed
+  unchanged and unreleased. Feedback used only the matching completed partial
+  resume and was not reused for the original midpoint review.
+- After app/backend restart all twenty-eight v1/v2/v3 legacy/canceled/completed
+  records, partial ancestry, optimizer state, CPU inference and scoped feedback
+  reopened exactly without further training. All 120 optimizer/continuation/
+  cancellation files, three source files and 675 prior artifact files retained
+  their hashes. Evidence: /tmp/almg-partial-resume-native-qa/verification.json and
+  native captures; generated datasets, checkpoints, weights and intents remain
+  outside Git.
+- Validation: 615 Python tests passed with warnings as errors and Metal enabled,
+  70 Flutter tests passed, and analysis was clean. Tests cover real SGD/mixed AdamW
+  partial recovery, restored schedule/gradient traces and exact final models,
+  completed/corrupt-source rejection, consent, re-cancellation and chained recovery,
+  cyclic ancestry, source immutability, scoped feedback and explicit UI review.
+- Remaining: arbitrary durable OS/process interruption, general fresh-run
+  cancellation, approved text-corpus/tokenizer integration, broader budgets/resource
+  profiling and profiled 50M–100M training. Lineage validation is bounded to sixteen
+  continuation records. Current synthetic fixtures remain capped at 16384 parameters;
+  these checks establish checkpoint engineering, not language quality or release
+  acceptance. Unchanged hardware/user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -60,4 +60,20 @@ void main() {
     await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
     expect(find.text('Cancel running continuation'), findsNothing);
   });
+  testWidgets('retained partial resume reviews the partial endpoint and restores its saved update', (tester) async {
+    final paths = <String>[]; Map<String, dynamic>? approval;
+    await tester.pumpWidget(MaterialApp(home: DecoderOptimizerContinuationDialog(sourceId: 'parent', partialId: 'partial', request: (path, body) async {
+      paths.add(path);
+      if (path.endsWith('/resume')) { approval = body; return {'status': 'completed', 'completed_steps': 20}; }
+      final result = review(); result['restore_step'] = 11; result['resume_from'] = {'record_id': 'partial'}; result['estimates'] = {'optimizer_updates': 9}; return result;
+    })));
+    await tester.pumpAndSettle();
+    expect(paths, ['/decoder-optimizer-continuations/partial/resume-review']);
+    expect(find.textContaining('Restore step 11 · remaining updates: 9'), findsOneWidget);
+    await tester.tap(find.text('Resume retained checkpoint')); await tester.pump(); await tester.pump(const Duration(milliseconds: 300));
+    expect(paths.last, '/decoder-optimizer-continuations/partial/resume'); expect(approval?['confirmed'], true);
+    expect((approval?['reviewed'] as Map)['restore_step'], 11);
+    expect(find.textContaining('Continuation completed at optimizer step 20.'), findsOneWidget);
+    await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
+  });
 }

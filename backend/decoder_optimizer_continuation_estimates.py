@@ -11,11 +11,11 @@ def feedback(records,current):
     for record in records:
         try:
             saved=record['review'];observed=record['isolated_workflow_measurements'];seconds=observed['elapsed_seconds'];cpu=observed['isolated_process_peak_rss_bytes'];gpu=observed['isolated_metal_peak_bytes']
-            if ((record.get('format'),record.get('schema_version')) not in (('almg-optimizer-continuation-v1',1),('almg-optimizer-continuation-v2',2)) or record.get('status','completed')!='completed'
+            if ((record.get('format'),record.get('schema_version')) not in (('almg-optimizer-continuation-v1',1),('almg-optimizer-continuation-v2',2),('almg-optimizer-continuation-v3',3)) or record.get('status','completed')!='completed'
                 or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
                 or any(saved.get(key)!=current[key] for key in ('source','config','runtime','implementation_sha256'))
                 or record.get('training_approved') is not True or record.get('source_modified') is not False
-                or record.get('restored_steps')!=current['source']['checkpoint_step'] or record.get('completed_steps')!=current['config']['steps']
+                or saved.get('resume_from')!=current.get('resume_from') or record.get('restored_steps')!=current.get('restore_step',current['source']['checkpoint_step']) or record.get('completed_steps')!=current['config']['steps']
                 or record.get('scheduler_completed_steps')!=current['config']['steps']
                 or observed.get('format')!='almg-isolated-optimizer-continuation-measurements-v1' or observed.get('schema_version')!=1
                 or observed.get('scope')!='fresh_process_optimizer_checkpoint_continuation' or observed.get('measured') is not True or observed.get('isolated_trial_peak_measured') is not True

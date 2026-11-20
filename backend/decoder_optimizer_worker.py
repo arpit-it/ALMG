@@ -12,10 +12,11 @@ from .decoder_optimizer_measurements import process_peak_rss
 
 def main():
     request=json.load(sys.stdin);root=Path(request['root'])
-    continuing=request.get('action','fixture')=='continuation'
+    continuing=request.get('action','fixture') in ('continuation','partial_resume')
     if continuing:
         from . import decoder_optimizer_continuations as continuations
-        record=continuations.run(root,request['identifier'],True,request['approved'],request.get('request_id'));folder=continuations._folder(root,record['id'])
+        runner=continuations.run_partial if request.get('action')=='partial_resume' else continuations.run
+        record=runner(root,request['identifier'],True,request['approved'],request.get('request_id'));folder=continuations._folder(root,record['id'])
     else:
         record=fixture.run(root,request['plan_id'],True,request['initialized'],request['settings'],request['approved']);folder=fixture._folder(root,record['id'])
     import mlx.core as mx
