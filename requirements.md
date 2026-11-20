@@ -5899,6 +5899,44 @@ P3-LMF-05 partial progress · explicit CPU classifier feasibility and saved evid
   host verification. Unchanged hardware/user-action blockers remain open and
   skipped. No generated/private artifacts, weights or unrelated edits committed.
 
+P3-LMF-05 partial progress · CPU image recipe feasibility and retained evidence · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Experimental image fitting now has a CPU-specific
+  feasibility review before approval, with fresh admission and execution checks.
+  The local 48x48 shape recipe estimates mask/palette layout and fitting copies;
+  the caption-ridge branch estimates dense pixel targets/coefficients and the
+  quadratic training Gram matrix. Both include encoded dataset, memory and disk
+  budgets and explicitly require no Metal/CUDA accelerator. These are calculated
+  budgets, not measured peaks, diffusion capability or a duration guarantee.
+- The image dialog has its own approval action and report label. Resource/stale
+  rejection cannot initialize through the new gate; legacy API clients still get
+  fresh admission. Candidate reproducibility records retain the exact approved,
+  queue-admission and execution reports, validated against the prepared dataset
+  approval. Optional image profiles do not rewrite legacy classifier/image records.
+  Shared run-manifest and decoder implementation/checkpoint modules are unchanged.
+  External Commons collection remains separately permission-controlled.
+- Native local verification: rebuilt macOS ALMG and used the isolated 45-example
+  rendered-shape fixture. Opened the image feasibility report, cancelled with no
+  fixture file changes, reopened and explicitly approved CPU image fitting with
+  idle waiting off. The report calculated 20751 model scalars,
+  166008 float64 layout bytes, 272314648 bytes memory reserve and
+  69048700 bytes additional disk reserve. Candidate eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee
+  completed on CPU with held-out pixel accuracy 1.0 on this primitive local
+  fixture, not a general image-quality claim. The app's reproducibility dialog
+  showed exact approval plus fresh admission/execution snapshots. After app/backend
+  restart the complete manifest reopened with exact equality. 12 image/earlier CPU
+  artifact hash checks remained unchanged. No external collection/download ran.
+- Verification: 560 Python tests passed with actual Metal regressions and warnings
+  as errors; 51 Flutter tests passed; analysis and diff checks clean. New tests cover
+  read-only shape estimates, stale/low-resource rejection, snapshot tampering,
+  caption-ridge Gram/target dimensions using local fixtures, and distinct image
+  approval UI. Caption-ridge resource math is unit-verified; this native run used
+  rendered shapes and does not claim live Commons pipeline verification. Evidence:
+  /tmp/almg-image-feasibility-native-qa/verification.json and native/test/build logs.
+- Remaining: native caption-ridge fixture coverage, measured CPU classifier/image
+  calibration and duration, broader neural/full-epoch feasibility, and Windows/CUDA
+  host verification. Unchanged hardware/user-action blockers remain open and skipped.
+  No generated/private artifacts, weights or unrelated edits are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

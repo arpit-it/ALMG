@@ -44,6 +44,7 @@ if __package__:
     from . import decoder_stream_training_feasibility
     from . import decoder_stream_training_measurements
     from . import classifier_feasibility
+    from . import image_feasibility
 else:
     import training_resources
     import lora_validation
@@ -78,6 +79,7 @@ else:
     import decoder_stream_training_feasibility
     import decoder_stream_training_measurements
     import classifier_feasibility
+    import image_feasibility
     import decoder_stream_previews
     import decoder_stream_evaluations
     import decoder_stream_archives
@@ -1853,6 +1855,9 @@ def run(job):
             if job.get('recipe','classifier')=='classifier' and job.get('classifier_feasibility'):
                 approved=job['classifier_feasibility']
                 job['classifier_execution_feasibility']=classifier_feasibility.admit(ROOT,job,rows,approved['settings'],approved)
+            if job.get('recipe')=='text_to_image' and job.get('image_feasibility'):
+                approved=job['image_feasibility']
+                job['image_execution_feasibility']=image_feasibility.admit(ROOT,job,rows,approved['settings'],approved)
             job["resource_check"] = training_resources.check(rows, ROOT)
             job["status"] = "training"
             store_job(job)
@@ -1893,8 +1898,9 @@ def run(job):
             else:
                 joblib.dump(model, work / "candidate.joblib")
             model_path = work / ("candidate.json" if job.get("recipe") == "text_to_image" else "candidate.joblib")
-            run_manifest.write(work, classifier_feasibility.attach_manifest(job,run_manifest.build(job, rows, metrics, model_path,
-                                                       recipe_contracts.export_metadata(job))))
+            manifest=run_manifest.build(job, rows, metrics, model_path,recipe_contracts.export_metadata(job))
+            manifest=classifier_feasibility.attach_manifest(job,manifest)
+            run_manifest.write(work,image_feasibility.attach_manifest(job,manifest))
             CANDIDATES[job["id"]] = (model, rows, metrics)
             job.update(status="preview_ready", metrics=metrics, examples=len(rows),
                        preview_count=0, candidate_directory=str(work))
@@ -1951,7 +1957,7 @@ def export_candidate(job, candidate):
                 joblib.dump(model, files / "model.joblib")
             work = ROOT / "training-sessions" / job["id"]
             if (work / "run-manifest.json").is_file():
-                manifest = classifier_feasibility.validate_manifest(run_manifest.read(work))
+                manifest = image_feasibility.validate_manifest(classifier_feasibility.validate_manifest(run_manifest.read(work)))
                 if manifest['dataset']['sha256'] != run_manifest.digest(rows) or manifest['evaluation_sha256'] != run_manifest.digest(metrics):
                     raise ValueError("Candidate dataset or evaluation changed after the run record was captured.")
                 if manifest['settings_sha256'] != run_manifest.digest(recipe_contracts.export_metadata(job)):
@@ -2236,7 +2242,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'error': 'A completed candidate is required.'}, 404)
             folder = ROOT / job['id'] if job['status'] == 'passed' else ROOT / 'training-sessions' / job['id']
             try:
-                return self.respond(classifier_feasibility.validate_manifest(run_manifest.read(folder)))
+                return self.respond(image_feasibility.validate_manifest(classifier_feasibility.validate_manifest(run_manifest.read(folder))))
             except ValueError as error:
                 return self.respond({'error': str(error)}, 409)
         with LOCK:
@@ -2703,6 +2709,8 @@ class Handler(BaseHTTPRequestHandler):
                     status = job["status"]
                     if action == 'classifier-feasibility' and status == 'dataset_ready':
                         return self.respond(classifier_feasibility.review(ROOT, job, TRAINING_DATA.get(job['id'], []), data))
+                    if action == 'image-feasibility' and status == 'dataset_ready':
+                        return self.respond(image_feasibility.review(ROOT,job,TRAINING_DATA.get(job['id'], []),data))
                     if action == 'plan-decoder-dataset' and status == 'factory_review':
                         if data.get('confirmed') is not True:
                             raise ValueError('Review the selected local dataset before planning.')
@@ -3244,6 +3252,10 @@ class Handler(BaseHTTPRequestHandler):
                             fresh=classifier_feasibility.admit(ROOT,job,TRAINING_DATA.get(job['id'], []),parameters,data.get('reviewed_feasibility'))
                             job['classifier_feasibility']=data.get('reviewed_feasibility') or fresh
                             job['classifier_admission_feasibility']=fresh
+                        if job.get('recipe')=='text_to_image':
+                            fresh=image_feasibility.admit(ROOT,job,TRAINING_DATA.get(job['id'], []),parameters,data.get('reviewed_feasibility'))
+                            job['image_feasibility']=data.get('reviewed_feasibility') or fresh
+                            job['image_admission_feasibility']=fresh
                         resources = training_resources.check(TRAINING_DATA.get(job["id"], []), ROOT)
                         POWER_INTERRUPTED_JOBS.discard(job["id"])
                         job.update(status="queued", **parameters, resource_check=resources, error=None)

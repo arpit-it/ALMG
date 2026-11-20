@@ -5597,12 +5597,15 @@ class _StudioPageState extends State<StudioPage> {
       'idle': _idle,
       if (!_imageRecipe) 'allow_repair': _allowRepair,
     };
-    if (!_imageRecipe) {
+    {
       setState(() => _busy = true);
       try {
-        final report = await _request('/jobs/$id/classifier-feasibility', parameters);
+        final report = await _request('/jobs/$id/${_imageRecipe ? 'image-feasibility' : 'classifier-feasibility'}', parameters);
         if (!mounted) return;
-        final approved = await showDialog<bool>(context: context, builder: (context) => CpuTrainingFeasibilityDialog(report: report));
+        final approved = await showDialog<bool>(context: context, builder: (context) => _imageRecipe
+          ? CpuTrainingFeasibilityDialog(report: report, title: 'CPU image recipe feasibility', approvalLabel: 'Approve CPU image training', recordLabel: 'View CPU image feasibility record',
+            description: 'This experimental 48×48 image recipe fits on CPU with NumPy/Pillow, without Metal or CUDA. External image collection requires separate approval. This is not diffusion training.')
+          : CpuTrainingFeasibilityDialog(report: report));
         if (approved != true || !mounted) return;
         parameters['reviewed_feasibility'] = report;
       } catch (error) {
