@@ -4450,6 +4450,58 @@ P3-LMF-03 partial progress · resumable iterative full-training-split byte BPE �
   polling. No external collection, downloads, weight changes, generated artifact
   commits or push; unrelated user edits and previous artifacts are preserved.
 
+P3-LMF-03 partial progress · full-index comparison of completed whole-split BPE fits · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed one-merge and iterative whole-training-split
+  BPE fits now offer separate full-index comparison and saved comparison inventory.
+  Typed references bind the fitting namespace/ID/revision and exact codec hash;
+  pending or mismatched fitting kinds reject before a report is created. The new
+  report format/namespace leaves existing sample-tokenizer comparisons unchanged.
+- Comparisons use the actual whole-split codecs' 65536-byte input limit rather than
+  the sample experiment's 4096-byte limit. They visit every unique record in saved
+  train/validation/test splits without refitting or expanding duplicate weights.
+  Reports retain full-population coverage, lossless-only efficiency, unsupported/
+  failure counts and bounded affected-record provenance without storing source text.
+  Input/index/fitting-manifest/codec signatures and hashes are checked around bounded
+  batches; code/runtime/permission changes preserve the last committed cursor/counts.
+  Same-byte codec rewrites during a batch also invalidate its signatures.
+- Native pause/restart/explicit resume use the existing comparison controls. Whole-
+  split fits and sample-fitted tokenizers retain their distinct record limits and
+  provenance; historical sample reports are not reinterpreted or rewritten. Positive
+  round trips do not establish contamination clearance, generated-model vocabulary
+  compatibility or training/release approval. Both remain explicitly disabled.
+- Local app verification: rebuilt native macOS ALMG on isolated fixture port 28847.
+  Reopened legacy sample report 31e6947b5b254fde8c3f06341e9701ad unchanged with its
+  original 4096-byte limit and 12 unsupported records. Cancel created no new report.
+  Confirmed iterative-codec comparison dc802c1d20e14524a60b4093859c0b28, paused at
+  90/413 records, restarted backend/app and reopened the exact saved record/revision.
+  Explicit resume completed all 413 records (319/47/47 by split) losslessly, including
+  all 12 records above 4096 bytes, with zero unsupported/failed/lossy records.
+- A second native scan, 0e18609755264786b4ff470429eb1073, completed the same full
+  index using the earlier one-merge codec and also round-tripped all records. Whole-
+  split training token counts were 42000 for the four-merge codec and 53733 for the
+  one-merge codec; independent per-record encoding matched both reports' split
+  record/token/byte counts. Codec hashes remained exactly those of the original
+  completed fits. All 24 original source/index/tokenizer/fitting/legacy-report files
+  remained byte-identical; no fit was advanced and no model trial existed. QA used
+  one-record batches for deterministic pause; production bounds stayed at 100.
+- Evidence: /tmp/almg-fitted-bpe-comparison-native-qa/ contains legacy sample JSON,
+  comparison consent, paused-fitted-comparison-ui.json,
+  restarted-paused-fitted-comparison-ui.json, complete-iterative-comparison-ui.json,
+  complete-one-merge-comparison-ui.json, verification.json, original fingerprints
+  and native build/restart/test logs.
+- Verification: 460 Python tests passed with ALMG_METAL_TESTS=1; 34 Flutter tests
+  passed; analysis/diff checks passed. New coverage independently checks full-record
+  encoding over 4 KiB for both completed codec kinds, no refitting/advancing fits,
+  typed/completed/review/permission gates, restart/idempotence, atomic-save failure,
+  codec/source tampering and same-byte mid-batch signature changes with saved
+  progress preserved. Existing sample comparisons and one-merge formats remain intact.
+- Remaining: larger-vocabulary full-split fitting, full-split character-BPE/Unigram
+  fitting and learned streamed-tokenizer model-input/admission integration remain
+  open. Larger-than-RAM ingestion and independent hardware/Windows/scratch-space
+  criteria stay unverified and were skipped without unchanged polling. No external
+  collection, downloads, weight changes, generated artifact commits or push;
+  unrelated user edits and all existing artifacts are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

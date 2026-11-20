@@ -2770,14 +2770,18 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _beginStreamTokenizerEvaluation(Map<String, dynamic> experiment) async {
+    final kind = experiment['format'] == 'almg-stream-iterative-bpe-fit-v1' ? 'iterative'
+      : experiment['format'] == 'almg-stream-bpe-fit-v1' ? 'one_merge' : null;
+    final path = kind == null ? '/decoder-stream-tokenizer-experiments/${experiment['id']}/evaluations'
+      : '/decoder-stream-fitted-tokenizers/$kind/${experiment['id']}/evaluations';
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
       title: const Text('Compare saved tokenizer across full index?'),
-      content: const Text('Read every saved record using the fitted codec without refitting. Save resumable split counts for coverage, lossless efficiency, lossy unknown replacement and unsupported records. Oversized records are counted without truncation. Source text is omitted from the report. This does not fit the full corpus, clear contamination or approve model training.'),
+      content: const Text('Read every saved record using the fitted codec without refitting. Save resumable split counts for coverage, lossless efficiency, lossy unknown replacement and unsupported records. Oversized records are counted without truncation. Source text is omitted from the report. The saved codec is not changed. This comparison does not clear contamination or approve model training.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
         TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm full-index tokenizer comparison'))]));
     if (confirmed != true || !mounted) return;
     try {
-      final record = await _request('/decoder-stream-tokenizer-experiments/${experiment['id']}/evaluations', {'confirmed': true, 'reviewed': experiment});
+      final record = await _request(path, {'confirmed': true, 'reviewed': experiment});
       if (mounted) await _runStreamTokenizerEvaluation(record);
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
@@ -2787,6 +2791,7 @@ class _StudioPageState extends State<StudioPage> {
       title: Text('Full-index tokenizer comparison · ${record['status']}'), scrollable: true,
       content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Text('${record['processed_records']} / ${record['total_records']} unique records compared'),
+        Text('Codec record limit: ${record['method']['maximum_encoded_record_bytes']} UTF-8 bytes'),
         const Text('The codec was not refitted. Efficiency uses lossless encoded records only; unsupported and lossy records remain explicit. Partial reports describe progress so far. This grants no model training approval.'),
         for (final entry in (record['splits'] as Map).entries)
           Text('${entry.key}: ${entry.value['lossless_records']}/${entry.value['records']} lossless · ${entry.value['unsupported_records']} unsupported · ${entry.value['lossy_records']} lossy · ${entry.value['encoding_failures']} encoding failures'),
@@ -2797,6 +2802,8 @@ class _StudioPageState extends State<StudioPage> {
   }
 
   Future<void> _runStreamTokenizerEvaluation(Map<String, dynamic> initial) async {
+    final route = initial['format'] == 'almg-stream-fitted-tokenizer-evaluation-v1'
+      ? 'decoder-stream-fitted-tokenizer-evaluations' : 'decoder-stream-tokenizer-evaluations';
     var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
     unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
       child: StatefulBuilder(builder: (context, update) {
@@ -2808,7 +2815,7 @@ class _StudioPageState extends State<StudioPage> {
       }))));
     try {
       while (!pause && record['status'] != 'complete') {
-        record = await _request('/decoder-stream-tokenizer-evaluations/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        record = await _request('/$route/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
         if (!mounted) return;
         refresh?.call(() {});
       }
@@ -2822,9 +2829,11 @@ class _StudioPageState extends State<StudioPage> {
     }
   }
 
-  Future<void> _savedStreamTokenizerEvaluations(String experimentId) async {
+  Future<void> _savedStreamTokenizerEvaluations(String experimentId, {String? fitKind}) async {
     try {
-      final reports = (await _request('/decoder-stream-tokenizer-experiments/$experimentId/evaluations'))['reports'] as List;
+      final path = fitKind == null ? '/decoder-stream-tokenizer-experiments/$experimentId/evaluations'
+        : '/decoder-stream-fitted-tokenizers/$fitKind/$experimentId/evaluations';
+      final reports = (await _request(path))['reports'] as List;
       if (!mounted) return;
       final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
         title: const Text('Saved full-index tokenizer comparisons'), children: [
@@ -2867,6 +2876,8 @@ class _StudioPageState extends State<StudioPage> {
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
       ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
         if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _exportWholeStreamBPE(record); }, child: const Text('Export private whole-split tokenizer')),
+        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _beginStreamTokenizerEvaluation(record); }, child: const Text('Compare fitted tokenizer across full index')),
+        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _savedStreamTokenizerEvaluations(record['id'] as String, fitKind: iterative ? 'iterative' : 'one_merge'); }, child: const Text('View fitted-tokenizer comparisons')),
         if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume whole-split BPE fitting'))]));
     if (resume == true && mounted) await _runWholeStreamBPE(record);
   }
