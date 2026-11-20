@@ -35,6 +35,9 @@ def review(root,identifier,execution_mode='fresh_process'):
     result['estimates']={**result['estimates'],'reference_optimizer_updates':0,
                          'recorded_training_optimizer_updates':result['config']['steps']-parent['completed_steps'],
                          'corpus_work_estimate':None,'isolated_corpus_memory':None}
+    if __package__:from . import decoder_corpus_phase_feedback
+    else:import decoder_corpus_phase_feedback
+    decoder_corpus_phase_feedback.apply(root,initialized,corpus,result,'training_resume')
     result['revision']=training.digest({k:v for k,v in result.items() if k!='revision'})
     return result
 

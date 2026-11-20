@@ -119,11 +119,17 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
         if (_resume) Text('Restore $_resumeLabel update ${_review![_trainingResume ? 'training_resume_from' : 'reference_resume_from']['completed_steps']} · remaining reference updates ${_review!['estimates']['reference_optimizer_updates']} · recorded training updates ${_review!['estimates']['recorded_training_optimizer_updates']}.'),
         Text(_review!['feasible'] == true ? 'Resources cover corpus optimizer reserves.' : 'Corpus optimizer cannot start.'),
         Text('Memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes · disk reserve: ${_review!['estimates']['required_free_disk_bytes']} bytes.'),
+        if (_resume) ...[
+          if (_review!['estimates']['isolated_phase_resume_memory'] case final Map memory) Text('Compatible measured resume peaks: RSS ${memory['isolated_process_peak_rss_bytes']} bytes · Metal ${memory['isolated_metal_peak_bytes']} bytes. Calculated floor: ${memory['calculated_memory_floor_bytes']} bytes; existing reserves never decrease.'),
+          if (_review!['estimates']['phase_resume_work_estimate'] case final Map work) Text('Estimated $_resumeLabel resume work: ${(work['estimated_seconds'] as num).toStringAsFixed(3)} s from ${work['sample_count']} compatible completed run(s). Exact retained source, revision, phase and counter only; canceled samples excluded. Includes worker setup and approved remaining work; excludes parent launch and queue/approval waits.')
+          else const Text('Resume work estimate unavailable: complete a compatible exact-source phase resume first.'),
+        ] else ...[
         if (_review!['estimates']['isolated_corpus_memory'] case final Map memory)
           Text('Compatible measured peaks: RSS ${memory['isolated_process_peak_rss_bytes']} bytes · Metal ${memory['isolated_metal_peak_bytes']} bytes. Calculated floor: ${memory['calculated_memory_floor_bytes']} bytes; the reserve never falls below the original calculation.'),
         if (_review!['estimates']['corpus_work_estimate'] case final Map work)
           Text('Estimated corpus workflow work: ${(work['estimated_seconds'] as num).toStringAsFixed(3)} s from ${work['sample_count']} compatible measured run(s). Heuristic includes both trajectories and worker setup; excludes parent launch and queue/approval waits.')
         else const Text('Corpus workflow estimate unavailable: complete a compatible isolated run first.'),
+        ],
         for (final reason in _review!['blockers'] as List) Text(reason as String),
         ExpansionTile(title: const Text('View corpus optimizer review'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],

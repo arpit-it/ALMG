@@ -133,4 +133,17 @@ void main() {
     await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
   });
 
+  testWidgets('resume reviews distinguish measured peaks and exact-phase work estimates', (tester) async {
+    for(final training in [false,true]) {
+      final label=training ? 'recorded training' : 'reference';
+      await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(key:ValueKey(label),initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},referenceResumeId:training ? null : 'retained',trainingResumeId:training ? 'retained' : null,request:(path,body) async => {'feasible':true,training ? 'training_resume_from' : 'reference_resume_from':{'completed_steps':2},'estimates':{'reference_optimizer_updates':training ? 0 : 18,'recorded_training_optimizer_updates':training ? 18 : 20,'isolated_phase_resume_memory':{'isolated_process_peak_rss_bytes':1000,'isolated_metal_peak_bytes':100,'calculated_memory_floor_bytes':1375},'phase_resume_work_estimate':{'estimated_seconds':.625,'sample_count':1}},'blockers':[]})));
+      await tester.tap(find.text('Review $label resume resources'));await tester.pumpAndSettle();
+      await tester.ensureVisible(find.textContaining('Estimated $label resume work: 0.625 s'));
+      expect(find.textContaining('Compatible measured resume peaks: RSS 1000 bytes'),findsOneWidget);
+      expect(find.textContaining('Exact retained source, revision, phase and counter only'),findsOneWidget);
+      expect(find.textContaining('Corpus workflow estimate unavailable'),findsNothing);
+      expect(find.textContaining('Estimated corpus workflow work:'),findsNothing);
+    }
+  });
+
 }

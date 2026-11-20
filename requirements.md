@@ -7539,6 +7539,51 @@ P3-LMF-06 partial progress · separately approved recorded-training resume · 20
   scope. Unchanged independent hardware/user-action blockers remain open and skipped;
   this bounded recovery slice establishes no language-quality or release acceptance.
 
+P3-LMF-05 partial progress · exact-source fresh corpus phase-resume feedback · 2026-11-21:
+- [ ] P3-LMF-05 remains open. Separately approved fresh corpus reference and recorded-
+  training resumes now derive resource reviews from compatible completed isolated
+  observations. Matching requires the exact retained source/revision/files and actual
+  counter, resume phase, corpus, optimizer/precision/model configuration, runtime,
+  producer and execution policy. Canceled/incomplete, shared-process, malformed,
+  changed-source/config/runtime/producer and other-phase samples are excluded.
+- Reviews show measured RSS/Metal peaks separately from a calculated memory floor
+  and heuristic remaining-work estimate. Time uses the maximum compatible observed
+  worker time plus 25% headroom. The memory floor uses maximum compatible RSS plus
+  maximum Metal peak with 25% headroom; it can only raise existing conservative
+  reserves. Raised floors that exceed current resources block before worker launch.
+  Samples come from the latest twenty verified corpus runs. These are exact-source
+  workflow estimates, not total wall-time bounds or larger-model predictions; parent
+  launch/admission and queue/approval waits remain excluded. Full fresh-run forecasts
+  remain separate and cannot consume either phase-resume profile.
+- Native verification used the rebuilt ALMG app and offline fixture backend on port
+  28915. Mixed FP16 AdamW reference resume from update 2 and recorded-training resume
+  from update 13 both began without estimates. Live cancellation at reference update
+  3 / training update 14 produced no estimate, and reviewing each new retained partial
+  also had no compatible forecast. Two unpaced completed resumes per original source
+  produced sample counts 1 then 2 with exact observed-time/max-peak calculations.
+  Final two-sample estimates were 0.899 s for reference resume and 0.889 s for recorded-
+  training resume; calculated measured-peak floors were 85,415,103 and 86,664,383 bytes.
+  Existing reserves never decreased. Completed models passed checkpoint/CPU checks.
+- After app/backend restart, the latest twenty saved corpus records reopened exactly
+  in native history, and both original-source reviews retained their exact two-sample
+  estimates/floors. Backend readers verified all 49 corpus/continuation records. All
+  445 retained files, including all original 404, stayed byte-identical. Evidence:
+  /tmp/almg-corpus-phase-feedback-native-qa/verification.json, native.log, restart.log,
+  and captured cold/canceled/different-partial/completed/feedback/restarted reviews.
+  No external collection occurred; generated QA artifacts and weights stay outside Git.
+- Validation: 642 Python tests passed with warnings as errors and Metal enabled;
+  all 83 Flutter tests passed and analysis was clean. New tests cover exact-source/
+  phase/counter matching, incompatible and invalid observations, conservative two-
+  sample maxima, real isolated phase execution, canceled/zero-update exclusion,
+  same-counter different partials, original-file preservation and calibrated-memory
+  rejection before process creation. UI tests distinguish estimates from measurements.
+- Remaining: broader model/budget profiling depends on expanded P3-LMF-06 engine
+  support beyond the current 16384-parameter and ten/twenty-update limits. Other
+  source/configuration/phase profiles require their own completed compatible samples.
+  Windows/CUDA has no available host; physical power/sleep/idle checks require user
+  action. These unchanged blockers remain open and skipped. Arbitrary durable process/
+  OS interruption recovery and broader quality/50M–100M acceptance remain in P3-LMF-06.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
