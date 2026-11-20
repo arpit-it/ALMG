@@ -4006,6 +4006,49 @@ P3-LMF-03 partial progress · approved byte-level BPE comparison experiments · 
   and were skipped without repeated checks. No downloads, weight/training-artifact
   modifications, generated artifact commits or push; unrelated user edits preserved.
 
+P3-LMF-03 partial progress · character BPE with explicit coverage gaps · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Tokenizer experiments now also support character-
+  alphabet BPE: its sorted NFC codepoint alphabet and deterministic pair merges
+  are learned exclusively from approved training records, under a configurable
+  32–512 vocabulary cap. Unknown held-out characters reject encoding without
+  adding vocabulary, refitting, substitution or an implicit unknown special token.
+  The fixed-byte BPE path remains separately available with complete byte coverage.
+- Split comparisons report encoded/total documents, uncovered codepoint counts,
+  character coverage and token efficiency only over encodable records. A split
+  with no encodable records has unavailable token counts/ratios and a false full-
+  split round-trip flag; training coverage is not presented as held-out coverage.
+  Both artifact types use checksum-bound manifests, separate approval/config
+  evidence, strict reload/export and model-training-disabled policy. Existing
+  version-one byte-BPE artifacts/configurations remain readable without rewriting.
+- Local app verification: rebuilt native macOS ALMG on fixture port 28838, preserving
+  the copied multilingual dataset and legacy byte-BPE artifact. Canceling character
+  fitting created no new experiment. Explicit 128-cap approval created experiment
+  05f676b60dfa47aab9d5efb1e7e1a9e6 with 26 alphabet entries + 41 merges = 67 tokens.
+  Three training records round-tripped (661 byte tokens / 12 character-BPE tokens).
+  Validation/test each had zero encodable records, 56/112 uncovered characters and
+  unavailable efficiency ratios, displayed explicitly in the native comparison.
+  This repetitive fixture does not establish general compression or model quality.
+- Independent checks verified the training-only alphabet/artifact, all coverage
+  counts and eligible-only denominators. Native private ZIP restored successfully
+  and round-tripped a novel combination of known multilingual training text;
+  uncovered Unicode still rejected without changing the vocabulary. All five
+  dataset/legacy-byte-artifact files stayed byte-identical. Backend/app restart
+  reopened both the legacy byte-BPE report and new character-BPE report exactly,
+  without refitting; no model training ran. Evidence:
+  /tmp/almg-character-bpe-native-qa/ (fitting-consent-ui.txt, experiment-ui.json,
+  comparison-ui.txt, export-consent-ui.txt, reopened-experiment-ui.json,
+  legacy-byte-ui.json, verification.json and build/restart/test logs).
+- Verification: 416 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed; Flutter analysis and diff checks passed. New tests cover golden Unicode-
+  alphabet merge IDs, NFC round trips, immutable unknown-character rejection,
+  invalid alphabet/merge/config/artifact inputs, training-only fitting, coverage
+  accounting, export and legacy byte-BPE compatibility.
+- Remaining: Unigram, configurable special/unknown tokens, larger/streamed fitting,
+  generated-model integration and tokenizer configuration saved with a model remain
+  open. Prior dataset/hardware/Windows/scratch-space blockers remain open and were
+  skipped without unchanged polling. No downloads, weight/training-artifact changes,
+  generated artifact commits or push; unrelated user edits preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
