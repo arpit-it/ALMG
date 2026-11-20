@@ -10,11 +10,12 @@ class DecoderOptimizerFixtureDialog extends StatefulWidget {
 
 class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureDialog> {
   String _optimizer = 'sgd';
+  int _accumulation = 1;
   final _rate = TextEditingController(text: '0.01');
   Map<String, dynamic>? _review;
   bool _busy = false;
   String? _error;
-  Map<String, dynamic> get _settings => {'schema_version': 1, 'optimizer': _optimizer, 'learning_rate': double.tryParse(_rate.text),
+  Map<String, dynamic> get _settings => {'schema_version': 2, 'gradient_accumulation_steps': _accumulation, 'optimizer': _optimizer, 'learning_rate': double.tryParse(_rate.text),
     'schedule': 'warmup_cosine', 'warmup_steps': 2, 'steps': 10, 'gradient_clip_norm': 1.0, 'weight_decay': _optimizer == 'adamw' ? 0.01 : 0.0};
   String get _path => '/decoder-architecture-plans/${widget.initialized['plan_id']}';
   @override void dispose() { _rate.dispose(); super.dispose(); }
@@ -55,13 +56,16 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
       const Text('Train this fresh initialization on generated token IDs for ten steps. Save a step-five model, optimizer moments and scheduler counter, restore them and compare with uninterrupted execution. Retain the trained model privately; original initialization stays unchanged. No text-corpus, large-model or release approval is established.'),
       DropdownButton<String>(value: _optimizer, items: const [DropdownMenuItem(value: 'sgd', child: Text('SGD')), DropdownMenuItem(value: 'adamw', child: Text('AdamW'))],
         onChanged: _busy ? null : (value) => setState(() { _optimizer = value!; _review = null; })),
+      DropdownButton<int>(value: _accumulation, items: const [DropdownMenuItem(value: 1, child: Text('1 microbatch per update')), DropdownMenuItem(value: 2, child: Text('2 microbatches per update'))],
+        onChanged: _busy ? null : (value) => setState(() { _accumulation = value!; _review = null; })),
+      const Text('Accumulation averages gradients by real target-token count, then clips and updates once. Optimizer/scheduler counters and checkpoint steps count updates, not microbatches.'),
       TextField(controller: _rate, enabled: !_busy, decoration: const InputDecoration(labelText: 'Learning rate (0 to 0.1, exclusive zero)'), onChanged: (_) => setState(() => _review = null)),
       const Text('FP32 Metal gradients, NumPy optimizer state; two warmup steps, cosine decay and global gradient clipping at 1.0. This fixture supports at most 16,384 parameters. Cancellation and independent checkpoint continuation are not exposed yet.'),
       if (_busy) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),
       if (_review != null) ...[
         Text(_review!['feasible'] == true ? 'Resources cover calculated optimizer fixture reserves.' : 'Optimizer fixture cannot start.'),
-        Text('Calculated optimizer-state bytes: ${_review!['estimates']['optimizer_state_bytes']} · memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes.'),
+        Text('Calculated optimizer-state bytes: ${_review!['estimates']['optimizer_state_bytes']} · accumulation buffer: ${_review!['estimates']['gradient_accumulation_buffer_bytes']} · memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes.'),
         for (final reason in _review!['blockers'] as List) Text(reason as String),
         ExpansionTile(title: const Text('View optimizer feasibility record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],

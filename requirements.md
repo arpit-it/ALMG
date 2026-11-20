@@ -6404,6 +6404,48 @@ P3-LMF-06 partial progress · versioned SGD/AdamW checkpointed optimizer fixture
   profiling and unavailable Windows/CUDA verification; unchanged hardware/user-
   action blockers remain skipped.
 
+P3-LMF-06 partial progress · versioned token-weighted gradient accumulation · 2026-11-20:
+- [ ] P3-LMF-06 remains open. The bounded optimizer fixture now accepts version-2
+  training settings with one or two microbatches per optimizer update. Gradients
+  are averaged by real target-token counts, then globally clipped once before one
+  SGD/AdamW update. Scheduler counters and checkpoint steps count optimizer updates,
+  not microbatches. Review accounts for an additional FP32 accumulation buffer and
+  rejects two-way accumulation when the initialized effective batch has one row.
+- Version-1 settings retain their original exact shape and implicitly execute one
+  full-batch microbatch. Existing checkpoint/artifact wrappers remain readable;
+  saved-history reads now validate the versioned config, restore optimizer/moment/
+  scheduler state, verify file hashes and reproduce trained-model CPU inference.
+  Changing accumulation in the app invalidates its previous resource review.
+- Native verification: rebuilt and ran ALMG with the isolated 8704-parameter
+  two-layer initialization. Both copied legacy v1 SGD/AdamW records and actual
+  checkpoints loaded unchanged before new writes. Explicitly reviewed and trained
+  two-microbatch SGD fixture 4a88f4fbc62640dca3b4eacb8afade62 and AdamW fixture
+  445d84b3e26b4a999bcbdd00e2b270b6. Each used two effective rows / one row per
+  microbatch, sixteen real targets per update, twenty microbatch backward calls in
+  the recorded ten-update trajectory, and a calculated 34816-byte accumulation
+  buffer. Initial accumulated gradients agreed with the full-batch gradient within
+  1.4901161193847656e-08. SGD loss fell 4.852477073669434 → 4.767636299133301;
+  AdamW loss fell to 3.6877036094665527 on the synthetic token-ID fixture.
+- Both restored checkpoint step five and finished optimizer/scheduler step ten;
+  final parameter and optimizer-state max errors versus uninterrupted accumulated
+  execution were 0.0. After app/backend restart all four v1/v2 records, checkpoint
+  restoration and saved-model CPU generation reopened exactly. All twenty optimizer
+  artifact files (including ten legacy copies), three source files and 45 prior
+  artifact files retained their hashes. Local evidence:
+  /tmp/almg-gradient-accumulation-native-qa/verification.json and native UI captures;
+  generated data, checkpoints and weights remain outside Git.
+- Validation: 589 Python tests passed with warnings as errors and Metal enabled,
+  61 Flutter tests passed, and analysis was clean. Coverage includes unequal
+  target-count weighting, empty/mismatched/nonfinite/overflowing gradients,
+  version/bounds rejection, incompatible effective-batch admission, both actual
+  accumulated Metal optimizers, update cadence, checkpoint state and UI review
+  invalidation. These fixture results do not establish general language quality.
+- Remaining: approved text-corpus/tokenizer integration, independent continuation/
+  cancellation, larger configurable sequence/batch/step budgets, validated mixed
+  precision, general interruption/resource monitoring and the profiled 50M–100M
+  target. P3-LMF-05 and unavailable hardware/user-action criteria stay open; unchanged
+  blockers remain skipped while this engine work progresses.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

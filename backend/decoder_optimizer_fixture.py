@@ -18,9 +18,12 @@ DEFAULT={'schema_version':1,'optimizer':'sgd','learning_rate':.01,'schedule':'wa
 
 
 def configuration(values):
-    if not isinstance(values,dict) or set(values)!=set(DEFAULT):raise ValueError('Provide every versioned optimizer fixture setting.')
+    if not isinstance(values,dict):raise ValueError('Provide every versioned optimizer fixture setting.')
+    keys=set(DEFAULT)|({'gradient_accumulation_steps'} if values.get('schema_version')==2 else set())
+    if set(values)!=keys:raise ValueError('Provide every versioned optimizer fixture setting.')
     c=dict(values)
-    if type(c['schema_version']) is not int or c['schema_version']!=1 or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose version-1 SGD or AdamW with warmup/cosine scheduling.')
+    if type(c['schema_version']) is not int or c['schema_version'] not in (1,2) or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose supported versioned SGD or AdamW with warmup/cosine scheduling.')
+    if type(c.get('gradient_accumulation_steps',1)) is not int or c.get('gradient_accumulation_steps',1) not in (1,2):raise ValueError('Choose one or two microbatches per optimizer update.')
     if type(c['steps']) is not int or c['steps']!=10 or type(c['warmup_steps']) is not int or not 0<=c['warmup_steps']<=3:raise ValueError('This fixture supports ten steps and zero to three warmup steps.')
     for key,maximum in (('learning_rate',.1),('gradient_clip_norm',10),('weight_decay',.1)):
         value=c[key]
@@ -35,6 +38,24 @@ def learning_rate(c,completed):
     if warmup and step<=warmup:return c['learning_rate']*step/warmup
     progress=(step-warmup)/(c['steps']-warmup)
     return c['learning_rate']*(.1+.9*.5*(1+math.cos(math.pi*progress)))
+
+
+
+def accumulate(pieces):
+    if not pieces:raise ValueError('At least one nonempty gradient microbatch is required.')
+    total=0;sums=None
+    for gradients,targets in pieces:
+        if type(targets) is not int or targets<=0 or not isinstance(gradients,dict) or not gradients:raise ValueError('Microbatches need positive real target-token counts and gradients.')
+        values={name:np.asarray(value,dtype=np.float32) for name,value in gradients.items()}
+        if any(not np.isfinite(value).all() for value in values.values()):raise ValueError('Nonfinite microbatch gradients cannot accumulate.')
+        if sums is None:sums={name:np.zeros_like(value) for name,value in values.items()}
+        if set(sums)!=set(values) or any(sums[name].shape!=value.shape for name,value in values.items()):raise ValueError('Microbatch gradient names/shapes must match.')
+        try:
+            with np.errstate(over='raise',invalid='raise'):
+                for name,value in values.items():sums[name]+=value*targets
+        except FloatingPointError as error:raise ValueError('Accumulated gradients overflowed; no update is allowed.') from error
+        total+=targets
+    return {name:(value/total).astype(np.float32) for name,value in sums.items()}
 
 
 def update(parameters,gradients,state,c):
@@ -88,7 +109,11 @@ def review(root,plan_id,initialized,settings):
     profile=hardware.hardware(root);estimates=hardware.estimate(current['config'],json_bytes);moments=current['actual_weight_bytes']*(2 if c['optimizer']=='adamw' else 0)
     estimates.update(optimizer_state_bytes=moments,optimizer_location='numpy_cpu_float32',required_available_memory_bytes=estimates['required_available_memory_bytes']+moments*4,
                      required_free_disk_bytes=estimates['required_free_disk_bytes']+max(2*1024**2,current['actual_weight_bytes']*128))
+    effective_rows=min(2,current['config']['batch_size']);accumulation=c.get('gradient_accumulation_steps',1)
+    estimates.update(effective_batch_rows=effective_rows,microbatch_rows=effective_rows//accumulation if effective_rows%accumulation==0 else None,gradient_accumulation_steps=accumulation,gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if accumulation>1 else 0)
+    estimates['required_available_memory_bytes']+=current['actual_weight_bytes']*2 if accumulation>1 else 0
     reasons=list(profile['errors'])
+    if effective_rows%accumulation:reasons.append('Two-way accumulation requires at least two effective rows; initialize a compatible batch-size plan.')
     if profile['system']!='Darwin' or profile['machine']!='arm64' or not profile['metal_available']:reasons.append('Apple silicon with MLX Metal is required for gradients; the optimizer uses FP32 NumPy arrays.')
     if not hardware._fits(profile,estimates):reasons.append('Current memory/disk does not cover optimizer fixture reserves.')
     record={'format':'almg-optimizer-fixture-review-v1','schema_version':1,'source':{'plan_id':plan_id,'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
@@ -121,11 +146,24 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
     with mx.stream(mx.gpu):
         _,loss,gradient=backward.metal_functions(shape,mx);tx=mx.array(x);ty=mx.array(y);tm=mx.array(mask)
         def score(values,shift=0):return float(loss({name:mx.array(value) for name,value in values.items()},mx.array((x+shift)%shape['vocab_size']),mx.array((y+shift)%shape['vocab_size']),tm).item())
+        accumulation=c.get('gradient_accumulation_steps',1)
+        def full_gradient(values,inputs=tx,targets=ty,weights=tm):
+            gradients=gradient({name:mx.array(value) for name,value in values.items()},inputs,targets,weights);mx.eval(gradients)
+            return {name:np.array(value) for name,value in gradients.items()}
+        def accumulated_gradient(values):
+            if accumulation==1:return full_gradient(values)
+            pieces=[]
+            for inputs,targets,weights in zip(np.array_split(x,accumulation),np.array_split(y,accumulation),np.array_split(mask,accumulation)):
+                pieces.append((full_gradient(values,mx.array(inputs),mx.array(targets),mx.array(weights)),int(weights.sum())))
+            return accumulate(pieces)
+        original_gradient=full_gradient(source);accumulated=accumulated_gradient(source)
+        gradient_error=max(float(np.max(np.abs(original_gradient[name]-accumulated[name]))) for name in original_gradient)
+        if gradient_error>1e-5:raise ValueError('Accumulated gradients do not match the effective full batch within FP32 tolerance.')
         def optimize(values,state,end):
             logs=[]
             while state['step']<end:
-                grads=gradient({name:mx.array(value) for name,value in values.items()},tx,ty,tm);mx.eval(grads)
-                values,state,entry=update(values,{name:np.array(value) for name,value in grads.items()},state,c);logs.append(entry)
+                grads=accumulated_gradient(values)
+                values,state,entry=update(values,grads,state,c);entry.update(microbatches=accumulation,target_tokens=int(mask.sum()));logs.append(entry)
             return values,state,logs
         initial=score(source);validation_initial=score(source,1);empty={'step':0,'m':{},'v':{}}
         uninterrupted,reference_state,_=optimize(source,empty,10)
@@ -140,7 +178,7 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
     if initializations.read(root,plan_id,initialized['id'])!=initialized or file_digest(initializations._folder(root,plan_id)/initialized['id']/'model.json')!=current['source']['model_sha256']:raise ValueError('Source initialization changed during optimizer training; retained artifacts need review.')
     record={'format':'almg-decoder-optimizer-fixture-v1','schema_version':1,'id':identifier,'created_at':datetime.now(timezone.utc).isoformat(),'review':current,'approved_review':approved,
         'initial_train_loss':initial,'final_train_loss':final,'initial_validation_loss':validation_initial,'final_validation_loss':validation_final,
-        'optimizer':c,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':first+last,'checkpoint_restored_steps':5,'checkpoint_optimizer_max_error':moment_error,'checkpoint_parameter_max_error':resume_error,
+        'optimizer':c,'gradient_accumulation_steps':accumulation,'effective_batch_rows':rows,'microbatch_rows':rows//accumulation,'full_batch_gradient_max_error':gradient_error,'microbatch_backward_calls_in_recorded_trajectory':c['steps']*accumulation,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':first+last,'checkpoint_restored_steps':5,'checkpoint_optimizer_max_error':moment_error,'checkpoint_parameter_max_error':resume_error,
         'generated_token_ids':generated,'inference_runtime':'planned_decoder_numpy_cpu','pretrained_student_weights_loaded':False,'updated_weights_saved':True,'initialization_modified':False,'training_approved':True,'release_approved':False,
         'limitations':'Generated token-ID smoke fixture only; no text corpus/tokenizer, full-epoch training, general model quality, large-model or mixed-precision claim. Cancellation and independent checkpoint continuation are not yet exposed.',
         'files':{str(path.relative_to(directory)):file_digest(path) for path in directory.rglob('*') if path.is_file()}}
@@ -151,9 +189,10 @@ def read(root,identifier):
     directory=_folder(root,identifier)
     if (directory/'record.json').stat().st_size>128000:raise ValueError('Optimizer fixture record exceeds size limit.')
     record=json.loads((directory/'record.json').read_text())
-    if (record.get('format')!='almg-decoder-optimizer-fixture-v1' or record.get('id')!=identifier or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
+    if (record.get('format')!='almg-decoder-optimizer-fixture-v1' or record.get('schema_version')!=1 or record.get('id')!=identifier or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
         or set(record['files'])!={'step-5/model.json','step-5/optimizer.json','step-5/checkpoint.json','trained-model.json'}
         or any(file_digest(directory/name)!=sha for name,sha in record['files'].items()) or _generate(PlannedDecoder.load(directory/'trained-model.json'))!=record['generated_token_ids']):raise ValueError('Optimizer fixture artifact or inference binding changed.')
+    restore(directory/'step-5',configuration(record['optimizer']),record['review']['revision'])
     return record
 
 

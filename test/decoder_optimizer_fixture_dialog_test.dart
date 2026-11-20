@@ -16,5 +16,12 @@ void main() {
     expect(find.text('Train and save optimizer fixture'), findsNothing);
     await tester.tap(find.text('Review optimizer fixture')); await tester.pumpAndSettle();
     expect((requests.last['settings'] as Map)['optimizer'], 'adamw');
+    await tester.ensureVisible(find.text('1 microbatch per update'));
+    await tester.tap(find.text('1 microbatch per update')); await tester.pumpAndSettle();
+    await tester.tap(find.text('2 microbatches per update').last); await tester.pumpAndSettle();
+    expect(find.text('Train and save optimizer fixture'), findsNothing);
+    await tester.tap(find.text('Review optimizer fixture')); await tester.pumpAndSettle();
+    expect((requests.last['settings'] as Map)['schema_version'], 2);
+    expect((requests.last['settings'] as Map)['gradient_accumulation_steps'], 2);
   });
 }

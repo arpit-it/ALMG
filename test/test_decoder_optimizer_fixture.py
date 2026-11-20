@@ -64,3 +64,40 @@ class DecoderOptimizerFixtureTests(unittest.TestCase):
                 self.assertFalse(report['pretrained_student_weights_loaded']);self.assertTrue(report['updated_weights_saved']);self.assertFalse(report['release_approved'])
                 self.assertEqual(fixture.read(root,report['id']),report);self.assertTrue(all(p.read_bytes()==value for p,value in before.items()))
             self.assertEqual(len(fixture.history(root,plan['id'],source['id'])),2)
+
+    def test_v2_accumulation_is_token_weighted_and_legacy_config_remains_exact(self):
+        self.assertEqual(fixture.configuration(dict(fixture.DEFAULT)),fixture.DEFAULT)
+        c={**fixture.DEFAULT,'schema_version':2,'gradient_accumulation_steps':2}
+        self.assertEqual(fixture.configuration(c)['gradient_accumulation_steps'],2)
+        for value in (0,3,True):
+            with self.assertRaises(ValueError):fixture.configuration({**c,'gradient_accumulation_steps':value})
+        with self.assertRaises(ValueError):fixture.configuration({**fixture.DEFAULT,'gradient_accumulation_steps':2})
+        result=fixture.accumulate([({'weight':np.array([1.,3.],np.float32)},3),({'weight':np.array([9.,1.],np.float32)},1)])
+        np.testing.assert_array_equal(result['weight'],np.array([3.,2.5],np.float32))
+        for pieces in ([],[({'w':np.ones(2)},0)],[({'w':np.ones(2)},1),({'other':np.ones(2)},1)],[({'w':np.ones(2)},1),({'w':np.ones(3)},1)],[({'w':np.array([float('nan')])},1)],[({'w':np.array([1e38],np.float32)},10)]):
+            with self.assertRaises(ValueError):fixture.accumulate(pieces)
+
+    def test_accumulation_resource_review_rejects_an_incompatible_effective_batch(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);plan=plans.save(root,True,plans.review({**plans.DEFAULT,'batch_size':1}));source=initializations.run(root,plan['id'],True,plan)
+            settings={**fixture.DEFAULT,'schema_version':2,'gradient_accumulation_steps':2}
+            review=fixture.review(root,plan['id'],source,settings)
+            self.assertFalse(review['feasible']);self.assertIsNone(review['estimates']['microbatch_rows'])
+            with self.assertRaises(ValueError):fixture.run(root,plan['id'],True,source,settings,review)
+            self.assertFalse((root/'decoder-optimizer-fixtures').exists())
+
+    @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS')=='1','Requires real accumulated Metal gradients')
+    def test_two_microbatches_match_full_gradient_and_advance_one_optimizer_step(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);plan,source=self.source(root)
+            for optimizer in ('sgd','adamw'):
+                c={**fixture.DEFAULT,'schema_version':2,'gradient_accumulation_steps':2,'optimizer':optimizer,'weight_decay':.01 if optimizer=='adamw' else 0.0}
+                approved=fixture.review(root,plan['id'],source,c);self.assertEqual(approved['estimates']['microbatch_rows'],1)
+                self.assertEqual(approved['estimates']['gradient_accumulation_buffer_bytes'],source['actual_weight_bytes'])
+                report=fixture.run(root,plan['id'],True,source,c,approved)
+                self.assertEqual(report['completed_steps'],10);self.assertEqual(report['scheduler_completed_steps'],10)
+                self.assertEqual(report['microbatch_backward_calls_in_recorded_trajectory'],20)
+                self.assertEqual([entry['step'] for entry in report['step_log']],list(range(1,11)))
+                self.assertTrue(all(entry['microbatches']==2 and entry['target_tokens']==16 for entry in report['step_log']))
+                self.assertLessEqual(report['full_batch_gradient_max_error'],1e-5);self.assertLessEqual(report['checkpoint_parameter_max_error'],1e-7)
+                self.assertLessEqual(report['checkpoint_optimizer_max_error'],1e-7);self.assertEqual(fixture.read(root,report['id']),report)
