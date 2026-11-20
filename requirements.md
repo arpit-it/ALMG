@@ -3878,6 +3878,44 @@ P3-LMF-02 partial progress · summary-only streamed approach planning · 2026-11
   skipped without unchanged polling. No external collection, weights/artifact
   modification, generated artifact commit or push; unrelated user edits preserved.
 
+P3-LMF-02 partial progress · bound live-Qwen streamed planning evidence · 2026-11-20:
+- [ ] P3-LMF-02 remains open. New streamed approach plans bind the canonical
+  planner-adapter input (system instructions plus summary-only context), registered
+  recipe catalog and validated JSON result to SHA-256 fingerprints. Request
+  mutation during planning rejects publication. A provider identifying as local
+  Qwen must report a loaded model name and a verified 64-hex weights revision;
+  missing/unloaded/unverified identity rejects without saving a plan. Existing
+  version-one plans without these additive fingerprints remain readable.
+- Local app verification closed the previous synthetic native workflow's live
+  Qwen verification gap: rebuilt native macOS ALMG on isolated fixture port 28835
+  used the already downloaded, verified mlx-community/Qwen3.8-27B-4bit checkpoint,
+  without a scripted planner, download or weight modification. A synthetic offline
+  research goal produced plan 8c165389ae0d4a2d80772bdd4dba8417 recommending
+  from_scratch via registered decoder_from_scratch. Saved provider was local_qwen,
+  loaded=true with verified weights revision
+  9a6194da35d6e590c38d8ce1076fc48e86197d45ce21e38dddf5180a5cc4f107.
+- Captured adapter request and actual Qwen JSON result independently matched the
+  saved fingerprints; input contained only the allowed dataset counts/evidence
+  revisions and recipe catalog, with no source text or token arrays. Explicit
+  acknowledgment kept execution/training/release flags false; no trial/model was
+  created. Backend/app restart reopened the identical saved plan without another
+  inference request. All 18 source fixture files stayed byte-identical and all
+  checkpoint file fingerprints stayed unchanged. The isolated inference process
+  was restarted to release its loaded model while preserving weights/artifacts.
+- Evidence: /tmp/almg-live-stream-plan-native-qa/ (plan-ui.json,
+  reopened-plan-ui.json, planner-request.json, planner-result.json, receipt-ui.json,
+  verification.json, weights-before.json and build/restart/test logs). Generated
+  plans, traces, datasets and model files are excluded from Git.
+- Verification: 407 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed, Flutter analysis and diff checks passed. Tests verify exact request/
+  catalog/result digests, mutated-request rejection, verified local-Qwen identity
+  requirements and legacy plan readability, alongside existing approval rejection.
+- Remaining: this verifies approach planning on one synthetic dataset/goal, not
+  streamed trial execution, model quality, scheduling or checkpoint cursor recovery.
+  Broader mixing/incremental policies and larger-than-RAM acceptance remain open.
+  Unchanged physical power/Windows and safe scratch-space blockers were skipped
+  without polling. User changes and training artifacts were preserved; no push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

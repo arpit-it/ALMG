@@ -1,5 +1,6 @@
 """Summary-only streamed dataset approach plans; no execution or training approval."""
 import json
+import re
 from pathlib import Path
 import uuid
 
@@ -32,21 +33,33 @@ def propose(root,window_id,confirmed,reviewed,goal,planner,planner_identity=None
     summary={key:record[key] for key in ('id','revision','index_id','index_revision','tokenizer_id','tokenizer_revision',
                                        'overlap_id','overlap_revision','total_records','window_counts','target_tokens')}
     implementation=file_digest(Path(__file__))
-    result=planner('Recommend one approach: from_scratch, fine_tuning, distillation, or retrieval. '
+    system=('Recommend one approach: from_scratch, fine_tuning, distillation, or retrieval. '
         'Return recipe (a registered ID), approach and a short reason. This is a summary-only streamed dataset plan: '
         'full streamed trial execution, scheduling and checkpoint recovery are unavailable. Do not claim execution or training approval. '
-        'The overlap gate is lexical and does not prove cleanliness, source permission or model quality. No source text or token arrays are provided.',
-        {'goal':goal.strip(),'dataset_summary':summary,'registered_recipes':catalog,'streamed_execution_available':False})
+        'The overlap gate is lexical and does not prove cleanliness, source permission or model quality. No source text or token arrays are provided.')
+    context={'goal':goal.strip(),'dataset_summary':summary,'registered_recipes':catalog,'streamed_execution_available':False}
+    request_sha256=digest({'system':system,'data':context})
+    catalog_sha256=digest(catalog)
+    result=planner(system,context)
     if not isinstance(result,dict) or not isinstance(result.get('recipe'),str) or result['recipe'] not in available:raise ValueError('The planner selected an unavailable registered recipe.')
     if result.get('approach') not in ('from_scratch','fine_tuning','distillation','retrieval'):raise ValueError('The planner returned an unsupported approach.')
     if not isinstance(result.get('reason'),str) or not 1<=len(result['reason'].strip())<=600:raise ValueError('The planner must provide a short explanation.')
     if (batches._validated(root,window_id,reviewed)!=record or recipe_contracts.planning_catalog('decoder_trial')!=catalog
-            or file_digest(Path(__file__))!=implementation):raise ValueError('Streamed planning evidence changed. Request a fresh plan.')
+            or file_digest(Path(__file__))!=implementation
+            or digest({'system':system,'data':context})!=request_sha256):raise ValueError('Streamed planning evidence changed. Request a fresh plan.')
+    identity=planner_identity() if planner_identity else {'provider':'unspecified'}
+    if not isinstance(identity,dict):raise ValueError('The planner identity is unavailable; no plan published.')
+    if identity.get('provider')=='local_qwen' and (
+            identity.get('loaded') is not True or not isinstance(identity.get('model'),str) or not identity['model'].strip()
+            or not isinstance(identity.get('verified_weights_revision'),str)
+            or re.fullmatch('[a-f0-9]{64}',identity['verified_weights_revision']) is None):
+        raise ValueError('Local Qwen must report its loaded, verified weights revision; no plan published.')
     plan={'format':'almg-stream-approach-plan-v1','schema_version':1,'id':uuid.uuid4().hex,
           'windows_id':window_id,'windows_revision':record['revision'],'goal':goal.strip(),
           'recipe':result['recipe'],'recipe_contract':available[result['recipe']],
           'approach':result['approach'],'reason':result['reason'].strip(),'dataset_summary':summary,
-          'planner':planner_identity() if planner_identity else {'provider':'unspecified'},
+          'planner':identity,'planner_request':{'version':1,'summary_only':True,'sha256':request_sha256,
+              'recipe_catalog_sha256':catalog_sha256,'validated_result_sha256':digest(result)},
           'implementation_sha256':implementation,'executable':False,'training_approved':False,'release_approved':False,
           'limitations':'Approach planning only. Full streamed training, scheduling and checkpoint recovery are unavailable. Acknowledgment is not execution consent.'}
     plan['revision']=digest(plan);folder=_folder(root,plan['id']);folder.mkdir(parents=True)

@@ -5,6 +5,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch,Mock
 from backend import decoder_stream_plans as plans,decoder_trials
+from backend.run_manifest import digest
 
 
 def record():
@@ -18,7 +19,10 @@ class StreamPlanTests(unittest.TestCase):
         review=record();planner=Mock(return_value={'recipe':'decoder_from_scratch','approach':'from_scratch','reason':'Inspect the dataset before a future local trial.'})
         with TemporaryDirectory() as root,patch.object(plans.batches,'_validated',return_value=review):
             plan=plans.propose(root,review['id'],True,review,'Synthetic local planning goal',planner,lambda:{'provider':'scripted_local_fixture'})
-            context=planner.call_args.args[1]
+            system,context=planner.call_args.args
+            self.assertEqual(plan['planner_request']['sha256'],digest({'system':system,'data':context}))
+            self.assertEqual(plan['planner_request']['recipe_catalog_sha256'],digest(context['registered_recipes']))
+            self.assertEqual(plan['planner_request']['validated_result_sha256'],digest(planner.return_value))
             self.assertEqual(context['dataset_summary'],review);self.assertFalse(context['streamed_execution_available'])
             self.assertEqual(set(context),{'goal','dataset_summary','registered_recipes','streamed_execution_available'})
             self.assertFalse(plan['executable']);self.assertFalse(plan['training_approved'])
@@ -58,3 +62,25 @@ class StreamPlanTests(unittest.TestCase):
             path=plans._folder(root,plan['id'])/'plan.json';path.write_text(json.dumps(dict(plan,executable=True)))
             with self.assertRaises(ValueError):plans.read(root,plan['id'])
             self.assertEqual(plans.list_plans(root,review['id'],True),[])
+
+
+    def test_local_qwen_requires_loaded_verified_identity_and_mutated_requests_reject(self):
+        review=record();result={'recipe':'decoder_from_scratch','approach':'from_scratch','reason':'A local approach plan.'}
+        with TemporaryDirectory() as root,patch.object(plans.batches,'_validated',return_value=review):
+            for identity in ({'provider':'local_qwen','loaded':False},
+                             {'provider':'local_qwen','loaded':True,'model':'local','verified_weights_revision':'invalid'}):
+                with self.assertRaisesRegex(ValueError,'loaded, verified'):
+                    plans.propose(root,review['id'],True,review,'goal',lambda *args:result,lambda:identity)
+            def mutate(system,context):
+                context['goal']='changed';return result
+            with self.assertRaisesRegex(ValueError,'evidence changed'):
+                plans.propose(root,review['id'],True,review,'goal',mutate)
+            self.assertFalse((Path(root)/'decoder-stream-plans').exists())
+            identity={'provider':'local_qwen','loaded':True,'model':'local','verified_weights_revision':'f'*64}
+            plan=plans.propose(root,review['id'],True,review,'goal',lambda *args:result,lambda:identity)
+            self.assertEqual(plan['planner'],identity);self.assertFalse(plan['executable'])
+            # Version-one plans created before request fingerprints remain readable.
+            legacy={key:value for key,value in plan.items() if key not in ('planner_request','revision')}
+            legacy['revision']=digest(legacy)
+            (plans._folder(root,plan['id'])/'plan.json').write_text(json.dumps(legacy))
+            self.assertEqual(plans.read(root,plan['id']),legacy)
