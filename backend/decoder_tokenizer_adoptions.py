@@ -7,11 +7,13 @@ from tempfile import TemporaryDirectory
 import uuid
 
 if __package__:
+    from .decoder_recipe import VOCABULARY_LIMIT
     from . import decoder_datasets as datasets, decoder_tokenizer_experiments as experiments
     from . import decoder_tokenizer_compatibility as compatibility
     from .decoder_model_tokenizer import ModelTokenizer
     from .run_manifest import digest, file_digest
 else:
+    from decoder_recipe import VOCABULARY_LIMIT
     import decoder_datasets as datasets
     import decoder_tokenizer_experiments as experiments
     import decoder_tokenizer_compatibility as compatibility
@@ -30,8 +32,8 @@ def adopt(root, identifier, confirmed, reviewed, reviewed_dataset):
         raise ValueError('The dataset review changed. Reopen it before tokenizer selection.')
     # Oversized vocabularies cannot be represented by this registered decoder.
     size = record['vocabulary_size']
-    if not 4 <= size <= 256:
-        raise ValueError('Tokenizer selection requires 4 to 256 actual IDs, including special tokens.')
+    if not 4 <= size <= VOCABULARY_LIMIT:
+        raise ValueError('Tokenizer selection requires 4 to 512 actual IDs, including special tokens.')
     report = compatibility.review(root, identifier, record, {'vocab_size':size})
     if not report['vocabulary_and_lossless_checks_passed']:
         raise ValueError('Tokenizer selection blocked: every saved split must encode losslessly without UNK replacement.')

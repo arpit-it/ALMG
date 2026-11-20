@@ -46,8 +46,11 @@ class CompatibilityTests(unittest.TestCase):
         with TemporaryDirectory() as root:
             _, large = self.prepare(root, multilingual=True, algorithm='byte_level_bpe', vocabulary_cap=320)
             report = compatibility.review(root, large['id'], large, {'vocab_size':256})
-            self.assertEqual({b['code'] for b in report['compatibility_blockers']}, {'recipe_vocabulary_limit','vocabulary_mismatch'})
+            self.assertEqual({b['code'] for b in report['compatibility_blockers']}, {'vocabulary_mismatch'})
             self.assertTrue(all(s['lossless'] for s in report['splits'].values()))
+            matching=compatibility.review(root,large['id'],large,{'vocab_size':large['vocabulary_size']})
+            self.assertTrue(matching['vocabulary_and_lossless_checks_passed'])
+            self.assertEqual(matching['recipe']['architecture_version'],2)
             _, lossy = self.prepare(root, multilingual=True, algorithm='unigram',
                                     special_tokens={'unk':'<UNK>'}, unknown_policy='replace')
             report = compatibility.review(root, lossy['id'], lossy, {'vocab_size':lossy['vocabulary_size']})
@@ -59,7 +62,7 @@ class CompatibilityTests(unittest.TestCase):
     def test_stale_reviews_invalid_dimensions_changed_source_and_wrong_training_provenance(self):
         with TemporaryDirectory() as root:
             dataset, record = self.prepare(root)
-            for config in ({}, {'vocab_size':True}, {'vocab_size':3}, {'vocab_size':257}, {'vocab_size':32,'width':8}):
+            for config in ({}, {'vocab_size':True}, {'vocab_size':3}, {'vocab_size':513}, {'vocab_size':32,'width':8}):
                 with self.assertRaises(ValueError): compatibility.review(root, record['id'], record, config)
             with self.assertRaisesRegex(ValueError, 'review changed'):
                 compatibility.review(root, record['id'], {}, {'vocab_size':32})

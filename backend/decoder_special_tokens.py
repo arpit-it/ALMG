@@ -65,7 +65,9 @@ class SpecialTokenizer:
         if add_boundaries and 'eos' in self.special_ids:tokens.append(self.special_ids['eos'])
         return tokens
 
-    def decode(self,tokens,*,skip_special_tokens=True):
+    def decode(self,tokens,*,skip_special_tokens=True,byte_errors='strict'):
+        if byte_errors not in ('strict','replace') or (byte_errors!='strict' and type(self.base) is not ByteBPE):
+            raise ValueError('Explicit byte replacement decoding requires a byte-BPE base.')
         if (type(skip_special_tokens) is not bool or not isinstance(tokens,list) or not 1<=len(tokens)<=4100
                 or any(type(value) is not int or not 0<=value<len(self.pieces) for value in tokens)):
             raise ValueError('Provide bounded IDs and an explicit special-token decode policy.')
@@ -76,7 +78,8 @@ class SpecialTokenizer:
             if size>262144:raise ValueError('Decoded special-token text exceeds its bound.')
             parts.append(text)
         def flush():
-            if pending:append(self.base.decode(pending));pending.clear()
+            if pending:
+                append(self.base.decode(pending,errors=byte_errors) if type(self.base) is ByteBPE else self.base.decode(pending));pending.clear()
         for value in tokens:
             role=roles.get(value)
             if role is None:pending.append(value);continue

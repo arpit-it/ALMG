@@ -49,7 +49,8 @@ def specification(dataset=None):
     if dataset is not None:
         spec.update(scope='reviewed_local_text_trial', dataset_id=dataset['id'],
                     dataset_manifest_sha256=run_manifest.digest(dataset))
-        spec['recipe_contract']['pipeline'] = decoder_bundle.pipeline_for((dataset.get('tokenizer') or {}).get('format'))
+        spec['recipe_contract']['pipeline'] = decoder_bundle.pipeline_for((dataset.get('tokenizer') or {}).get('format'),
+            {'vocab_size':dataset['tokenizer']['vocabulary_size']} if (dataset.get('tokenizer') or {}).get('format') == 'almg-reviewed-model-tokenizer-v1' else None)
     return spec
 
 
@@ -190,10 +191,11 @@ def infer_bundle(bundle_path, prompt, max_new_tokens):
                 generated.append(token)
     except FloatingPointError as error:
         raise ValueError('The private decoder produced invalid inference scores.') from error
+    decode_preview = getattr(tokenizer,'decode_preview',tokenizer.decode)
     result = {'schema_version': 1, 'id': uuid.uuid4().hex,
               'created_at': datetime.now(timezone.utc).isoformat(),
-              'prompt': prompt.strip(), 'completion': tokenizer.decode(generated),
-              'text': tokenizer.decode(tokens), 'generated_token_ids': generated,
+              'prompt': prompt.strip(), 'completion': decode_preview(generated),
+              'text': decode_preview(tokens), 'generated_token_ids': generated,
               'bundle_manifest_sha256': run_manifest.digest(manifest),
               'inference': {'version': 1, 'algorithm': 'greedy', 'runtime': 'numpy_cpu',
                             'max_new_tokens': max_new_tokens, 'context_policy': 'sliding_window',

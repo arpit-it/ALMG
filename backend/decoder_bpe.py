@@ -64,12 +64,13 @@ class ByteBPE:
         for rank,pair in enumerate(self.merges):tokens=self._merge(tokens,tuple(pair),256+rank)
         return tokens
 
-    def decode(self,tokens):
+    def decode(self,tokens,*,errors='strict'):
+        if errors not in ('strict','replace'):raise ValueError('Choose strict or explicit replacement UTF-8 decoding.')
         if (not isinstance(tokens,list) or not 1<=len(tokens)<=4096
                 or any(type(value) is not int or not 0<=value<len(self.pieces) for value in tokens)):
             raise ValueError('Provide bounded token IDs from this BPE vocabulary.')
         if sum(len(self.pieces[value]) for value in tokens)>4096:raise ValueError('Decoded BPE text exceeds 4096 bytes.')
-        return b''.join(self.pieces[value] for value in tokens).decode('utf-8')
+        return b''.join(self.pieces[value] for value in tokens).decode('utf-8',errors=errors)
 
     def artifact(self):
         return {'format':'almg-byte-bpe-tokenizer-v1','schema_version':1,'normalization':'NFC',
@@ -88,5 +89,4 @@ class ByteBPE:
     def validate_current_model(self,config):
         if not isinstance(config,dict) or type(config.get('vocab_size')) is not int or config['vocab_size']!=len(self.pieces):
             raise ValueError('Model vocabulary size must exactly match the BPE artifact.')
-        if len(self.pieces)>256:raise ValueError('The current decoder supports at most 256 tokens; learned BPE requires a future compatible architecture.')
         raise ValueError('BPE experiment artifacts are not enabled for pretraining yet.')

@@ -1702,10 +1702,10 @@ class _StudioPageState extends State<StudioPage> {
     final size = await showDialog<int>(context: context, builder: (context) => SimpleDialog(
       title: const Text('Choose decoder vocabulary to check'), children: [
         const Padding(padding: EdgeInsets.all(16), child: Text('Recheck saved inputs against tokenizer IDs and lossless encoding. This read-only review does not initialize weights or approve training.')),
-        if (actual >= 4 && actual <= 256)
+        if (actual >= 4 && actual <= 512)
           SimpleDialogOption(onPressed: () => Navigator.pop(context, actual), child: Text('Match all $actual tokenizer IDs')),
         SimpleDialogOption(onPressed: () => Navigator.pop(context, 16), child: const Text('Default decoder: 16 IDs')),
-        SimpleDialogOption(onPressed: () => Navigator.pop(context, 256), child: const Text('Maximum decoder: 256 IDs')),
+        SimpleDialogOption(onPressed: () => Navigator.pop(context, 512), child: const Text('Maximum decoder: 512 IDs')),
         SimpleDialogOption(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
       ]));
     if (size == null || !mounted) return;

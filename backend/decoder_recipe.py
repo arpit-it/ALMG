@@ -1,6 +1,15 @@
 """Bounded CPU decoder construction and validated local artifact persistence."""
 import numpy as np
 
+VOCABULARY_LIMIT = 512
+
+
+def architecture_version(config):
+    size = config.get('vocab_size', 16)
+    if type(size) is not int or not 4 <= size <= VOCABULARY_LIMIT:
+        raise ValueError('Choose a decoder vocabulary size between 4 and 512.')
+    return 2 if size > 256 else 1
+
 PIPELINE = {
     'schema_version': 1,
     'stages': {
@@ -41,6 +50,8 @@ CONTRACT = {
     'resume': 'Explicitly approved restart from a revision-bound step-50 SGD checkpoint.',
     'status': 'bounded_trial', 'capabilities': ['initialize', 'approved_local_trial'],
     'pipeline': PIPELINE,
+    'architecture_profiles': [{'version':1,'vocabulary_min':4,'vocabulary_max':256},
+                              {'version':2,'vocabulary_min':4,'vocabulary_max':VOCABULARY_LIMIT}],
     'planning': {'workflow': 'decoder_trial', 'approaches': ['from_scratch'],
                  'scopes': ['generated_local_text_fixture', 'reviewed_local_text_trial']},
 }
@@ -49,7 +60,7 @@ CONTRACT = {
 class Decoder:
     def __init__(self, config):
         defaults = {'vocab_size': 16, 'context_length': 16, 'width': 8, 'seed': 7}
-        limits = {'vocab_size': (4, 256), 'context_length': (2, 128), 'width': (4, 64), 'seed': (0, 2**32 - 1)}
+        limits = {'vocab_size': (4, VOCABULARY_LIMIT), 'context_length': (2, 128), 'width': (4, 64), 'seed': (0, 2**32 - 1)}
         if not isinstance(config, dict) or set(config) - set(defaults):
             raise ValueError('Only decoder dimensions and seed are supported; pretrained weights are not accepted.')
         self.config = {**defaults, **config}

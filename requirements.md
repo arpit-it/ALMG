@@ -4502,6 +4502,60 @@ P3-LMF-03 partial progress · full-index comparison of completed whole-split BPE
   collection, downloads, weight changes, generated artifact commits or push;
   unrelated user edits and all existing artifacts are preserved.
 
+P3-LMF-03 partial progress · wider decoder profile and trained byte-BPE persistence · 2026-11-20:
+- [ ] P3-LMF-03 remains open. The registered bounded decoder now validates 4–512
+  vocabulary IDs and advertises its architecture profiles. Models through 256 IDs
+  retain architecture component version 1; larger vocabularies select version 2.
+  Matrix serialization stays in the existing parameterized decoder format, with
+  strict stage/config/pipeline binding in bundles and checkpoints. Legacy word/byte
+  and reviewed-tokenizer models remain readable without rewriting their artifacts.
+- Reviewed model-tokenizer wrappers, compatibility and immutable dataset adoption
+  now use the same 512-ID limit, including reserved controls. Compatibility reports
+  explicitly use version 2 and record the selected architecture profile; native
+  controls offer exact actual IDs or the 512-ID maximum. Bare experiment artifacts
+  remain ineligible for direct pretraining. Lossy/OOV inputs, mismatched dimensions
+  and stale reviews still reject. Selection does not grant model-training approval.
+- Wider-profile generated previews have a separately stored policy: at most 160
+  IDs (128 context plus 32 generated) and 65536 UTF-8 output bytes, with explicit
+  byte replacement, control skipping and visible UNK. Dataset encoding/round trips
+  retain their strict input limits and no unknown replacement. This prevents large
+  learned byte pieces from being incorrectly constrained by the dataset's 4-KiB
+  decode limit during private generation; invalid IDs and output overflow still fail.
+- Local app verification: rebuilt native macOS ALMG on isolated fixture port 28848.
+  Opened the existing 60-ID trial unchanged. Native lossy-Unigram selection still
+  rejected; 16-vs-320 model vocabulary review still reported mismatch. Exact 320-ID
+  byte-BPE review passed under architecture profile 2. Confirmed selection created
+  immutable dataset 516417a89b1044b7b03f66278daadae1; separate native trial approval
+  created b27fccaba5dc4ccb90cf515084aba230 and completed 100 real fresh-weight Metal
+  SGD steps with 5760 trainable parameters.
+- Native pipeline inspection and independent reload verified architecture version 2,
+  tokenization version 2, model vocabulary 320 and the exact saved tokenizer in the
+  step-50 checkpoint/final bundle. CPU/Metal maximum inference error was
+  7.692969763439805e-07. Loss fell from 5.7667012214660645 to 0.9861118793487549,
+  but validation/test accuracy was 0/0: the 0.8 quality target failed and remains
+  recorded false. This verifies execution/persistence, not model quality or release.
+- Backend/app restart reopened identical dataset/trial/pipeline records. Native CPU
+  preview generated 12 tokens for “banana” using the saved wider model. All 27
+  original source/dataset/experiment/legacy-model files and all new checkpoint/model
+  artifacts stayed byte-identical across restart/preview. The legacy 60-ID bundle
+  still restored as architecture version 1. No public release was approved.
+- Evidence: /tmp/almg-wide-byte-bpe-native-qa/ contains legacy-trial-ui.json, lossy
+  rejection, mismatch/wide compatibility reports, selection/training consent,
+  wide-{dataset,trial,pipeline}-ui.json, restarted-wide-{dataset,trial,pipeline,preview}
+  evidence, verification.json, original fingerprints and native build/restart/test logs.
+- Verification: 465 Python tests passed with ALMG_METAL_TESTS=1; 34 Flutter tests
+  passed; analysis/diff checks passed. New tests verify 512-ID fresh initialization
+  without student file access, causality, maximum-size model persistence within the
+  existing loader bound, architecture/profile tampering, 320-ID model/checkpoint
+  and actual Metal execution, legacy loading, strict vs generated decoding, byte
+  controls/UTF-8 continuity, replacement-output expansion and explicit preview bounds.
+- Remaining: full-split character-BPE/Unigram and larger-vocabulary fitting, plus
+  learned streamed-tokenizer model-input/admission integration, remain open. The
+  widened profile alone does not approve streamed training. Larger-than-RAM and
+  independent hardware/Windows/scratch-space criteria remain unverified and were
+  skipped without unchanged polling. No external collection, downloads, generated
+  artifact commits or push; user edits and prior weights/artifacts are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

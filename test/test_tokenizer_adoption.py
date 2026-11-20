@@ -65,7 +65,9 @@ class AdoptionTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError,'losslessly'):adoptions.adopt(root,exp['id'],True,exp,parent)
             self.assertEqual(before,sorted(str(p) for p in Path(root).rglob('*')))
             parent,exp = fixture(root,algorithm='byte_level_bpe',cap=320,special=False)
-            with self.assertRaisesRegex(ValueError,'256'):adoptions.adopt(root,exp['id'],True,exp,parent)
+            adopted=adoptions.adopt(root,exp['id'],True,exp,parent)
+            self.assertEqual(adopted['tokenizer']['vocabulary_size'],exp['vocabulary_size'])
+            self.assertEqual(trials.specification(adopted)['recipe_contract']['pipeline']['stages']['architecture']['version'],2)
 
     def test_failed_atomic_publication_cleans_staging_and_preserves_parent(self):
         with TemporaryDirectory() as root:

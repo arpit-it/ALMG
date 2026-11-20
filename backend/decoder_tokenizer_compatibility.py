@@ -3,10 +3,12 @@ import json
 from pathlib import Path
 
 if __package__:
+    from .decoder_recipe import VOCABULARY_LIMIT
     from . import decoder_datasets as datasets, decoder_tokenizer_experiments as experiments
     from .decoder_special_tokens import SpecialTokenizer, restore_base
     from .run_manifest import digest, file_digest
 else:
+    from decoder_recipe import VOCABULARY_LIMIT
     import decoder_datasets as datasets
     import decoder_tokenizer_experiments as experiments
     from decoder_special_tokens import SpecialTokenizer, restore_base
@@ -16,8 +18,8 @@ else:
 def review(root, identifier, reviewed, config):
     """Re-encode every bounded input; never trust cached comparison summaries."""
     if (not isinstance(config, dict) or set(config) != {'vocab_size'}
-            or type(config['vocab_size']) is not int or not 4 <= config['vocab_size'] <= 256):
-        raise ValueError('Choose a decoder vocabulary size between 4 and 256.')
+            or type(config['vocab_size']) is not int or not 4 <= config['vocab_size'] <= VOCABULARY_LIMIT):
+        raise ValueError('Choose a decoder vocabulary size between 4 and 512.')
     record = experiments.read(root, identifier)
     if not isinstance(reviewed, dict) or reviewed != record:
         raise ValueError('The tokenizer review changed. Reopen the saved experiment.')
@@ -36,8 +38,8 @@ def review(root, identifier, reviewed, config):
         raise ValueError('Tokenizer training provenance does not match the saved training split.')
     blockers = []
     actual = len(model.pieces)
-    if not 4 <= actual <= 256:
-        blockers.append({'code': 'recipe_vocabulary_limit', 'message': f'The tokenizer has {actual} IDs; this decoder supports 4 to 256.'})
+    if not 4 <= actual <= VOCABULARY_LIMIT:
+        blockers.append({'code': 'recipe_vocabulary_limit', 'message': f'The tokenizer has {actual} IDs; this decoder supports 4 to 512.'})
     if actual != config['vocab_size']:
         blockers.append({'code': 'vocabulary_mismatch', 'message': f"Model vocabulary {config['vocab_size']} does not match all {actual} tokenizer IDs, including special IDs."})
     splits = {}
@@ -66,11 +68,11 @@ def review(root, identifier, reviewed, config):
     if experiments.read(root, identifier) != record or datasets.read(root, dataset['id']) != dataset:
         raise ValueError('Tokenizer or dataset changed during compatibility review.')
     result = {
-        'format': 'almg-tokenizer-compatibility-review-v1', 'schema_version': 1,
+        'format': 'almg-tokenizer-compatibility-review-v2', 'schema_version': 2,
         'experiment_id': identifier, 'experiment_revision': record['revision'],
         'tokenizer_sha256': record['tokenizer_sha256'], 'dataset_id': dataset['id'],
         'dataset_manifest_sha256': digest(dataset), 'dataset_sha256': dataset['dataset_sha256'],
-        'recipe': {'id': 'decoder_from_scratch', 'version': 1, 'vocabulary_min': 4, 'vocabulary_max': 256},
+        'recipe': {'id': 'decoder_from_scratch', 'version': 1, 'vocabulary_min': 4, 'vocabulary_max': VOCABULARY_LIMIT, 'architecture_version': 2 if config['vocab_size']>256 else 1},
         'model_config': dict(config), 'actual_vocabulary_size': actual,
         'special_tokens': record.get('special_tokens', {}), 'splits': splits,
         'vocabulary_and_lossless_checks_passed': not blockers, 'compatibility_blockers': blockers,

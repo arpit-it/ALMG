@@ -147,7 +147,7 @@ def run(initialize, root, dataset, work_directory, stop=None):
     decoder_bundle.load(workspace / 'bundle')
     return {'scope': 'Small reviewed-local-text trial; general model release is not enabled.',
             'recipe': 'decoder_from_scratch', 'dataset_id': manifest['id'], 'dataset_sha256': manifest['dataset_sha256'],
-            'metrics': metrics, 'generated_text': tokenizer.decode(generated), 'trainable_parameters': sum(v.size for v in model.parameters.values()),
+            'metrics': metrics, 'generated_text': tokenizer.decode_preview(generated) if hasattr(tokenizer,'decode_preview') else tokenizer.decode(generated), 'trainable_parameters': sum(v.size for v in model.parameters.values()),
             'checkpoint': {'completed_steps': 50, 'reused_existing_checkpoint': reused},
             'bundle_format': 'almg-decoder-bundle-v1', 'stage': 'pretraining_local', 'stage_version': 1,
             'cpu_inference_max_error': cpu_error,
