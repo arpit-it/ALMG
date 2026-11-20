@@ -22,15 +22,35 @@ def _source(root, identifier):
     return parent, initialized, corpus, admission, folder
 
 
-def review(root, identifier):
+def _depth(record):
+    return record['lineage_depth'] if record['schema_version']==3 else 1
+
+
+def _snapshot(record):
+    return {'record_id':record['id'],'record_revision':record['revision'],
+            'model_sha256':record['files']['trained-model.json'],'optimizer_sha256':record['files']['optimizer.json'],
+            'completed_steps':record['completed_steps'],'lineage_depth':_depth(record)}
+
+
+def _partial_state(root, record):
+    folder=_folder(root,record['id']);model=training.PlannedDecoder.load(folder/'trained-model.json')
+    data=json.loads((folder/'optimizer.json').read_text())
+    return model,{'step':data['step'],**{kind:{name:np.asarray(value,dtype=np.float32) for name,value in data[kind].items()} for kind in ('m','v')}}
+
+
+def review(root, identifier, resume_id=None):
     parent, _, corpus, admission, checkpoint = _source(root, identifier)
-    c = admission['config']; restore_step = c['steps'] // 2
-    model, state = training.optimizer.restore(checkpoint, c, parent['review']['revision'])
+    c = admission['config']; partial=None if resume_id is None else read(root,resume_id)
+    if partial is not None and (partial.get('status')!='canceled' or partial['review']['source']['record_id']!=identifier or _depth(partial)>=16):
+        raise ValueError('Select a canceled partial from this original corpus run with fewer than sixteen ancestors.')
+    restore_step=c['steps']//2 if partial is None else partial['completed_steps']
+    model,state=training.optimizer.restore(checkpoint,c,parent['review']['revision']) if partial is None else _partial_state(root,partial)
     if model.config != admission['model_config'] or state['step'] != restore_step:
         raise ValueError('Saved corpus checkpoint dimensions/counters changed.')
     estimates = {**admission['estimates'], 'optimizer_updates': c['steps'] - restore_step,
                  'reference_comparison_optimizer_updates': 0, 'restore_step': restore_step}
-    record = {'format': 'almg-corpus-continuation-review-v1', 'schema_version': 1,
+    record = {'format': 'almg-corpus-continuation-review-v1' if partial is None else 'almg-corpus-continuation-review-v2', 'schema_version': 1 if partial is None else 2,
+              'resume_from':None if partial is None else _snapshot(partial),
               'source': {'record_id': identifier, 'record_revision': parent['revision'],
                          'checkpoint_sha256': training.file_digest(checkpoint/'checkpoint.json'),
                          'optimizer_sha256': training.file_digest(checkpoint/'optimizer.json'),
@@ -39,7 +59,7 @@ def review(root, identifier):
               'restore_step': restore_step, 'runtime': admission['runtime'], 'estimates': estimates,
               'hardware': admission['hardware'], 'feasible': admission['feasible'], 'blockers': admission['blockers'],
               'training_approved': False, 'release_approved': False,
-              'scope': 'restore_saved_corpus_midpoint_and_complete_original_budget_in_new_private_artifacts',
+              'scope': 'restore_saved_corpus_midpoint_and_complete_original_budget_in_new_private_artifacts' if partial is None else 'restore_retained_corpus_partial_and_complete_original_remaining_updates',
               'implementation_sha256': training.digest({'continuation': training.file_digest(Path(__file__)), 'cancellation': training.file_digest(Path(__file__).with_name('decoder_corpus_cancellations.py')), 'trainer': admission['implementation_sha256']})}
     record['revision'] = training.digest(record)
     return record
@@ -51,13 +71,13 @@ def _folder(root, identifier):
     return Path(root)/'decoder-corpus-continuations'/identifier
 
 
-def run(root, identifier, confirmed, approved, request_id=None):
+def run(root, identifier, confirmed, approved, request_id=None, resume_id=None):
     if confirmed is not True:
         raise ValueError('Explicitly confirm restoring the corpus checkpoint and completing its remaining updates.')
     if request_id is not None:
         cancellation.validate(request_id)
-    current = review(root, identifier)
-    keys = ('format', 'schema_version', 'source', 'corpus_id', 'corpus_revision', 'config', 'restore_step', 'runtime', 'estimates', 'implementation_sha256')
+    current = review(root, identifier, resume_id)
+    keys = ('format', 'schema_version', 'source', 'corpus_id', 'corpus_revision', 'config', 'restore_step', 'resume_from', 'runtime', 'estimates', 'implementation_sha256')
     if (not isinstance(approved, dict) or approved.get('revision') != training.digest({k:v for k,v in approved.items() if k != 'revision'})
             or any(approved.get(key) != current[key] for key in keys)):
         raise ValueError('Corpus continuation review changed. Reopen it before confirming.')
@@ -68,12 +88,14 @@ def run(root, identifier, confirmed, approved, request_id=None):
     c = current['config']
     import mlx.core as mx
     observer = training.measurements.OptimizerMeasurements(mx)
-    model, state = training.optimizer.restore(checkpoint, c, parent['review']['revision'])
+    partial=None if resume_id is None else read(root,resume_id)
+    model,state=training.optimizer.restore(checkpoint,c,parent['review']['revision']) if partial is None else _partial_state(root,partial)
+    cancel_id=identifier if partial is None else partial['id'];cancel_revision=parent['revision'] if partial is None else partial['revision'];cancel_kind='run' if partial is None else 'partial'
     initial_losses = training.split_losses(model, windows)
     continuation_id = uuid.uuid4().hex; folder = _folder(root, continuation_id); folder.mkdir(parents=True)
     with mx.stream(mx.gpu):
         values, state, logs, gradient_error = training.train_updates(model.parameters, state, c['steps'], windows['train'], c, model.config, mx, observer,
-            stop=lambda: cancellation.requested(root,identifier,parent['revision'],request_id))
+            stop=lambda: cancellation.requested(root,cancel_id,cancel_revision,request_id,cancel_kind))
     model.parameters = values
     final_losses = training.split_losses(model, windows)
     reference = training.PlannedDecoder.load(training._folder(root, identifier)/'trained-model.json')
@@ -87,11 +109,12 @@ def run(root, identifier, confirmed, approved, request_id=None):
     model.save(folder/'trained-model.json')
     (folder/'optimizer.json').write_text(json.dumps({'step': state['step'], **{kind:{name:value.tolist() for name,value in state[kind].items()} for kind in ('m','v')}}, allow_nan=False))
     (folder/'tokenizer.json').write_text(json.dumps(tokenizer.artifact(), ensure_ascii=False), encoding='utf-8')
-    if training.read(root, identifier) != parent:
+    if (partial is not None and read(root,resume_id)!=partial) or training.read(root, identifier) != parent:
         raise ValueError('Source corpus run changed during continuation; new artifacts retained for review.')
     observed = observer.finish(); observed['scope'] = 'corpus_checkpoint_continuation_in_shared_backend'
     observed['limitations'] = 'Shared backend time/RSS/Metal observations include restore, remaining updates, evaluation, model/state saving and CPU generation. There is no uninterrupted retraining trajectory here. Counters may include other work; no isolated peaks or future duration estimate.'
-    record = {'format': 'almg-corpus-continuation-v2', 'schema_version': 2, 'id': continuation_id,
+    record = {'format': 'almg-corpus-continuation-v2' if partial is None else 'almg-corpus-continuation-v3', 'schema_version': 2 if partial is None else 3,
+              'lineage_depth':1 if partial is None else _depth(partial)+1, 'id': continuation_id,
               'status': 'canceled' if canceled else 'completed', 'request_id': request_id,
               'created_at': datetime.now(timezone.utc).isoformat(), 'review': approved, 'admission': current,
               'restored_step': current['restore_step'], 'completed_steps': state['step'], 'scheduler_completed_steps': state['step'],
@@ -100,7 +123,7 @@ def run(root, identifier, confirmed, approved, request_id=None):
               'generated_token_ids': generated, 'generated_text': text, 'inference_runtime': 'planned_decoder_numpy_cpu',
               'workflow_measurements': observed, 'pretrained_student_weights_loaded': False,
               'source_modified': False, 'training_approved': True, 'release_approved': False,
-              'limitations': 'Bounded original-budget continuation with cooperative cancellation only. Canceled model/state/counter remain private; independent partial resume, arbitrary interruption and quality/release approval remain unexposed.',
+              'limitations': 'Bounded original-budget continuation with cooperative cancellation only. Canceled model/state/counter remain private; Partial resume requires separate approval and preserves ancestors. Arbitrary interruption and quality/release approval remain unexposed.',
               'files': {name:training.file_digest(folder/name) for name in ('trained-model.json','optimizer.json','tokenizer.json')}}
     record['revision'] = training.digest(record)
     temporary=folder/'.record.tmp'
@@ -109,34 +132,47 @@ def run(root, identifier, confirmed, approved, request_id=None):
     return read(root, continuation_id)
 
 
-def read(root, identifier):
-    folder = _folder(root, identifier)
+def read(root, identifier, _seen=None):
+    folder=_folder(root,identifier)
+    seen=set() if _seen is None else set(_seen)
+    if identifier in seen or len(seen)>=16:raise ValueError('Cyclic or over-depth corpus partial lineage.')
+    seen.add(identifier)
     if (folder/'record.json').stat().st_size > 256000:
         raise ValueError('Corpus continuation record exceeds size limit.')
     record = json.loads((folder/'record.json').read_text()); approved = record['review']
-    if ((record.get('format'),record.get('schema_version')) not in (('almg-corpus-continuation-v1',1),('almg-corpus-continuation-v2',2)) or record.get('id') != identifier
+    if ((record.get('format'),record.get('schema_version')) not in (('almg-corpus-continuation-v1',1),('almg-corpus-continuation-v2',2),('almg-corpus-continuation-v3',3)) or record.get('id') != identifier
             or record.get('revision') != training.digest({k:v for k,v in record.items() if k != 'revision'})
             or set(record.get('files',{})) != {'trained-model.json','optimizer.json','tokenizer.json'}
             or any((folder/name).stat().st_size > 16*1024**2 or training.file_digest(folder/name) != sha for name,sha in record['files'].items())
             or approved.get('revision') != training.digest({k:v for k,v in approved.items() if k != 'revision'})):
         raise ValueError('Corpus continuation record/artifact binding changed.')
     parent = training.read(root, approved['source']['record_id']); c = parent['review']['config']; midpoint = c['steps']//2
-    status = record.get('status') if record['schema_version']==2 else 'completed'
-    if record['schema_version']==2 and 'request_id' not in record:
+    snapshot=approved.get('resume_from');partial=None
+    if record['schema_version']==3:
+        if not isinstance(snapshot,dict):raise ValueError('Missing retained corpus partial lineage.')
+        partial=read(root,snapshot.get('record_id'),seen)
+        if (partial.get('status')!='canceled' or partial['review']['source']['record_id']!=parent['id'] or snapshot!=_snapshot(partial)
+                or record.get('lineage_depth')!=_depth(partial)+1 or record['lineage_depth']>16):
+            raise ValueError('Retained corpus partial source binding changed.')
+    elif snapshot is not None:raise ValueError('Legacy corpus continuations cannot claim partial ancestry.')
+    restored=midpoint if partial is None else partial['completed_steps']
+    cancel_id=parent['id'] if partial is None else partial['id'];cancel_revision=parent['revision'] if partial is None else partial['revision'];cancel_kind='run' if partial is None else 'partial'
+    status = record.get('status') if record['schema_version']>=2 else 'completed'
+    if record['schema_version']>=2 and 'request_id' not in record:
         raise ValueError('Missing corpus continuation request binding.')
-    if record['schema_version']==2 and record.get('request_id') is not None:
+    if record['schema_version']>=2 and record.get('request_id') is not None:
         cancellation.validate(record['request_id'])
     completed = record['completed_steps']
     if (status not in ('completed','canceled') or type(completed) is not int
-            or (status=='completed' and completed!=c['steps']) or (status=='canceled' and not midpoint<=completed<c['steps'])
-            or (status=='canceled' and (record.get('request_id') is None or not cancellation.requested(root,parent['id'],parent['revision'],record['request_id'])))):
+            or (status=='completed' and completed!=c['steps']) or (status=='canceled' and not restored<=completed<c['steps'])
+            or (status=='canceled' and (record.get('request_id') is None or not cancellation.requested(root,cancel_id,cancel_revision,record['request_id'],cancel_kind)))):
         raise ValueError('Invalid corpus continuation cancellation status or retained counter.')
     checkpoint = training._folder(root,parent['id'])/f'step-{midpoint}'
     if (approved['source']['record_revision'] != parent['revision'] or approved['config'] != c or approved['corpus_id'] != parent['review']['corpus_id']
-            or approved['corpus_revision'] != parent['review']['corpus_revision'] or approved['restore_step'] != midpoint
+            or approved['corpus_revision'] != parent['review']['corpus_revision'] or approved['restore_step'] != restored
             or any(approved['source'][key] != training.file_digest(checkpoint/name) for key,name in (('checkpoint_sha256','checkpoint.json'),('optimizer_sha256','optimizer.json')))
             or approved['source']['model_sha256'] != parent['files']['trained-model.json']
-            or record['restored_step'] != midpoint or record['scheduler_completed_steps'] != completed):
+            or record['restored_step'] != restored or record['scheduler_completed_steps'] != completed):
         raise ValueError('Corpus continuation source/counter binding changed.')
     model = training.PlannedDecoder.load(folder/'trained-model.json'); state = json.loads((folder/'optimizer.json').read_text())
     expected = set(model.parameters) if c['optimizer']=='adamw' else set()
@@ -151,9 +187,9 @@ def read(root, identifier):
                 raise ValueError('Invalid final corpus optimizer moments.')
     snapshot_folder = Path(root)/'decoder-corpus-inputs'/approved['corpus_id']
     windows = json.loads((snapshot_folder/'windows.json').read_text())['train']
-    if len(record['step_log']) != completed-midpoint:
+    if len(record['step_log']) != completed-restored:
         raise ValueError('Invalid corpus continuation update count.')
-    for step, entry in enumerate(record['step_log'],midpoint):
+    for step, entry in enumerate(record['step_log'],restored):
         indices, arrays = training.batch_arrays(windows,step,c['batch_size'])
         if entry.get('step') != step+1 or entry.get('learning_rate') != training.optimizer.learning_rate(c,step) or entry.get('window_index') != indices[0] or entry.get('window_indices') != indices or entry.get('target_tokens') != int(arrays[2].sum()) or entry.get('microbatches') != c['gradient_accumulation_steps']:
             raise ValueError('Corpus continuation window schedule changed.')
@@ -177,3 +213,14 @@ def history(root, source_id):
     training.read(root,source_id)
     records = [read(root,path.parent.name) for path in (Path(root)/'decoder-corpus-continuations').glob('*/record.json')]
     return sorted([record for record in records if record['review']['source']['record_id']==source_id],key=lambda record:record['created_at'])[-20:]
+
+
+def review_partial(root, identifier):
+    partial=read(root,identifier)
+    return review(root,partial['review']['source']['record_id'],identifier)
+
+
+def run_partial(root, identifier, confirmed, approved, request_id=None):
+    if confirmed is not True:raise ValueError('Explicitly confirm retained corpus partial resume.')
+    partial=read(root,identifier)
+    return run(root,partial['review']['source']['record_id'],True,approved,request_id,identifier)

@@ -7215,6 +7215,62 @@ P3-LMF-06 partial progress · cooperative corpus continuation cancellation · 20
   profiling, broader quality evaluation and profiled 50M–100M training. Unchanged
   independent hardware/user-action blockers remain open and skipped.
 
+P3-LMF-06 partial progress · approved retained-partial corpus resume · 2026-11-21:
+- [ ] P3-LMF-06 remains open. A canceled corpus continuation now offers separate
+  retained-partial review and explicit resume confirmation. Review binds the exact
+  partial ID/revision, model/optimizer hashes, actual counter, original corpus and
+  configuration/precision, runtime and conservative admission. Only canceled sources
+  with original work remaining can resume. Completed sources, stale reviews, corrupt
+  state, cyclic ancestry and over-depth lineage reject execution.
+- Resume restores the retained model, FP32 optimizer moments and actual scheduler
+  counter, preserving the original step-derived corpus windows and learning rates.
+  New version-3 private records retain immutable ancestry through repeated resume/
+  cancel operations. Both source partial and original run remain unchanged. Reads
+  verify the ancestor chain, saved counters/state, window/target/schedule trace,
+  file hashes and own CPU inference. Completed descendants must match the original
+  final model within 1e-7 and generated token IDs/text exactly. Lineage is bounded
+  to sixteen records; arbitrary interrupted-process recovery is not established.
+- Resume cancellation uses a distinct partial-source kind and its ID/revision, with
+  a fresh run token. Version-2 cancellation receipts support original/partial source
+  kinds; existing version-1 receipts and v1/v2 continuation records remain readable
+  without rewriting. A retained partial can be re-canceled safely, then separately
+  reviewed again from its newly saved actual update rather than the old midpoint.
+- Native verification: rebuilt/launched ALMG and reopened all twelve prior records
+  exactly. Reviewed canceled update-eleven SGD 0ad9d3c9c5f04b549372cb3d3a2343cf and
+  mixed FP16 AdamW 7ed1874d6ed44d12a5f72bd5c5d87e9c; reviews showed restore eleven
+  and nine remaining updates with matching partial optimizer hashes. Closing the
+  first review created no output. Explicitly resumed both; local pacing only made
+  live re-cancellation observable. New canceled records
+  ac4df9d1fc4247e1b4253eb147b2e611 (SGD) and
+  2a2801524a604a2999788e6b983ebd3c (AdamW) restored eleven and retained update twelve,
+  with depth-two ancestry and actual model/moment/scheduler state.
+- Removed pacing and separately approved those update-twelve partials. Completed
+  SGD 8158a8135d7147768e8cafda1984ab6b and AdamW
+  46a9d0a6cc3f43ffb685806b1ec49b92 restored twelve, recorded only updates thirteen
+  through twenty and finished optimizer/scheduler counter twenty. Both matched
+  original final weights with 0.0 error and identical CPU-generated tokens/text.
+  Depth-three records bind both retained ancestors. These are toy-corpus checkpoint
+  engineering checks, not language-quality or release acceptance.
+- After app/backend restart all sixteen legacy/canceled/resumed records, ancestry,
+  receipt kinds, optimizer states/counters and CPU text reopened exactly without
+  further training. All 221 original fixture files and all 241 retained files kept
+  their hashes. Evidence: /tmp/almg-corpus-partial-native-qa/verification.json,
+  sgd-partial-review-ui.json, adamw-partial-review-ui.json, sgd-recanceled-ui.json,
+  adamw-recanceled-ui.json, sgd-completed-ui.json, adamw-completed-ui.json and
+  restarted native captures. No external collection occurred; generated artifacts,
+  receipts, tokenizers and weights remain outside Git.
+- Validation: 627 Python tests passed with warnings as errors and Metal enabled,
+  77 Flutter tests passed, analysis clean. New real FP32 SGD/mixed AdamW coverage
+  checks chained state/schedule recovery, exact final reference inference, immutable
+  ancestors, completed-source/stale-review rejection, cancellation source isolation,
+  cyclic and depth-limit rejection. UI tests verify separate partial review/resume
+  routes and actual retained counters; native checks exercise live partial Cancel.
+- Remaining: fresh corpus-run cancellation, arbitrary durable OS/process interruption,
+  larger budgets/resource profiling, broader quality evaluation and profiled 50M–100M
+  training. Corpus-engine peak profiling under P3-LMF-05 is independently actionable
+  with this bounded engine. Unchanged independent hardware/user-action blockers
+  remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

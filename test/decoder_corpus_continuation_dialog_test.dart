@@ -49,4 +49,24 @@ void main() {
     expect(find.text('Cancel corpus continuation'),findsNothing);
   });
 
+  testWidgets('retained corpus partial has separate review and resume routes', (tester) async {
+    final paths=<String>[];
+    await tester.pumpWidget(MaterialApp(home: DecoderCorpusContinuationDialog(sourceId:'original',partialId:'partial',request:(path,body) async {
+      paths.add(path);
+      if(path.endsWith('/resume')) {
+        expect(body['confirmed'],true);
+        return {'status':'completed','restored_step':12,'completed_steps':20,'reference_parameter_max_error':0,'generated_text':'amber birch'};
+      }
+      return {'feasible':true,'restore_step':12,'estimates':{'optimizer_updates':8},'blockers':[]};
+    })));
+    expect(find.text('Confirm resume retained corpus partial'),findsNothing);
+    await tester.tap(find.text('Review retained corpus resume resources'));await tester.pumpAndSettle();
+    expect(paths.last,'/decoder-corpus-continuations/partial/resume-review');
+    expect(find.text('Restore update 12 · remaining updates 8.'),findsOneWidget);
+    await tester.tap(find.text('Confirm resume retained corpus partial'));await tester.pump();await tester.pump(const Duration(milliseconds:300));
+    expect(paths.last,'/decoder-corpus-continuations/partial/resume');
+    expect(find.text('Generated text: amber birch'),findsOneWidget);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
 }

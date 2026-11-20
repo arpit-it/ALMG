@@ -3,8 +3,9 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 class DecoderCorpusContinuationDialog extends StatefulWidget {
-  const DecoderCorpusContinuationDialog({super.key, required this.sourceId, required this.request});
+  const DecoderCorpusContinuationDialog({super.key, required this.sourceId, this.partialId, required this.request});
   final String sourceId;
+  final String? partialId;
   final Future<Map<String, dynamic>> Function(String, Map<String, dynamic>) request;
   @override State<DecoderCorpusContinuationDialog> createState() => _DecoderCorpusContinuationDialogState();
 }
@@ -15,7 +16,8 @@ class _DecoderCorpusContinuationDialogState extends State<DecoderCorpusContinuat
   bool _cancelPending = false;
   String? _requestId;
   String? _error;
-  String get _path => '/decoder-corpus-optimizer-runs/${widget.sourceId}';
+  bool get _partial => widget.partialId != null;
+  String get _path => _partial ? '/decoder-corpus-continuations/${widget.partialId}' : '/decoder-corpus-optimizer-runs/${widget.sourceId}';
   Future<void> _perform(Future<void> Function() action) async {
     setState(() { _busy = true; _error = null; });
     try { await action(); } catch (error) { if (mounted) setState(() => _error = '$error'); }
@@ -23,7 +25,7 @@ class _DecoderCorpusContinuationDialogState extends State<DecoderCorpusContinuat
   }
   Future<void> _load() => _perform(() async {
     setState(() => _review = null);
-    final review = await widget.request('$_path/continuation-review', {});
+    final review = await widget.request('$_path/${_partial ? 'resume-review' : 'continuation-review'}', {});
     if (mounted) setState(() => _review = review);
   });
   Future<void> _show(Map<String, dynamic> record) => showDialog<void>(context: context, builder: (context) => AlertDialog(
@@ -35,13 +37,15 @@ class _DecoderCorpusContinuationDialogState extends State<DecoderCorpusContinuat
       Text('Generated text: ${record['generated_text']}'),
       const Text('Separate private result; the original corpus run is preserved. No model release or broader language-quality acceptance is established.'),
       SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
-    ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    ])), actions: [
+      if (record['status'] == 'canceled' && record['id'] is String) TextButton(onPressed: () => showDialog<void>(context: context, builder: (_) => DecoderCorpusContinuationDialog(sourceId: widget.sourceId, partialId: record['id'] as String, request: widget.request)), child: const Text('Review retained corpus partial resume')),
+      TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   Future<void> _continue() => _perform(() async {
     final random = Random.secure();
     final token = List.generate(16, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
     setState(() { _running = true; _cancelPending = false; _requestId = token; });
     try {
-      final record = await widget.request('$_path/continue', {'confirmed': true, 'reviewed': _review, 'request_id': token});
+      final record = await widget.request('$_path/${_partial ? 'resume' : 'continue'}', {'confirmed': true, 'reviewed': _review, 'request_id': token});
       if (mounted) { setState(() { _running = false; _requestId = null; }); await _show(record); }
     } finally { if (mounted) setState(() { _running = false; _requestId = null; }); }
   });
@@ -49,11 +53,11 @@ class _DecoderCorpusContinuationDialogState extends State<DecoderCorpusContinuat
     final token = _requestId;
     if (token == null || !_running || _cancelPending) return;
     setState(() { _cancelPending = true; _error = null; });
-    try { await widget.request('$_path/cancel-continuation', {'confirmed': true, 'request_id': token}); }
+    try { await widget.request('$_path/${_partial ? 'cancel-resume' : 'cancel-continuation'}', {'confirmed': true, 'request_id': token}); }
     catch (error) { if (mounted) setState(() { _cancelPending = false; _error = '$error'; }); }
   }
   Future<void> _history() => _perform(() async {
-    final result = await widget.request('$_path/continuations', {});
+    final result = await widget.request('/decoder-corpus-optimizer-runs/${widget.sourceId}/continuations', {});
     if (!mounted) return;
     setState(() => _busy = false);
     final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
@@ -64,9 +68,9 @@ class _DecoderCorpusContinuationDialogState extends State<DecoderCorpusContinuat
       ]));
     if (selected != null && mounted) await _show(selected);
   });
-  @override Widget build(BuildContext context) => AlertDialog(title: const Text('Review corpus checkpoint continuation'), scrollable: true,
+  @override Widget build(BuildContext context) => AlertDialog(title: Text(_partial ? 'Review retained corpus partial resume' : 'Review corpus checkpoint continuation'), scrollable: true,
     content: SizedBox(width: 640, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      const Text('Restore the saved midpoint model, FP32 optimizer moments and scheduler counter. Complete only the remaining original updates using the original corpus windows and precision settings, then compare with the saved final model. Save a new private model, tokenizer and optimizer state. Original artifacts stay unchanged. Cancel requests stop between optimizer updates and retain private partial model/state. Independent partial resume and arbitrary interrupted-run recovery are not exposed yet.'),
+      Text(_partial ? 'Restore this retained canceled model, FP32 moments and actual saved counter. Complete only the remaining original updates with the original configuration, preserving all ancestors. Resume cancellation retains another private partial; each further resume requires a new review. Arbitrary OS interruption recovery remains unverified.' : 'Restore the saved midpoint model, FP32 optimizer moments and scheduler counter. Complete only the remaining original updates using the original corpus windows and precision settings, then compare with the saved final model. Save a new private model, tokenizer and optimizer state. Original artifacts stay unchanged. Cancel requests stop between optimizer updates and retain private partial model/state. Retained partial resume requires separate approval; arbitrary interrupted-run recovery remains unverified.'),
       if (_busy) const LinearProgressIndicator(),
       if (_running && _cancelPending) const Text('Cancellation requested. Waiting for a safe optimizer-update boundary and retained result.'),
       if (_error != null) Text(_error!),
@@ -79,8 +83,8 @@ class _DecoderCorpusContinuationDialogState extends State<DecoderCorpusContinuat
     ])), actions: [
       if (_running) TextButton(onPressed: _cancelPending ? null : _cancel, child: const Text('Cancel corpus continuation')),
       TextButton(onPressed: _busy ? null : _history, child: const Text('Saved corpus checkpoint continuations')),
-      TextButton(onPressed: _busy ? null : _load, child: const Text('Review corpus continuation resources')),
-      if (_review?['feasible'] == true) TextButton(onPressed: _busy ? null : _continue, child: const Text('Confirm continue corpus checkpoint')),
+      TextButton(onPressed: _busy ? null : _load, child: Text(_partial ? 'Review retained corpus resume resources' : 'Review corpus continuation resources')),
+      if (_review?['feasible'] == true) TextButton(onPressed: _busy ? null : _continue, child: Text(_partial ? 'Confirm resume retained corpus partial' : 'Confirm continue corpus checkpoint')),
       TextButton(onPressed: _busy ? null : () => Navigator.pop(context), child: const Text('Close')),
     ]);
 }
