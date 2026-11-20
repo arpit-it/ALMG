@@ -2,6 +2,7 @@
 from datetime import datetime,timezone
 from importlib.metadata import version,PackageNotFoundError
 import json
+import math
 from pathlib import Path
 import platform
 import shutil
@@ -59,7 +60,7 @@ def estimate(config,json_bytes):
             'required_available_memory_bytes':max(256*MIB+gpu+cpu,256*MIB+p*64,256*MIB+json_bytes*16),
             'required_free_disk_bytes':max(64*MIB+512*1024,64*MIB+p*32,64*MIB+json_bytes*8),
             'synthetic_batch_shape':[rows,length],'dataset_storage_bytes':0,'dataset_storage_scope':'synthetic_ids_only_no_dataset_import',
-            'measured':False,'peak_memory_measured':False,'duration_estimate_seconds':None,
+            'measured':False,'peak_memory_measured':False,'duration_estimate_seconds':None,'diagnostic_work_estimate':None,
             'assumptions':'FP32 Metal weights/gradients and two transient parameter copies; SGD has no moment buffers. Bounded synthetic probe only. CPU JSON/reference budget and existing reload/execution reserves included. Kernel/allocator/framework overhead is not measured; admission is not a runtime memory guarantee.'}
 
 
@@ -72,7 +73,7 @@ def _fits(hardware_info,estimates):
 def _calibrate(root,plan_id,current,profile,estimates):
     """Only compatible, immutable isolated diagnostics may raise admission reserves."""
     implementation=digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_architecture_backward.py','decoder_architecture_feasibility.py','decoder_diagnostic_measurements.py','decoder_diagnostic_worker.py','planned_decoder.py')})
-    records=[];peak=rss=0
+    records=[];timings=[];peak=rss=0
     for path in sorted((Path(root)/'decoder-architecture-backward-checks'/plan_id).glob('*.json')):
         try:
             if path.stat().st_size>128000:continue
@@ -89,12 +90,25 @@ def _calibrate(root,plan_id,current,profile,estimates):
             gpu=measurement['isolated_metal_peak_bytes'];cpu=measurement['isolated_process_peak_rss_bytes']
             if type(gpu) is not int or type(cpu) is not int or min(gpu,cpu)<=0:continue
             peak=max(peak,gpu);rss=max(rss,cpu);records.append({'id':report['id'],'revision':report['revision']})
+            seconds=measurement.get('isolated_workflow_elapsed_seconds')
+            if type(seconds) in (int,float) and math.isfinite(seconds) and seconds>0:
+                timings.append({'id':report['id'],'revision':report['revision'],'measured_seconds':seconds})
         except (OSError,ValueError,TypeError,KeyError,AttributeError):continue
     estimates['calibrated_gpu_working_bytes']=max(estimates['estimated_gpu_working_bytes'],peak)
     if records:estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],256*MIB+rss+estimates['calibrated_gpu_working_bytes'])
+    if timings:
+        observed=[sample['measured_seconds'] for sample in timings]
+        estimates['diagnostic_work_estimate']={
+            'estimated_seconds':max(observed)*1.25,'measured':False,'sample_count':len(timings),
+            'observed_min_seconds':min(observed),'observed_max_seconds':max(observed),
+            'headroom_multiplier':1.25,'source_reports':timings,
+            'method':'highest_compatible_isolated_workflow_time_with_25_percent_headroom',
+            'scope':'Same initialized model, hardware, runtime and synthetic five-step diagnostic implementation only; includes model loading, feasibility checks and CPU numerical checks.',
+            'excludes':['interpreter_and_import_startup','user_approval_waits','parent_report_publication','full_dataset_training'],
+            'limitations':'Heuristic work estimate, not a confidence interval or upper bound. Shared load can change; no optimizer-throughput or full-training wall-time prediction.'}
     return {'compatible_reports':records,'observed_metal_peak_bytes':peak or None,'observed_process_peak_rss_bytes':rss or None,
             'scope':'same_initialization_hardware_runtime_and_diagnostic_implementation_only',
-            'policy':'Measurements only raise reserves. CPU RSS and Metal peak may overlap; their sum plus reserve is deliberately conservative. No duration or full-training extrapolation.'}
+            'policy':'Measurements only raise reserves. CPU RSS and Metal peak may overlap; their sum plus reserve is deliberately conservative. Measured workflow timing may estimate this same bounded diagnostic only; no full-training extrapolation.'}
 
 
 def review(root,plan_id,confirmed,reviewed,precision='float32',device='metal'):

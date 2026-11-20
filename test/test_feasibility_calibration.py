@@ -63,3 +63,24 @@ class FeasibilityCalibrationTests(unittest.TestCase):
             with patch.object(feasibility,'hardware',return_value=hardware):review=feasibility.review(root,record['plan_id'],True,record)
             self.assertEqual(len(review['calibration']['compatible_reports']),22)
             self.assertEqual(review['calibration']['observed_process_peak_rss_bytes'],1024**3)
+
+    def test_diagnostic_time_estimate_uses_highest_compatible_complete_workflow(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);record,hardware,first,path=self.fixture(root)
+            first['diagnostic_measurements']['isolated_workflow_elapsed_seconds']=2.0;self.write(path,first)
+            second=deepcopy(first);second['id']='b'*32;second['diagnostic_measurements']['isolated_workflow_elapsed_seconds']=5.0;self.write(path.with_name(second['id']+'.json'),second)
+            before={p:p.read_bytes() for p in root.rglob('*') if p.is_file()}
+            with patch.object(feasibility,'hardware',return_value=hardware):review=feasibility.review(root,record['plan_id'],True,record)
+            estimate=review['estimates']['diagnostic_work_estimate']
+            self.assertEqual(estimate['estimated_seconds'],6.25);self.assertEqual(estimate['sample_count'],2)
+            self.assertEqual({value['id'] for value in estimate['source_reports']},{first['id'],second['id']})
+            self.assertFalse(estimate['measured']);self.assertIsNone(review['estimates']['duration_estimate_seconds'])
+            self.assertIn('parent_report_publication',estimate['excludes']);self.assertTrue(all(p.read_bytes()==value for p,value in before.items()))
+
+    def test_missing_or_invalid_workflow_timing_preserves_memory_calibration_without_forecast(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);record,hardware,original,path=self.fixture(root)
+            for seconds in (None,0,-1,'unknown',True):
+                report=deepcopy(original);report['diagnostic_measurements']['isolated_workflow_elapsed_seconds']=seconds;self.write(path,report)
+                with patch.object(feasibility,'hardware',return_value=hardware):review=feasibility.review(root,record['plan_id'],True,record)
+                self.assertIsNone(review['estimates']['diagnostic_work_estimate']);self.assertEqual(len(review['calibration']['compatible_reports']),1)

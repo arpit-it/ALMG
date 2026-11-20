@@ -6137,6 +6137,40 @@ P3-LMF-05 partial progress · measured CPU image calibration and bounded fit est
   neural/full-epoch feasibility and suitable Windows/CUDA verification. Unchanged
   hardware/user-action blockers remain open and skipped.
 
+P3-LMF-05 partial progress · bounded planned-decoder diagnostic time estimate · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Planned-model backward feasibility now estimates
+  the same bounded synthetic diagnostic workflow from compatible isolated v4
+  measurements: highest observed complete child-workflow time plus explicit 25%
+  heuristic headroom. The record retains source report IDs/revisions, measured
+  times/range, sample count, method, scope and exclusions; the app distinguishes
+  these observations from the calculated estimate. Full-training duration stays
+  unknown, and no optimizer-throughput extrapolation is made.
+- Existing exact initialization, hardware/runtime, producer, precision, isolated
+  process and integrity compatibility checks also gate timing evidence. Missing,
+  nonpositive or invalid workflow times produce no time estimate while preserving
+  valid peak-memory calibration. Timing includes model loading, feasibility and
+  CPU numerical checks, and excludes interpreter/import startup, approval waits,
+  parent report publication and full dataset training. Headroom is a heuristic,
+  not a confidence interval or guaranteed upper bound.
+- Native verification: rebuilt and ran ALMG with an isolated copy of the existing
+  8704-parameter two-layer initialization. Initial review showed no estimate.
+  Explicitly confirmed the five-step Metal diagnostic and observed
+  0.2564115000423044 seconds of isolated workflow work. Reopened feasibility showed
+  0.3205143750528805 seconds based on saved report
+  2502eed125e74ca0a62433c20785100e. Updated weights were discarded and main training/
+  release remained unapproved. After app/backend restart the saved diagnostic
+  reopened exactly and the next review reconstructed the identical estimate.
+  All three copied plan/initialization files and three original artifact files
+  retained their hashes. Local evidence: /tmp/almg-architecture-duration-native-qa/
+  verification.json and native UI captures; generated artifacts remain outside Git.
+- Validation: 571 Python tests passed with warnings as errors and Metal enabled,
+  55 Flutter tests passed, and analysis was clean. Tests cover multi-observation
+  maximum selection/provenance, read-only review, absent/invalid/boolean timings,
+  continued memory calibration and the estimate/exclusion labels in the app.
+- Remaining: total training wall-time forecasting, broader neural/full-epoch
+  feasibility and suitable Windows/CUDA hardware verification. Unchanged hardware/
+  user-action blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

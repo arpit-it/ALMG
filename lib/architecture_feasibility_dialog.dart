@@ -42,6 +42,8 @@ class _ArchitectureFeasibilityDialogState extends State<ArchitectureFeasibilityD
           Text('Calibrated with ${(_report!['calibration']['compatible_reports'] as List).length} compatible isolated diagnostic report(s). '
             'Observed Metal peak: ${_mib(_report!['calibration']['observed_metal_peak_bytes'])}; process peak RSS: ${_mib(_report!['calibration']['observed_process_peak_rss_bytes'])}. '
             'Measurements can only raise reserves. CPU and GPU memory may overlap; the admission sum is conservative. This applies only to the same synthetic diagnostic.'),
+        if (_report!['estimates']['diagnostic_work_estimate'] != null)
+          Text('Estimated complete synthetic diagnostic work: ${_report!['estimates']['diagnostic_work_estimate']['estimated_seconds']} s, based on ${_report!['estimates']['diagnostic_work_estimate']['sample_count']} compatible report(s), highest observed workflow time plus 25%. Includes model loading, feasibility and CPU numerical checks. Excludes interpreter/import startup, approval waits and report publication. A heuristic, not an upper bound or full-training prediction.'),
         const Text('Calculated estimates and compatible measured diagnostic peaks are distinct. No full-training peak or duration prediction is available. Existing model loading and execution reserves are included; runtime exhaustion is still possible. Resources are checked again at execution.'),
         for (final reason in _report!['blockers'] as List) Text(reason as String),
         if (_report!['recommendation'] != null) Text('Smaller suggestion: ${_report!['recommendation']['config']['layers']} layers · width ${_report!['recommendation']['config']['hidden_size']} · '
