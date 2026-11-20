@@ -5773,6 +5773,50 @@ P3-LMF-05 partial progress · measured isolated streamed chunks and limited work
   Unchanged hardware/user-action blockers remain open and skipped. No private or
   generated artifacts, weights or unrelated user edits are committed.
 
+P3-LMF-05 partial progress · compatible streamed measurements raise admission reserves · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Streamed-training feasibility now incorporates
+  validated isolated chunk observations from matching saved trials. Compatibility
+  requires the exact training review/window/source/settings, Metal hardware/MLX
+  runtime, measurement producer and admission implementation. All matching trial
+  directories are considered, independent of the UI history limit, including
+  measured final-evaluation chunks. Historical incompatible observations remain
+  readable but do not calibrate new execution.
+- Calculated values remain separate from measured calibration. GPU admission
+  uses at least the larger calculated/observed peak; memory and checkpoint disk
+  reserves can only rise. CPU RSS plus GPU peak plus the base reserve deliberately
+  overcounts possible unified-memory overlap, which the UI/report discloses.
+  A bounded summary retains compatible evidence count/digest and peak-source
+  run/checkpoint revisions. Changed evidence invalidates stale initial approval;
+  continuation and worker admission also use the current calibrated reserves.
+- Feasibility v2 snapshots preserve calibration in the existing hardware-profile
+  record. Readers accept both v1 and v2 without rewriting old records. Read-only
+  calibration validates historical checkpoints; it creates no new trial or
+  optimizer and does not claim a full-epoch or duration guarantee.
+- Native local verification: rebuilt macOS ALMG on Apple M4 Max. A fresh measured
+  baseline chunk raised GPU working budget from 59392 to
+  187152 bytes and memory reserve from
+  268959744 to 343071504 bytes, using measured RSS
+  74448896 bytes. A QA fixture reported
+  306015624 available bytes, between the original and calibrated memory
+  requirements, without changing actual system RAM. The app blocked approval,
+  showed measured calibration and created no trial. Restoring normal observations
+  allowed explicit approval of run 5b282ffd44cd4c22a0b6d4339721042d, whose saved v2
+  feasibility snapshot included that evidence. Continued five updates using it.
+  An older v1 profile reopened with exact equality. After app/backend restart,
+  the v2 profile reopened unchanged, the new trial resumed to ten updates with
+  two compatible chunks in execution admission, and a fresh review recovered
+  three matching chunks. All 246 pre-existing fixture file hashes stayed unchanged.
+- Verification: 553 Python tests passed with actual Metal and warnings as errors;
+  49 Flutter tests passed; analysis and diff checks clean. New tests cover read-only
+  calibration, measured-reserve rejection, stale approval and hardware/runtime/
+  producer incompatibility while retaining historical readability. Evidence:
+  /tmp/almg-stream-calibration-native-qa/verification.json and native/test/build logs.
+- Remaining: final-evaluation/full-trial and broader/full-epoch duration prediction,
+  broader training feasibility, supported-recipe CPU fallback verification and
+  Windows/CUDA host verification. Unchanged hardware/user-action blockers stay
+  open and skipped. No generated/private artifacts, weights or unrelated edits
+  are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

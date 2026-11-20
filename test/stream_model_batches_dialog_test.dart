@@ -168,7 +168,10 @@ void main() {
       reviewed: const {'id': 'stream'}, routePrefix: 'decoder-stream-learned-windows', allowPersistence: true,
       request: (path, body) async {
         if (path.endsWith('/training-review')) return {'binding': 'reviewed'};
-        if (path.endsWith('/training-feasibility')) return {'feasible': true, 'estimates': <String, dynamic>{}, 'blockers': <String>[]};
+        if (path.endsWith('/training-feasibility')) {
+          return {'feasible': true, 'estimates': <String, dynamic>{}, 'blockers': <String>[],
+            'calibration': {'compatible_chunk_count': 1, 'observed_metal_peak_bytes': 200, 'observed_process_peak_rss_bytes': 500}};
+        }
         if (path.endsWith('/hardware-profile')) {
           expect(body['confirmed'], true);
           return {'available': true, 'record': {'device': 'Fixture GPU'}};
@@ -195,6 +198,7 @@ void main() {
     await tester.pumpAndSettle();
     await tester.ensureVisible(find.text('Approve manual streamed trial'));
     await tester.tap(find.text('Approve manual streamed trial')); await tester.pumpAndSettle();
+    expect(find.textContaining('Measured calibration: 1 compatible training chunks'), findsOneWidget);
     await tester.tap(find.text('Cancel')); await tester.pumpAndSettle(); expect(starts, 0);
     await tester.tap(find.text('Approve manual streamed trial')); await tester.pumpAndSettle();
     await tester.tap(find.text('Approve twenty-step trial')); await tester.pumpAndSettle();

@@ -134,7 +134,11 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
           Text(feasibility['feasible'] == true ? 'Hardware feasibility: current resources cover calculated trial reserves.' : 'Hardware feasibility: this trial cannot start.'),
           Text('Calculated parameters: ${feasibility['estimates']['parameter_count']} · memory reserve ${feasibility['estimates']['required_available_memory_bytes']} bytes · '
             'additional disk reserve ${feasibility['estimates']['required_free_disk_bytes']} bytes.'),
-          const Text('Float32 Metal only. Estimates cover this bounded twenty-step trial, not a full epoch. Peak memory and training duration are not measured or predicted. Resources are checked again before initialization.'),
+          if ((feasibility['calibration']?['compatible_chunk_count'] as num? ?? 0) > 0)
+            Text('Measured calibration: ${feasibility['calibration']['compatible_chunk_count']} compatible training chunks · '
+              'Metal peak ${feasibility['calibration']['observed_metal_peak_bytes']} bytes · process RSS ${feasibility['calibration']['observed_process_peak_rss_bytes']} bytes. '
+              'Measurements can only raise reserves. CPU/GPU unified memory can overlap; the admission sum is conservative.'),
+          const Text('Float32 Metal only. Calculated reserves and compatible prior measurements cover this bounded twenty-step trial, not a full epoch. No total duration prediction is available. Resources are checked again before initialization and each continuation.'),
           for (final reason in feasibility['blockers'] as List) Text(reason as String),
           ExpansionTile(title: const Text('View streamed-training feasibility record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(feasibility))]),
         ])),
