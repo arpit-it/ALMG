@@ -2836,6 +2836,93 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _beginWholeStreamBPE(String indexId) async {
+    try {
+      final review = await _request('/decoder-stream-indexes/$indexId/whole-byte-bpe-review', {'vocabulary_cap': 257});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Fit one byte-BPE merge on the full training split?'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('Count adjacent byte pairs in all ${review['population_split_counts']['train']} unique training records. Held-out records and duplicate occurrence weights are excluded from fitting.'),
+          const Text('This initial whole-split baseline learns at most one merge, for 256 or 257 IDs. It supports whole records up to 64 KiB, uses disk-backed counters, saves progress and requires explicit resume after restart. This does not approve model training or establish model compatibility. Learned tokens and permission notes may be private.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(review)),
+        ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm whole-training-split BPE fitting'))]));
+      if (confirmed != true || !mounted) return;
+      final record = await _request('/decoder-stream-indexes/$indexId/whole-byte-bpe-fits', {'confirmed': true, 'reviewed': review});
+      if (mounted) await _runWholeStreamBPE(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _showWholeStreamBPE(Map<String, dynamic> record) async {
+    final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Whole-split byte BPE · ${record['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${record['processed_records']} / ${record['total_records']} training records counted'),
+        const Text('Full saved training split only. This baseline learns at most one merge, not a larger-vocabulary BPE fit. Model training remains disabled.'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+      ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _exportWholeStreamBPE(record); }, child: const Text('Export private whole-split tokenizer')),
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume whole-split BPE fitting'))]));
+    if (resume == true && mounted) await _runWholeStreamBPE(record);
+  }
+
+  Future<void> _runWholeStreamBPE(Map<String, dynamic> initial) async {
+    var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: StatefulBuilder(builder: (context, update) {
+        refresh = update;
+        return AlertDialog(title: const Text('Fitting whole-training-split byte BPE'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: (record['total_records'] as num) == 0 ? 0 : (record['processed_records'] as num) / (record['total_records'] as num)),
+          Text('${record['processed_records']} / ${record['total_records']} training records counted'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause whole-split BPE fitting'))]);
+      }))));
+    try {
+      while (!pause && record['status'] != 'complete') {
+        record = await _request('/decoder-stream-bpe-fits/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        if (!mounted) return;
+        refresh?.call(() {});
+      }
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await _showWholeStreamBPE(record);
+    } catch (error) { refresh = null; if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); } }
+  }
+
+  Future<void> _savedWholeStreamBPE(String indexId) async {
+    try {
+      final fits = (await _request('/decoder-stream-indexes/$indexId/whole-byte-bpe-fits'))['fits'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved whole-split byte BPE fits'), children: [
+          if (fits.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No whole-split fits saved.')),
+          for (final fit in fits) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(fit as Map)),
+            child: Text('${(fit['id'] as String).substring(0, 8)} · ${fit['status']} · ${fit['processed_records']}/${fit['total_records']} records')),
+        ]));
+      if (selected != null && mounted) await _showWholeStreamBPE(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _exportWholeStreamBPE(Map<String, dynamic> record) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Export private whole-split tokenizer?'),
+      content: const Text('Save codec and fitting/provenance manifest only. Learned tokens and permission notes may be private. Source documents, pair-count database, weights and model-training approvals are excluded.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Choose whole-split tokenizer ZIP destination'))]));
+    if (confirmed != true || !mounted) return;
+    try {
+      final destination = await getSaveLocation(suggestedName: 'whole-split-byte-bpe-${(record['id'] as String).substring(0, 8)}.zip',
+        acceptedTypeGroups: [const XTypeGroup(label: 'Private tokenizer ZIP', extensions: ['zip'])]);
+      if (destination == null || !mounted) return;
+      final result = await _request('/decoder-stream-bpe-fits/${record['id']}/export', {'confirmed': true, 'reviewed': record});
+      await XFile.fromData(base64Decode(result['data'] as String), mimeType: 'application/zip', name: result['name'] as String).saveTo(destination.path);
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(title: const Text('Whole-split tokenizer ZIP saved'), content: Text(destination.path),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _showStreamIndex(Map<String, dynamic> record) async {
     final action = await showDialog<String>(context: context, builder: (context) => AlertDialog(
       title: Text('Streamed text index · ${record['status']}'), scrollable: true,
@@ -2855,6 +2942,8 @@ class _StudioPageState extends State<StudioPage> {
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'byte-statistics'), child: const Text('Analyze byte token distribution')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'tokenizers'), child: const Text('View saved streamed tokenizers')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'fit-sample'), child: const Text('Fit tokenizer on streamed sample')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'whole-byte-bpe'), child: const Text('Fit byte BPE on full training split')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-whole-byte-bpe'), child: const Text('View whole-split byte BPE fits')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'sample-experiments'), child: const Text('View streamed tokenizer experiments')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'windows'), child: const Text('View saved streamed token windows')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-byte-statistics'), child: const Text('View saved byte statistics')),
@@ -2883,6 +2972,8 @@ class _StudioPageState extends State<StudioPage> {
     if (action == 'byte-statistics') await _beginStreamByteStatistics(record);
     if (action == 'tokenizers') await _savedStreamTokenizers(record['id'] as String);
     if (action == 'fit-sample') await _fitStreamTokenizerSample(record['id'] as String);
+    if (action == 'whole-byte-bpe') await _beginWholeStreamBPE(record['id'] as String);
+    if (action == 'saved-whole-byte-bpe') await _savedWholeStreamBPE(record['id'] as String);
     if (action == 'sample-experiments') await _savedStreamTokenizerExperiments(record['id'] as String);
     if (action == 'windows') await _savedStreamWindows(record['id'] as String);
     if (action == 'saved-byte-statistics') await _savedStreamByteStatistics(record['id'] as String);

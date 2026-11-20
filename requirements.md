@@ -4345,6 +4345,60 @@ P3-LMF-03 partial progress · resumable full-index learned-tokenizer comparison 
   No external collection, downloads, weight changes, generated artifact commits
   or push; unrelated user edits and existing training artifacts are preserved.
 
+P3-LMF-03 partial progress · resumable whole-training-split one-merge byte BPE · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed indexes now offer a separately reviewed
+  “Fit byte BPE on full training split,” saved fitting inventory, pause, explicit
+  resume and private export. This initial whole-split baseline supports vocabulary
+  caps 256/257 and learns at most one merge. It counts adjacent UTF-8 byte pairs in
+  every unique training record, never heldouts or expanded duplicate occurrences,
+  with minimum pair frequency two and lexicographic byte-ID tie breaking. It does
+  not claim larger-vocabulary iterative BPE fitting.
+- SQLite stores at most 256² distinct pair counters with the existing bounded cache.
+  Per-record counters are bounded by the whole-record 65536-byte input limit. No
+  whole-corpus token sequence is retained in memory or copied to work storage. Production batches stop at 100 records or roughly 1 MiB plus at most
+  one bounded record. A 64 MiB scratch-space admission check protects counter storage.
+  Counts, cursor, byte/record totals and an ordered training-group hash chain commit
+  in the same transaction. Source/index signatures, hashes, permissions, code and
+  runtime bind approval/resume; changed scope preserves prior progress.
+- Publication uses an atomic artifacts-directory rename after committed counting.
+  Interrupted publication resumes without recounting. A lost response after rename
+  is recovered as the existing complete artifact, without overwriting it. The new
+  versioned codec format explicitly stores its training-chain hash convention,
+  actual count, cap and one-merge/64-KiB policies; it does not masquerade as the
+  earlier canonical-training-array binding. Standalone reload/encode/decode and
+  private manifest/codec ZIP export are supported. Pair databases and source text
+  are excluded from export. This codec is not admitted to model training.
+- Local app verification: rebuilt native macOS ALMG on isolated fixture port 28845.
+  Cancel created no fit. Explicit approval scanned the full 319-record training
+  population of index 393aeda5b72d4e8dac42b0568c1f45f2 (413 total; 47 validation
+  and 47 test records excluded). Native pause saved 120/319 records; backend/app
+  restart reopened the exact saved record and required explicit resume. Fit
+  51ba3a43ea88472884822929db0547cd completed 319 records / 57644 UTF-8 bytes,
+  including all eight training records above 4096 bytes without truncation.
+- The published codec has 257 IDs and learned [32,97] (space followed by “a”) at
+  frequency 3911. Independent full-training-split pair counts, training bytes/count
+  and the ordered group-chain hash matched exactly. Native Save exported a ZIP
+  containing only manifest.json and tokenizer.json. Standalone restore round-tripped
+  unseen Unicode and a long Unicode record. All 16 original source/index/tokenizer
+  files stayed byte-identical; no model trial existed. QA used one-record batches
+  for deterministic native pause; production remained at 100.
+- Evidence: /tmp/almg-whole-split-bpe-native-qa/ contains native fitting consent,
+  paused-fit-ui.json, restarted-paused-fit-ui.json, complete-fit-ui.json,
+  export consent/save evidence, ZIP, verification.json, original fingerprints and
+  build/restart/test logs. Generated work databases and codec artifacts stay there.
+- Verification: 451 Python tests passed with ALMG_METAL_TESTS=1; 34 Flutter tests
+  passed, analysis/diff checks passed. Added tests independently check global pair
+  selection and heldout exclusion, exact whole-training hash/counts, long Unicode,
+  restart/idempotence/export, invalid cap/confirmation/disk/code/permission gates,
+  atomic counter+cursor rollback, publication interruption/lost-response recovery,
+  explicit zero-merge baseline and tampered codecs. Existing formats remain intact.
+- Remaining: iterative multiple-merge full-split BPE and full-split character-BPE/
+  Unigram fitting, plus learned streamed-tokenizer model-input/admission integration,
+  remain open. This one-merge baseline does not establish larger-than-RAM ingestion
+  verification or resolve the existing hardware/Windows/scratch-space criteria;
+  unchanged blockers were skipped. No external collection, downloads, weight
+  changes, generated artifact commits or push; unrelated user edits are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
