@@ -1672,8 +1672,41 @@ class _StudioPageState extends State<StudioPage> {
         ],
         SelectableText(const JsonEncoder.withIndent('  ').convert(experiment)),
       ])),
-      actions: [TextButton(onPressed: () { Navigator.pop(context); _exportTokenizerExperiment(experiment); }, child: const Text('Export private tokenizer experiment')),
+      actions: [TextButton(onPressed: () { Navigator.pop(context); _reviewTokenizerCompatibility(experiment); }, child: const Text('Review model compatibility')),
+        TextButton(onPressed: () { Navigator.pop(context); _exportTokenizerExperiment(experiment); }, child: const Text('Export private tokenizer experiment')),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+  }
+
+  Future<void> _reviewTokenizerCompatibility(Map<String, dynamic> experiment) async {
+    final actual = experiment['vocabulary_size'] as int;
+    final size = await showDialog<int>(context: context, builder: (context) => SimpleDialog(
+      title: const Text('Choose decoder vocabulary to check'), children: [
+        const Padding(padding: EdgeInsets.all(16), child: Text('Recheck saved inputs against tokenizer IDs and lossless encoding. This read-only review does not initialize weights or approve training.')),
+        if (actual >= 4 && actual <= 256)
+          SimpleDialogOption(onPressed: () => Navigator.pop(context, actual), child: Text('Match all $actual tokenizer IDs')),
+        SimpleDialogOption(onPressed: () => Navigator.pop(context, 16), child: const Text('Default decoder: 16 IDs')),
+        SimpleDialogOption(onPressed: () => Navigator.pop(context, 256), child: const Text('Maximum decoder: 256 IDs')),
+        SimpleDialogOption(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+      ]));
+    if (size == null || !mounted) return;
+    try {
+      final report = await _request('/decoder-tokenizer-experiments/${experiment['id']}/compatibility-review',
+        {'reviewed': experiment, 'config': {'vocab_size': size}});
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Tokenizer model compatibility'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text(report['vocabulary_and_lossless_checks_passed'] == true
+            ? 'Vocabulary and lossless encoding checks passed.' : 'Compatibility checks found blockers.'),
+          Text('Model: $size IDs · tokenizer: ${report['actual_vocabulary_size']} IDs including special tokens'),
+          for (final blocker in report['compatibility_blockers'] as List) Text(blocker['message'] as String),
+          for (final split in ['train', 'validation', 'test'])
+            Text('$split: ${report['splits'][split]['lossless_documents']}/${report['splits'][split]['documents']} lossless records'),
+          Text(report['remaining_gate'] as String),
+          const Text('Training is unavailable for this experiment. This review grants no training or release approval.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(report)),
+        ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
   Future<void> _savedTokenizerExperiments(String datasetId) async {

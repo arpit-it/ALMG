@@ -4142,6 +4142,48 @@ P3-LMF-03 partial progress · explicit special-token IDs and lossy UNK policy ·
   artifacts remain available. No downloads, weight changes, generated artifact
   commits or push; unrelated user edits preserved.
 
+P3-LMF-03 partial progress · source-bound model compatibility review · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Saved tokenizer experiments now offer native
+  “Review model compatibility” with matching actual IDs, default 16 or maximum
+  256 decoder vocabulary choices. The API accepts an exact integer vocabulary
+  size in the registered bounded decoder's 4–256 range; invalid fields, booleans,
+  stale reviews, changed dataset revisions and wrong training provenance reject.
+- The version-1 read-only report restores the saved codec, counts all actual base
+  and special IDs, checks model vocabulary equality and recipe capacity, and
+  re-encodes every training/validation/test document. ID bounds and exact NFC
+  round trips are recomputed from verified source records, not cached comparison
+  claims. Explicit UNK replacement cannot satisfy lossless admission. Reports bind
+  experiment/tokenizer/dataset revisions, selected vocabulary, implementation
+  digests and exact per-split results; concurrent source changes reject publication.
+- This is a compatibility review, not model integration or training authorization.
+  Even a passing vocabulary/lossless review explicitly keeps pretraining, model
+  training and release disabled. It initializes no weights, rewrites no dataset or
+  experiment and requires the separate immutable model-tokenizer integration and
+  explicit training approval before future execution can be enabled.
+- Local app verification: rebuilt native macOS ALMG on isolated fixture port
+  28841. A saved character-BPE tokenizer matched 60 model IDs including PAD 57 /
+  BOS 58 / EOS 59, and all five records round-tripped losslessly. Selecting 16 IDs
+  reported vocabulary mismatch. Saved byte-BPE with 320 IDs against model maximum
+  256 reported both capacity and mismatch blockers. Saved Unigram with matching
+  98 IDs and replacement policy still reported validation/test lossless blockers
+  (56/112 uncovered characters). Native cancel returned without creating work.
+- Restarted backend/app, reopened the saved experiment and recomputed the native
+  report: exact contents/revision matched. All 16 existing dataset/tokenizer files
+  remained byte-identical; no model trial was created. Evidence under
+  /tmp/almg-tokenizer-compatibility-native-qa/: matching-ui.json, mismatch-ui.json,
+  oversized-ui.json, lossy-ui.json, cancel-ui.txt, restarted-matching-ui.json,
+  verification.json and native build/restart logs.
+- Verification: 429 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed; Flutter analysis and diff checks passed. Added coverage for special-ID
+  accounting, lossless matching/mismatch, oversized vocabulary, lossy heldouts,
+  invalid dimensions, stale/source/provenance failures, invalid emitted IDs,
+  distrust of cached summaries, concurrent changes, reload and no writes/weights.
+- Remaining: tokenizer adoption into an immutable reviewed dataset version,
+  configuration saved/reloaded with a trained model, and larger/streamed fitting
+  remain open. Existing hardware/Windows/scratch-space blockers were skipped.
+  P3-LMF-01 is already complete. No external collection, downloads, generated
+  artifact commits or push; unrelated user edits and all saved artifacts preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

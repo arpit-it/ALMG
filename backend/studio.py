@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -73,6 +73,7 @@ else:
     import decoder_stream_plans
     import decoder_stream_jsonl
     import decoder_tokenizer_experiments
+    import decoder_tokenizer_compatibility
     import chat_history
     import inference
     import image_recipe
@@ -2297,6 +2298,8 @@ class Handler(BaseHTTPRequestHandler):
 
             if len(parts) == 3 and parts[0] == 'decoder-datasets' and parts[2] == 'tokenizer-experiments':
                 return self.respond(decoder_tokenizer_experiments.train(ROOT, parts[1], data.get('confirmed'), data.get('reviewed'), data.get('config')))
+            if len(parts) == 3 and parts[0] == 'decoder-tokenizer-experiments' and parts[2] == 'compatibility-review':
+                return self.respond(decoder_tokenizer_compatibility.review(ROOT, parts[1], data.get('reviewed'), data.get('config')))
             if len(parts) == 3 and parts[0] == 'decoder-tokenizer-experiments' and parts[2] == 'export':
                 return self.respond(decoder_tokenizer_experiments.export(ROOT, parts[1], data.get('confirmed'), data.get('reviewed')))
             if len(parts) == 3 and parts[0] == 'decoder-streams' and parts[2] == 'jsonl-indexes':
