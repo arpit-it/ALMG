@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'architecture_feasibility_dialog.dart';
+import 'decoder_optimizer_fixture_dialog.dart';
 
 class DecoderArchitecturePlanDialog extends StatefulWidget {
   const DecoderArchitecturePlanDialog({super.key, required this.request});
@@ -70,6 +71,7 @@ class _DecoderArchitecturePlanDialogState extends State<DecoderArchitecturePlanD
           'This initialization record covers the CPU forward check only; backward results are separate diagnostics. No optimizer update, model quality, training approval or release is established by initialization. Planned memory estimates remain unmeasured; actual tensor bytes exclude runtime overhead.'),
         ExpansionTile(title: const Text('View initialized architecture record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(record))]),
       ])), actions: [
+        TextButton(onPressed: () => showDialog<void>(context: context, builder: (context) => DecoderOptimizerFixtureDialog(initialized: record, request: widget.request)), child: const Text('Train bounded optimizer fixture')),
         TextButton(onPressed: () => _backward(record), child: const Text('Check planned-model backward pass')),
         TextButton(onPressed: () => _backwardHistory(record), child: const Text('Saved backward checks')),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));

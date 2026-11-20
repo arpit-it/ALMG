@@ -6358,6 +6358,52 @@ P3-LMF-05 partial progress · measured saved-trial worker work and compatible es
   full-epoch feasibility and suitable Windows/CUDA hardware verification.
   Unchanged hardware/user-action blockers remain open and skipped.
 
+P3-LMF-06 partial progress · versioned SGD/AdamW checkpointed optimizer fixture · 2026-11-20:
+- [ ] P3-LMF-06 remains open. Added a separate bounded optimizer-training path for
+  existing freshly initialized planned decoders, preserving all prior trial and
+  artifact formats. Version-1 settings select SGD or AdamW, learning rate, warmup/
+  cosine scheduling and global gradient clipping. The ten-step fixture uses FP32
+  Metal causal gradients and NumPy optimizer arrays, with a 16384-parameter cap.
+  AdamW first/second moments and scheduler step are durable in a new checkpoint
+  format; restored execution is compared with an uninterrupted reference.
+- A resource review precedes explicit Train and save approval. AdamW moment bytes
+  are included in calculated CPU reserves. Source initialization/config/hash and
+  implementation are bound to the review; invalid settings, stale reviews and
+  unsupported resources cannot start. The fixture rejects nonfinite gradients/
+  updates and failed loss/resume checks. It retains a private trained model plus
+  a step-five checkpoint; the original initialization is never overwritten.
+  Saved history verifies file hashes and runs the saved model's own CPU inference.
+- Native verification: rebuilt and ran ALMG with the existing 8704-parameter
+  two-layer initialization, copied into an isolated fixture root. Explicitly
+  reviewed and trained SGD fixture c60181c25234492aa1c58eb4b91dd161 and AdamW
+  fixture 4e1e83b3fb924fdc8468025bc4d3e405 at learning rate 0.01. SGD train loss
+  fell 4.852477073669434 → 4.767636299133301 (synthetic validation
+  4.86411190032959 → 4.830671310424805); AdamW train loss fell to
+  3.6877036094665527 (validation 4.01680326461792). AdamW review accounted for
+  69632 moment bytes; SGD has no moment buffers. Both restored step five and
+  completed step ten with parameter and optimizer-state max error 0.0 versus the
+  uninterrupted reference, including the restored scheduler counter.
+- After app/backend restart both records reopened exactly and saved-model CPU
+  generation reproduced their token IDs. All ten new checkpoint/model/report
+  files, three source plan/initialization files and 42 prior artifact files
+  retained their hashes. No pretrained student weights were loaded and no release
+  was approved. Local evidence: /tmp/almg-optimizer-engine-native-qa/verification.json
+  and native UI captures; generated weights/checkpoints remain outside Git.
+- Validation: 586 Python tests passed with warnings as errors and Metal enabled,
+  61 Flutter tests passed, and analysis was clean. Added coverage includes strict
+  config/schedule/clipping bounds, NaN/missing-gradient/moment rejection, durable
+  AdamW moment/counter restoration, changed/tampered checkpoint rejection, consent/
+  stale-review guards, both actual Metal optimizers, private model reload and
+  optimizer edits invalidating the app's previous resource review.
+- Remaining: approved text-corpus/tokenizer integration, independent checkpoint
+  continuation/cancellation controls, gradient accumulation, configurable sequence/
+  batch/step budgets, validated mixed precision, interruption/resource monitoring
+  across general training, and the profiled 50M–100M engineering target. This is a
+  synthetic token-ID engineering fixture, not completed general pretraining or a
+  general text-generation quality result. P3-LMF-05 stays open for broader-engine
+  profiling and unavailable Windows/CUDA verification; unchanged hardware/user-
+  action blockers remain skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
