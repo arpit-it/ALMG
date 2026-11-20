@@ -158,6 +158,7 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
       content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
         Text('Saved progress: ${run['completed_steps']} / 20 updates · ${run['status']}'),
         const Text('Paused at each five-step checkpoint. Continue runs the next five updates immediately. Final metrics do not approve release.'),
+        const Text('Trial-specific hardware reserves are checked before every continuation. Insufficient resources keep the previous checkpoint so you can retry later.'),
         if (busy) const LinearProgressIndicator(),
         if (error != null) Text(error!),
         SelectableText(const JsonEncoder.withIndent('  ').convert(run)),

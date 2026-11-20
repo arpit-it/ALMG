@@ -2381,7 +2381,7 @@ class Handler(BaseHTTPRequestHandler):
                 if parts[2] == 'hardware-profile':
                     return self.respond(decoder_stream_training_feasibility.read_profile(ROOT, parts[1], data.get('confirmed')))
                 if parts[2] == 'step':
-                    return self.respond(decoder_stream_training.step(ROOT, parts[1], data.get('confirmed'), data.get('expected_revision')))
+                    return self.respond(decoder_stream_training_feasibility.step(ROOT, parts[1], data.get('confirmed'), data.get('expected_revision')))
                 if parts[2] == 'preview':
                     return self.respond(decoder_stream_previews.preview(ROOT, parts[1], data.get('confirmed'), data.get('reviewed_revision'), data.get('prompt'), data.get('max_new_tokens', 12)))
                 if parts[2] == 'previews':

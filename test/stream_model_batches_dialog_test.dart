@@ -183,6 +183,7 @@ void main() {
         if (path.endsWith('/step')) {
           steps++;
           expect(body['expected_revision'], 'zero');
+          if (steps == 1) throw StateError('Insufficient trial memory; previous checkpoint retained');
           return {'id': 'trial', 'revision': 'five', 'completed_steps': 5, 'status': 'paused'};
         }
         return {'rows': 1, 'real_target_tokens': 2, 'sequence_lengths': [2]};
@@ -199,7 +200,10 @@ void main() {
     expect(find.textContaining('Fixture GPU'), findsOneWidget);
     await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
     await tester.tap(find.text('Run next five updates')); await tester.pumpAndSettle();
-    expect(steps, 1); expect(find.text('Saved progress: 5 / 20 updates · paused'), findsOneWidget);
+    expect(steps, 1); expect(find.textContaining('Insufficient trial memory'), findsOneWidget);
+    expect(find.text('Saved progress: 0 / 20 updates · paused'), findsOneWidget);
+    await tester.tap(find.text('Run next five updates')); await tester.pumpAndSettle();
+    expect(steps, 2); expect(find.text('Saved progress: 5 / 20 updates · paused'), findsOneWidget);
   });
 
   testWidgets('batch inspector allows retry after a binding failure', (tester) async {

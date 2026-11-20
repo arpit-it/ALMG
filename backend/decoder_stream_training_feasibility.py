@@ -95,3 +95,15 @@ def read_profile(root,run_id,confirmed):
                 or report.get('training_review_sha256')!=record['training_review_sha256'] or report.get('windows_id')!=state['windows_id']
                 or report.get('training_approved') is not False or report.get('release_approved') is not False):raise ValueError('Saved feasibility snapshot changed.')
     return {'available':True,'record':record}
+
+
+def step(root,run_id,confirmed,expected_revision):
+    """Recheck current trial reserves at each explicitly requested continuation."""
+    if confirmed is not True:raise ValueError('Confirm running the next five manual updates now.')
+    with training._LOCK:
+        state=training.read(root,run_id)
+        # A stale/replayed request remains a no-op, even if resources changed.
+        if expected_revision!=state['revision'] or state['status']=='complete':return state
+        fresh=review(root,state['windows_id'],True,state['review'])
+        if not fresh['feasible']:raise training_resources.ResourceUnavailable('Streamed continuation blocked; previous checkpoint retained. '+' '.join(fresh['blockers']))
+        return training.step(root,run_id,True,expected_revision)

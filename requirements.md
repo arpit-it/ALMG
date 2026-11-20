@@ -5693,6 +5693,40 @@ P3-LMF-05 partial progress · saved hardware approval profiles for streamed tria
   skipped. No generated artifacts, private data, weights or unrelated edits
   are included in this commit.
 
+P3-LMF-05 partial progress · trial-specific feasibility on every streamed continuation · 2026-11-20:
+- [ ] P3-LMF-05 remains open. HTTP requests for the next five streamed training
+  updates now revalidate the exact training review and live model-specific memory,
+  disk, Metal working-set and runtime requirements before calling the existing
+  training engine. The same gate covers legacy trials without saved hardware
+  profiles. An insufficient-resource or unsupported-hardware result retains the
+  previous checkpoint and allows retry after conditions improve. Continuation
+  still requires explicit confirmation; stale/replayed and completed-run requests
+  remain no-ops before another admission or optimizer call.
+- The gate uses the engine's existing reentrant lock to keep review/continuation
+  sequencing consistent. Existing checkpoint formats, receipts and training
+  implementation hashes remain unchanged. The UI explains that every continuation
+  rechecks trial reserves and preserves the last checkpoint on rejection.
+- Native local verification: rebuilt macOS ALMG on Apple M4 Max and approved new
+  Unigram trial 2ecc319c916e48059d5c5887c4f7d21f. A local QA backend fixture reported one
+  byte of available memory without changing actual system memory. The app blocked
+  the first continuation, displayed the retained-checkpoint reason and kept exact
+  zero-step state and initialized artifact hashes. Restoring normal observations
+  allowed retry to five updates. The same fixture blocked an older paused trial
+  at ten updates with exact state equality. After app/backend restart, the new
+  five-step checkpoint reopened unchanged and resumed to ten updates. All
+  214 pre-existing fixture file hashes remained unchanged.
+- Verification: 549 Python tests passed with real Metal and warnings as errors;
+  49 Flutter tests passed; analysis and diff checks clean. New tests verify
+  rejection before the optimizer, unchanged files/state, successful retry, replay
+  idempotence, consent, legacy gating and unsupported Metal rejection; the widget
+  test verifies error display, unchanged progress and retry. Evidence:
+  /tmp/almg-stream-continuation-native-qa/verification.json and native/test/build logs.
+- Remaining: measured streamed-training calibration and duration prediction,
+  broader/full-epoch feasibility, persisted per-continuation resource observations,
+  supported-recipe CPU fallback verification, and Windows/CUDA host verification.
+  Unchanged hardware/user-action blockers remain open and skipped. No generated
+  artifacts, private data, weights or unrelated edits are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
