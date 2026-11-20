@@ -3916,6 +3916,50 @@ P3-LMF-02 partial progress · bound live-Qwen streamed planning evidence · 2026
   Unchanged physical power/Windows and safe scratch-space blockers were skipped
   without polling. User changes and training artifacts were preserved; no push.
 
+P3-LMF-02 partial progress · resumable streamed JSONL text preparation · 2026-11-20:
+- [ ] P3-LMF-02 remains open. Stored local sources now offer a separate confirmed
+  streamed JSONL preparation path, removing the small importer’s 16-record limit.
+  The source picker accepts .jsonl alongside .txt. Each nonblank UTF-8 physical line
+  must be an object containing exactly one string text field; unknown/duplicate
+  fields, malformed JSON, invalid Unicode, empty text and unsupported controls/
+  tokenizer limits reject the current transaction. Original lines remain bounded
+  to 64 KiB; processing uses the established bounded byte/line transaction budgets.
+- Extracted bodies use existing NFC/whitespace normalization, global exact dedup
+  and canonical normalized-text hash split buckets. The immutable shared index
+  retains original source hash/bytes, first line, byte offset, raw-line hash and
+  occurrence count. Blank lines are counted. Cursor/rows commit together and resume
+  explicitly after restart; malformed batches roll back while preserving earlier
+  progress. The new worker has its own implementation binding; existing plain-text
+  preparation implementation and previously saved indexes are unchanged. Shared
+  record review, byte analysis and private export consume the resulting index.
+- Local app verification: rebuilt native macOS ALMG on fixture port 28836. Uploaded
+  183,180-byte synthetic JSONL source b6562b4160b34b8db0c4fdc2c816177e through the
+  native picker/storage confirmation. Canceling extraction created no index.
+  Confirmed preparation of index f258e2cc52c249c19c4bce65488849eb paused at 100 lines,
+  99 unique records and byte 28,316 (fixture used 100-line steps for deterministic
+  pause verification). Backend/app restart reopened that exact committed cursor;
+  explicit resume completed all 603 lines: 601 unique, one duplicate, one blank;
+  split counts train 489 / validation 53 / test 59. Independent inspection verified
+  every extracted body, canonical group hash, split, line, offset and raw-line hash;
+  original bytes were unchanged. Native record review showed extracted bodies.
+- Native private export saved exact manifest/database copies. A standalone restored
+  copy read successfully without raw JSONL; source hash, JSONL method and line
+  provenance survived. No trial/training ran. Evidence:
+  /tmp/almg-stream-jsonl-native-qa/ (source-ui.json, preparation-consent-ui.txt,
+  paused-index-ui.json, reopened-index-ui.json, completed-index-ui.json,
+  records-ui.txt, export-review-ui.txt, export-completed-ui.txt, verification.json,
+  build/restart logs). Generated source/index/export copies are excluded from Git.
+- Verification: 410 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed, Flutter analysis and diff checks passed. Added tests cover explicit
+  consent, pause/reload/resume, extraction/dedup/lineage, private export/byte-analysis
+  compatibility, malformed-batch rollback, schema/Unicode/control/size rejection
+  and unchanged legacy plain-text behavior.
+- Remaining: larger-than-RAM acceptance is not established by this small fixture;
+  that scratch-space blocker remains open. Full streamed training/scheduling/
+  checkpoint recovery and broader mixing/incremental policies also remain open.
+  Unchanged power/Windows blockers were skipped. No external collection, weights/
+  training artifact changes, generated artifact commit or push; user edits preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

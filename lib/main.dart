@@ -2608,19 +2608,19 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
-  Future<void> _beginStreamIndex(Map<String, dynamic> source) async {
+  Future<void> _beginStreamIndex(Map<String, dynamic> source, {bool jsonl = false}) async {
     final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
-      title: const Text('Prepare line-based text index?'),
-      content: const Text('Treat each UTF-8 line as a document, normalize Unicode/whitespace and deduplicate exact normalized lines. '
+      title: Text(jsonl ? 'Prepare streamed JSONL text index?' : 'Prepare line-based text index?'),
+      content: Text(jsonl ? 'Extract the text string from each nonblank JSONL line locally. Exactly one text field is required; unknown/duplicate fields, malformed JSON, invalid Unicode, empty text or unsupported limits reject the current transaction. Each original line must fit 64 KiB. Original source hashes, line numbers, byte offsets and raw-line hashes are preserved. Unicode/whitespace normalization, global exact deduplication and stable 80/10/10 split buckets apply. Processing is bounded and can pause/resume after restart. This creates a review index and never starts training.' : 'Treat each UTF-8 line as a document, normalize Unicode/whitespace and deduplicate exact normalized lines. '
         'Stable hash buckets assign train/validation/test splits (80/10/10). Empty lines are counted. '
         'Invalid UTF-8, oversized lines or unsupported word limits stop the current batch while preserving earlier progress. '
         'This creates an index for review and does not start training.'),
       actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm line-based preparation'))],
+        TextButton(onPressed: () => Navigator.pop(context, true), child: Text(jsonl ? 'Confirm streamed JSONL preparation' : 'Confirm line-based preparation'))],
     ));
     if (confirmed != true || !mounted) return;
     try {
-      final record = await _request('/decoder-streams/${source['id']}/indexes', {'confirmed': true}, const Duration(minutes: 10));
+      final record = await _request('/decoder-streams/${source['id']}/${jsonl ? 'jsonl-indexes' : 'indexes'}', {'confirmed': true}, const Duration(minutes: 10));
       if (mounted) await _runStreamIndex(record);
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
@@ -2668,11 +2668,13 @@ class _StudioPageState extends State<StudioPage> {
       actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
         TextButton(onPressed: () => Navigator.pop(context, 'saved'), child: const Text('View saved text indexes')),
         if (source['status'] == 'stored_not_prepared') TextButton(onPressed: () => Navigator.pop(context, 'prepare'), child: const Text('Prepare streamed text index')),
+        if (source['status'] == 'stored_not_prepared') TextButton(onPressed: () => Navigator.pop(context, 'prepare-jsonl'), child: const Text('Prepare JSONL text index')),
         if (source['status'] == 'uploading') TextButton(onPressed: () => Navigator.pop(context, 'upload'), child: const Text('Resume local source upload'))],
     ));
     if (!mounted) return;
     if (action == 'upload') await _uploadStreamedSource(existing: source);
     if (action == 'prepare') await _beginStreamIndex(source);
+    if (action == 'prepare-jsonl') await _beginStreamIndex(source, jsonl: true);
     if (action == 'saved') await _savedStreamIndexes(source['id'] as String);
   }
 
@@ -2696,7 +2698,7 @@ class _StudioPageState extends State<StudioPage> {
   Future<void> _uploadStreamedSource({Map<String, dynamic>? existing}) async {
     var overlay = false;
     try {
-      final file = await openFile(acceptedTypeGroups: [const XTypeGroup(label: 'Local text source', extensions: ['txt'])]);
+      final file = await openFile(acceptedTypeGroups: [const XTypeGroup(label: 'Local text or JSONL source', extensions: ['txt', 'jsonl'])]);
       if (file == null || !mounted) return;
       final total = await file.length();
       if (!mounted) return;
