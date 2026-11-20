@@ -65,4 +65,16 @@ void main() {
     expect(find.textContaining('not a total wall-time guarantee'), findsOneWidget);
     expect(find.textContaining('Measured workflow time:'), findsNothing);
   });
+  testWidgets('fresh-worker observations display isolated peaks instead of shared-process labels', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: DecoderOptimizerFixtureDialog(initialized: const {'id': 'init', 'plan_id': 'plan'}, request: (path, body) async {
+      if (path.endsWith('/optimizer-train')) return {'isolated_workflow_measurements': {'elapsed_seconds': 1.5, 'isolated_process_peak_rss_bytes': 200, 'isolated_metal_peak_bytes': 100}};
+      return {'feasible': true, 'estimates': {}, 'blockers': <String>[]};
+    })));
+    await tester.tap(find.text('Review optimizer fixture')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Train and save optimizer fixture')); await tester.pump(); await tester.pump(const Duration(milliseconds: 300));
+    expect(find.text('Measured isolated worker time: 1.500 s.'), findsOneWidget);
+    expect(find.textContaining('Measured fresh-worker peak RSS: 200 bytes'), findsOneWidget);
+    expect(find.textContaining('RSS is a process-lifetime high-water mark'), findsNothing);
+    await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
+  });
 }

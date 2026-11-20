@@ -35,7 +35,11 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
   Future<void> _show(Map<String, dynamic> record) => showDialog<void>(context: context, builder: (context) => AlertDialog(
     title: const Text('Saved optimizer fixture'), scrollable: true,
     content: SizedBox(width: 660, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-      if (record['workflow_measurements'] case final Map observed) ...[
+      if (record['isolated_workflow_measurements'] case final Map isolated) ...[
+        Text('Measured isolated worker time: ${(isolated['elapsed_seconds'] as num).toStringAsFixed(3)} s.'),
+        Text('Measured fresh-worker peak RSS: ${isolated['isolated_process_peak_rss_bytes']} bytes · Metal peak: ${isolated['isolated_metal_peak_bytes']} bytes.'),
+        const Text('Includes worker/runtime overhead and both training trajectories, checkpoint work and CPU inference. Process launch, queue and approval waits are excluded. These measurements do not establish large-model feasibility.'),
+      ] else if (record['workflow_measurements'] case final Map observed) ...[
         Text('Measured workflow time: ${(observed['elapsed_seconds'] as num).toStringAsFixed(3)} s · sampled active Metal maximum: ${observed['sampled_active_metal_max_bytes']} bytes.'),
         const Text('Shared backend memory observations include other work; RSS is a process-lifetime high-water mark. These are not isolated trial peaks or future training-duration estimates. Timing includes both verification trajectories and checkpoint/inference work.'),
       ],
@@ -91,6 +95,7 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
       if (_review != null) ...[
         Text(_review!['feasible'] == true ? 'Resources cover calculated optimizer fixture reserves.' : 'Optimizer fixture cannot start.'),
         Text('Optimizer updates: ${_review!['estimates']['optimizer_updates']} · checkpoint step: ${_review!['estimates']['checkpoint_step']}. Batch rows: ${_review!['estimates']['effective_batch_rows']} · sequence length: ${_review!['estimates']['sequence_length']} · targets per update: ${_review!['estimates']['target_tokens_per_update']}. Calculated optimizer-state bytes: ${_review!['estimates']['optimizer_state_bytes']} · accumulation buffer: ${_review!['estimates']['gradient_accumulation_buffer_bytes']} · memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes.'),
+        if (_review!['estimates']['isolated_optimizer_memory'] case final Map memory) Text('Measured isolated optimizer peaks: RSS ${memory['isolated_process_peak_rss_bytes']} bytes · Metal ${memory['isolated_metal_peak_bytes']} bytes. The calibrated reserve never falls below the calculated reserve.'),
         if (_review!['estimates']['optimizer_work_estimate'] case final Map estimate) ...[
           Text('Estimated workflow work: ${(estimate['estimated_seconds'] as num).toStringAsFixed(3)} s from ${estimate['sample_count']} compatible measured run(s).'),
           const Text('Estimate includes both verification trajectories and checkpoint/inference work. Queue and approval waits are excluded; this is not a total wall-time guarantee. Memory reserves stay conservative.'),

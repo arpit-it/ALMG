@@ -39,3 +39,15 @@ class OptimizerEstimateTests(unittest.TestCase):
             if math.isfinite(seconds):record['revision']=digest({k:v for k,v in record.items() if k!='revision'})
             self.assertIsNone(estimates.estimate([record],current))
         record=self.record(current);record['revision']='tampered';self.assertIsNone(estimates.estimate([record],current))
+
+    def test_only_compatible_isolated_peaks_produce_a_conservative_memory_floor(self):
+        current=self.current();record=self.record(current)
+        self.assertIsNone(estimates.memory_calibration([record],current))
+        record['isolated_workflow_measurements']={'format':'almg-isolated-optimizer-measurements-v1','schema_version':1,'scope':'fresh_process_bounded_optimizer_fixture','measured':True,'isolated_trial_peak_measured':True,'elapsed_seconds':3.,'isolated_process_peak_rss_bytes':200,'isolated_metal_peak_bytes':100}
+        record['revision']=digest({k:v for k,v in record.items() if k!='revision'})
+        result=estimates.memory_calibration([record],current);self.assertEqual(result['calculated_memory_floor_bytes'],375);self.assertTrue(result['measured']);self.assertEqual(result['sample_count'],1)
+        self.assertEqual(estimates.estimate([record],current)['estimated_seconds'],3.75)
+        self.assertIsNone(estimates.memory_calibration([record],{**current,'runtime':{'python':'changed'}}))
+        for key,value in [('isolated_trial_peak_measured',False),('isolated_process_peak_rss_bytes',True),('isolated_metal_peak_bytes',-1)]:
+            changed=deepcopy(record);changed['isolated_workflow_measurements'][key]=value;changed['revision']=digest({k:v for k,v in changed.items() if k!='revision'})
+            self.assertIsNone(estimates.memory_calibration([changed],current))

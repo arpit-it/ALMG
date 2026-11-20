@@ -127,8 +127,13 @@ def review(root,plan_id,initialized,settings):
     record={'format':'almg-optimizer-fixture-review-v1','schema_version':1,'source':{'plan_id':plan_id,'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
         'config':c,'model_config':current['config'],'runtime':work_estimates.runtime(profile),'hardware':profile,'estimates':estimates,'feasible':not reasons,'blockers':reasons,
         'scope':'bounded_synthetic_updates_with_durable_optimizer_and_scheduler_checkpoint_not_general_pretraining','training_approved':False,'release_approved':False,
-        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_optimizer_estimates.py','decoder_optimizer_measurements.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
-    estimates['optimizer_work_estimate']=work_estimates.estimate(history(root,plan_id,current['id']),record)
+        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_optimizer_isolated.py','decoder_optimizer_worker.py','decoder_optimizer_estimates.py','decoder_optimizer_measurements.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
+    prior=history(root,plan_id,current['id']);estimates['optimizer_work_estimate']=work_estimates.estimate(prior,record)
+    estimates['calculated_memory_reserve_bytes']=estimates['required_available_memory_bytes']
+    calibration=work_estimates.memory_calibration(prior,record);estimates['isolated_optimizer_memory']=calibration
+    if calibration is not None:estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],calibration['calculated_memory_floor_bytes'])
+    if not hardware._fits(profile,estimates) and not any('memory/disk' in reason for reason in reasons):reasons.append('Current memory/disk does not cover isolated optimizer calibration reserves.')
+    record['feasible']=not reasons
     record['revision']=digest(record);return record
 
 

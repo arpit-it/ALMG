@@ -6708,6 +6708,57 @@ P3-LMF-06 partial progress · independently approved checkpoint continuation · 
   remain open. These synthetic runs do not establish language quality or release
   approval. Unchanged hardware/user-action blockers remain open and skipped.
 
+P3-LMF-05 partial progress · fresh-worker optimizer peaks and calibrated reserves · 2026-11-20:
+- [ ] P3-LMF-05 remains open. App-approved bounded optimizer training now executes
+  in a new local Python/MLX worker for each run. Consent, current review/source,
+  runtime and resource checks precede process launch and are checked again by the
+  engine. The parent binds the response to its nonce, actual child PID, approved
+  review and verified saved artifacts. Timeout/failure retains artifacts; no old
+  checkpoint, weights or shared Metal counters are deleted/reset.
+- The worker atomically augments its new saved run with versioned isolated peak
+  RSS/Metal measurements and elapsed worker work, including bootstrap/imports,
+  internal admission, both training trajectories, checkpoints and CPU inference.
+  Process launch, parent admission, queue/approval waits and final measurement
+  publication are excluded. Peak memory includes worker/runtime overhead. Legacy
+  shared-process observations remain readable and explicitly distinct in the UI.
+- Compatible isolated measurements update later preapproval review. The calculated
+  memory reserve remains a floor; a derived floor sums observed fresh-process RSS
+  and Metal peaks with 25% headroom, and can only raise admission above that
+  calculated reserve. Unified memory may overlap, so the sum is conservative.
+  Runtime/source/configuration/producer mismatch and non-isolated/invalid peaks
+  are ignored. Work-time estimates prefer compatible fresh-worker observations.
+  These measurements/heuristics are not large-model or exhaustion guarantees.
+- Native verification: rebuilt and ran ALMG with the isolated local 8704-parameter
+  two-layer initialization and external collection disabled. Reopened all sixteen
+  retained optimizer/continuation records before writes. Explicitly approved
+  twenty-update/two-microbatch FP32 SGD run d771750a3f814551822e03f618dfb691
+  and mixed FP16 AdamW run 8bab00e00b934e3086ec6da1a83b2815. Their distinct
+  worker PIDs were 57189/57387, separate from backend PID 51730. Measured SGD
+  peak RSS/Metal were 76414976/212288 bytes with work time 0.5497713750228286 s;
+  AdamW peaks were 82362368/246848 bytes with work time 0.5826146659674123 s.
+- Renewed review showed one compatible isolated source each and work estimates
+  0.6872142187785357/0.7282683324592654 s. Measured memory floors were below the
+  existing conservative reserves, which correctly stayed 271505728/271784256
+  bytes; disk reserves were unchanged. Canceling renewed reviews wrote no new
+  training artifacts. Both actual runs decreased loss and retained 0.0 model/
+  optimizer-state errors after midpoint checkpoint restoration.
+- After app/backend restart all eighteen legacy/isolated/continuation records,
+  CPU inference, measured peaks and calibrated memory/time reviews reopened
+  exactly without additional training. All eighty-six optimizer/continuation
+  files, three source files and 391 prior artifact files retained their hashes.
+  Evidence: /tmp/almg-isolated-native-qa/verification.json, native captures and
+  recovery-continue.log. Generated data, models and weights remain outside Git.
+- Validation: 607 Python tests passed with warnings as errors and Metal enabled,
+  67 Flutter tests passed, and analysis was clean. Tests cover real fresh-worker
+  SGD/AdamW execution, process separation, consent/review gating before launch,
+  compatible-only peak calibration, upward-floor low-memory rejection before
+  launch, no reserve reduction, source preservation,
+  persisted records and isolated-versus-shared UI labels.
+- Remaining: broader engine/continuation peak profiling, arbitrary interruption/
+  cancellation, text-corpus integration and the profiled 50M–100M target. Bounded
+  synthetic fixtures remain capped at 16384 parameters. Windows/CUDA, physical
+  power and oversized-fixture blockers remain open and skipped unchanged.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
