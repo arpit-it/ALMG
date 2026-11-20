@@ -2730,7 +2730,9 @@ class _StudioPageState extends State<StudioPage> {
         for (final split in ['train', 'validation', 'test'])
           Text('$split sample: ${record['comparison'][split]['documents_lossless']}/${record['comparison'][split]['documents']} lossless records · ${record['comparison'][split]['token_count'] ?? 'unavailable'} tokens'),
         SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
-      ])), actions: [TextButton(onPressed: () { Navigator.pop(context); _exportStreamTokenizerExperiment(record); }, child: const Text('Export private sampled tokenizer')),
+      ])), actions: [TextButton(onPressed: () { Navigator.pop(context); _beginStreamTokenizerEvaluation(record); }, child: const Text('Compare tokenizer across full index')),
+        TextButton(onPressed: () { Navigator.pop(context); _savedStreamTokenizerEvaluations(record['id'] as String); }, child: const Text('View saved full-index comparisons')),
+        TextButton(onPressed: () { Navigator.pop(context); _exportStreamTokenizerExperiment(record); }, child: const Text('Export private sampled tokenizer')),
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   }
 
@@ -2764,6 +2766,73 @@ class _StudioPageState extends State<StudioPage> {
       if (!mounted) return;
       await showDialog<void>(context: context, builder: (context) => AlertDialog(title: const Text('Sampled tokenizer ZIP saved'), content: Text(destination.path),
         actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _beginStreamTokenizerEvaluation(Map<String, dynamic> experiment) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Compare saved tokenizer across full index?'),
+      content: const Text('Read every saved record using the fitted codec without refitting. Save resumable split counts for coverage, lossless efficiency, lossy unknown replacement and unsupported records. Oversized records are counted without truncation. Source text is omitted from the report. This does not fit the full corpus, clear contamination or approve model training.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm full-index tokenizer comparison'))]));
+    if (confirmed != true || !mounted) return;
+    try {
+      final record = await _request('/decoder-stream-tokenizer-experiments/${experiment['id']}/evaluations', {'confirmed': true, 'reviewed': experiment});
+      if (mounted) await _runStreamTokenizerEvaluation(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _showStreamTokenizerEvaluation(Map<String, dynamic> record) async {
+    final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Full-index tokenizer comparison · ${record['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${record['processed_records']} / ${record['total_records']} unique records compared'),
+        const Text('The codec was not refitted. Efficiency uses lossless encoded records only; unsupported and lossy records remain explicit. Partial reports describe progress so far. This grants no model training approval.'),
+        for (final entry in (record['splits'] as Map).entries)
+          Text('${entry.key}: ${entry.value['lossless_records']}/${entry.value['records']} lossless · ${entry.value['unsupported_records']} unsupported · ${entry.value['lossy_records']} lossy · ${entry.value['encoding_failures']} encoding failures'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+      ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume full-index tokenizer comparison'))]));
+    if (resume == true && mounted) await _runStreamTokenizerEvaluation(record);
+  }
+
+  Future<void> _runStreamTokenizerEvaluation(Map<String, dynamic> initial) async {
+    var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: StatefulBuilder(builder: (context, update) {
+        refresh = update;
+        return AlertDialog(title: const Text('Comparing saved tokenizer'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: (record['total_records'] as num) == 0 ? 0 : (record['processed_records'] as num) / (record['total_records'] as num)),
+          Text('${record['processed_records']} / ${record['total_records']} compared'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause tokenizer comparison'))]);
+      }))));
+    try {
+      while (!pause && record['status'] != 'complete') {
+        record = await _request('/decoder-stream-tokenizer-evaluations/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        if (!mounted) return;
+        refresh?.call(() {});
+      }
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await _showStreamTokenizerEvaluation(record);
+    } catch (error) {
+      refresh = null;
+      if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); }
+    }
+  }
+
+  Future<void> _savedStreamTokenizerEvaluations(String experimentId) async {
+    try {
+      final reports = (await _request('/decoder-stream-tokenizer-experiments/$experimentId/evaluations'))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved full-index tokenizer comparisons'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No comparisons saved.')),
+          for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['id'] as String).substring(0, 8)} · ${report['status']} · ${report['processed_records']}/${report['total_records']} records')),
+        ]));
+      if (selected != null && mounted) await _showStreamTokenizerEvaluation(selected);
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 

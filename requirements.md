@@ -4291,6 +4291,60 @@ P3-LMF-03 partial progress · reviewed fitting samples from streamed indexes · 
   re-polled. No external collection, downloads, weight changes, generated artifact
   commits or push; unrelated user edits and prior artifacts are preserved.
 
+P3-LMF-03 partial progress · resumable full-index learned-tokenizer comparison · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Saved streamed tokenizer experiments now offer a
+  separately confirmed “Compare tokenizer across full index,” saved report inventory,
+  pause and explicit resume. Every unique record in the original saved splits is
+  visited without refitting the sampled codec or expanding duplicate occurrences.
+  Production steps process at most 100 records or roughly 1 MiB of input, with at
+  most one bounded indexed record beyond the byte threshold; SQLite retains its
+  bounded cache and reports retain no source text.
+- Version-1 reports bind experiment/tokenizer/index/source revisions and file
+  signatures, source permissions, implementation/runtime and comparison-only
+  approval. Start/final completion verify full index/source hashes; each batch checks
+  source signatures, manifest/artifact integrity and scope before and after reading.
+  Cursor and counters are published atomically together. Implementation/source/
+  permission changes and storage failures preserve the last saved batch. Restarts
+  do not automatically resume processing; complete records remain immutable.
+- Full-population split results include character coverage, source occurrences,
+  encoded/lossless/lossy/unsupported/failed records, total encoded tokens, explicit
+  UNK/boundary overhead and lossless-only compression/efficiency. Records over
+  4096 bytes are counted as unsupported without truncation. Coverage includes their
+  characters; efficiency excludes unsupported/lossy records. Exact round-trip success
+  requires all records in a completed split to encode losslessly. Bounded finding
+  samples (20 per category) retain affected groups and original line/byte/hash
+  provenance, while aggregate totals cover the full population. No contamination
+  clearance, model-vocabulary compatibility or model training approval is implied.
+- Local app verification: rebuilt native macOS ALMG on isolated fixture port 28844.
+  Cancel did not create a report. Confirmed Unigram comparison on the 413-record
+  coverage fixture, paused at 80/413, restarted backend/app and reopened the exact
+  saved record/revision. Explicit native resume completed report
+  31e6947b5b254fde8c3f06341e9701ad. Split totals were 319/47/47; unsupported counts
+  were 8/3/1 (12 total). One validation record required two UNKs and was reported
+  lossy, never lossless. Full-record round-trip flags correctly remained false.
+- A second native byte-BPE comparison, f35772e4c4324d0c8884de0e6efc043e, completed
+  all 401 records of the existing clean fixture (326/39/36), with all-record lossless
+  success true. This remains a sample-fitted 320-ID codec, not model admission.
+  Independent per-record encoding matched both reports' split totals, token counts,
+  lossless bytes and UNKs. All 16 original source/index/tokenizer files stayed
+  byte-identical; no model trial or tokenizer refit occurred. QA used one-record
+  batches to make native pause deterministic; production defaults stayed at 100.
+- Evidence: /tmp/almg-full-tokenizer-comparison-native-qa/ contains consent,
+  paused-comparison-ui.json, restarted-paused-comparison-ui.json,
+  completed-comparison-ui.json, positive-full-comparison-ui.json,
+  verification.json, original-file fingerprints and build/restart/test logs.
+- Verification: 446 Python tests passed with ALMG_METAL_TESTS=1; 34 Flutter tests
+  passed; analysis/diff checks passed. Added tests cover independent full-population
+  accounting, both batch bounds, explicit no-refit assertion, oversized/OOV/UNK
+  handling, restart/idempotence, code/source/permission changes, atomic save failure,
+  mid-batch scope changes, preserved progress and report tampering.
+- Remaining: full-corpus and incremental/resumable learned-tokenizer fitting, plus
+  streamed model-input/admission integration, remain open. Full-index comparison
+  does not turn sampled fitting into a full-corpus fit. Existing larger-than-RAM,
+  hardware/Windows/scratch-space blockers were skipped without unchanged polling.
+  No external collection, downloads, weight changes, generated artifact commits
+  or push; unrelated user edits and existing training artifacts are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
