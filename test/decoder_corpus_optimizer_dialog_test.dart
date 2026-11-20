@@ -116,4 +116,21 @@ void main() {
     await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
   });
 
+  testWidgets('recorded training resume requires its own review and shows carried versus executed work', (tester) async {
+    Map<String,dynamic>? submitted;
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},trainingResumeId:'retained',request:(path,body) async {
+      if(path.endsWith('training-resume-review'))return {'feasible':true,'training_resume_from':{'record_id':'retained','completed_steps':2},'estimates':{'reference_optimizer_updates':0,'recorded_training_optimizer_updates':18},'blockers':[]};
+      expect(path,'/decoder-corpus-optimizer-runs/retained/training-resume');submitted=body;
+      return {'training_steps_carried':2,'training_updates_executed':18,'reference_updates_executed':0,'initial_losses':{'train':2,'validation':2,'test':2},'final_losses':{'train':1,'validation':1.5,'test':1.6},'generated_text':'amber birch'};
+    })));
+    expect(find.text('Corpus SGD'),findsNothing);
+    expect(find.text('Confirm resume retained corpus recorded training'),findsNothing);
+    await tester.tap(find.text('Review recorded training resume resources'));await tester.pumpAndSettle();
+    expect(find.textContaining('Restore recorded training update 2 · remaining reference updates 0'),findsOneWidget);
+    await tester.tap(find.text('Confirm resume retained corpus recorded training'));await tester.pump();await tester.pump(const Duration(milliseconds:300));
+    expect(submitted!['confirmed'],true);expect((submitted!['reviewed'] as Map)['training_resume_from']['record_id'],'retained');
+    expect(find.textContaining('Retained training updates: 2 · new training updates executed: 18'),findsOneWidget);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
 }

@@ -147,7 +147,7 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
               'splits': saved['review']['splits'], 'estimates': reserve, 'hardware': profile,
               'feasible': not reasons, 'blockers': reasons, 'training_approved': False, 'release_approved': False,
               'implementation_sha256': digest({name: file_digest(Path(__file__).with_name(name)) for name in
-                  ('decoder_corpus_optimizer.py', 'decoder_corpus_inputs.py', 'decoder_optimizer_fixture.py', 'decoder_corpus_feedback.py', 'decoder_corpus_isolated.py', 'decoder_corpus_worker.py', 'decoder_corpus_run_cancellations.py', 'decoder_corpus_reference_resume.py',
+                  ('decoder_corpus_optimizer.py', 'decoder_corpus_inputs.py', 'decoder_optimizer_fixture.py', 'decoder_corpus_feedback.py', 'decoder_corpus_isolated.py', 'decoder_corpus_worker.py', 'decoder_corpus_run_cancellations.py', 'decoder_corpus_reference_resume.py', 'decoder_corpus_training_resume.py',
                    'decoder_architecture_backward.py', 'decoder_mixed_precision.py', 'planned_decoder.py', 'decoder_tokenizer.py')})}
     reserve['calculated_memory_reserve_bytes']=reserve['required_available_memory_bytes']
     memory,work=feedback.feedback(history(root,initialized,reviewed_inputs),result) if execution_mode=='fresh_process' else (None,None)
@@ -170,15 +170,21 @@ def _generated(model, tokenizer):
     return tokens, tokenizer.decode_preview(tokens) if hasattr(tokenizer, 'decode_preview') else tokenizer.decode(tokens)
 
 
-def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execution_mode='shared_backend', request_id=None, reference_resume_id=None):
+def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execution_mode='shared_backend', request_id=None, reference_resume_id=None, training_resume_id=None):
     if confirmed is not True:
         raise ValueError('Explicitly confirm corpus training and private checkpoint/model storage.')
     if request_id is not None:run_cancellation.validate(request_id)
     if __package__:from . import decoder_corpus_reference_resume as reference_resume
     else:import decoder_corpus_reference_resume as reference_resume
+    if __package__:from . import decoder_corpus_training_resume as training_resume
+    else:import decoder_corpus_training_resume as training_resume
+    if reference_resume_id is not None and training_resume_id is not None:raise ValueError('Choose one retained corpus phase.')
     parent = None if reference_resume_id is None else reference_resume.source(root, reference_resume_id)[0]
     current = review(root, initialized, reviewed_inputs, settings, execution_mode) if parent is None else reference_resume.review(root, reference_resume_id, execution_mode)
-    keys = ('format', 'schema_version', 'source', 'corpus_id', 'corpus_revision', 'config', 'model_config', 'runtime', 'splits', 'estimates', 'implementation_sha256', 'execution_mode', 'reference_resume_from')
+    if training_resume_id is not None:
+        parent=training_resume.source(root,training_resume_id)[0]
+        current=training_resume.review(root,training_resume_id,execution_mode)
+    keys = ('format', 'schema_version', 'source', 'corpus_id', 'corpus_revision', 'config', 'model_config', 'runtime', 'splits', 'estimates', 'implementation_sha256', 'execution_mode', 'reference_resume_from', 'training_resume_from')
     if (not isinstance(approved, dict) or approved.get('revision') != digest({k: v for k, v in approved.items() if k != 'revision'})
             or any(approved.get(key) != current.get(key) for key in keys)):
         raise ValueError('Corpus optimizer review changed. Reopen it before training.')
@@ -221,15 +227,28 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
                 if state['step']<end:raise run_cancellation.Stopped(values,state,logs,phase)
                 return values, state, logs
             empty = {'step': 0, 'm': {}, 'v': {}}; midpoint = c['steps'] // 2
-            reference_values, reference_initial_state = (initial_parameters, empty) if parent is None else reference_resume.state(root,parent)
-            reference, reference_state, reference_log = optimize(reference_values, reference_initial_state, c['steps'])
-            reference_log = reference_prefix + reference_log
-            phase='checkpointed_training'
-            halfway, state, first = optimize(initial_parameters, empty, midpoint)
-            model.parameters = halfway
-            optimizer.checkpoint(folder / f'step-{midpoint}', model, state, c, approved['revision'])
-            restored, state = optimizer.restore(folder / f'step-{midpoint}', c, approved['revision'])
-            values, state, last = optimize(restored.parameters, state, c['steps'])
+            if training_resume_id is None:
+                reference_values, reference_initial_state = (initial_parameters, empty) if parent is None else reference_resume.state(root,parent)
+                reference, reference_state, reference_log = optimize(reference_values, reference_initial_state, c['steps'])
+                reference_log = reference_prefix + reference_log
+                phase='checkpointed_training'
+                values,state,first=optimize(initial_parameters,empty,midpoint)
+            else:
+                reference,reference_state=training_resume.reference(root,parent)
+                reference_log=parent['reference_step_log'];phase='checkpointed_training'
+                values,state=reference_resume.state(root,parent);first=parent['step_log']
+                if state['step']<midpoint:
+                    values,state,new_logs=optimize(values,state,midpoint)
+                    first=first+new_logs
+            if state['step']==midpoint:
+                model.parameters=values
+                optimizer.checkpoint(folder/f'step-{midpoint}',model,state,c,approved['revision'])
+                restored,state=optimizer.restore(folder/f'step-{midpoint}',c,approved['revision'])
+                values=restored.parameters
+            elif training_resume_id is not None:
+                checkpoint_model,checkpoint_state=optimizer.restore(_folder(root,parent['id'])/f'step-{midpoint}',c,parent['review']['revision'])
+                optimizer.checkpoint(folder/f'step-{midpoint}',checkpoint_model,checkpoint_state,c,approved['revision'])
+            values, state, last = optimize(values, state, c['steps'])
             parameter_error = max(float(np.max(np.abs(values[name] - reference[name]))) for name in values)
             moment_error = max([0.] + [float(np.max(np.abs(state[kind][name] - reference_state[kind][name]))) for kind in ('m', 'v') for name in state[kind]])
             probe = windows['test'][0]['inputs']
@@ -255,7 +274,7 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
     observed = observer.finish()
     observed['scope'] = 'bounded_corpus_optimizer_in_shared_backend' if execution_mode=='shared_backend' else 'phase_samples_inside_isolated_corpus_worker'
     if execution_mode=='fresh_process':observed['limitations']='Synchronized phase samples inside one fresh corpus worker, not its isolated lifetime peaks. See isolated_workflow_measurements when published. Sampling starts after admission and excludes worker bootstrap/history validation; no total wall-time or future-duration guarantee.'
-    observed['limitations'] += ' Corpus scope: starts after admission/snapshot validation and includes model loading, checkpoint restore, all split evaluations and tokenizer-backed CPU generation. Fresh runs execute both trajectories; reference resume executes only the retained reference remainder followed by the original recorded training budget.'
+    observed['limitations'] += ' Corpus scope: starts after admission/snapshot validation and includes model loading, checkpoint restore, all split evaluations and tokenizer-backed CPU generation. Fresh runs execute both trajectories; reference resume executes only the retained reference remainder followed by the original recorded training budget. Recorded-training resume reuses the completed reference and executes only its remaining original training updates.'
     record = {'format': 'almg-corpus-optimizer-run-v3', 'schema_version': 3, 'id': identifier,
               'status':'completed','request_id':request_id,
               'created_at': datetime.now(timezone.utc).isoformat(), 'review': approved, 'admission': current,
@@ -275,9 +294,10 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
               'inference_runtime': 'planned_decoder_numpy_cpu', 'pretrained_student_weights_loaded': False,
               'training_approved': True, 'release_approved': False, 'source_initialization_modified': False,
               'workflow_measurements': observed,
-              'limitations': 'Small reviewed text corpus, FP32 or bounded mixed FP16 SGD/AdamW, FP32 masters, one/two effective rows and one/two token-weighted microbatches only. Held-out losses are diagnostics; no quality/release gate. Fresh runs execute both comparison trajectories. Reference resume carries saved updates and executes only the reference remainder before original checkpointed training. Saved midpoint continuation and retained reference resume require separate approval; recorded-training partial resume remains unavailable. Fixed-scale mixed precision is validated only for bounded corpus fixtures; split losses use the saved FP32 master model, not a general quality or memory-savings claim.',
+              'limitations': 'Small reviewed text corpus, FP32 or bounded mixed FP16 SGD/AdamW, FP32 masters, one/two effective rows and one/two token-weighted microbatches only. Held-out losses are diagnostics; no quality/release gate. Fresh runs execute both comparison trajectories. Reference resume carries saved updates and executes only the reference remainder before original checkpointed training. Saved midpoint continuation and retained reference resume require separate approval; recorded-training partial resume likewise requires its own exact-state approval. Fixed-scale mixed precision is validated only for bounded corpus fixtures; split losses use the saved FP32 master model, not a general quality or memory-savings claim.',
               'files': {str(path.relative_to(folder)): file_digest(path) for path in folder.rglob('*') if path.is_file()}}
     record.update(reference_resume.metadata(approved,c['steps']))
+    record.update(training_resume.metadata(approved,state['step']))
     if parent is not None:record['reference_step_log']=reference_log
     record['revision'] = digest(record)
     (folder / 'record.json').write_text(json.dumps(record, allow_nan=False, indent=2))
@@ -295,6 +315,9 @@ def read(root, identifier, _seen=None):
     if __package__:from . import decoder_corpus_reference_resume as reference_resume
     else:import decoder_corpus_reference_resume as reference_resume
     reference_resume.lineage(root,record,seen)
+    if __package__:from . import decoder_corpus_training_resume
+    else:import decoder_corpus_training_resume
+    decoder_corpus_training_resume.lineage(root,record,seen)
     if record.get('format')=='almg-corpus-optimizer-run-v4':return run_cancellation.read(root,folder,record)
     approved = record['review']; c = configuration(approved['config'], approved['config']['sequence_length'])
     midpoint = c['steps'] // 2

@@ -38,12 +38,12 @@ def _execute(root,payload,approved,action):
         raise ValueError('Corpus worker timed out; any saved model/checkpoint artifacts are retained.')
     if process.returncode:raise ValueError('Corpus worker failed; any saved artifacts are retained. '+stderr[-600:])
     response=json.loads(stdout)
-    if action in ('full','reference_resume'):record=training.read(root,response['record_id']);observed=training.feedback.measurements(record)
+    if action in ('full','reference_resume','training_resume'):record=training.read(root,response['record_id']);observed=training.feedback.measurements(record)
     else:
         module=_continuations();record=module.read(root,response['record_id']);observed=module.measured_feedback.measurements(record)
     if action=='reference_resume' and record['review'].get('reference_resume_from')!=approved.get('reference_resume_from'):raise ValueError('Retained reference worker source changed.')
-    expected=approved['corpus_id'] if action in ('full','reference_resume') else (approved['source']['record_id'] if action=='continuation' else approved['resume_from']['record_id'])
-    actual=record['review']['corpus_id'] if action in ('full','reference_resume') else (record['review']['source']['record_id'] if action=='continuation' else record['review']['resume_from']['record_id'])
+    expected=approved['corpus_id'] if action in ('full','reference_resume','training_resume') else (approved['source']['record_id'] if action=='continuation' else approved['resume_from']['record_id'])
+    actual=record['review']['corpus_id'] if action in ('full','reference_resume','training_resume') else (record['review']['source']['record_id'] if action=='continuation' else record['review']['resume_from']['record_id'])
     if (response.get('nonce')!=nonce or response.get('process_id')!=process.pid or process.pid==os.getpid()
             or observed is None or observed['process_id']!=process.pid or record['review']!=approved or record.get('request_id')!=expected_token
             or record['review']['execution_mode']!='fresh_process' or actual!=expected):
@@ -102,3 +102,20 @@ def run_reference_resume(root,identifier,confirmed,approved,request_id=None):
         raise ValueError('Retained reference review changed; reopen it before confirming.')
     if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Reference resume is blocked by current resources.')
     return _execute(root,{'identifier':identifier,'request_id':request_id},approved,'reference_resume')
+
+def review_training_resume(root,identifier):
+    if __package__:from . import decoder_corpus_training_resume
+    else:import decoder_corpus_training_resume
+    return decoder_corpus_training_resume.review(root,identifier)
+
+
+def run_training_resume(root,identifier,confirmed,approved,request_id=None):
+    if confirmed is not True:raise ValueError('Explicitly confirm retained recorded-training resume.')
+    if request_id is not None:training.run_cancellation.validate(request_id)
+    current=review_training_resume(root,identifier)
+    keys=('format','schema_version','training_resume_from','source','corpus_id','corpus_revision','config','model_config','runtime','estimates','implementation_sha256','execution_mode')
+    if (not isinstance(approved,dict) or approved.get('revision')!=training.digest({k:v for k,v in approved.items() if k!='revision'})
+            or any(approved.get(key)!=current.get(key) for key in keys)):
+        raise ValueError('Retained recorded-training review changed; reopen it before confirming.')
+    if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Recorded-training resume is blocked by current resources.')
+    return _execute(root,{'identifier':identifier,'request_id':request_id},approved,'training_resume')

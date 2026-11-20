@@ -7493,6 +7493,52 @@ P3-LMF-06 partial progress · separately approved retained-reference resume · 2
   hardware/user-action blockers remain open and skipped. This verifies bounded
   private optimizer recovery, with no language-quality or release acceptance claim.
 
+P3-LMF-06 partial progress · separately approved recorded-training resume · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Fresh corpus runs canceled during recorded training
+  now offer a separate phase-specific resource review and explicit resume approval.
+  The review binds the exact retained record/revision/files, original initialization,
+  corpus, optimizer/precision settings and actual training counter. Resume reuses the
+  saved completed reference and its FP32 optimizer state without reference retraining,
+  restores the active FP32 training model/moments and executes only remaining original
+  updates. It preserves carried logs and separately records carried/executed work.
+- Before the midpoint, resumed training reaches and restores the original midpoint
+  checkpoint. At/after the midpoint, its saved model/moments are preserved in a new
+  checkpoint bound to the new approval, while training resumes from the actual later
+  counter. Completed and wrong-phase sources, stale approvals, changed ancestry and
+  cyclic/excessive lineage are rejected. Re-cancellation saves another private partial;
+  each further resume requires another review, with at most sixteen ancestors across
+  reference-to-training recovery. All source files remain immutable.
+- Separate isolated recorded-training resume time/peak measurements are persisted
+  with exact worker identity and approval binding. Completed/canceled resume samples
+  cannot calibrate full fresh-run forecasts. Existing saved reference resumes and
+  ordinary midpoint continuations remain readable and functional.
+- Native verification used the rebuilt local ALMG app and offline fixture backend at
+  port 28914. SGD fresh training canceled at update 2, resumed and canceled at 3, then
+  completed using 17 remaining updates. Mixed FP16 AdamW restored the existing update-12
+  state, canceled at 13, then completed with seven remaining updates. Both executed
+  zero reference optimizer updates, had zero final weight/moment difference from the
+  retained completed reference, decreasing full-split training loss and matching
+  reloaded tokenizer-backed CPU generation. Both outputs also completed independently
+  approved midpoint continuation from update 10 to 20 in the native app.
+- After app/backend restart, all latest 20 corpus optimizer records and both new
+  midpoint continuations reopened exactly in native histories; backend readers
+  verified all 43 retained corpus/continuation records, including older records outside
+  the twenty-entry UI history. All 404 retained files, including all original 358,
+  remained byte-identical. Evidence: /tmp/almg-corpus-training-resume-native-qa/
+  verification.json, native.log, midpoint.log, restart.log and captured reviews/results.
+  No external collection occurred; models, receipts and QA outputs stay outside Git.
+- Validation: 640 Python tests passed with warnings as errors and Metal enabled;
+  all 82 Flutter tests passed and analysis was clean. Real SGD/mixed AdamW tests
+  restore source training updates 0, 1, 10 and 11; re-cancel and finish; assert the exact
+  executed update indices with no reference replay, preserved midpoint/model/moment
+  bytes, immutable ancestors, stale approval/cycle rejection, isolated worker identity,
+  zero-update cancellation and exclusion from fresh-run calibration.
+- Remaining: arbitrary durable OS/process interruption recovery, exact resumed-work
+  calibration, broader model/budget support and profiling, quality evaluation and
+  profiled 50M–100M training. P3-LMF-01 remains complete for its recorded architecture
+  scope. Unchanged independent hardware/user-action blockers remain open and skipped;
+  this bounded recovery slice establishes no language-quality or release acceptance.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
