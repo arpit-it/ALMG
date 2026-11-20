@@ -2,6 +2,7 @@
 from pathlib import Path
 import json
 from tempfile import NamedTemporaryFile
+from time import perf_counter
 if __package__:
     from . import decoder_stream_training as training,decoder_architecture_feasibility as hardware,training_resources
     from .run_manifest import digest,file_digest
@@ -101,9 +102,14 @@ def step(root,run_id,confirmed,expected_revision):
     """Recheck current trial reserves at each explicitly requested continuation."""
     if confirmed is not True:raise ValueError('Confirm running the next five manual updates now.')
     with training._LOCK:
+        started=perf_counter()
         state=training.read(root,run_id)
         # A stale/replayed request remains a no-op, even if resources changed.
         if expected_revision!=state['revision'] or state['status']=='complete':return state
         fresh=review(root,state['windows_id'],True,state['review'])
         if not fresh['feasible']:raise training_resources.ResourceUnavailable('Streamed continuation blocked; previous checkpoint retained. '+' '.join(fresh['blockers']))
-        return training.step(root,run_id,True,expected_revision)
+        if __package__:
+            from . import decoder_stream_training_measurements as measurements
+        else:
+            import decoder_stream_training_measurements as measurements
+        return measurements.execute(root,state,fresh,started)

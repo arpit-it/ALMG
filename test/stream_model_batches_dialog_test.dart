@@ -173,6 +173,10 @@ void main() {
           expect(body['confirmed'], true);
           return {'available': true, 'record': {'device': 'Fixture GPU'}};
         }
+        if (path.endsWith('/measurements')) {
+          expect(body['confirmed'], true);
+          return {'records': [{'completed_steps': 5}], 'estimated_remaining_update_checkpoint_seconds': 3.0, 'remaining_chunks': 3};
+        }
         if (path.endsWith('/training-begin')) {
           starts++;
           expect(body['reviewed'], {'binding': 'reviewed'});
@@ -204,6 +208,9 @@ void main() {
     expect(find.text('Saved progress: 0 / 20 updates · paused'), findsOneWidget);
     await tester.tap(find.text('Run next five updates')); await tester.pumpAndSettle();
     expect(steps, 2); expect(find.text('Saved progress: 5 / 20 updates · paused'), findsOneWidget);
+    await tester.tap(find.text('View continuation measurements')); await tester.pumpAndSettle();
+    expect(find.text('Saved measured chunks: 1'), findsOneWidget);
+    expect(find.text('Estimated remaining update/checkpoint work: 3.0 seconds · 3 chunks.'), findsOneWidget);
   });
 
   testWidgets('batch inspector allows retry after a binding failure', (tester) async {

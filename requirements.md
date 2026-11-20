@@ -5727,6 +5727,52 @@ P3-LMF-05 partial progress · trial-specific feasibility on every streamed conti
   Unchanged hardware/user-action blockers remain open and skipped. No generated
   artifacts, private data, weights or unrelated edits are committed.
 
+P3-LMF-05 partial progress · measured isolated streamed chunks and limited work estimate · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Each explicitly requested five-update streamed
+  continuation now runs in a fresh local Python/Metal process. Parent and worker
+  check trial-specific admission, and saved observations bind before/after state
+  revisions, approval/review, resulting checkpoint manifest, both admission
+  snapshots and measurement implementation. Original training/checkpoint formats
+  and hashes are unchanged; existing trials remain readable and resumable.
+- Measurements distinguish worker elapsed work from broader request work, which
+  includes parent admission and worker startup but excludes lock queue and metric
+  publication. Metal allocator peak excludes cache; process peak RSS includes
+  interpreter/imports, CPU loading/source validation and checkpoint saving. Their
+  unified-memory usage may overlap, so no combined measured CPU/GPU peak is claimed.
+  The final chunk explicitly records that it includes held-out evaluation.
+- Saved trial dialogs expose immutable continuation observations and a limited
+  remaining update/checkpoint estimate: largest observed same-run nonfinal request
+  work multiplied by remaining five-update chunks. It excludes final held-out
+  evaluation and manual pauses; hardware/load changes can invalidate comparison.
+  No full-epoch or full-training duration is claimed. Legacy trials with no
+  measurements display no inferred estimate. Replays do not run another worker.
+- Worker errors/timeouts tell users to inspect the last saved checkpoint. If
+  measurement publication fails after a successful training chunk, the app names
+  the advanced progress and retains the checkpoint; replaying the old request
+  returns saved progress rather than applying duplicate updates.
+- Native verification: rebuilt macOS ALMG on Apple M4 Max with the existing
+  Unigram fixture. Run 8fa76c716bd244b49fe8b59ee05cdfa6 completed twenty updates through
+  four distinct worker PIDs. First-chunk measurements recorded Metal peak
+  187152 bytes, peak RSS 70205440 bytes, worker work
+  0.0942474160110578 seconds and request work 0.3491889579454437 seconds;
+  the UI showed the resulting three-chunk remaining-work estimate. App/backend
+  restart recovered the first checkpoint and measurement record exactly. Continued
+  through 10/15/20 updates and opened all four saved measurements; the final chunk
+  flagged held-out evaluation, covering 298 validation and
+  273 test windows. Release remained unapproved. An older trial showed no
+  measurements/estimate. All 225 pre-existing fixture file hashes stayed unchanged.
+- Verification: 551 Python tests passed with actual Metal and warnings as errors;
+  both final focused measurement tests passed; 49 Flutter tests passed; analysis
+  and diff checks clean. Tests cover isolated peaks, duration scope, checkpoint
+  bindings, tamper rejection, consent, replay and worker/publication recovery.
+  Evidence: /tmp/almg-stream-chunk-measurements-native-qa/verification.json,
+  native-finish.log, recovery.log and test/build logs.
+- Remaining: feed compatible streamed measurements back into subsequent admission
+  estimates, estimate final evaluation/full-trial and broader/full-epoch duration,
+  supported-recipe CPU fallback verification and Windows/CUDA host verification.
+  Unchanged hardware/user-action blockers remain open and skipped. No private or
+  generated artifacts, weights or unrelated user edits are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -165,6 +165,22 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
       ])), actions: [
         TextButton(onPressed: busy ? null : () async {
           try {
+            final result = await widget.request('/decoder-stream-training-runs/${run['id']}/measurements', {'confirmed': true});
+            if (!context.mounted) return;
+            await showDialog<void>(context: context, builder: (context) => AlertDialog(
+              title: const Text('Streamed-trial chunk measurements'), scrollable: true,
+              content: SizedBox(width: 660, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Text('Saved measured chunks: ${(result['records'] as List).length}'),
+                if (result['estimated_remaining_update_checkpoint_seconds'] == null) const Text('No measured nonfinal chunk is available for a remaining-work estimate.')
+                else Text('Estimated remaining update/checkpoint work: ${result['estimated_remaining_update_checkpoint_seconds']} seconds · ${result['remaining_chunks']} chunks.'),
+                const Text('Estimate uses the largest observed nonfinal chunk in this run, including admission and worker startup. It excludes final held-out evaluation, queue time and manual pauses; hardware/load changes can invalidate comparison. '
+                  'Each measured chunk uses a fresh process. Metal allocator peak excludes cache; process RSS includes CPU/loading and may overlap GPU memory. No full-epoch duration or combined measured CPU/GPU peak is claimed.'),
+                SelectableText(const JsonEncoder.withIndent('  ').convert(result)),
+              ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+          } catch (failure) { if (context.mounted) update(() => error = failure.toString()); }
+        }, child: const Text('View continuation measurements')),
+        TextButton(onPressed: busy ? null : () async {
+          try {
             final profile = await widget.request('/decoder-stream-training-runs/${run['id']}/hardware-profile', {'confirmed': true});
             if (!context.mounted) return;
             await showDialog<void>(context: context, builder: (context) => AlertDialog(
