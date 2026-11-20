@@ -1589,6 +1589,8 @@ class _StudioPageState extends State<StudioPage> {
       content: SizedBox(width: 620, child: SelectableText(const JsonEncoder.withIndent('  ').convert(manifest))),
       actions: [
         TextButton(onPressed: () { Navigator.pop(context); _reviewDecoderSourcePermission(manifest); }, child: const Text('Review source permissions')),
+        TextButton(onPressed: () { Navigator.pop(context); _trainBpeExperiment(manifest); }, child: const Text('Train byte BPE experiment')),
+        TextButton(onPressed: () { Navigator.pop(context); _savedTokenizerExperiments(manifest['id'] as String); }, child: const Text('View saved tokenizer experiments')),
         TextButton(onPressed: () { Navigator.pop(context); _mixDecoderDatasets(manifest); }, child: const Text('Mix with another local dataset')),
         TextButton(onPressed: () { Navigator.pop(context); _identifyDecoderLanguages(manifest['id'] as String); }, child: const Text('Identify local document languages')),
         TextButton(onPressed: () { Navigator.pop(context); _savedDecoderLanguages(manifest['id'] as String); }, child: const Text('View saved language reports')),
@@ -1612,6 +1614,74 @@ class _StudioPageState extends State<StudioPage> {
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
       ],
     ));
+  }
+
+  Future<void> _trainBpeExperiment(Map<String, dynamic> dataset) async {
+    final cap = await showDialog<int>(context: context, builder: (context) => SimpleDialog(
+      title: const Text('Choose byte BPE vocabulary cap'), children: [
+        for (final size in [256, 272, 320, 512]) SimpleDialogOption(onPressed: () => Navigator.pop(context, size), child: Text('$size tokens maximum')),
+      ]));
+    if (cap == null || !mounted) return;
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Fit byte BPE on the training split?'),
+      content: Text('Fit deterministic byte-pair merges on ${dataset['splits']['train']} training records only, with a $cap-token vocabulary cap. '
+        'Samples must fit 4096 UTF-8 bytes; this experiment supports at most 16 documents. Each unique training record contributes once; mixture weights are not expanded. Validation/test records are encoded for comparison and never fitted. '
+        'Check NFC Unicode round trips and compare token counts with the fixed byte alphabet. Learned tokens may encode private training phrases. '
+        'This saves a separate tokenizer experiment; the dataset tokenizer is preserved. Model training with this artifact, special tokens and Unigram are unavailable.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm BPE fitting'))]));
+    if (confirmed != true || !mounted) return;
+    try {
+      final experiment = await _request('/decoder-datasets/${dataset['id']}/tokenizer-experiments',
+        {'confirmed': true, 'reviewed': dataset, 'config': {'vocabulary_cap': cap}}, const Duration(minutes: 2));
+      if (mounted) await _showTokenizerExperiment(experiment);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _showTokenizerExperiment(Map<String, dynamic> experiment) async {
+    await showDialog<void>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Byte BPE experiment verified'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${experiment['vocabulary_size']} vocabulary entries · cap ${experiment['config']['vocabulary_cap']}'),
+        const Text('Training records only were fitted. Each saved split passed NFC round-trip checks. This experiment does not enable model training.'),
+        for (final split in ['train', 'validation', 'test']) Text('$split: ${experiment['comparison'][split]['baseline_byte_tokens']} byte tokens → ${experiment['comparison'][split]['bpe_tokens']} BPE tokens'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(experiment)),
+      ])),
+      actions: [TextButton(onPressed: () { Navigator.pop(context); _exportTokenizerExperiment(experiment); }, child: const Text('Export private tokenizer experiment')),
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+  }
+
+  Future<void> _savedTokenizerExperiments(String datasetId) async {
+    try {
+      final experiments = (await _request('/decoder-datasets/$datasetId/tokenizer-experiments'))['experiments'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved tokenizer experiments'), children: [
+          if (experiments.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved tokenizer experiments.')),
+          for (final experiment in experiments) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(experiment as Map)),
+            child: Text('${(experiment['id'] as String).substring(0, 8)} · byte BPE · ${experiment['vocabulary_size']} tokens')),
+        ]));
+      if (selected != null && mounted) await _showTokenizerExperiment(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _exportTokenizerExperiment(Map<String, dynamic> experiment) async {
+    final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: const Text('Export private BPE tokenizer?'),
+      content: const Text('Save the fitted tokenizer and comparison manifest in a private ZIP. Learned byte tokens may encode private training phrases. Dataset documents and model weights are excluded. No training approval is included.'),
+      actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+        TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Choose tokenizer ZIP destination'))]));
+    if (confirmed != true || !mounted) return;
+    try {
+      final destination = await getSaveLocation(suggestedName: 'tokenizer-experiment-${(experiment['id'] as String).substring(0, 8)}.zip',
+        acceptedTypeGroups: [const XTypeGroup(label: 'Private tokenizer ZIP', extensions: ['zip'])]);
+      if (destination == null || !mounted) return;
+      final result = await _request('/decoder-tokenizer-experiments/${experiment['id']}/export', {'confirmed': true, 'reviewed': experiment});
+      await XFile.fromData(base64Decode(result['data'] as String), mimeType: 'application/zip', name: result['name'] as String).saveTo(destination.path);
+      if (!mounted) return;
+      await showDialog<void>(context: context, builder: (context) => AlertDialog(title: const Text('Private tokenizer ZIP saved'), content: Text(destination.path),
+        actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
   Future<void> _reviewDecoderSourcePermission(Map<String, dynamic> parent) async {

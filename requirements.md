@@ -3960,6 +3960,52 @@ P3-LMF-02 partial progress · resumable streamed JSONL text preparation · 2026-
   Unchanged power/Windows blockers were skipped. No external collection, weights/
   training artifact changes, generated artifact commit or push; user edits preserved.
 
+P3-LMF-03 partial progress · approved byte-level BPE comparison experiments · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Independent tokenizer work now uses the verified
+  small-dataset path while P3-LMF-02's larger-than-RAM/scratch-space criterion stays
+  open. A separate byte-level BPE engine deterministically fits adjacent byte-pair
+  merges on explicitly approved training records only, with a configurable 256–512
+  vocabulary cap, minimum pair frequency two and lexicographic token-ID tie breaks.
+  The fixed 256-byte alphabet covers valid UTF-8; merges never cross documents.
+  Each unique training record contributes once; mixture weights are not expanded.
+- The bounded experiment supports at most sixteen documents / 4096 UTF-8 bytes per
+  sample, saves exact dataset/config approval evidence and training-document hashes,
+  and compares fixed-byte/BPE token counts, efficiency, unknown-token counts and NFC
+  round trips independently for train/validation/test. Held-out records are encoded
+  but never fitted. Versioned tokenizer/manifest files are immutable, checksum-bound,
+  reloadable and privately exportable; learned merges may encode private phrases,
+  which the confirmation/export UI discloses. Original dataset/tokenizer files and
+  all existing model tokenizer contracts are preserved.
+- Model training with these experiment artifacts is deliberately unavailable;
+  incompatible vocabularies/configurations and legacy model-tokenizer loading are
+  rejected. A learned vocabulary over 256 entries requires a future compatible
+  architecture, and no model-pretraining integration or special tokens are claimed.
+- Local app verification: rebuilt native macOS ALMG on fixture port 28837 with a
+  five-record multilingual dataset. Canceling fitting created no experiment.
+  Explicit training-split approval produced experiment
+  2502ea1037e14beca625dbcb6a7a2767: 64 merges / 320 vocabulary entries from three
+  training records. All five records round-tripped. Repetitive synthetic training
+  text used 661 fixed-byte tokens versus 15 BPE tokens; validation stayed 127/127
+  and test 175/175. These sample-specific counts are not general compression or
+  model-quality evidence. Independent checks recounted every split and verified
+  fitting hash/artifact against training records only; dataset files stayed exact.
+- Native private ZIP export contained exactly the saved tokenizer and manifest,
+  without dataset documents or weights. Exported tokenizer restored and round-
+  tripped unseen résumé/Japanese/Hindi/emoji text. Backend/app restart reopened the
+  identical experiment without refitting. No model trial or model was created.
+  Evidence: /tmp/almg-byte-bpe-native-qa/ (fitting-consent-ui.txt, experiment-ui.json,
+  reopened-experiment-ui.json, export-consent-ui.txt, verification.json and build/
+  restart/test logs). Generated artifacts remain outside Git.
+- Verification: 413 Python tests passed with ALMG_METAL_TESTS=1, 34 Flutter tests
+  passed; Flutter analysis and diff checks passed. Tests cover golden merge IDs,
+  deterministic fitting, unseen Unicode, training-split isolation, malformed IDs/
+  merges/config, stale review/consent, checksum/reload/export and pretraining rejection.
+- Remaining: plain BPE, Unigram, special-token definitions, larger/streamed fitting,
+  generated-model compatibility and saving the trained BPE configuration with a model
+  remain open. P3-LMF-02 and prior hardware/Windows/scratch-space blockers stay open
+  and were skipped without repeated checks. No downloads, weight/training-artifact
+  modifications, generated artifact commits or push; unrelated user edits preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
