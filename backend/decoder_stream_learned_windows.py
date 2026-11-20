@@ -239,6 +239,10 @@ def read_batch(root,window_id,confirmed,reviewed,cursor=None,split='train',batch
     if review(root,record['comparison_id'],record['overlap_id'])!=record['reviewed_sources']:
         raise ValueError('Learned-window source evidence changed.')
     page=record_page(root,window_id,True,cursor,split,batch_size)
+    return _assemble(window_id,record,split,page)
+
+
+def _assemble(window_id,record,split,page):
     inputs=[];targets=[];masks=[];lengths=[];provenance=[]
     for row in page['records']:
         ids=row['token_ids']

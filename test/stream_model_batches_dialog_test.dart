@@ -59,6 +59,31 @@ void main() {
     expect(find.textContaining('259'), findsOneWidget);
   });
 
+  testWidgets('learned optimizer confirmation and history stay on the learned route', (tester) async {
+    final calls = <String>[];
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(
+      reviewed: const {'id': 'learned'}, routePrefix: 'decoder-stream-learned-windows',
+      request: (path, body) async {
+        calls.add(path);
+        if (path.endsWith('/optimization-checks')) return {'reports': <dynamic>[]};
+        if (path.endsWith('/optimization-check')) {
+          expect(body['reviewed_batch'], isNotNull); expect(body['confirmed'], true);
+          return {'initial_batch_loss': 3.0, 'final_batch_loss': 2.0, 'vocabulary_size': 260, 'model_architecture_version': 2, 'evaluation': {}};
+        }
+        return {'rows': 1, 'real_target_tokens': 2, 'sequence_lengths': [2], 'next_cursor': null};
+      }))));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('Check masked optimization')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel')); await tester.pumpAndSettle(); expect(calls.length, 1);
+    await tester.tap(find.text('Check masked optimization')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm five-step optimizer check')); await tester.pumpAndSettle();
+    expect(calls.last, '/decoder-stream-learned-windows/learned/optimization-check');
+    expect(find.text('Learned vocabulary: 260 IDs · architecture version 2'), findsOneWidget);
+    await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
+    await tester.tap(find.text('Saved optimizer checks')); await tester.pumpAndSettle();
+    expect(calls.last, '/decoder-stream-learned-windows/learned/optimization-checks');
+  });
+
   testWidgets('batch inspector allows retry after a binding failure', (tester) async {
     var attempts = 0;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(reviewed: const {'id': 'fixture'}, request: (path, body) async {

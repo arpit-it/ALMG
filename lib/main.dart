@@ -2258,7 +2258,7 @@ class _StudioPageState extends State<StudioPage> {
         if (record['status'] == 'complete') TextButton(onPressed: () {
           Navigator.pop(context, false);
           showDialog<void>(context: this.context, builder: (context) => StreamModelBatchesDialog(
-            reviewed: record, routePrefix: route, allowOptimization: !learned,
+            reviewed: record, routePrefix: route,
             request: (path, body) => _request(path, body, const Duration(minutes: 10))));
         }, child: const Text('Inspect model input batches')),
         if (!learned && record['status'] == 'complete') TextButton(onPressed: () { Navigator.pop(context, false); _planStreamedApproach(record); }, child: const Text('Plan streamed approach')),

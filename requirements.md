@@ -4603,6 +4603,55 @@ P3-LMF-03 partial progress · learned-tokenizer streamed windows and masked inpu
   skipped. No external collection, downloads, generated artifacts or weights are
   included in this change; no push is authorized or performed.
 
+P3-LMF-03 partial progress · learned-vocabulary masked optimizer diagnostic · 2026-11-20:
+- [ ] P3-LMF-03 remains open. The learned-window batch inspector now offers a
+  separately confirmed five-step Metal diagnostic using the exact saved learned
+  vocabulary (4–512 IDs supported by the registered architecture). Reviewed codec,
+  window revision, source/permission/contamination bindings and the inspected
+  training batch must match before initialization and again after GPU execution.
+  Student parameters start from new weights; pretrained weights are never loaded.
+- A bounded learned-tokenizer split iterator performs full integrity checks at
+  split boundaries and file/permission guards around each page, retaining at most
+  16 windows per batch. Consumers must exhaust the iterator before publishing
+  metrics. Evaluation covers every saved validation/test window with zero held-out
+  optimizer updates and aggregates masked loss/correct counts by real targets.
+  Changed sources, incomplete populations or invalid metrics prevent publication.
+- The shared numerical implementation retains the legacy fixed-byte route/report
+  format. Learned diagnostics use their own report namespace/version and record
+  codec hash, actual vocabulary, architecture profile, inspected-batch digest and
+  provenance, all parameter tensor updates, padding loss/gradient errors and CPU
+  inference agreement. Model weights are discarded; only diagnostic JSON is saved.
+  Numerical success does not approve training, establish usable quality or release.
+- Local native verification: rebuilt and launched the macOS app on port 28850
+  using the previously completed 401-record learned-window fixture. Inspected a
+  training batch with learned IDs above 255 and lengths [16,16,4,16]. Cancelling
+  consent created no report. Confirmed five-step check
+  a54984a70f0e4798a232eddc32a3a53b used 260 IDs/architecture version 2, updated all
+  parameter tensors and reduced batch loss 5.591536521911621 → 5.449448585510254.
+  Twelve padding positions produced masked target loss error 0 and gradient error
+  7.450580596923828e-09; CPU/Metal inference error was 3.5565019707028966e-08.
+- The app reported full validation coverage: 569 windows / 8,732 targets in 36
+  batches; full test coverage: 522 windows / 8,028 targets in 33 batches. Neither
+  held-out split received optimizer updates. Validation/test next-token accuracy
+  was approximately 0.191/0.192; no quality or release claim follows from this
+  five-step diagnostic. Restarting backend and app reopened the exact report from
+  Saved optimizer checks. Independent database counts, target totals and inspected
+  batch hash matched; all 22 pre-existing source/fit/comparison/window files stayed
+  byte-identical. Only one new diagnostic JSON appeared; no model/trial was saved.
+- Verification: 477 Python tests passed with ALMG_METAL_TESTS=1 and warnings as
+  errors, 36 Flutter tests passed, analysis/diff checks were clean, and native
+  build/restart succeeded. Added coverage includes actual wider Metal updates,
+  padding invariance, CPU agreement, confirmation/stale scope, complete split
+  traversal and target weighting, boundary validation frequency, permission/window
+  rewrites between pages, post-GPU changes, report reload/separate namespaces and
+  learned UI confirmation/history routing. Evidence remains outside Git in
+  /tmp/almg-learned-optimizer-native-qa/verification.json, *-ui.json/*-ui.txt and logs.
+- Remaining: approved durable streamed training, checkpoint recovery and model
+  persistence for full-split learned codecs, larger full-split vocabulary budgets,
+  full-split character-BPE/Unigram and broader acceptance verification. Unchanged
+  hardware/Windows/larger-than-RAM blockers stay open and skipped. No external
+  collection, downloads, generated artifacts/weights in Git or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

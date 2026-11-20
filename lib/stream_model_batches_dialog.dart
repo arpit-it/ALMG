@@ -42,7 +42,7 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
     if (confirmed != true || !mounted) return;
     setState(() { _loading = true; _error = null; });
     try {
-      final report = await widget.request('/decoder-stream-windows/${widget.reviewed['id']}/optimization-check', {
+      final report = await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/optimization-check', {
         'confirmed': true, 'reviewed': widget.reviewed, 'reviewed_batch': batch, 'cursor': _cursor,
       });
       if (!mounted) return;
@@ -55,6 +55,7 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
     await showDialog<void>(context: context, builder: (context) => AlertDialog(
         title: const Text('Masked optimizer diagnostic verified'), scrollable: true,
         content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          if (report['vocabulary_size'] != null) Text('Learned vocabulary: ${report['vocabulary_size']} IDs · architecture version ${report['model_architecture_version']}'),
           Text('Training batch loss: ${report['initial_batch_loss']} → ${report['final_batch_loss']}'),
           const Text('Five-step numerical check only. The model was discarded; held-out evaluation does not establish usable model quality.'),
           if (report['evaluation'] == null) const Text('Legacy report: held-out probes cover only the first four windows of each split.'),
@@ -66,7 +67,7 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
   Future<void> _savedOptimizationChecks() async {
     if (!widget.allowOptimization) return;
     try {
-      final reports = (await widget.request('/decoder-stream-windows/${widget.reviewed['id']}/optimization-checks', {'confirmed': true}))['reports'] as List;
+      final reports = (await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/optimization-checks', {'confirmed': true}))['reports'] as List;
       if (!mounted) return;
       final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
         title: const Text('Saved masked optimizer checks'), children: [

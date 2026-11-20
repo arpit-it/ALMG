@@ -15,11 +15,12 @@ else:
     from run_manifest import digest,file_digest
 
 
-def evaluate_split(root,window_id,reviewed,split,score):
+def evaluate_split(root,window_id,reviewed,split,score,*,batch_worker=None):
     """Forward-only complete split evaluation, with bounded batches and token weighting."""
+    batch_worker=batches if batch_worker is None else batch_worker
     if split not in ('validation','test'):raise ValueError('Evaluate a held-out split.')
     seen_windows=targets=correct=0;loss_sum=0.0;page_count=0
-    for batch in batches.iter_batches(root,window_id,True,reviewed,split,16):
+    for batch in batch_worker.iter_batches(root,window_id,True,reviewed,split,16):
         if not batch['rows'] or batch['real_target_tokens']<=0:
             raise ValueError('Held-out evaluation encountered an empty batch.')
         page_loss,page_correct=score(batch)
@@ -39,15 +40,24 @@ def evaluate_split(root,window_id,reviewed,split,score):
 
 
 def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):
+    return _run(root,window_id,confirmed,reviewed,reviewed_batch,cursor,batches,False)
+
+
+def _run(root,window_id,confirmed,reviewed,reviewed_batch,cursor,batch_worker,learned):
     if confirmed is not True:raise ValueError('Confirm the five-step masked optimizer diagnostic; no model is saved.')
-    train=batches.read_batch(root,window_id,True,reviewed,cursor,'train',4)
+    train=batch_worker.read_batch(root,window_id,True,reviewed,cursor,'train',4)
     if not isinstance(reviewed_batch,dict) or reviewed_batch!=train:raise ValueError('The inspected training batch changed. Reopen it before the diagnostic.')
     if not train['rows']:raise ValueError('Select a nonempty training batch.')
     if platform.system()!='Darwin' or platform.machine()!='arm64':raise ValueError('This diagnostic requires Apple silicon and local Metal access.')
     import mlx.core as mx
     import numpy as np
     if not mx.metal.is_available():raise ValueError('Metal is unavailable for the optimizer diagnostic.')
-    model=recipe_contracts.initialize_recipe('decoder_from_scratch',{'vocab_size':256,'seed':7})
+    vocabulary_size=train.get('vocabulary_size') if learned else 256
+    if (type(vocabulary_size) is not int or not 4<=vocabulary_size<=512
+            or (learned and (reviewed.get('format')!='almg-stream-learned-windows-v1'
+                             or vocabulary_size!=reviewed.get('vocabulary_size')))):
+        raise ValueError('The inspected vocabulary does not match a supported model profile.')
+    model=recipe_contracts.initialize_recipe('decoder_from_scratch',{'vocab_size':vocabulary_size,'seed':7})
     before={name:np.array(value).copy() for name,value in model.parameters.items()}
     with mx.stream(mx.gpu):
         parameters={name:mx.array(value) for name,value in model.parameters.items()}
@@ -68,7 +78,7 @@ def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):
             return mx.sum((mx.logsumexp(scores,axis=-1)-correct)*weights)/mx.sum(weights)
         gradient=mx.grad(loss)
         initial=float(loss(parameters,x,y,mask).item())
-        altered=mx.where(mask==0,(y+127)%256,y)
+        altered=mx.where(mask==0,(y+127)%vocabulary_size,y)
         padding_loss_error=abs(float(loss(parameters,x,altered,mask).item())-initial)
         original_gradient=gradient(parameters,x,y,mask);altered_gradient=gradient(parameters,x,altered,mask)
         padding_gradient_error=max(float(mx.max(mx.abs(original_gradient[name]-altered_gradient[name])).item()) for name in parameters)
@@ -90,12 +100,12 @@ def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):
             correct_scores=mx.take_along_axis(scores,py[...,None],axis=-1).squeeze(-1)
             return (float(mx.sum((mx.logsumexp(scores,axis=-1)-correct_scores)*pm).item()),
                     int(mx.sum((mx.argmax(scores,axis=-1)==py)*pm).item()))
-        evaluation={split:evaluate_split(root,window_id,reviewed,split,score) for split in ('validation','test')}
+        evaluation={split:evaluate_split(root,window_id,reviewed,split,score,batch_worker=batch_worker) for split in ('validation','test')}
 
     # Recheck the exact source batch after GPU execution before writing evidence.
-    if batches.read_batch(root,window_id,True,reviewed,cursor,'train',4)!=train:
+    if batch_worker.read_batch(root,window_id,True,reviewed,cursor,'train',4)!=train:
         raise ValueError('Source bindings changed during the diagnostic; no report published.')
-    report={'format':'almg-stream-masked-optimizer-check-v1','schema_version':1,'id':uuid.uuid4().hex,
+    report={'format':'almg-stream-learned-masked-optimizer-check-v1' if learned else 'almg-stream-masked-optimizer-check-v1','schema_version':1,'id':uuid.uuid4().hex,
             'windows_id':window_id,'windows_revision':reviewed['revision'],'training_batch_sha256':digest(train),
             'training_cursor':cursor,'training_provenance':train['provenance'],
             'steps':5,'learning_rate':.05,'seed':7,'model_config':model.config,
@@ -107,11 +117,14 @@ def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):
             'masked_target_loss_error':padding_loss_error,'masked_target_gradient_error':padding_gradient_error,
             'evaluation':evaluation,'device':'Metal GPU','mlx_version':decoder_bundle.version('mlx'),
             'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in
-                ('decoder_stream_optimization.py','decoder_stream_batches.py','decoder_recipe.py','decoder_tokenizer.py')}),
+                (('decoder_stream_optimization.py','decoder_stream_learned_optimization.py','decoder_stream_learned_batches.py','decoder_stream_learned_windows.py','decoder_stream_fitted_tokenizer_evaluations.py','decoder_stream_bpe.py','decoder_stream_iterative_bpe.py','decoder_bpe.py','decoder_recipe.py','recipe_contracts.py') if learned else ('decoder_stream_optimization.py','decoder_stream_batches.py','decoder_recipe.py','decoder_tokenizer.py'))}),
             'model_saved':False,'training_approved':False,'release_approved':False,
             'limitations':'Five-step numerical diagnostic on one batch. All saved held-out windows are evaluated without optimizer updates. Five updates on one training batch do not establish usable model quality or release readiness.'}
     report['revision']=digest(report)
-    folder=Path(root)/'decoder-stream-optimization-checks'/window_id;folder.mkdir(parents=True,exist_ok=True)
+    if learned:
+        report.update(tokenizer_sha256=train['tokenizer_sha256'],vocabulary_size=vocabulary_size,model_architecture_version=2 if vocabulary_size>256 else 1)
+        report['revision']=digest({k:v for k,v in report.items() if k!='revision'})
+    folder=Path(root)/('decoder-stream-learned-optimization-checks' if learned else 'decoder-stream-optimization-checks')/window_id;folder.mkdir(parents=True,exist_ok=True)
     temporary=folder/(uuid.uuid4().hex+'.tmp')
     try:
         temporary.write_text(json.dumps(report,ensure_ascii=False,allow_nan=False,indent=2),encoding='utf-8')
@@ -120,14 +133,18 @@ def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):
     return report
 
 def list_reports(root,window_id,confirmed):
+    return _list_reports(root,window_id,confirmed,False)
+
+
+def _list_reports(root,window_id,confirmed,learned):
     if confirmed is not True:raise ValueError('Confirm local diagnostic report review.')
     batches.windows._folder(root,window_id)
-    folder=Path(root)/'decoder-stream-optimization-checks'/window_id;reports=[]
+    folder=Path(root)/('decoder-stream-learned-optimization-checks' if learned else 'decoder-stream-optimization-checks')/window_id;reports=[]
     for path in sorted(folder.glob('*.json')) if folder.exists() else []:
         try:
             if path.stat().st_size>256*1024:continue
             report=json.loads(path.read_text(encoding='utf-8'))
-            if (report.get('format')!='almg-stream-masked-optimizer-check-v1' or type(report.get('schema_version')) is not int
+            if (report.get('format')!=('almg-stream-learned-masked-optimizer-check-v1' if learned else 'almg-stream-masked-optimizer-check-v1') or type(report.get('schema_version')) is not int
                     or report['schema_version']!=1 or report.get('id')!=path.stem or report.get('windows_id')!=window_id
                     or report.get('revision')!=digest({k:v for k,v in report.items() if k!='revision'})
                     or any(report.get(key) is not False for key in ('model_saved','training_approved','release_approved'))):
