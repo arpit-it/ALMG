@@ -5580,6 +5580,45 @@ P3-LMF-05 partial progress · isolated synthetic diagnostic peak measurements ·
   of full-training feasibility. Unchanged hardware/user-action blockers remain
   open and skipped. No private/generated data, weights or unrelated edits committed.
 
+P3-LMF-05 partial progress · measured diagnostic calibration feeds admission · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Subsequent architecture feasibility reviews now
+  consume compatible saved isolated diagnostic measurements. Matching requires
+  the same initialization/model, plan/configuration, Metal hardware and MLX runtime,
+  diagnostic implementation hash, valid report/snapshot revisions and isolated
+  measurement provenance. Incompatible, shared, corrupted or invalid measurements
+  are ignored. Historical high-water observations are retained beyond the UI's
+  20-record history display limit; measurements never lower the calculated reserves.
+- Reviews retain calculated estimates separately from measured calibration and
+  identify source report IDs/revisions. GPU admission uses the larger calculated
+  or observed peak, including the Metal working-set check; memory admission uses
+  at least the existing reserve and a conservative CPU RSS + GPU peak + base
+  reserve. CPU/GPU unified-memory overlap is explicitly disclosed. Changed
+  calibration invalidates an old approval, and live resources are rechecked.
+  No duration prediction or extrapolation to full dataset training is made.
+- New feasibility v2 snapshots retain calibration alongside experiment records;
+  older saved feasibility snapshots remain readable without migration or rewriting.
+- Native verification: rebuilt and ran ALMG on local Apple M4 Max with isolated
+  fixtures. First report f3d37ed2daca4f6daac4b77246d41918 supplied a measured Metal
+  peak of 254912 bytes and process RSS of
+  65863680 bytes. The next review visibly cited that
+  compatible report, raised GPU budget from 167936 to
+  254912 bytes and raised the memory reserve from
+  271436096 to 334554048 bytes. Explicit approval produced
+  second diagnostic edc1fb7529f04386b4715922dbd8f560 carrying that calibration.
+  After app/backend restart the saved second report and an older feasibility-v1
+  report reopened unchanged, and a fresh review recovered both compatible trials.
+  All 27 pre-existing architecture fixture file hashes remained unchanged.
+- Verification: 543 Python tests passed with real Metal and warnings as errors;
+  48 Flutter tests passed; analysis and diff checks clean. Added tests cover
+  read-only calibration, live low-memory blocking, incompatible/tampered/shared
+  rejection and retaining an older high-water measurement beyond 20 reports.
+  Evidence: /tmp/almg-calibrated-feasibility-native-qa/verification.json and logs.
+- Remaining: full-dataset training feasibility/calibration and approval integration,
+  training-duration prediction, supported-recipe CPU fallback verification and
+  Windows/CUDA verification on suitable hardware. Unchanged hardware/user-action
+  blockers remain open and skipped. No generated/private artifacts, weights or
+  unrelated user edits are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

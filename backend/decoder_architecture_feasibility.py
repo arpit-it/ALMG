@@ -66,12 +66,40 @@ def estimate(config,json_bytes):
 def _fits(hardware_info,estimates):
     memory=hardware_info.get('available_memory_bytes');disk=hardware_info.get('free_disk_bytes');device=hardware_info.get('metal_device') or {};working=device.get('max_recommended_working_set_size')
     return (type(memory) is int and memory>=estimates['required_available_memory_bytes'] and type(disk) is int and disk>=estimates['required_free_disk_bytes']
-            and (type(working) is not int or estimates['estimated_gpu_working_bytes']<=working))
+            and (type(working) is not int or estimates.get('calibrated_gpu_working_bytes',estimates['estimated_gpu_working_bytes'])<=working))
+
+
+def _calibrate(root,plan_id,current,profile,estimates):
+    """Only compatible, immutable isolated diagnostics may raise admission reserves."""
+    implementation=digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_architecture_backward.py','decoder_architecture_feasibility.py','decoder_diagnostic_measurements.py','decoder_diagnostic_worker.py','planned_decoder.py')})
+    records=[];peak=rss=0
+    for path in sorted((Path(root)/'decoder-architecture-backward-checks'/plan_id).glob('*.json')):
+        try:
+            if path.stat().st_size>128000:continue
+            report=json.loads(path.read_text(encoding='utf-8'));measurement=report['diagnostic_measurements'];saved=report['hardware_feasibility'];device=saved['hardware']
+            if (report.get('format')!='almg-planned-decoder-backward-check-v4' or report.get('schema_version')!=4 or report.get('id')!=path.stem
+                    or report.get('revision')!=digest({k:v for k,v in report.items() if k!='revision'}) or report.get('implementation_sha256')!=implementation
+                    or report.get('plan_id')!=plan_id or report.get('initialization_revision')!=current['revision'] or report.get('model_sha256')!=current['model_sha256']
+                    or report.get('config')!=current['config'] or report.get('backward_checked') is not True
+                    or any(report.get(key) is not False for key in ('updated_weights_saved','training_approved','release_approved'))
+                    or saved.get('revision')!=digest({k:v for k,v in saved.items() if k!='revision'})
+                    or saved.get('precision')!='float32' or saved.get('device')!='metal' or saved.get('feasible') is not True
+                    or any(device.get(key)!=profile.get(key) for key in ('system','machine','mlx_version','metal_device'))
+                    or measurement.get('isolated_trial_peak_measured') is not True or measurement.get('scope')!='fresh_process_synthetic_diagnostic'):continue
+            gpu=measurement['isolated_metal_peak_bytes'];cpu=measurement['isolated_process_peak_rss_bytes']
+            if type(gpu) is not int or type(cpu) is not int or min(gpu,cpu)<=0:continue
+            peak=max(peak,gpu);rss=max(rss,cpu);records.append({'id':report['id'],'revision':report['revision']})
+        except (OSError,ValueError,TypeError,KeyError,AttributeError):continue
+    estimates['calibrated_gpu_working_bytes']=max(estimates['estimated_gpu_working_bytes'],peak)
+    if records:estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],256*MIB+rss+estimates['calibrated_gpu_working_bytes'])
+    return {'compatible_reports':records,'observed_metal_peak_bytes':peak or None,'observed_process_peak_rss_bytes':rss or None,
+            'scope':'same_initialization_hardware_runtime_and_diagnostic_implementation_only',
+            'policy':'Measurements only raise reserves. CPU RSS and Metal peak may overlap; their sum plus reserve is deliberately conservative. No duration or full-training extrapolation.'}
 
 
 def review(root,plan_id,confirmed,reviewed,precision='float32',device='metal'):
     if confirmed is not True:raise ValueError('Confirm local hardware inspection for this initialized model.')
-    plan,current,json_bytes=_source(root,plan_id,reviewed);profile=hardware(root);estimates=estimate(current['config'],json_bytes);reasons=[]
+    plan,current,json_bytes=_source(root,plan_id,reviewed);profile=hardware(root);estimates=estimate(current['config'],json_bytes);calibration=_calibrate(root,plan_id,current,profile,estimates);reasons=[]
     if device!='metal':reasons.append('This backward diagnostic supports Metal only; CPU forward inspection is separate and CUDA is not implemented here.')
     if precision!='float32':reasons.append('This backward diagnostic supports float32 only; other precision modes have not been validated.')
     if not profile['metal_available'] or profile['system']!='Darwin' or profile['machine']!='arm64':reasons.append('Apple silicon with an available MLX Metal runtime is required.')
@@ -91,10 +119,10 @@ def review(root,plan_id,confirmed,reviewed,precision='float32',device='metal'):
             else:break
             candidate_bytes=plans.review(config)['estimates']['weight_bytes'];candidate=estimate(config,max(1,(json_bytes*candidate_bytes+original_bytes-1)//original_bytes))
             if _fits(profile,candidate):recommendation={'config':dict(config),'estimates':candidate,'status':'estimated_fit_requires_new_plan_initialization_and_review'};break
-    report={'format':'almg-architecture-feasibility-v1','schema_version':1,
+    report={'format':'almg-architecture-feasibility-v2','schema_version':2,
             'source':{'plan_id':plan_id,'plan_revision':plan['revision'],'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
             'scope':'bounded_synthetic_backward_diagnostic_only_not_full_training','device':device,'precision':precision,'hardware':profile,'estimates':estimates,
-            'feasible':not reasons,'blockers':reasons,'recommendation':recommendation,'training_approved':False,'release_approved':False,
+            'calibration':calibration,'feasible':not reasons,'blockers':reasons,'recommendation':recommendation,'training_approved':False,'release_approved':False,
             'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_architecture_feasibility.py','decoder_architecture_plans.py','training_resources.py')})}
     report['revision']=digest(report)
     return report
@@ -105,6 +133,6 @@ def admit(root,plan_id,reviewed,approved=None):
     fresh=review(root,plan_id,True,reviewed,precision,device)
     if approved is not None:
         if (not isinstance(approved,dict) or approved.get('feasible') is not True or approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'})
-                or any(approved.get(key)!=fresh[key] for key in ('format','schema_version','source','scope','device','precision','estimates','implementation_sha256'))):raise ValueError('Hardware/configuration review changed; reopen feasibility before approving.')
+                or any(approved.get(key)!=fresh[key] for key in ('format','schema_version','source','scope','device','precision','estimates','calibration','implementation_sha256'))):raise ValueError('Hardware/configuration review changed; reopen feasibility before approving.')
     if not fresh['feasible']:raise training_resources.ResourceUnavailable('Backward check blocked: '+' '.join(fresh['blockers']))
     return fresh

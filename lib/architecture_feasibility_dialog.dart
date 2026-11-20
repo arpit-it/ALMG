@@ -38,7 +38,11 @@ class _ArchitectureFeasibilityDialogState extends State<ArchitectureFeasibilityD
         Text('Device: ${_report!['hardware']['metal_device']?['device_name'] ?? 'Metal unavailable'} · MLX ${_report!['hardware']['mlx_version'] ?? 'unavailable'}'),
         Text('Observed memory: ${_mib(_report!['hardware']['available_memory_bytes'])} available / ${_mib(_report!['hardware']['total_memory_bytes'])} total · disk ${_mib(_report!['hardware']['free_disk_bytes'])} free'),
         Text('Calculated reserves: ${_mib(_report!['estimates']['required_available_memory_bytes'])} memory · ${_mib(_report!['estimates']['required_free_disk_bytes'])} disk'),
-        const Text('Estimated, not measured peak memory. No duration prediction is available. Existing model loading and execution reserves are included; runtime exhaustion is still possible. Resources are checked again at execution.'),
+        if ((_report!['calibration']?['compatible_reports'] as List?)?.isNotEmpty == true)
+          Text('Calibrated with ${(_report!['calibration']['compatible_reports'] as List).length} compatible isolated diagnostic report(s). '
+            'Observed Metal peak: ${_mib(_report!['calibration']['observed_metal_peak_bytes'])}; process peak RSS: ${_mib(_report!['calibration']['observed_process_peak_rss_bytes'])}. '
+            'Measurements can only raise reserves. CPU and GPU memory may overlap; the admission sum is conservative. This applies only to the same synthetic diagnostic.'),
+        const Text('Calculated estimates and compatible measured diagnostic peaks are distinct. No full-training peak or duration prediction is available. Existing model loading and execution reserves are included; runtime exhaustion is still possible. Resources are checked again at execution.'),
         for (final reason in _report!['blockers'] as List) Text(reason as String),
         if (_report!['recommendation'] != null) Text('Smaller suggestion: ${_report!['recommendation']['config']['layers']} layers · width ${_report!['recommendation']['config']['hidden_size']} · '
           '${_report!['recommendation']['config']['attention_heads']} heads. Not applied: save, initialize and review a new plan first.'),
