@@ -6919,6 +6919,46 @@ P3-LMF-06 partial progress · approved retained-partial checkpoint resume · 202
   these checks establish checkpoint engineering, not language quality or release
   acceptance. Unchanged hardware/user-action blockers remain open and skipped.
 
+P3-LMF-06 partial progress · reviewed corpus input snapshots · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Initialized planned decoders now expose “Review text
+  corpus inputs”. Select an existing prepared local dataset and sequence length
+  four/eight, review compatibility, then explicitly confirm saving private inputs.
+  Existing dataset integrity, fitted-tokenizer and cross-split contamination checks
+  apply. Every source requires a recorded creation/permission declaration; pending
+  sources, mismatched model/tokenizer vocabulary, oversized models/windows and
+  insufficient model context block saving. Changed reviews require a fresh check.
+- New version-1 immutable snapshots bind the initialization/model hash, exact dataset
+  revision, tokenizer artifact, sequence length and window digest. Windows preserve
+  document boundaries, cover each real target once before training-only sampling
+  weights, right-pad with masked targets, and retain separate validation/test inputs.
+  Save publishes atomically and read verifies every file/review binding. Original
+  datasets, tokenizer and initialized weights are preserved. No training approval
+  transfers to these inputs and saving performs no optimizer updates.
+- Local app verification: rebuilt/launched ALMG with a generated six-document,
+  four-word corpus and a fresh 704-parameter initialization. The native app blocked
+  six unresolved source permissions, then accepted the reviewed dataset. Closing
+  before confirmation created no output. Confirmed save produced private record
+  ec05cf95ac73467f87d33a0317a3bda3: train six windows/38 real targets, validation
+  two windows/10 targets, test two windows/nine targets. Reopened the exact record
+  from history and again after restarting app/backend. The same reviewed tokenizer
+  was rejected for the retained 128-ID initialization. All 143 original fixture
+  files retained their hashes. No external collection occurred. Evidence:
+  /tmp/almg-corpus-input-native-qa/verification.json and native captures
+  permissions-blocked-ui.json, compatible-ui.json, saved-ui.json,
+  restarted-ui.json and vocabulary-blocked-ui.json.
+- Validation: 618 Python tests passed with warnings as errors and Metal enabled;
+  71 Flutter tests passed; analysis clean. New tests cover exact review/consent,
+  source permission/vocabulary blocking, masked document windows, target counts,
+  training-only weighting, corrupt snapshot rejection, preserved source files and
+  UI approval invalidation. Generated fixtures, snapshots and weights stay out of Git.
+- Remaining: connect these reviewed snapshots to configurable optimizer execution,
+  corpus loss/evaluation and tokenizer-backed generation/checkpoint continuation;
+  general fresh-run cancellation, durable OS interruption, larger budgets and
+  profiled 50M–100M training remain open. This input-preparation change does not
+  establish corpus training, language quality or release acceptance. P3-LMF-01 is
+  already complete for its recorded architecture scope. Unchanged blocked items
+  remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
