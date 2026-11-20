@@ -18,7 +18,7 @@ else:
 
 
 def tokenization_version(tokenizer_format):
-    return 3 if tokenizer_format == 'almg-reviewed-stream-model-tokenizer-v1' else 2 if tokenizer_format == 'almg-reviewed-model-tokenizer-v1' else 1
+    return 4 if tokenizer_format == 'almg-approved-stream-training-tokenizer-v1' else 3 if tokenizer_format == 'almg-reviewed-stream-model-tokenizer-v1' else 2 if tokenizer_format == 'almg-reviewed-model-tokenizer-v1' else 1
 
 
 def pipeline_for(tokenizer_format, config=None):
@@ -32,6 +32,11 @@ def pipeline_for(tokenizer_format, config=None):
         pipeline['stages']['tokenization'] = {'version':3, 'interface':'almg-reviewed-stream-model-tokenizer-v1', 'status':'reviewed_stream_persistence_only'}
         pipeline['stages']['pretraining'] = {'version':1, 'interface':'reviewed_stream_training_requires_separate_approval', 'status':'initialization_only_no_optimizer_updates'}
         pipeline['stages']['evaluation'] = {'version':2, 'interface':'cpu_model_tokenizer_roundtrip', 'status':'initialization_persistence_only'}
+    if tokenizer_format == 'almg-approved-stream-training-tokenizer-v1':
+        pipeline['stages']['dataset_preparation'] = {'version':2, 'interface':'reviewed_source_bound_stream_windows_v1_to_v3', 'status':'approved_manual_trial'}
+        pipeline['stages']['tokenization'] = {'version':4, 'interface':'almg-approved-stream-training-tokenizer-v1', 'status':'approved_manual_sgd20_trial'}
+        pipeline['stages']['pretraining'] = {'version':2, 'interface':'manual_stream_sgd20_checkpoint_v1', 'status':'explicit_approval_required'}
+        pipeline['stages']['evaluation'] = {'version':2, 'interface':'masked_full_stream_heldout_evaluation', 'status':'private_metrics_no_release'}
     return pipeline
 
 
@@ -51,6 +56,9 @@ def save(destination, model, tokenizer, training, pretraining_stage='pretraining
         raise ValueError('Streamed codec persistence requires its separate initialization-only stage; training is unavailable.')
     if tokenization == 3:
         tokenizer.validate_persistence_record(training)
+    if tokenization == 4:
+        if pretraining_stage != 'pretraining_local':raise ValueError('Approved stream training requires its local pretraining stage.')
+        tokenizer.validate_training_record(training)
     with TemporaryDirectory(prefix='.almg-decoder-bundle-', dir=destination.parent) as temporary:
         staged = Path(temporary) / 'bundle'
         staged.mkdir()
@@ -66,7 +74,7 @@ def save(destination, model, tokenizer, training, pretraining_stage='pretraining
             'runtime': {'python': platform.python_version(), 'system': platform.system(),
                         'machine': platform.machine(), 'numpy': version('numpy')},
             'components': {name: file_digest(Path(__file__).with_name(name)) for name in
-                           ('decoder_recipe.py', 'decoder_tokenizer.py', 'decoder_training.py', 'decoder_dataset_training.py', 'decoder_checkpoint.py', 'decoder_bundle.py', 'decoder_model_tokenizer.py', 'decoder_tokenizer_adoptions.py', 'decoder_bpe.py', 'decoder_character_bpe.py', 'decoder_unigram.py', 'decoder_special_tokens.py', 'decoder_stream_model_tokenizer.py', 'decoder_stream_bpe.py', 'decoder_stream_iterative_bpe.py', 'decoder_stream_character_bpe.py', 'decoder_stream_unigram.py')},
+                           ('decoder_recipe.py', 'decoder_tokenizer.py', 'decoder_training.py', 'decoder_dataset_training.py', 'decoder_checkpoint.py', 'decoder_bundle.py', 'decoder_model_tokenizer.py', 'decoder_tokenizer_adoptions.py', 'decoder_bpe.py', 'decoder_character_bpe.py', 'decoder_unigram.py', 'decoder_special_tokens.py', 'decoder_stream_model_tokenizer.py', 'decoder_stream_bpe.py', 'decoder_stream_iterative_bpe.py', 'decoder_stream_character_bpe.py', 'decoder_stream_unigram.py', 'decoder_stream_training_tokenizer.py')},
             'files': {name: file_digest(staged / name) for name in ('decoder.json', 'tokenizer.json')},
         }
         (staged / 'manifest.json').write_text(json.dumps(manifest, ensure_ascii=False, allow_nan=False, indent=2), encoding='utf-8')
@@ -91,8 +99,8 @@ def load(folder):
                 or digest(manifest.get('recipe')) != digest({'id': 'decoder_from_scratch', 'version': 1})
                 or digest(manifest.get('stages')) not in (
                     digest({'architecture': architecture, 'tokenization': tokenization, stage: 1, 'artifact': 1})
-                    for stage in ('pretraining_fixture', 'pretraining_local', 'initialization_check') for tokenization in (1,2,3) for architecture in (1,2)
-                    if (tokenization == 3) == (stage == 'initialization_check'))
+                    for stage in ('pretraining_fixture', 'pretraining_local', 'initialization_check') for tokenization in (1,2,3,4) for architecture in (1,2)
+                    if (tokenization == 3) == (stage == 'initialization_check') and (tokenization != 4 or stage == 'pretraining_local'))
                 or not isinstance(manifest.get('training'), dict)
                 or not isinstance(manifest.get('files'), dict)
                 or set(manifest['files']) != {'decoder.json', 'tokenizer.json'}):
@@ -118,7 +126,7 @@ def load(folder):
         expected_version = tokenization_version(tokenizer.artifact()['format'])
         if manifest['stages']['tokenization'] != expected_version:
             raise ValueError('Decoder bundle tokenization version does not match its artifact.')
-        if expected_version in (2,3) and digest(manifest.get('pipeline')) != digest(pipeline_for(tokenizer.artifact()['format'], model.config)):
+        if expected_version in (2,3,4) and digest(manifest.get('pipeline')) != digest(pipeline_for(tokenizer.artifact()['format'], model.config)):
             raise ValueError('Reviewed model tokenizer pipeline contract does not match.')
         if expected_version == 3:
             tokenizer.validate_persistence_record(manifest['training'])
@@ -127,6 +135,10 @@ def load(folder):
             fresh = Decoder(model.config)
             if any(not (model.parameters[name] == fresh.parameters[name]).all() for name in fresh.parameters):
                 raise ValueError('Initialization-only stream bundle contains modified parameters.')
+        if expected_version == 4:
+            tokenizer.validate_training_record(manifest['training'])
+            if model.config != {'vocab_size':len(tokenizer.vocabulary), 'context_length':16, 'width':8, 'seed':7}:
+                raise ValueError('Stream training requires the approved tiny decoder profile.')
         if (model.config != manifest['config'] or model.config['vocab_size'] != len(tokenizer.vocabulary)
                 or tokenizer.fingerprint() != manifest['tokenizer_sha256']):
             raise ValueError('Decoder bundle model/tokenizer configuration mismatch.')

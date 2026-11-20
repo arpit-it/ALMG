@@ -114,6 +114,66 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _beginTraining() async {
+    try {
+      final review = await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/training-review', {});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Approve a manual streamed trial?'), scrollable: true,
+        content: const Text('Approve exactly 20 SGD updates, learning rate 0.05, seed 7, width 8 and context 16, using this reviewed tokenizer and source. '
+          'Each manual continuation runs five updates now on four successive training windows per update, cycling from the first window. '
+          'Every five updates saves a private model/tokenizer checkpoint. Closing pauses at that boundary; reopen saved trials to resume. '
+          'The final checkpoint evaluates all saved validation/test windows. This short trial establishes no usable model quality or release. '
+          'This is manual execution, without idle or power scheduling. Private weights and tokenizer pieces remain local.'),
+        actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Approve twenty-step trial'))]));
+      if (confirmed != true || !mounted) return;
+      setState(() => _loading = true);
+      final run = await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/training-begin', {'confirmed': true, 'reviewed': review});
+      if (!mounted) return;
+      setState(() => _loading = false);
+      await _showTraining(run);
+    } catch (error) { if (mounted) setState(() { _error = error.toString(); _loading = false; }); }
+  }
+
+  Future<void> _showTraining(Map<String, dynamic> initial) async {
+    var run = initial;
+    var busy = false;
+    String? error;
+    await showDialog<void>(context: context, barrierDismissible: false, builder: (context) => StatefulBuilder(builder: (context, update) => AlertDialog(
+      title: const Text('Manual streamed training trial'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Text('Saved progress: ${run['completed_steps']} / 20 updates · ${run['status']}'),
+        const Text('Paused at each five-step checkpoint. Continue runs the next five updates immediately. Final metrics do not approve release.'),
+        if (busy) const LinearProgressIndicator(),
+        if (error != null) Text(error!),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(run)),
+      ])), actions: [
+        if (run['status'] != 'complete') TextButton(onPressed: busy ? null : () async {
+          update(() { busy = true; error = null; });
+          try {
+            final next = await widget.request('/decoder-stream-training-runs/${run['id']}/step', {'confirmed': true, 'expected_revision': run['revision']});
+            if (context.mounted) update(() { run = next; busy = false; });
+          } catch (failure) { if (context.mounted) update(() { error = failure.toString(); busy = false; }); }
+        }, child: const Text('Run next five updates')),
+        TextButton(onPressed: busy ? null : () => Navigator.pop(context), child: const Text('Close')),
+      ])));
+  }
+
+  Future<void> _savedTraining() async {
+    try {
+      final runs = (await widget.request('/${widget.routePrefix}/${widget.reviewed['id']}/training-runs', {'confirmed': true}))['runs'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved manual streamed trials'), children: [
+          if (runs.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved manual trials.')),
+          for (final run in runs) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(run as Map)),
+            child: Text('${(run['id'] as String).substring(0, 8)} · ${run['completed_steps']} / 20 · ${run['status']}')),
+        ]));
+      if (selected != null && mounted) await _showTraining(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   Future<void> _savedOptimizationChecks() async {
     if (!widget.allowOptimization) return;
     try {
@@ -131,6 +191,7 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
   }
 
   @override Widget build(BuildContext context) => AlertDialog(
+    scrollable: true,
     title: const Text('Inspect model input batches'),
     content: SizedBox(width: 720, height: MediaQuery.sizeOf(context).height * .55, child: Column(children: [
       const Text('Read-only inputs, shifted targets and loss masks. Token IDs encode original text and may contain personal information. '
@@ -142,6 +203,10 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
       Expanded(child: _loading ? const Center(child: CircularProgressIndicator()) : _error != null
         ? SingleChildScrollView(child: Column(mainAxisSize: MainAxisSize.min, children: [Text(_error!), TextButton(onPressed: _load, child: const Text('Retry input batch'))]))
         : SingleChildScrollView(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          if (widget.allowPersistence) Wrap(spacing: 8, children: [
+            if (_split == 'train') TextButton(onPressed: _beginTraining, child: const Text('Approve manual streamed trial')),
+            TextButton(onPressed: _savedTraining, child: const Text('Saved manual streamed trials')),
+          ]),
           Text('Sequence lengths: ${_batch?['sequence_lengths']}'),
           ExpansionTile(title: const Text('View arrays, masks and source references'), children: [
             SelectableText(const JsonEncoder.withIndent('  ').convert(_batch)),

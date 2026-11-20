@@ -39,6 +39,25 @@ def evaluate_split(root,window_id,reviewed,split,score,*,batch_worker=None):
             'integrity_policy':'full_hashes_at_split_start_and_end_stat_guards_each_batch'}
 
 
+def metal_functions(model,mx):
+    def norm(values):
+        return (values-mx.mean(values,axis=-1,keepdims=True))/mx.sqrt(mx.var(values,axis=-1,keepdims=True)+1e-5)
+    def logits(p,tokens):
+        hidden=p['token_embedding'][tokens]+p['position_embedding'][:tokens.shape[1]];normalized=norm(hidden)
+        scores=(normalized@p['query'])@mx.swapaxes(normalized@p['key'],-1,-2)/(model.config['width']**.5)
+        causal=mx.triu(mx.full((tokens.shape[1],tokens.shape[1]),-float('inf')),k=1)
+        attention=mx.softmax(scores+causal,axis=-1)
+        hidden=hidden+(attention@(normalized@p['value']))@p['attention_output']
+        hidden=hidden+mx.maximum(norm(hidden)@p['feed_forward_in'],0)@p['feed_forward_out']
+        return norm(hidden)@p['head']
+    def loss(p,inputs,targets,weights):
+        scores=logits(p,inputs)
+        correct=mx.take_along_axis(scores,targets[...,None],axis=-1).squeeze(-1)
+        return mx.sum((mx.logsumexp(scores,axis=-1)-correct)*weights)/mx.sum(weights)
+    gradient=mx.grad(loss)
+    return logits,loss,gradient
+
+
 def run(root,window_id,confirmed,reviewed,reviewed_batch,cursor=None):
     return _run(root,window_id,confirmed,reviewed,reviewed_batch,cursor,batches,False)
 
@@ -69,21 +88,7 @@ def _run(root,window_id,confirmed,reviewed,reviewed_batch,cursor,batch_worker,le
     with mx.stream(mx.gpu):
         parameters={name:mx.array(value) for name,value in model.parameters.items()}
         x=mx.array(train['inputs']);y=mx.array(train['targets']);mask=mx.array(train['loss_mask'],dtype=mx.float32)
-        def norm(values):
-            return (values-mx.mean(values,axis=-1,keepdims=True))/mx.sqrt(mx.var(values,axis=-1,keepdims=True)+1e-5)
-        def logits(p,tokens):
-            hidden=p['token_embedding'][tokens]+p['position_embedding'][:tokens.shape[1]];normalized=norm(hidden)
-            scores=(normalized@p['query'])@mx.swapaxes(normalized@p['key'],-1,-2)/(model.config['width']**.5)
-            causal=mx.triu(mx.full((tokens.shape[1],tokens.shape[1]),-float('inf')),k=1)
-            attention=mx.softmax(scores+causal,axis=-1)
-            hidden=hidden+(attention@(normalized@p['value']))@p['attention_output']
-            hidden=hidden+mx.maximum(norm(hidden)@p['feed_forward_in'],0)@p['feed_forward_out']
-            return norm(hidden)@p['head']
-        def loss(p,inputs,targets,weights):
-            scores=logits(p,inputs)
-            correct=mx.take_along_axis(scores,targets[...,None],axis=-1).squeeze(-1)
-            return mx.sum((mx.logsumexp(scores,axis=-1)-correct)*weights)/mx.sum(weights)
-        gradient=mx.grad(loss)
+        logits,loss,gradient=metal_functions(model,mx)
         initial=float(loss(parameters,x,y,mask).item())
         altered=mx.where(mask==0,(y+(1 if alphabet_based else 127))%vocabulary_size,y)
         padding_targets_changed=int(mx.sum((altered!=y)*(mask==0)).item())

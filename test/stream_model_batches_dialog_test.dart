@@ -145,6 +145,37 @@ void main() {
     expect(find.text('Stream model/tokenizer persistence verified'), findsOneWidget);
   });
 
+  testWidgets('manual streamed trial requires approval and advances only on continuation', (tester) async {
+    var starts = 0;
+    var steps = 0;
+    await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(
+      reviewed: const {'id': 'stream'}, routePrefix: 'decoder-stream-learned-windows', allowPersistence: true,
+      request: (path, body) async {
+        if (path.endsWith('/training-review')) return {'binding': 'reviewed'};
+        if (path.endsWith('/training-begin')) {
+          starts++;
+          expect(body['reviewed'], {'binding': 'reviewed'});
+          expect(body['confirmed'], true);
+          return {'id': 'trial', 'revision': 'zero', 'completed_steps': 0, 'status': 'paused'};
+        }
+        if (path.endsWith('/step')) {
+          steps++;
+          expect(body['expected_revision'], 'zero');
+          return {'id': 'trial', 'revision': 'five', 'completed_steps': 5, 'status': 'paused'};
+        }
+        return {'rows': 1, 'real_target_tokens': 2, 'sequence_lengths': [2]};
+      }))));
+    await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Approve manual streamed trial'));
+    await tester.tap(find.text('Approve manual streamed trial')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Cancel')); await tester.pumpAndSettle(); expect(starts, 0);
+    await tester.tap(find.text('Approve manual streamed trial')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Approve twenty-step trial')); await tester.pumpAndSettle();
+    expect(starts, 1); expect(steps, 0);
+    await tester.tap(find.text('Run next five updates')); await tester.pumpAndSettle();
+    expect(steps, 1); expect(find.text('Saved progress: 5 / 20 updates · paused'), findsOneWidget);
+  });
+
   testWidgets('batch inspector allows retry after a binding failure', (tester) async {
     var attempts = 0;
     await tester.pumpWidget(MaterialApp(home: Scaffold(body: StreamModelBatchesDialog(reviewed: const {'id': 'fixture'}, request: (path, body) async {

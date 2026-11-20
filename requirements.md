@@ -5041,6 +5041,54 @@ P3-LMF-03 partial progress · reviewed streamed-codec model bundle persistence c
   remain open and skipped. No external collection, downloads, generated artifacts/
   weights in Git or push; unrelated edits and prior training artifacts are preserved.
 
+P3-LMF-03 partial progress · approved manual streamed training checkpoints · 2026-11-20:
+- [ ] P3-LMF-03 remains open. The learned-window inspector now offers a separate
+  “Approve manual streamed trial” action and saved trial history. Explicit consent
+  binds the completed source/overlap review, exact codec/windows, runtime, code and
+  fixed seed-7 tiny-decoder settings. Approval initializes a private checkpoint;
+  each “Run next five updates” executes five masked SGD updates immediately and
+  pauses at a saved boundary, up to 20 updates. Four successive training windows
+  per update cycle from the beginning; this is a bounded manual trial, not a full
+  corpus training run or idle/AC scheduler.
+- Each boundary publishes a new immutable model/tokenizer bundle before atomically
+  advancing its state pointer. Receipts bind the source-batch chain, next cursor,
+  cumulative real-target loss, prior checkpoint hash and final evaluation hash.
+  Replayed requests cannot advance twice; source/runtime/code changes and resource
+  failures stop continuation. Failed publication preserves the previous checkpoint
+  and private unpublished files. A distinct tokenization-v4 contract permits these
+  approved trained weights; v3 initialization-only bundles retain their fresh-seed,
+  zero-update checks and cannot be promoted by toggling approval flags.
+- Final evaluation exhausts every saved validation/test window in batches of at
+  most 16 with masked, token-weighted metrics and no held-out optimizer updates.
+  The fixed 80% accuracy target is recorded independently; release remains false.
+  No external collection, pretrained download or general scheduling was enabled.
+- Local app evidence: rebuilt and ran ALMG on this Mac against local fixture
+  backend port 28858. Cancel created no additional trial. Approved Unigram trial
+  c0c63517b3a049dfa9e5462ab4c284d2 saved five updates, survived a complete app/backend
+  restart with identical saved state, then resumed through 10/15/20 updates.
+  Native byte-BPE trial 1a7d904877ba4428b77f996b6c960428 (260 IDs, architecture v2)
+  and character-BPE trial 7ccb884e596849afbb38d91ab39b83f8 (64 IDs, architecture v1)
+  also completed 20 updates. Each changed all nine parameter tensors and saved
+  five reloadable model/tokenizer checkpoints. CPU/Metal maximum differences were
+  1.03e-7, 9.22e-8 and 4.84e-8 respectively; stored CPU outputs reloaded exactly.
+- Verified full held-outs: Unigram 298 validation windows/4404 targets and 273 test
+  windows/4055 targets; byte BPE 569/8732 and 522/8028; character BPE 187/2921 and
+  174/2713. Test accuracies were about 16.9%, 61.8% and 4.6%, so all correctly kept
+  quality_target_met=false and release_approved=false. All three completed reports
+  reopened identically after another app/backend restart. All 81 prior stream
+  files, old trained byte-BPE bundles and earlier checkpoints remained byte-identical.
+- Verification: 508 Python tests passed with real Metal enabled and warnings as
+  errors; 40 Flutter tests passed; Flutter analysis and diff checks were clean.
+  Tests cover consent/stale reviews, restart/resume equivalence within 1e-6 for
+  independent float32 Metal runs, duplicate requests, source changes, immutable
+  earlier checkpoints and failed state publication. Evidence is under
+  /tmp/almg-stream-training-native-qa/ (native JSON, verification.json, restart
+  captures and test/build logs); generated files and weights are outside Git.
+- Remaining: broader tokenizer acceptance, production-scale streamed training,
+  general streamed-model inference/export and scheduler integration. P3-LMF-01
+  is already complete. Unchanged physical power, Windows and oversized-fixture
+  blockers remain open and skipped; unrelated user edits were preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
