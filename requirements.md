@@ -5295,6 +5295,57 @@ P3-LMF-03 acceptance complete · isolated streamed-archive import and CPU previe
   power/Windows/oversized-fixture blockers remain open and skipped; continue with
   the next independently actionable requirement in document order.
 
+P3-LMF-04 partial progress · validated pre-allocation architecture plans · 2026-11-20:
+- [ ] P3-LMF-04 remains open. Recipe details now offer “Plan decoder architecture”.
+  Structured version-1 plans validate layer count, hidden width, attention heads,
+  head dimension, feed-forward width, context, vocabulary, seed and planning batch
+  size before allocation. Unknown/missing fields, booleans in numeric fields,
+  out-of-range dimensions, hidden_size != heads × head_dim and FF width below
+  hidden width are rejected. Native presets and an explicit bounded head selector
+  make the supported layouts reviewable; editing fields invalidates save approval.
+- Plans explicitly describe bias-free dense decoder layouts with untied head/input
+  embeddings, learned absolute positions, parameter-free LayerNorm, ReLU and
+  normal(0, 0.02) initialization. Other strategies are rejected in this version.
+  Per-tensor shapes and exact calculated parameter counts are produced without
+  constructing weights: 2*vocab*hidden + context*hidden + layers*(4*hidden^2 +
+  2*hidden*feed_forward). Supported planning bounds are 1–8 layers, hidden 8–128,
+  1–8 heads, head dimension 2–64, FF width 8–512, context 2–256 and vocabulary 4–512.
+- Memory output separates FP32 weights, gradients, two Adam moment tensors and a
+  retained activation-layout estimate. Every estimate is explicitly unmeasured;
+  workspace, allocator and runtime/framework memory are excluded, so this is not
+  a feasibility guarantee. The UI and saved schema state plan-only,
+  weights_allocated=false, execution_available=false and no training/release
+  approval. Review creates no files. Saving requires explicit approval of the
+  exact code/configuration review and atomically publishes only plan.json.
+- Local app verification: rebuilt and ran ALMG on this Mac against local fixture
+  backend port 28863. A two-layer configuration with width 16, three heads and
+  head dimension 8 was rejected before saving. Reviewed the tiny single-layer
+  preset (1,664 parameters, 6,656 FP32 weight bytes), then closed it without any
+  saved artifact. Explicitly saved the valid two-layer/two-head preset as
+  5373ba6fc55b40f8821266ce4c5973d3: 15 planned tensors, 8,704 parameters, 34,816
+  weight bytes, 34,816 gradient bytes, 69,632 Adam moment bytes, 327,680 activation
+  layout bytes and 466,944 total training-layout bytes. No model was initialized.
+- After complete app/backend restart, native saved-plan history reopened the exact
+  configuration, shapes, counts, estimates and flags. Only plan.json existed in
+  the new artifact directory; all prior imported-model payloads/history stayed
+  byte-identical. Tests independently compare the legacy-compatible plan's every
+  tensor shape, actual parameter count and actual weight bytes with the existing
+  Decoder, verify multilayer/head arithmetic without constructor calls, reject
+  invalid configurations and stale consent, and cover restart/tamper and failed
+  atomic publication. This validates planning, not execution of the new layouts.
+- Verification: 524 Python tests passed with real Metal regression fixtures and
+  warnings as errors; 45 Flutter tests passed; Flutter analysis and diff checks
+  were clean. Evidence: /tmp/almg-architecture-plan-native-qa/ (native invalid,
+  tiny-review, saved/reopened plan JSON and UI captures, restart verification and
+  test/build logs). Plans and generated artifacts are outside Git; no external
+  requests, pretrained downloads or changes to existing trained weights occurred.
+- Remaining acceptance: construct/initialize the configurable architecture from
+  its approved plan, execute and validate forward/backward passes for those
+  layouts, persist/reload initialized architecture/weights, and report the actual
+  constructed parameter count alongside the declared memory estimates.
+  P3-LMF-03 stays complete. Unchanged P3-LMF-02 hardware/Windows/oversized-fixture
+  blockers remain open and skipped; unrelated user changes are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_stream_imports, decoder_stream_archives, decoder_stream_evaluations, decoder_stream_previews, decoder_stream_training, decoder_stream_persistence, decoder_stream_unigram, decoder_stream_unigram_candidates, decoder_stream_character_bpe, decoder_stream_learned_optimization, decoder_stream_learned_windows, decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_architecture_plans, decoder_stream_imports, decoder_stream_archives, decoder_stream_evaluations, decoder_stream_previews, decoder_stream_training, decoder_stream_persistence, decoder_stream_unigram, decoder_stream_unigram_candidates, decoder_stream_character_bpe, decoder_stream_learned_optimization, decoder_stream_learned_windows, decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -76,6 +76,7 @@ else:
     import decoder_stream_evaluations
     import decoder_stream_archives
     import decoder_stream_imports
+    import decoder_architecture_plans
     import decoder_stream_batches
     import decoder_stream_optimization
     import decoder_stream_plans
@@ -2322,6 +2323,12 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond(decoder_datasets.prepare(ROOT, data.get('documents'), data.get('confirmed'), data.get('tokenizer_kind', 'words')), 201)
             if self.path == '/decoder-trial-proposals':
                 return self.respond(decoder_trials.propose(ROOT, data.get('goal'), ask, planner_identity=inference.loaded_identity, dataset=data.get('dataset')))
+            if self.path == '/decoder-architecture-plans/review':
+                return self.respond(decoder_architecture_plans.review(data.get('config')))
+            if self.path == '/decoder-architecture-plans/save':
+                return self.respond(decoder_architecture_plans.save(ROOT, data.get('confirmed'), data.get('reviewed')), 201)
+            if self.path == '/decoder-architecture-plans/list':
+                return self.respond({'plans': decoder_architecture_plans.list_plans(ROOT, data.get('confirmed'))})
             if self.path == '/decoder-stream-imports':
                 return self.respond(decoder_stream_imports.import_private(ROOT, data.get('confirmed'), data.get('source_name'), data.get('data')), 201)
             if self.path == '/decoder-stream-imports/list':
