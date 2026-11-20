@@ -7,11 +7,11 @@ import re
 import uuid
 import numpy as np
 if __package__:
-    from . import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision,decoder_optimizer_measurements as measurements
+    from . import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision,decoder_optimizer_measurements as measurements,decoder_optimizer_estimates as work_estimates
     from .planned_decoder import PlannedDecoder
     from .run_manifest import digest,file_digest
 else:
-    import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision,decoder_optimizer_measurements as measurements
+    import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision,decoder_optimizer_measurements as measurements,decoder_optimizer_estimates as work_estimates
     from planned_decoder import PlannedDecoder
     from run_manifest import digest,file_digest
 DEFAULT={'schema_version':1,'optimizer':'sgd','learning_rate':.01,'schedule':'warmup_cosine','warmup_steps':2,'steps':10,'gradient_clip_norm':1.0,'weight_decay':0.0}
@@ -125,9 +125,10 @@ def review(root,plan_id,initialized,settings):
     if profile['system']!='Darwin' or profile['machine']!='arm64' or not profile['metal_available']:reasons.append('Apple silicon with MLX Metal is required for gradients; the optimizer uses FP32 NumPy arrays.')
     if not hardware._fits(profile,estimates):reasons.append('Current memory/disk does not cover optimizer fixture reserves.')
     record={'format':'almg-optimizer-fixture-review-v1','schema_version':1,'source':{'plan_id':plan_id,'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
-        'config':c,'model_config':current['config'],'hardware':profile,'estimates':estimates,'feasible':not reasons,'blockers':reasons,
+        'config':c,'model_config':current['config'],'runtime':work_estimates.runtime(profile),'hardware':profile,'estimates':estimates,'feasible':not reasons,'blockers':reasons,
         'scope':'bounded_synthetic_updates_with_durable_optimizer_and_scheduler_checkpoint_not_general_pretraining','training_approved':False,'release_approved':False,
-        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_optimizer_measurements.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
+        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_optimizer_estimates.py','decoder_optimizer_measurements.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
+    estimates['optimizer_work_estimate']=work_estimates.estimate(history(root,plan_id,current['id']),record)
     record['revision']=digest(record);return record
 
 
@@ -145,7 +146,7 @@ def _generate(model):
 def run(root,plan_id,confirmed,initialized,settings,approved):
     if confirmed is not True:raise ValueError('Explicitly approve optimizer fixture training and saved weights/checkpoints.')
     current=review(root,plan_id,initialized,settings)
-    if not isinstance(approved,dict) or approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'}) or any(approved.get(key)!=current[key] for key in ('format','schema_version','source','config','model_config','estimates','implementation_sha256')):raise ValueError('Optimizer review changed; reopen it before training.')
+    if not isinstance(approved,dict) or approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'}) or any(approved.get(key)!=current[key] for key in ('format','schema_version','source','config','model_config','runtime','estimates','implementation_sha256')):raise ValueError('Optimizer review changed; reopen it before training.')
     if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Optimizer fixture is blocked by hardware/resources.')
     import mlx.core as mx
     observer=measurements.OptimizerMeasurements(mx)

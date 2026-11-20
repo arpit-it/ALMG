@@ -193,6 +193,12 @@ class DecoderOptimizerFixtureTests(unittest.TestCase):
                 self.assertEqual(len(observed['phase_samples']),41)
                 self.assertEqual([entry['phase'] for entry in observed['phase_samples'][:20]],[f'reference_update_{step}' for step in range(1,21)])
                 self.assertEqual(observed['phase_samples'][30]['phase'],'resumed_update_11')
+                refreshed=fixture.review(root,plan['id'],source,c);estimate=refreshed['estimates']['optimizer_work_estimate']
+                self.assertEqual(estimate['sample_count'],1);self.assertFalse(estimate['measured'])
+                self.assertEqual(estimate['source_records'][0]['record_id'],report['id'])
+                self.assertEqual(estimate['estimated_seconds'],observed['elapsed_seconds']*1.25)
+                self.assertEqual(refreshed['estimates']['required_available_memory_bytes'],approved['estimates']['required_available_memory_bytes'])
+                self.assertIsNone(fixture.review(root,plan['id'],source,{**c,'learning_rate':.02})['estimates']['optimizer_work_estimate'])
                 self.assertEqual(report['microbatch_backward_calls_in_recorded_trajectory'],40);self.assertEqual([entry['step'] for entry in report['step_log']],list(range(1,21)))
                 self.assertAlmostEqual(report['step_log'][-1]['learning_rate'],.001);self.assertLess(report['final_train_loss'],report['initial_train_loss'])
                 self.assertEqual(report['checkpoint_parameter_max_error'],0.);self.assertEqual(report['checkpoint_optimizer_max_error'],0.)

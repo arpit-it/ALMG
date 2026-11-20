@@ -6616,6 +6616,51 @@ P3-LMF-06 partial progress · observed optimizer work and shared memory · 2026-
   or large-model feasibility. Unchanged hardware/user-action blockers remain open
   and skipped while independent work continues.
 
+P3-LMF-05 partial progress · compatible optimizer-work estimates · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Preapproval review for the bounded optimizer fixture
+  now derives an approximate work-time estimate from verified completed compatible
+  runs. Compatibility requires the exact initialization/model hash, model/training
+  configuration, producer fingerprint and recorded Python/NumPy/MLX/Metal device/
+  CPU topology. New reviews persist runtime context and bind it to approval. Older
+  records remain readable; observations without compatible context are not reused.
+- The estimate is the highest compatible measured work time plus 25% headroom,
+  with source record IDs/revisions, measured range and sample count retained.
+  It is explicitly labeled estimated rather than measured. Both reference and
+  checkpointed trajectories, checkpoint I/O and inference checks are included;
+  queue, approval/admission waits and report publication are excluded. This is a
+  bounded-work heuristic, not a confidence interval, total wall-time guarantee or
+  general pretraining forecast. Only the latest twenty verified records for this
+  initialization are considered. Calculated memory/disk reserves are unchanged;
+  shared-process memory samples never reduce admission reserves.
+- Native verification: rebuilt and ran ALMG on this Mac with the isolated local
+  8704-parameter two-layer initialization and external collection disabled.
+  Reopened all twelve copied older records before writes. Twenty-update/two-way
+  accumulation reviews initially had no compatible estimate. Explicitly approved
+  FP32 SGD record eb51f539b5334bbf90d1a3afd6a2d2b5 and mixed FP16 AdamW record
+  d44d7cd3f2e246ba9dcf17ba9921ddcf. Their measured work times were
+  0.26134858292061836 and 0.36279399995692074 seconds. Reopening review then showed
+  one compatible source each and estimates 0.32668572865077294 and
+  0.45349249994615093 seconds, respectively, with unchanged memory/disk reserves.
+  Canceling the renewed reviews created no additional runs or artifacts.
+- Actual training still decreased loss (SGD 4.852477073669434 →
+  4.686117172241211; AdamW 4.852474212646484 → 2.6992383003234863) and restored
+  checkpoint state with 0.0 final parameter/moment errors. After app/backend
+  restart all fourteen records, checkpoint restoration, saved CPU generation and
+  both compatible estimates reopened exactly without further training. All
+  seventy optimizer files, three source files and 245 prior artifact files
+  retained their hashes. Evidence: /tmp/almg-estimate-native-qa/verification.json,
+  post-run-estimates.json and native captures; generated artifacts remain outside Git.
+- Validation: 600 Python tests passed with warnings as errors and Metal enabled,
+  63 Flutter tests passed, and analysis was clean. Tests cover maximum observed
+  time/headroom/provenance, changed initialization/config/runtime/producer,
+  incomplete or tampered records, nonpositive/nonfinite times, actual measured
+  optimizer feedback, unchanged reserves and estimated-versus-measured UI labels.
+- Remaining: isolated peak profiling/calibration and broader training-feasibility
+  estimates as the engine grows, unavailable Windows/CUDA and physical/oversized
+  hardware checks, plus P3-LMF-06 corpus integration, independent continuation/
+  cancellation and profiled 50M–100M training. These bounded synthetic timings do
+  not establish large-model feasibility. Unchanged blockers stay open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

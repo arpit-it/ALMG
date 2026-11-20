@@ -56,4 +56,13 @@ void main() {
     expect(find.textContaining('These are not isolated trial peaks'), findsOneWidget);
     await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
   });
+  testWidgets('review labels compatible work estimate separately from measured time and memory', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: DecoderOptimizerFixtureDialog(initialized: const {'id': 'init', 'plan_id': 'plan'}, request: (path, body) async => {
+      'feasible': true, 'estimates': {'optimizer_work_estimate': {'estimated_seconds': 5.0, 'sample_count': 2}}, 'blockers': <String>[]
+    })));
+    await tester.tap(find.text('Review optimizer fixture')); await tester.pumpAndSettle();
+    expect(find.text('Estimated workflow work: 5.000 s from 2 compatible measured run(s).'), findsOneWidget);
+    expect(find.textContaining('not a total wall-time guarantee'), findsOneWidget);
+    expect(find.textContaining('Measured workflow time:'), findsNothing);
+  });
 }

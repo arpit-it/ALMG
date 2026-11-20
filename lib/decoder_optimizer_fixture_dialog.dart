@@ -87,6 +87,10 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
       if (_review != null) ...[
         Text(_review!['feasible'] == true ? 'Resources cover calculated optimizer fixture reserves.' : 'Optimizer fixture cannot start.'),
         Text('Optimizer updates: ${_review!['estimates']['optimizer_updates']} · checkpoint step: ${_review!['estimates']['checkpoint_step']}. Batch rows: ${_review!['estimates']['effective_batch_rows']} · sequence length: ${_review!['estimates']['sequence_length']} · targets per update: ${_review!['estimates']['target_tokens_per_update']}. Calculated optimizer-state bytes: ${_review!['estimates']['optimizer_state_bytes']} · accumulation buffer: ${_review!['estimates']['gradient_accumulation_buffer_bytes']} · memory reserve: ${_review!['estimates']['required_available_memory_bytes']} bytes.'),
+        if (_review!['estimates']['optimizer_work_estimate'] case final Map estimate) ...[
+          Text('Estimated workflow work: ${(estimate['estimated_seconds'] as num).toStringAsFixed(3)} s from ${estimate['sample_count']} compatible measured run(s).'),
+          const Text('Estimate includes both verification trajectories and checkpoint/inference work. Queue and approval waits are excluded; this is not a total wall-time guarantee. Memory reserves stay conservative.'),
+        ] else const Text('Workflow time estimate unavailable: complete a compatible local fixture first.'),
         for (final reason in _review!['blockers'] as List) Text(reason as String),
         ExpansionTile(title: const Text('View optimizer feasibility record'), children: [SelectableText(const JsonEncoder.withIndent('  ').convert(_review))]),
       ],
