@@ -45,4 +45,15 @@ void main() {
     await tester.tap(find.text('Review optimizer fixture')); await tester.pumpAndSettle();
     expect((requests.last['settings'] as Map)['steps'], 20);
   });
+  testWidgets('saved resource observations distinguish measured shared memory from isolated peaks', (tester) async {
+    await tester.pumpWidget(MaterialApp(home: DecoderOptimizerFixtureDialog(initialized: const {'id': 'init', 'plan_id': 'plan'}, request: (path, body) async {
+      if (path.endsWith('/optimizer-train')) return {'workflow_measurements': {'elapsed_seconds': 1.25, 'sampled_active_metal_max_bytes': 128}};
+      return {'feasible': true, 'estimates': {'optimizer_state_bytes': 100}, 'blockers': <String>[]};
+    })));
+    await tester.tap(find.text('Review optimizer fixture')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Train and save optimizer fixture')); await tester.pump(); await tester.pump(const Duration(milliseconds: 300));
+    expect(find.textContaining('Measured workflow time: 1.250 s'), findsOneWidget);
+    expect(find.textContaining('These are not isolated trial peaks'), findsOneWidget);
+    await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
+  });
 }

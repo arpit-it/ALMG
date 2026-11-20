@@ -6570,6 +6570,52 @@ P3-LMF-06 partial progress · reviewed bounded optimizer update budgets · 2026-
   not establish general language quality. Unchanged hardware/user-action blockers
   remain open and skipped while independent work continues.
 
+P3-LMF-06 partial progress · observed optimizer work and shared memory · 2026-11-20:
+- [ ] P3-LMF-06 remains open. Bounded optimizer runs now save versioned workflow
+  measurements: synchronized elapsed work, active Metal samples after every
+  optimizer update, shared Metal peak counters before/after, and process-lifetime
+  RSS high-water observations in bytes. Samples distinguish uninterrupted
+  reference, checkpointed, resumed and finished phases. Shared counters are never
+  reset. Observations are included in the saved record revision and their producer
+  in the preapproval implementation fingerprint; older records remain readable.
+- Calculated admission reserves stay separate and unchanged. The app presents
+  observed time/sample memory and explicitly identifies shared-process scope.
+  RSS/Metal peak counters can include earlier or concurrent work; active-memory
+  samples exclude cached buffers and may miss transient peaks. These are not
+  isolated trial peak measurements, model-only memory costs or duration forecasts.
+  Timing includes source loading, initial checks, both optimizer trajectories,
+  checkpoint I/O, final evaluation and CPU generation, plus sampling overhead;
+  excludes admission/queue/approval waits and final report publication.
+- Native verification: rebuilt and ran ALMG on this Mac with the isolated local
+  8704-parameter two-layer initialization and external collection disabled.
+  Reopened all ten copied older records before writes. Explicitly reviewed/trained
+  twenty-update, two-microbatch FP32 SGD record efe3de36c01d4369b77da3e618c4f6cd
+  and mixed FP16 AdamW record 064b57ddddfe4d52bb34bd49e0809f38. Measured workflow
+  times were 0.2680305000394583 and 0.9372240829980001 seconds respectively.
+  Each saved forty-one ordered phase samples: twenty reference updates, ten
+  checkpointed updates, ten resumed updates and finish. Sampled active Metal
+  maximum was 35152 bytes for each; shared process RSS high-water observations
+  were 237617152 and 240599040 bytes. The app displayed the measured scope caveats.
+- SGD loss fell 4.852477073669434 → 4.686117172241211; AdamW loss fell
+  4.852474212646484 → 2.6992383003234863. Both restored step-ten model/optimizer/
+  scheduler state, completed twenty updates and matched uninterrupted final
+  weights/moments with 0.0 errors. After app/backend restart all twelve records,
+  their observations, checkpoint restoration and trained-model CPU generation
+  reopened exactly. All sixty optimizer files, three source files and 185 prior
+  artifact files retained their hashes. Evidence:
+  /tmp/almg-monitor-native-qa/verification.json and native UI captures; generated
+  datasets, checkpoints and weights remain outside Git.
+- Validation: 597 Python tests passed with warnings as errors and Metal enabled,
+  62 Flutter tests passed, and analysis was clean. Coverage includes synchronized
+  sample scope, no counter resets, RSS unit conversion, actual forty-one-phase
+  optimizer observations, checkpoint recovery, persisted reads and UI disclosure.
+- Remaining: approved text-corpus/tokenizer integration, independent continuation
+  and cancellation, broader training budgets, general interruption/resource
+  monitoring, isolated peak profiling/calibration for the wider engine and the
+  profiled 50M–100M target. These synthetic runs do not establish corpus quality
+  or large-model feasibility. Unchanged hardware/user-action blockers remain open
+  and skipped while independent work continues.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

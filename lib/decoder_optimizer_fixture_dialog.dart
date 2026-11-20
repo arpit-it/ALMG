@@ -33,7 +33,13 @@ class _DecoderOptimizerFixtureDialogState extends State<DecoderOptimizerFixtureD
   }
   Future<void> _show(Map<String, dynamic> record) => showDialog<void>(context: context, builder: (context) => AlertDialog(
     title: const Text('Saved optimizer fixture'), scrollable: true,
-    content: SizedBox(width: 660, child: SelectableText(const JsonEncoder.withIndent('  ').convert(record))),
+    content: SizedBox(width: 660, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+      if (record['workflow_measurements'] case final Map observed) ...[
+        Text('Measured workflow time: ${(observed['elapsed_seconds'] as num).toStringAsFixed(3)} s · sampled active Metal maximum: ${observed['sampled_active_metal_max_bytes']} bytes.'),
+        const Text('Shared backend memory observations include other work; RSS is a process-lifetime high-water mark. These are not isolated trial peaks or future training-duration estimates. Timing includes both verification trajectories and checkpoint/inference work.'),
+      ],
+      SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+    ])),
     actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
   Future<void> _train() async {
     setState(() { _busy = true; _error = null; });

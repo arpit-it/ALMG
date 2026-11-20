@@ -7,11 +7,11 @@ import re
 import uuid
 import numpy as np
 if __package__:
-    from . import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision
+    from . import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision,decoder_optimizer_measurements as measurements
     from .planned_decoder import PlannedDecoder
     from .run_manifest import digest,file_digest
 else:
-    import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision
+    import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision,decoder_optimizer_measurements as measurements
     from planned_decoder import PlannedDecoder
     from run_manifest import digest,file_digest
 DEFAULT={'schema_version':1,'optimizer':'sgd','learning_rate':.01,'schedule':'warmup_cosine','warmup_steps':2,'steps':10,'gradient_clip_norm':1.0,'weight_decay':0.0}
@@ -127,7 +127,7 @@ def review(root,plan_id,initialized,settings):
     record={'format':'almg-optimizer-fixture-review-v1','schema_version':1,'source':{'plan_id':plan_id,'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
         'config':c,'model_config':current['config'],'hardware':profile,'estimates':estimates,'feasible':not reasons,'blockers':reasons,
         'scope':'bounded_synthetic_updates_with_durable_optimizer_and_scheduler_checkpoint_not_general_pretraining','training_approved':False,'release_approved':False,
-        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
+        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_optimizer_measurements.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
     record['revision']=digest(record);return record
 
 
@@ -148,6 +148,7 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
     if not isinstance(approved,dict) or approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'}) or any(approved.get(key)!=current[key] for key in ('format','schema_version','source','config','model_config','estimates','implementation_sha256')):raise ValueError('Optimizer review changed; reopen it before training.')
     if not current['feasible'] or approved.get('feasible') is not True:raise ValueError('Optimizer fixture is blocked by hardware/resources.')
     import mlx.core as mx
+    observer=measurements.OptimizerMeasurements(mx)
     model=PlannedDecoder.load(initializations._folder(root,plan_id)/initialized['id']/'model.json');c=current['config'];source={name:value.copy() for name,value in model.parameters.items()};shape=model.config
     rows=c.get('batch_size',min(2,shape['batch_size']));length=c.get('sequence_length',min(8,shape['context_length']));sequence=np.arange(rows*(length+1)).reshape(rows,length+1)%shape['vocab_size'];x=sequence[:,:-1];y=sequence[:,1:];mask=np.ones_like(y,dtype=np.float32)
     identifier=uuid.uuid4().hex;directory=_folder(root,identifier);directory.mkdir(parents=True)
@@ -170,11 +171,11 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
         gradient_error=max(float(np.max(np.abs(original_gradient[name]-accumulated[name]))) for name in original_gradient)
         gradient_tolerance=1e-3 if precision=='mixed_float16' else 1e-5
         if gradient_error>gradient_tolerance:raise ValueError('Accumulated gradients do not match the effective full batch within the selected precision tolerance.')
-        def optimize(values,state,end):
+        def optimize(values,state,end,trajectory):
             logs=[]
             while state['step']<end:
                 grads=accumulated_gradient(values)
-                values,state,entry=update(values,grads,state,c);entry.update(microbatches=accumulation,target_tokens=int(mask.sum()));logs.append(entry)
+                values,state,entry=update(values,grads,state,c);entry.update(microbatches=accumulation,target_tokens=int(mask.sum()));logs.append(entry);observer.sample(f"{trajectory}_update_{state['step']}")
             return values,state,logs
         initial=score(source);validation_initial=score(source,1)
         master={name:mx.array(value) for name,value in source.items()};reference_loss=float(fp32_loss(master,tx,ty,tm).item())
@@ -182,18 +183,18 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
         causal_error=float(mx.max(mx.abs(logits(master,tx)[:,:cut]-logits(master,mx.array(altered))[:,:cut])).item())
         if abs(initial-reference_loss)>.05 or causal_error>1e-5:raise ValueError('Selected precision failed initial FP32-loss or causal-prefix compatibility.')
         empty={'step':0,'m':{},'v':{}};midpoint=c['steps']//2;checkpoint_path=directory/f'step-{midpoint}'
-        uninterrupted,reference_state,_=optimize(source,empty,c['steps'])
-        halfway,state,first=optimize(source,empty,midpoint);model.parameters=halfway;checkpoint(checkpoint_path,model,state,c,current['revision'])
-        restored,state=restore(checkpoint_path,c,current['revision']);parameters,state,last=optimize(restored.parameters,state,c['steps'])
+        uninterrupted,reference_state,_=optimize(source,empty,c['steps'],'reference')
+        halfway,state,first=optimize(source,empty,midpoint,'checkpointed');model.parameters=halfway;checkpoint(checkpoint_path,model,state,c,current['revision'])
+        restored,state=restore(checkpoint_path,c,current['revision']);parameters,state,last=optimize(restored.parameters,state,c['steps'],'resumed')
         resume_error=max(float(np.max(np.abs(parameters[name]-uninterrupted[name]))) for name in parameters)
         moment_error=max([0.0]+[float(np.max(np.abs(state[kind][name]-reference_state[kind][name]))) for kind in ('m','v') for name in state[kind]])
         final=score(parameters);validation_final=score(parameters,1)
     if not math.isfinite(final) or not final<initial or resume_error>1e-7 or moment_error>1e-7:raise ValueError('Optimizer fixture failed loss/resume checks; any saved checkpoint is retained.')
     model.parameters=parameters;model.save(directory/'trained-model.json');loaded=PlannedDecoder.load(directory/'trained-model.json')
-    generated=_generate(loaded)
+    generated=_generate(loaded);observed=observer.finish()
     if initializations.read(root,plan_id,initialized['id'])!=initialized or file_digest(initializations._folder(root,plan_id)/initialized['id']/'model.json')!=current['source']['model_sha256']:raise ValueError('Source initialization changed during optimizer training; retained artifacts need review.')
     record={'format':'almg-decoder-optimizer-fixture-v1','schema_version':1,'id':identifier,'created_at':datetime.now(timezone.utc).isoformat(),'review':current,'approved_review':approved,
-        'initial_train_loss':initial,'final_train_loss':final,'initial_validation_loss':validation_initial,'final_validation_loss':validation_final,
+        'workflow_measurements':observed,'initial_train_loss':initial,'final_train_loss':final,'initial_validation_loss':validation_initial,'final_validation_loss':validation_final,
         'compute_precision':precision,'master_parameter_dtype':'float32','master_gradient_dtype':'float32','optimizer_state_dtype':'float32','loss_scale':scale,'initial_fp32_reference_loss':reference_loss,'initial_precision_loss_difference':abs(initial-reference_loss),'causal_prefix_max_error':causal_error,'full_batch_gradient_tolerance':gradient_tolerance,'optimizer':c,'gradient_accumulation_steps':accumulation,'effective_batch_rows':rows,'sequence_length':length,'target_tokens_per_update':int(mask.sum()),'microbatch_rows':rows//accumulation,'full_batch_gradient_max_error':gradient_error,'microbatch_backward_calls_in_recorded_trajectory':c['steps']*accumulation,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':first+last,'checkpoint_restored_steps':midpoint,'checkpoint_optimizer_max_error':moment_error,'checkpoint_parameter_max_error':resume_error,
         'generated_token_ids':generated,'inference_runtime':'planned_decoder_numpy_cpu','pretrained_student_weights_loaded':False,'updated_weights_saved':True,'initialization_modified':False,'training_approved':True,'release_approved':False,
         'limitations':'Generated token-ID smoke fixture only; no text corpus/tokenizer, full-epoch training, general model quality, large-model or general mixed-precision claim. Mixed FP16 is validated only for this bounded fixture with fixed loss scaling. Cancellation and independent checkpoint continuation are not yet exposed.',
