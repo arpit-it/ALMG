@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:convert';
+import 'cpu_training_feasibility_dialog.dart';
 import 'dart:io';
 
 import 'package:file_selector/file_selector.dart';
@@ -5583,7 +5584,7 @@ class _StudioPageState extends State<StudioPage> {
   String _score(dynamic value) => (value as num).toStringAsFixed(3);
 
   /// Starts training on the approved dataset.
-  void _approveTraining(String id) {
+  Future<void> _approveTraining(String id) async {
     final target = double.tryParse(_target.text);
     if (target == null || !target.isFinite || target <= 0 || target > 1) {
       setState(
@@ -5591,11 +5592,25 @@ class _StudioPageState extends State<StudioPage> {
       );
       return;
     }
-    _submit('/jobs/$id/start', {
+    final parameters = <String, dynamic>{
       'target': target,
       'idle': _idle,
       if (!_imageRecipe) 'allow_repair': _allowRepair,
-    });
+    };
+    if (!_imageRecipe) {
+      setState(() => _busy = true);
+      try {
+        final report = await _request('/jobs/$id/classifier-feasibility', parameters);
+        if (!mounted) return;
+        final approved = await showDialog<bool>(context: context, builder: (context) => CpuTrainingFeasibilityDialog(report: report));
+        if (approved != true || !mounted) return;
+        parameters['reviewed_feasibility'] = report;
+      } catch (error) {
+        if (mounted) setState(() => _error = error.toString());
+        return;
+      } finally { if (mounted) setState(() => _busy = false); }
+    }
+    await _submit('/jobs/$id/start', parameters);
   }
 
   /// Sends one example to the trained candidate and adds its label to the preview.

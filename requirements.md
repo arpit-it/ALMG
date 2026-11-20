@@ -5858,6 +5858,47 @@ P3-LMF-05 partial progress · stage-specific bounded trial work estimate includi
   Unchanged hardware/user-action blockers stay open and skipped. No generated
   artifacts, private data, weights or unrelated edits are committed.
 
+P3-LMF-05 partial progress · explicit CPU classifier feasibility and saved evidence · 2026-11-20:
+- [ ] P3-LMF-05 remains open. The existing classifier approval screen now shows
+  a CPU-specific resource report before training. It requires no Metal/CUDA probe
+  or accelerator and distinguishes classifier fitting from optional Qwen repair
+  planning. Estimates cover encoded prepared rows, sparse TF-IDF with at most
+  30,000 features per candidate, a 32-copy coefficient/solver-history allowance,
+  memory and additional disk reserves. They are calculated, not measured peak
+  memory, and provide no CPU training-duration or exhaustion guarantee.
+- The UI hides approval when resources cannot be verified or are insufficient.
+  The start route validates a supplied report's exact dataset, labels, settings
+  and implementation and rechecks resources; legacy API clients still receive
+  fresh CPU admission. Execution rechecks again before fitting, including after
+  idle waits. The reproducibility record retains the exact user-approved report,
+  fresh queue admission and execution snapshots. Snapshot revisions bind the job
+  and original prepared-dataset approval, correctly distinct from post-split rows.
+  Legacy records without optional CPU profiles remain readable. The original
+  shared run-manifest module and decoder training/checkpoint formats are unchanged.
+- Native verification: rebuilt macOS ALMG and used an isolated 48-row, two-label
+  CPU fixture. Opened the resource report, cancelled with unchanged fixture files,
+  reopened and explicitly approved CPU training with idle waiting and repair off.
+  Report estimated 283831424 bytes memory and
+  97846848 bytes additional disk, with accelerator_required=false.
+  Candidate dddddddddddddddddddddddddddddddd completed on CPU with validation/test macro-F1
+  1.0/1.0 on this contrived fixture, not a general quality claim. Opened the actual
+  run reproducibility record and verified exact approval plus fresh admission and
+  execution profiles. After app/backend restart the complete manifest reopened
+  with exact equality; 4 candidate files and 5 earlier CPU fixture files
+  retained their SHA-256 hashes. Other datasets, weights and user changes were
+  outside the isolated fixture root; no external collection or repair was invoked.
+- Verification: 558 Python tests passed with actual Metal regressions enabled
+  and warnings as errors; 50 Flutter tests passed; analysis and diff checks clean.
+  New tests cover read-only CPU-only reports, stale/low-memory rejection,
+  preapproval versus post-split bindings, snapshot tamper detection, legacy
+  metadata and blocked approval UI. Evidence:
+  /tmp/almg-classifier-feasibility-native-qa/verification.json, native-final.log,
+  recovery.log and final test/build logs.
+- Remaining: other supported CPU recipe feasibility, measured classifier resource
+  calibration/duration, broader neural/full-epoch feasibility and Windows/CUDA
+  host verification. Unchanged hardware/user-action blockers remain open and
+  skipped. No generated/private artifacts, weights or unrelated edits committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

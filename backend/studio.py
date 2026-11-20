@@ -43,6 +43,7 @@ if __package__:
     from . import decoder_architecture_feasibility, decoder_architecture_backward, decoder_architecture_initializations, decoder_architecture_plans, decoder_stream_imports, decoder_stream_archives, decoder_stream_evaluations, decoder_stream_previews, decoder_stream_training, decoder_stream_persistence, decoder_stream_unigram, decoder_stream_unigram_candidates, decoder_stream_character_bpe, decoder_stream_learned_optimization, decoder_stream_learned_windows, decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
     from . import decoder_stream_training_feasibility
     from . import decoder_stream_training_measurements
+    from . import classifier_feasibility
 else:
     import training_resources
     import lora_validation
@@ -76,6 +77,7 @@ else:
     import decoder_stream_training
     import decoder_stream_training_feasibility
     import decoder_stream_training_measurements
+    import classifier_feasibility
     import decoder_stream_previews
     import decoder_stream_evaluations
     import decoder_stream_archives
@@ -1848,6 +1850,9 @@ def run(job):
                 return
             rows = TRAINING_DATA[job["id"]]
             run_manifest.validate_approval(job, rows, recipe_contracts.export_metadata(job))
+            if job.get('recipe','classifier')=='classifier' and job.get('classifier_feasibility'):
+                approved=job['classifier_feasibility']
+                job['classifier_execution_feasibility']=classifier_feasibility.admit(ROOT,job,rows,approved['settings'],approved)
             job["resource_check"] = training_resources.check(rows, ROOT)
             job["status"] = "training"
             store_job(job)
@@ -1888,8 +1893,8 @@ def run(job):
             else:
                 joblib.dump(model, work / "candidate.joblib")
             model_path = work / ("candidate.json" if job.get("recipe") == "text_to_image" else "candidate.joblib")
-            run_manifest.write(work, run_manifest.build(job, rows, metrics, model_path,
-                                                       recipe_contracts.export_metadata(job)))
+            run_manifest.write(work, classifier_feasibility.attach_manifest(job,run_manifest.build(job, rows, metrics, model_path,
+                                                       recipe_contracts.export_metadata(job))))
             CANDIDATES[job["id"]] = (model, rows, metrics)
             job.update(status="preview_ready", metrics=metrics, examples=len(rows),
                        preview_count=0, candidate_directory=str(work))
@@ -1946,7 +1951,7 @@ def export_candidate(job, candidate):
                 joblib.dump(model, files / "model.joblib")
             work = ROOT / "training-sessions" / job["id"]
             if (work / "run-manifest.json").is_file():
-                manifest = run_manifest.read(work)
+                manifest = classifier_feasibility.validate_manifest(run_manifest.read(work))
                 if manifest['dataset']['sha256'] != run_manifest.digest(rows) or manifest['evaluation_sha256'] != run_manifest.digest(metrics):
                     raise ValueError("Candidate dataset or evaluation changed after the run record was captured.")
                 if manifest['settings_sha256'] != run_manifest.digest(recipe_contracts.export_metadata(job)):
@@ -2231,7 +2236,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'error': 'A completed candidate is required.'}, 404)
             folder = ROOT / job['id'] if job['status'] == 'passed' else ROOT / 'training-sessions' / job['id']
             try:
-                return self.respond(run_manifest.read(folder))
+                return self.respond(classifier_feasibility.validate_manifest(run_manifest.read(folder)))
             except ValueError as error:
                 return self.respond({'error': str(error)}, 409)
         with LOCK:
@@ -2696,6 +2701,8 @@ class Handler(BaseHTTPRequestHandler):
                         raise ValueError("Training task not found.")
                     require_enabled_provider(job, action, data)
                     status = job["status"]
+                    if action == 'classifier-feasibility' and status == 'dataset_ready':
+                        return self.respond(classifier_feasibility.review(ROOT, job, TRAINING_DATA.get(job['id'], []), data))
                     if action == 'plan-decoder-dataset' and status == 'factory_review':
                         if data.get('confirmed') is not True:
                             raise ValueError('Review the selected local dataset before planning.')
@@ -3231,8 +3238,12 @@ class Handler(BaseHTTPRequestHandler):
                                 (rows[index]["label"] for index in usable), job["plan"]["labels"],
                             )
                         parameters = recipe_contracts.training_parameters(
-                            job.get("recipe", "classifier"), data, job.get("recipe_contract"))
+                            job.get("recipe", "classifier"), {key:value for key,value in data.items() if key!='reviewed_feasibility'}, job.get("recipe_contract"))
                         recipe_contracts.execution_variant(job.get("recipe", "classifier"), job.get("mode"))
+                        if job.get('recipe','classifier')=='classifier':
+                            fresh=classifier_feasibility.admit(ROOT,job,TRAINING_DATA.get(job['id'], []),parameters,data.get('reviewed_feasibility'))
+                            job['classifier_feasibility']=data.get('reviewed_feasibility') or fresh
+                            job['classifier_admission_feasibility']=fresh
                         resources = training_resources.check(TRAINING_DATA.get(job["id"], []), ROOT)
                         POWER_INTERRUPTED_JOBS.discard(job["id"])
                         job.update(status="queued", **parameters, resource_check=resources, error=None)
