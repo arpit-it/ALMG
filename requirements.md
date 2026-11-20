@@ -4817,6 +4817,59 @@ P3-LMF-03 partial progress · reviewed full-split character model inputs and num
   collection, downloads, generated artifacts/weights in Git or push; unrelated
   user edits and prior artifacts are preserved.
 
+P3-LMF-03 partial progress · resumable full-training-split Unigram candidate initialization · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Streamed indexes now offer separately reviewed
+  full-split Unigram candidate preparation with a 32–512-ID budget. This delivers
+  the fixed-candidate initialization stage only: no EM update, trained tokenizer,
+  model-input admission or training/release approval is produced. Native inventory
+  and consent text distinguish frequency-based initial probabilities from fitted
+  model probabilities; candidate pieces may encode private text.
+- The versioned candidate inventory counts every unique training record, excluding
+  held-out records and duplicate occurrence weights. NFC characters include the
+  complete training alphabet; within-word substrings of length 2–8 accumulate in
+  SQLite. Candidates occurring at least twice rank by frequency × (length − 1),
+  then lexical order, matching the bounded Unigram selection rule. Alphabet IDs
+  remain sorted first; selected substrings follow in sorted order. Positive initial
+  probabilities normalize selected counts. No cross-word/document pieces or
+  held-out alphabet expansion are introduced; alphabet overflow requires a new
+  review with a larger cap and preserves prior committed progress.
+- Per-step source buffers remain bounded to 100 records/about 1 MiB by default,
+  each record to 64 KiB, and in-memory substring deltas to 4,096 entries before
+  flushing into disk counters. Counts, training bytes, ordered group-chain hash and
+  cursor commit together. Original source/index signatures, permission review,
+  implementation binding and population checks guard publication. Interrupted
+  batches roll back; interrupted publication resumes from sealed counts. Completed
+  manifest/counter hashes and reconstructed initializers are checked on reload.
+- Native verification rebuilt/launched macOS on port 28854, rejected a 32-ID budget
+  whose training alphabet did not fit without publishing, and cancelled clean
+  64-ID consent without creating another inventory. Candidate inventory
+  d0739055d77743f6a76077bab5fcf381 paused at 8/326 training records. Restarting
+  backend/app restored the exact saved record; explicit native resume completed
+  all 326 unique training records, a 20-character alphabet, 12,897 distinct
+  training substrings and 64 candidate IDs (20 characters plus 44 substrings).
+  QA-only one-record steps/response latency made pause deterministic; production
+  batching is unchanged. A second backend/app restart reopened the identical
+  completed inventory with em_updates=0 and tokenizer_trained=false.
+- Independent verification reconstructed all alphabet/substring counts, rankings,
+  selected IDs, initial probabilities and the ordered training group chain. Initial
+  probability mass summed to one. All 53 prior source/index/tokenizer/comparison/
+  window/diagnostic fixture files stayed byte-identical; no model or trial was saved.
+  Evidence remains outside Git at /tmp/almg-unigram-candidates-native-qa/verification.json,
+  *-ui.json/*-ui.txt, fingerprints and native build/restart/test logs.
+- Validation: 494 Python tests with Metal checks and warnings as errors, 37 Flutter
+  tests, clean Flutter analysis/diff checks and successful native builds. Added
+  cases cover >16-document full-population counting, bounded counter flushing,
+  held-out-only character exclusion, >4 KiB records, no cross-word pieces,
+  deterministic ranking/mass, cap/consent/review guards, transactional rollback,
+  publication recovery, permission changes and mid-batch same-byte source rewrites.
+  Candidate inventories are rejected as trained full-split comparison codecs.
+- Remaining: resumable full-split Unigram EM fitting, likelihood checks and trained
+  codec persistence/comparison/admission; durable approved streamed model training
+  and checkpoint/model persistence; broader acceptance. Independent physical,
+  Windows and larger-than-RAM blockers remain open and skipped. No external
+  collection, downloads, generated artifacts/weights in Git or push; unrelated
+  edits and prior artifacts are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

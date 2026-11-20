@@ -2898,6 +2898,80 @@ class _StudioPageState extends State<StudioPage> {
     } catch (error) { if (mounted) setState(() => _error = error.toString()); }
   }
 
+  Future<void> _beginUnigramCandidates(String indexId) async {
+    try {
+      final cap = await showDialog<int>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Choose full-split Unigram candidate budget'), children: [
+          for (final size in [128, 32, 64, 256, 512]) SimpleDialogOption(onPressed: () => Navigator.pop(context, size), child: Text('$size candidate IDs maximum')),
+        ]));
+      if (cap == null || !mounted) return;
+      final reviewed = await _request('/decoder-stream-indexes/$indexId/unigram-candidate-review', {'vocabulary_cap': cap});
+      if (!mounted) return;
+      final confirmed = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+        title: const Text('Prepare full-split Unigram candidates?'), scrollable: true,
+        content: SizedBox(width: 620, child: Column(mainAxisSize: MainAxisSize.min, children: [
+          const Text('Count characters and within-word substrings across every unique training record using disk-backed counters. Held-out records and duplicate weights are excluded. '
+            'The cap must cover the entire training alphabet. Freeze candidate pieces and initial probabilities for later fitting. '
+            'This does not run EM, train a tokenizer or approve model training. Candidate pieces may encode private text. Progress can be explicitly resumed after restart.'),
+          SelectableText(const JsonEncoder.withIndent('  ').convert(reviewed)),
+        ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Confirm Unigram candidate preparation'))]));
+      if (confirmed != true || !mounted) return;
+      final record = await _request('/decoder-stream-indexes/$indexId/unigram-candidates', {'confirmed': true, 'reviewed': reviewed});
+      if (mounted) await _runUnigramCandidates(record);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
+  Future<void> _showUnigramCandidates(Map<String, dynamic> record) async {
+    final resume = await showDialog<bool>(context: context, builder: (context) => AlertDialog(
+      title: Text('Unigram candidates · ${record['status']}'), scrollable: true,
+      content: SizedBox(width: 620, child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Text('${record['processed_records']} / ${record['total_records']} unique training records counted'),
+        const Text('Candidate initialization only. No EM updates, trained tokenizer, model training or release. Initial probabilities are frequency-based; they are not fitted model probabilities.'),
+        if (record['initializer'] != null) Text('${(record['initializer']['alphabet'] as List).length} characters · ${record['initializer']['candidate_vocabulary_size']} candidate IDs · ${record['initializer']['distinct_training_substrings']} distinct substrings'),
+        SelectableText(const JsonEncoder.withIndent('  ').convert(record)),
+      ])), actions: [TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Close')),
+        if (record['status'] != 'complete') TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Resume Unigram candidates'))]));
+    if (resume == true && mounted) await _runUnigramCandidates(record);
+  }
+
+  Future<void> _runUnigramCandidates(Map<String, dynamic> initial) async {
+    var record = initial; var pause = false; var overlay = true; StateSetter? refresh;
+    unawaited(showDialog<void>(context: context, barrierDismissible: false, builder: (context) => PopScope(canPop: false,
+      child: StatefulBuilder(builder: (context, update) {
+        refresh = update;
+        return AlertDialog(title: const Text('Counting Unigram candidates'), content: Column(mainAxisSize: MainAxisSize.min, children: [
+          LinearProgressIndicator(value: (record['processed_records'] as num) / (record['total_records'] as num)),
+          Text('${record['processed_records']} / ${record['total_records']} training records counted'),
+        ]), actions: [TextButton(onPressed: () => pause = true, child: const Text('Pause Unigram candidates'))]);
+      }))));
+    try {
+      while (!pause && record['status'] != 'complete') {
+        record = await _request('/decoder-stream-unigram-candidates/${initial['id']}/step', {'confirmed': true}, const Duration(minutes: 10));
+        if (!mounted) return;
+        refresh?.call(() {});
+      }
+      refresh = null;
+      if (!mounted) return;
+      Navigator.pop(context); overlay = false;
+      await _showUnigramCandidates(record);
+    } catch (error) { refresh = null; if (mounted) { if (overlay) Navigator.pop(context); setState(() => _error = error.toString()); } }
+  }
+
+  Future<void> _savedUnigramCandidates(String indexId) async {
+    try {
+      final reports = (await _request('/decoder-stream-indexes/$indexId/unigram-candidates'))['reports'] as List;
+      if (!mounted) return;
+      final selected = await showDialog<Map<String, dynamic>>(context: context, builder: (context) => SimpleDialog(
+        title: const Text('Saved Unigram candidate inventories'), children: [
+          if (reports.isEmpty) const Padding(padding: EdgeInsets.all(16), child: Text('No saved Unigram candidates.')),
+          for (final report in reports) SimpleDialogOption(onPressed: () => Navigator.pop(context, Map<String, dynamic>.from(report as Map)),
+            child: Text('${(report['id'] as String).substring(0, 8)} · ${report['status']} · ${report['processed_records']}/${report['total_records']} records')),
+        ]));
+      if (selected != null && mounted) await _showUnigramCandidates(selected);
+    } catch (error) { if (mounted) setState(() => _error = error.toString()); }
+  }
+
   String? _wholeStreamFitKind(Map<String, dynamic> record) {
     if (record['format'] == 'almg-stream-character-bpe-fit-v1') return 'character_bpe';
     if (const ['almg-stream-iterative-bpe-fit-v1', 'almg-stream-iterative-bpe-fit-v2'].contains(record['format'])) return 'iterative';
@@ -3040,6 +3114,8 @@ class _StudioPageState extends State<StudioPage> {
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'tokenizers'), child: const Text('View saved streamed tokenizers')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'fit-sample'), child: const Text('Fit tokenizer on streamed sample')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'whole-byte-bpe'), child: const Text('Fit byte BPE on full training split')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'unigram-candidates'), child: const Text('Prepare full-split Unigram candidates')),
+        if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-unigram-candidates'), child: const Text('View saved Unigram candidates')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'character-bpe'), child: const Text('Fit character BPE on full training split')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'saved-character-bpe'), child: const Text('View whole-split character BPE fits')),
         if (record['status'] == 'complete') TextButton(onPressed: () => Navigator.pop(context, 'iterative-byte-bpe'), child: const Text('Fit iterative byte BPE on full training split')),
@@ -3074,6 +3150,8 @@ class _StudioPageState extends State<StudioPage> {
     if (action == 'tokenizers') await _savedStreamTokenizers(record['id'] as String);
     if (action == 'fit-sample') await _fitStreamTokenizerSample(record['id'] as String);
     if (action == 'whole-byte-bpe') await _beginWholeStreamBPE(record['id'] as String);
+    if (action == 'unigram-candidates') await _beginUnigramCandidates(record['id'] as String);
+    if (action == 'saved-unigram-candidates') await _savedUnigramCandidates(record['id'] as String);
     if (action == 'character-bpe') await _beginWholeStreamBPE(record['id'] as String, character: true);
     if (action == 'saved-character-bpe') await _savedWholeStreamBPE(record['id'] as String, character: true);
     if (action == 'iterative-byte-bpe') await _beginWholeStreamBPE(record['id'] as String, iterative: true);

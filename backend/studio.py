@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_stream_character_bpe, decoder_stream_learned_optimization, decoder_stream_learned_windows, decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
+    from . import decoder_stream_unigram_candidates, decoder_stream_character_bpe, decoder_stream_learned_optimization, decoder_stream_learned_windows, decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
 else:
     import training_resources
     import lora_validation
@@ -82,6 +82,7 @@ else:
     import decoder_stream_bpe
     import decoder_stream_iterative_bpe
     import decoder_stream_character_bpe
+    import decoder_stream_unigram_candidates
     import decoder_stream_fitted_tokenizer_evaluations
     import chat_history
     import inference
@@ -2096,6 +2097,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.respond({'error': str(error)}, 404)
         if len(stream_parts) == 4 and stream_parts[0] == 'decoder-stream-fitted-tokenizers' and stream_parts[3] == 'evaluations':
             return self.respond({'reports': decoder_stream_fitted_tokenizer_evaluations.list_reports(ROOT, stream_parts[2], stream_parts[1])})
+        if len(stream_parts) == 3 and stream_parts[0] == 'decoder-stream-indexes' and stream_parts[2] == 'unigram-candidates':
+            return self.respond({'reports': decoder_stream_unigram_candidates.list_reports(ROOT, stream_parts[1])})
         if len(stream_parts) == 3 and stream_parts[0] == 'decoder-stream-indexes' and stream_parts[2] == 'character-bpe-fits':
             return self.respond({'fits': decoder_stream_character_bpe.list_fits(ROOT, stream_parts[1])})
         if len(stream_parts) == 3 and stream_parts[0] == 'decoder-stream-indexes' and stream_parts[2] == 'iterative-byte-bpe-fits':
@@ -2344,6 +2347,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond(decoder_stream_learned_windows.read_batch(ROOT, parts[1], data.get('confirmed'), data.get('reviewed'), data.get('cursor'), data.get('split', 'train'), data.get('batch_size', 4)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-fitted-tokenizer-evaluations' and parts[2] == 'step':
                 return self.respond(decoder_stream_fitted_tokenizer_evaluations.step(ROOT, parts[1], data.get('confirmed')))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'unigram-candidate-review':
+                return self.respond(decoder_stream_unigram_candidates.review(ROOT, parts[1], data.get('vocabulary_cap', 128)))
+            if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'unigram-candidates':
+                return self.respond(decoder_stream_unigram_candidates.begin(ROOT, parts[1], data.get('confirmed'), data.get('reviewed')), 201)
+            if len(parts) == 3 and parts[0] == 'decoder-stream-unigram-candidates' and parts[2] == 'step':
+                return self.respond(decoder_stream_unigram_candidates.step(ROOT, parts[1], data.get('confirmed')))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'character-bpe-review':
                 return self.respond(decoder_stream_character_bpe.review(ROOT, parts[1], data.get('vocabulary_cap', 128)))
             if len(parts) == 3 and parts[0] == 'decoder-stream-indexes' and parts[2] == 'character-bpe-fits':
