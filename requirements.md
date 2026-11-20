@@ -4399,6 +4399,57 @@ P3-LMF-03 partial progress · resumable whole-training-split one-merge byte BPE 
   unchanged blockers were skipped. No external collection, downloads, weight
   changes, generated artifact commits or push; unrelated user edits are preserved.
 
+P3-LMF-03 partial progress · resumable iterative full-training-split byte BPE · 2026-11-20:
+- [ ] P3-LMF-03 remains open. Completed indexes now offer a separately reviewed
+  iterative byte-BPE fit over the whole saved training population. The new versioned
+  worker supports vocabulary caps 256–272 (up to 16 learned merges); the native
+  preset fits four merges for cap 260. After every selected global pair it re-encodes
+  original training records using the learned prefix and recounts pairs. Minimum
+  frequency two, lexicographic token-ID ties and document boundaries match the
+  existing bounded BPE fitter. Heldouts and duplicate occurrence weights are excluded.
+- Each pass commits cursor, counters, population chain and learned-prefix transition
+  atomically. The next pass starts with cleared counters and a reset cursor in the
+  same transaction that saves its new merge. Every pass verifies the same full
+  training-group chain and byte/count population. SQLite counters remain disk-backed;
+  only bounded record/token buffers are used, without storing a whole-corpus token
+  sequence. Input records remain whole up to 64 KiB; selected pieces retain the
+  existing 4096-byte bound. Counting stops early when no pair reaches frequency two.
+- The separate iterative namespace/codec format preserves existing one-merge job
+  and artifact formats. Pending jobs require unchanged source/permissions/code;
+  explicit pause/restart/resume and recoverable atomic publication are retained.
+  Saved manifests include ordered merge IDs, pairs, frequencies, pass count and
+  full-training binding. Private ZIP export includes only manifest and codec.
+  Model training/release remain disabled; this is not generated-model admission.
+- Local app verification: rebuilt native macOS ALMG on isolated fixture port 28846.
+  Reopened the earlier one-merge fit unchanged. Cancel created no iterative job.
+  Explicit native fitting created 6fa1c7a3e0de4d80a7b336c74ddfe128 on the existing
+  319-record training split (57644 UTF-8 bytes, including eight records over 4 KiB).
+  Pause occurred during pass two at 115/319 records, after merge [32,97] was saved.
+  Backend/app restart reopened the exact partial record/revision; explicit resume
+  completed four passes and published 260 IDs.
+- Learned pairs were [32,97], [98,99], [100,101], [102,103], each at frequency 3911.
+  Independent full-training recoding/pair counts matched every rank, ID and frequency,
+  and the full-training chain/byte count matched. Native Save exported a two-file
+  private ZIP whose standalone codec round-tripped unseen and long Unicode text.
+  All 19 original source/index/tokenizer/legacy-fit files remained byte-identical;
+  no model trial existed. QA used one-record batches for deterministic cross-pass
+  pause; production bounds remained 100 records/roughly 1 MiB per batch.
+- Evidence: /tmp/almg-iterative-stream-bpe-native-qa/ contains legacy-one-merge-ui.json,
+  iterative consent, paused-iterative-fit-ui.json, restarted-paused-iterative-fit-ui.json,
+  complete-iterative-fit-ui.json, export consent/save evidence, ZIP, verification.json,
+  original fingerprints and native build/restart/test logs.
+- Verification: 456 Python tests passed with ALMG_METAL_TESTS=1; 34 Flutter tests
+  passed; analysis/diff checks passed. New tests compare four- and sixteen-merge
+  output with the existing fitter oracle, verify exact between-pass restart,
+  atomic prefix/counter/cursor rollback, publication recovery, early no-pair stop,
+  cap rejection, long Unicode round trips and continued legacy one-merge execution.
+- Remaining: full-split vocabularies beyond this bounded 16-merge engine, full-split
+  character-BPE/Unigram fitting and learned streamed-tokenizer comparison/model-input
+  admission remain open. Larger-than-RAM ingestion and independent hardware/Windows/
+  scratch-space criteria remain unverified and were skipped without unchanged
+  polling. No external collection, downloads, weight changes, generated artifact
+  commits or push; unrelated user edits and previous artifacts are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
