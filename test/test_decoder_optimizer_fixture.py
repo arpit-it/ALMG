@@ -8,6 +8,7 @@ from unittest.mock import patch
 import numpy as np
 from backend import decoder_optimizer_fixture as fixture,decoder_architecture_plans as plans,decoder_architecture_initializations as initializations
 from backend.planned_decoder import PlannedDecoder
+from backend import decoder_mixed_precision as mixed_precision
 
 
 class DecoderOptimizerFixtureTests(unittest.TestCase):
@@ -101,3 +102,31 @@ class DecoderOptimizerFixtureTests(unittest.TestCase):
                 self.assertTrue(all(entry['microbatches']==2 and entry['target_tokens']==16 for entry in report['step_log']))
                 self.assertLessEqual(report['full_batch_gradient_max_error'],1e-5);self.assertLessEqual(report['checkpoint_parameter_max_error'],1e-7)
                 self.assertLessEqual(report['checkpoint_optimizer_max_error'],1e-7);self.assertEqual(fixture.read(root,report['id']),report)
+
+    def test_v3_precision_and_loss_scaling_are_explicit_and_unscale_before_clipping(self):
+        c={**fixture.DEFAULT,'schema_version':3,'gradient_accumulation_steps':2,'compute_precision':'mixed_float16','loss_scale':128.0}
+        self.assertEqual(fixture.configuration(c),c)
+        for key,value in [('compute_precision','bfloat16'),('loss_scale',1),('loss_scale',float('nan')),('loss_scale',True)]:
+            with self.assertRaises(ValueError):fixture.configuration({**c,key:value})
+        result=mixed_precision.unscale({'weight':np.array([128.,-256.],np.float32)},128.0)
+        np.testing.assert_array_equal(result['weight'],np.array([1.,-2.],np.float32))
+        with self.assertRaises(ValueError):mixed_precision.unscale({'weight':np.array([float('inf')],np.float32)},128.)
+        with self.assertRaises(ValueError):mixed_precision.unscale({'weight':np.array([1.],np.float16)},128.)
+        with self.assertRaises(ValueError):fixture.configuration({**c,'compute_precision':'float32'})
+
+    @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS')=='1','Requires mixed FP16 Metal computation')
+    def test_mixed_precision_keeps_master_state_fp32_and_reloads_both_optimizers(self):
+        with TemporaryDirectory() as temporary:
+            root=Path(temporary);plan,source=self.source(root)
+            for optimizer in ('sgd','adamw'):
+                c={**fixture.DEFAULT,'schema_version':3,'gradient_accumulation_steps':2,'compute_precision':'mixed_float16','loss_scale':128.,'optimizer':optimizer,'weight_decay':.01 if optimizer=='adamw' else 0.}
+                approved=fixture.review(root,plan['id'],source,c);report=fixture.run(root,plan['id'],True,source,c,approved)
+                self.assertEqual(report['compute_precision'],'mixed_float16');self.assertEqual(report['loss_scale'],128)
+                self.assertEqual(report['master_gradient_dtype'],'float32');self.assertEqual(report['master_parameter_dtype'],'float32')
+                self.assertLess(report['final_train_loss'],report['initial_train_loss']);self.assertLessEqual(report['initial_precision_loss_difference'],.05)
+                self.assertLessEqual(report['causal_prefix_max_error'],1e-5);self.assertLessEqual(report['full_batch_gradient_max_error'],report['full_batch_gradient_tolerance'])
+                folder=fixture._folder(root,report['id']);model,state=fixture.restore(folder/'step-5',c,report['review']['revision'])
+                self.assertTrue(all(value.dtype==np.float32 for value in model.parameters.values()))
+                self.assertTrue(all(value.dtype==np.float32 for kind in ('m','v') for value in state[kind].values()))
+                self.assertEqual(state['step'],5);self.assertEqual(fixture.read(root,report['id']),report)
+                with self.assertRaises(ValueError):fixture.restore(folder/'step-5',{**c,'loss_scale':64},report['review']['revision'])

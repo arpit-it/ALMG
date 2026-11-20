@@ -7,11 +7,11 @@ import re
 import uuid
 import numpy as np
 if __package__:
-    from . import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward
+    from . import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision
     from .planned_decoder import PlannedDecoder
     from .run_manifest import digest,file_digest
 else:
-    import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward
+    import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision
     from planned_decoder import PlannedDecoder
     from run_manifest import digest,file_digest
 DEFAULT={'schema_version':1,'optimizer':'sgd','learning_rate':.01,'schedule':'warmup_cosine','warmup_steps':2,'steps':10,'gradient_clip_norm':1.0,'weight_decay':0.0}
@@ -19,11 +19,15 @@ DEFAULT={'schema_version':1,'optimizer':'sgd','learning_rate':.01,'schedule':'wa
 
 def configuration(values):
     if not isinstance(values,dict):raise ValueError('Provide every versioned optimizer fixture setting.')
-    keys=set(DEFAULT)|({'gradient_accumulation_steps'} if values.get('schema_version')==2 else set())
+    keys=set(DEFAULT)|({'gradient_accumulation_steps'} if values.get('schema_version') in (2,3) else set())
+    if values.get('schema_version')==3:keys|={'compute_precision','loss_scale'}
     if set(values)!=keys:raise ValueError('Provide every versioned optimizer fixture setting.')
     c=dict(values)
-    if type(c['schema_version']) is not int or c['schema_version'] not in (1,2) or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose supported versioned SGD or AdamW with warmup/cosine scheduling.')
+    if type(c['schema_version']) is not int or c['schema_version'] not in (1,2,3) or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose supported versioned SGD or AdamW with warmup/cosine scheduling.')
     if type(c.get('gradient_accumulation_steps',1)) is not int or c.get('gradient_accumulation_steps',1) not in (1,2):raise ValueError('Choose one or two microbatches per optimizer update.')
+    if c.get('compute_precision','float32') not in ('float32','mixed_float16'):raise ValueError('Only FP32 or bounded mixed FP16 computation is supported.')
+    scale=c.get('loss_scale',1.0);expected=128.0 if c.get('compute_precision')=='mixed_float16' else 1.0
+    if type(scale) not in (int,float) or not math.isfinite(scale) or scale!=expected:raise ValueError('Use loss scale 128 for mixed FP16 or 1 for FP32.')
     if type(c['steps']) is not int or c['steps']!=10 or type(c['warmup_steps']) is not int or not 0<=c['warmup_steps']<=3:raise ValueError('This fixture supports ten steps and zero to three warmup steps.')
     for key,maximum in (('learning_rate',.1),('gradient_clip_norm',10),('weight_decay',.1)):
         value=c[key]
@@ -112,6 +116,7 @@ def review(root,plan_id,initialized,settings):
     effective_rows=min(2,current['config']['batch_size']);accumulation=c.get('gradient_accumulation_steps',1)
     estimates.update(effective_batch_rows=effective_rows,microbatch_rows=effective_rows//accumulation if effective_rows%accumulation==0 else None,gradient_accumulation_steps=accumulation,gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if accumulation>1 else 0)
     estimates['required_available_memory_bytes']+=current['actual_weight_bytes']*2 if accumulation>1 else 0
+    estimates.update(compute_precision=c.get('compute_precision','float32'),master_parameter_dtype='float32',optimizer_state_dtype='float32',loss_scale=c.get('loss_scale',1.0),precision_scope='FP32 conservative reserves are retained; mixed FP16 matrix products do not imply measured memory savings.')
     reasons=list(profile['errors'])
     if effective_rows%accumulation:reasons.append('Two-way accumulation requires at least two effective rows; initialize a compatible batch-size plan.')
     if profile['system']!='Darwin' or profile['machine']!='arm64' or not profile['metal_available']:reasons.append('Apple silicon with MLX Metal is required for gradients; the optimizer uses FP32 NumPy arrays.')
@@ -119,7 +124,7 @@ def review(root,plan_id,initialized,settings):
     record={'format':'almg-optimizer-fixture-review-v1','schema_version':1,'source':{'plan_id':plan_id,'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
         'config':c,'model_config':current['config'],'hardware':profile,'estimates':estimates,'feasible':not reasons,'blockers':reasons,
         'scope':'ten_synthetic_steps_with_durable_optimizer_and_scheduler_checkpoint_not_general_pretraining','training_approved':False,'release_approved':False,
-        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
+        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
     record['revision']=digest(record);return record
 
 
@@ -144,12 +149,14 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
     rows=min(2,shape['batch_size']);length=min(8,shape['context_length']);sequence=np.arange(rows*(length+1)).reshape(rows,length+1)%shape['vocab_size'];x=sequence[:,:-1];y=sequence[:,1:];mask=np.ones_like(y,dtype=np.float32)
     identifier=uuid.uuid4().hex;directory=_folder(root,identifier);directory.mkdir(parents=True)
     with mx.stream(mx.gpu):
-        _,loss,gradient=backward.metal_functions(shape,mx);tx=mx.array(x);ty=mx.array(y);tm=mx.array(mask)
+        fp32_logits,fp32_loss,fp32_gradient=backward.metal_functions(shape,mx);scale=c.get('loss_scale',1.0);precision=c.get('compute_precision','float32')
+        logits,loss,gradient=mixed_precision.functions(shape,mx,scale) if precision=='mixed_float16' else (fp32_logits,fp32_loss,fp32_gradient)
+        tx=mx.array(x);ty=mx.array(y);tm=mx.array(mask)
         def score(values,shift=0):return float(loss({name:mx.array(value) for name,value in values.items()},mx.array((x+shift)%shape['vocab_size']),mx.array((y+shift)%shape['vocab_size']),tm).item())
         accumulation=c.get('gradient_accumulation_steps',1)
         def full_gradient(values,inputs=tx,targets=ty,weights=tm):
             gradients=gradient({name:mx.array(value) for name,value in values.items()},inputs,targets,weights);mx.eval(gradients)
-            return {name:np.array(value) for name,value in gradients.items()}
+            return mixed_precision.unscale({name:np.array(value) for name,value in gradients.items()},scale)
         def accumulated_gradient(values):
             if accumulation==1:return full_gradient(values)
             pieces=[]
@@ -158,14 +165,20 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
             return accumulate(pieces)
         original_gradient=full_gradient(source);accumulated=accumulated_gradient(source)
         gradient_error=max(float(np.max(np.abs(original_gradient[name]-accumulated[name]))) for name in original_gradient)
-        if gradient_error>1e-5:raise ValueError('Accumulated gradients do not match the effective full batch within FP32 tolerance.')
+        gradient_tolerance=1e-3 if precision=='mixed_float16' else 1e-5
+        if gradient_error>gradient_tolerance:raise ValueError('Accumulated gradients do not match the effective full batch within the selected precision tolerance.')
         def optimize(values,state,end):
             logs=[]
             while state['step']<end:
                 grads=accumulated_gradient(values)
                 values,state,entry=update(values,grads,state,c);entry.update(microbatches=accumulation,target_tokens=int(mask.sum()));logs.append(entry)
             return values,state,logs
-        initial=score(source);validation_initial=score(source,1);empty={'step':0,'m':{},'v':{}}
+        initial=score(source);validation_initial=score(source,1)
+        master={name:mx.array(value) for name,value in source.items()};reference_loss=float(fp32_loss(master,tx,ty,tm).item())
+        altered=x.copy();cut=max(1,length//2);altered[:,cut:]=(altered[:,cut:]+1)%shape['vocab_size']
+        causal_error=float(mx.max(mx.abs(logits(master,tx)[:,:cut]-logits(master,mx.array(altered))[:,:cut])).item())
+        if abs(initial-reference_loss)>.05 or causal_error>1e-5:raise ValueError('Selected precision failed initial FP32-loss or causal-prefix compatibility.')
+        empty={'step':0,'m':{},'v':{}}
         uninterrupted,reference_state,_=optimize(source,empty,10)
         halfway,state,first=optimize(source,empty,5);model.parameters=halfway;checkpoint(directory/'step-5',model,state,c,current['revision'])
         restored,state=restore(directory/'step-5',c,current['revision']);parameters,state,last=optimize(restored.parameters,state,10)
@@ -178,9 +191,9 @@ def run(root,plan_id,confirmed,initialized,settings,approved):
     if initializations.read(root,plan_id,initialized['id'])!=initialized or file_digest(initializations._folder(root,plan_id)/initialized['id']/'model.json')!=current['source']['model_sha256']:raise ValueError('Source initialization changed during optimizer training; retained artifacts need review.')
     record={'format':'almg-decoder-optimizer-fixture-v1','schema_version':1,'id':identifier,'created_at':datetime.now(timezone.utc).isoformat(),'review':current,'approved_review':approved,
         'initial_train_loss':initial,'final_train_loss':final,'initial_validation_loss':validation_initial,'final_validation_loss':validation_final,
-        'optimizer':c,'gradient_accumulation_steps':accumulation,'effective_batch_rows':rows,'microbatch_rows':rows//accumulation,'full_batch_gradient_max_error':gradient_error,'microbatch_backward_calls_in_recorded_trajectory':c['steps']*accumulation,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':first+last,'checkpoint_restored_steps':5,'checkpoint_optimizer_max_error':moment_error,'checkpoint_parameter_max_error':resume_error,
+        'compute_precision':precision,'master_parameter_dtype':'float32','master_gradient_dtype':'float32','optimizer_state_dtype':'float32','loss_scale':scale,'initial_fp32_reference_loss':reference_loss,'initial_precision_loss_difference':abs(initial-reference_loss),'causal_prefix_max_error':causal_error,'full_batch_gradient_tolerance':gradient_tolerance,'optimizer':c,'gradient_accumulation_steps':accumulation,'effective_batch_rows':rows,'microbatch_rows':rows//accumulation,'full_batch_gradient_max_error':gradient_error,'microbatch_backward_calls_in_recorded_trajectory':c['steps']*accumulation,'completed_steps':state['step'],'scheduler_completed_steps':state['step'],'step_log':first+last,'checkpoint_restored_steps':5,'checkpoint_optimizer_max_error':moment_error,'checkpoint_parameter_max_error':resume_error,
         'generated_token_ids':generated,'inference_runtime':'planned_decoder_numpy_cpu','pretrained_student_weights_loaded':False,'updated_weights_saved':True,'initialization_modified':False,'training_approved':True,'release_approved':False,
-        'limitations':'Generated token-ID smoke fixture only; no text corpus/tokenizer, full-epoch training, general model quality, large-model or mixed-precision claim. Cancellation and independent checkpoint continuation are not yet exposed.',
+        'limitations':'Generated token-ID smoke fixture only; no text corpus/tokenizer, full-epoch training, general model quality, large-model or general mixed-precision claim. Mixed FP16 is validated only for this bounded fixture with fixed loss scaling. Cancellation and independent checkpoint continuation are not yet exposed.',
         'files':{str(path.relative_to(directory)):file_digest(path) for path in directory.rglob('*') if path.is_file()}}
     record['revision']=digest(record);(directory/'record.json').write_text(json.dumps(record,allow_nan=False,indent=2));return record
 

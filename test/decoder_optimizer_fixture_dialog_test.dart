@@ -21,7 +21,13 @@ void main() {
     await tester.tap(find.text('2 microbatches per update').last); await tester.pumpAndSettle();
     expect(find.text('Train and save optimizer fixture'), findsNothing);
     await tester.tap(find.text('Review optimizer fixture')); await tester.pumpAndSettle();
-    expect((requests.last['settings'] as Map)['schema_version'], 2);
+    expect((requests.last['settings'] as Map)['schema_version'], 3);
     expect((requests.last['settings'] as Map)['gradient_accumulation_steps'], 2);
+    await tester.ensureVisible(find.text('FP32 compute')); await tester.tap(find.text('FP32 compute')); await tester.pumpAndSettle();
+    await tester.tap(find.text('Mixed FP16 compute').last); await tester.pumpAndSettle();
+    expect(find.text('Train and save optimizer fixture'), findsNothing);
+    await tester.tap(find.text('Review optimizer fixture')); await tester.pumpAndSettle();
+    expect((requests.last['settings'] as Map)['compute_precision'], 'mixed_float16');
+    expect((requests.last['settings'] as Map)['loss_scale'], 128.0);
   });
 }

@@ -6446,6 +6446,47 @@ P3-LMF-06 partial progress · versioned token-weighted gradient accumulation · 
   target. P3-LMF-05 and unavailable hardware/user-action criteria stay open; unchanged
   blockers remain skipped while this engine work progresses.
 
+P3-LMF-06 partial progress · bounded mixed FP16 training · 2026-11-20:
+- [ ] P3-LMF-06 remains open. Version-3 optimizer settings explicitly select FP32
+  or mixed FP16 computation and bind the fixed loss scale to review/checkpoints.
+  Mixed mode uses FP16 matrix products, FP32 normalization/attention softmax/loss,
+  and FP32 master weights, gradients and SGD/AdamW state. Gradients are unscaled
+  before token-weighted accumulation and global clipping; nonfinite gradients
+  stop the fixture. Conservative FP32 resource reserves remain in place; this
+  change does not promise measured memory savings or dynamic loss scaling.
+- Changing precision invalidates prior app review. Version-1/2 settings and saved
+  checkpoints remain readable without rewriting existing artifacts. Mixed mode
+  uses loss scale 128; unsupported modes/scales and changed checkpoint bindings
+  are rejected. The existing 16384-parameter/ten-update fixture cap still applies.
+- Native verification: rebuilt and ran ALMG on this Mac using the isolated local
+  8704-parameter two-layer initialization and external collection disabled.
+  Reopened all four copied v1/v2 optimizer records before writes. Explicitly
+  reviewed and trained mixed FP16 with two microbatches per update for SGD record
+  32fcf8af2973489298f7d794accf1f03 and AdamW record
+  4f05c4d13b7247439d1114ef2dd90d63. SGD loss fell 4.852474212646484 →
+  4.767632484436035; AdamW loss fell to 3.687514066696167. Both completed ten
+  optimizer/scheduler updates and twenty recorded microbatch backward calls.
+  Initial loss differed from the FP32 reference by 2.86102294921875e-06; causal
+  prefix error was 0.0. Accumulated/full-batch gradient error was
+  7.772445678710938e-05, below the explicit mixed-mode 0.001 tolerance.
+- Both restored step-five model/optimizer/scheduler state and matched uninterrupted
+  execution with 0.0 final parameter and moment errors. After app/backend restart,
+  all six v1/v2/v3 records reopened exactly, including checkpoint restoration and
+  trained-model CPU token generation. All thirty optimizer files, three source
+  files and 65 prior artifact files retained their hashes. Evidence is retained in
+  /tmp/almg-mixed-precision-native-qa/verification.json and native UI captures;
+  generated data, checkpoints and weights remain outside Git.
+- Validation: 591 Python tests passed with warnings as errors and Metal enabled;
+  61 Flutter tests passed and analysis was clean. Tests cover precision/scale
+  rejection, nonfinite and non-FP32 master gradients, actual mixed SGD/AdamW loss
+  reduction, FP32 checkpoint state, causal behavior, restoration and review reset.
+- Remaining: approved text-corpus/tokenizer integration, independent continuation
+  and cancellation, larger configurable batch/sequence/step budgets, general
+  interruption/resource monitoring and profiled 50M–100M training. Mixed precision
+  is verified only for this bounded synthetic fixture, not general model quality
+  or large-model training. Unchanged hardware/user-action blockers remain open
+  and skipped; P3-LMF-01 is already complete for its recorded architecture scope.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
