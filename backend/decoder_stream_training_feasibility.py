@@ -1,5 +1,7 @@
 """Read-only preapproval admission for the existing bounded streamed SGD trial."""
 from pathlib import Path
+import json
+from tempfile import NamedTemporaryFile
 if __package__:
     from . import decoder_stream_training as training,decoder_architecture_feasibility as hardware,training_resources
     from .run_manifest import digest,file_digest
@@ -50,4 +52,46 @@ def begin(root,window_id,confirmed,reviewed,approved):
     if (approved.get('revision')!=digest({k:v for k,v in approved.items() if k!='revision'}) or approved.get('feasible') is not True
             or any(approved.get(key)!=fresh[key] for key in ('format','schema_version','scope','training_review_sha256','windows_id','windows_revision','precision','device','estimates','implementation_sha256'))):raise ValueError('Streamed-training feasibility changed; review it again.')
     if not fresh['feasible']:raise training_resources.ResourceUnavailable('Streamed trial blocked: '+' '.join(fresh['blockers']))
-    return training.begin(root,window_id,True,reviewed)
+    state=training.begin(root,window_id,True,reviewed)
+    try:_save_profile(root,state,approved,fresh)
+    except OSError as error:raise ValueError(f"Trial {state['id']} was initialized but hardware-profile publication failed; its checkpoint is retained. Reopen saved trials.") from error
+    return state
+
+
+def _save_profile(root,state,approved,fresh):
+    record={'format':'almg-stream-training-hardware-profile-v1','schema_version':1,'run_id':state['id'],
+            'training_review_sha256':digest(state['review']),'approval_sha256':digest(state['approval']),
+            'initial_state_revision':state['revision'],'initial_checkpoint':state['checkpoint'],
+            'initial_checkpoint_manifest_sha256':state['checkpoint_manifest_sha256'],
+            'approved_feasibility':approved,'execution_feasibility':fresh,'release_approved':False}
+    record['revision']=digest(record);directory=training._folder(root,state['id']);temporary=None
+    try:
+        with NamedTemporaryFile(mode='w',encoding='utf-8',dir=directory,prefix='.hardware-',suffix='.tmp',delete=False) as stream:
+            temporary=Path(stream.name);stream.write(json.dumps(record,allow_nan=False,indent=2))
+        temporary.replace(directory/'hardware-feasibility.json')
+    finally:
+        if temporary is not None:temporary.unlink(missing_ok=True)
+
+
+def read_profile(root,run_id,confirmed):
+    if confirmed is not True:raise ValueError('Confirm review of the private saved hardware profile.')
+    state=training.read(root,run_id);directory=training._folder(root,run_id);path=directory/'hardware-feasibility.json'
+    if not path.exists():return {'available':False,'reason':'No saved hardware approval profile. This may be a legacy trial or an interrupted profile publication; no historical hardware values are inferred.'}
+    if path.stat().st_size>128000:raise ValueError('Saved hardware profile exceeds its size limit.')
+    record=json.loads(path.read_text(encoding='utf-8'))
+    if (record.get('format')!='almg-stream-training-hardware-profile-v1' or record.get('schema_version')!=1 or record.get('run_id')!=run_id
+            or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'}) or record.get('release_approved') is not False
+            or record.get('training_review_sha256')!=digest(state['review']) or record.get('approval_sha256')!=digest(state['approval'])):raise ValueError('Saved hardware profile binding changed.')
+    checkpoint=record['initial_checkpoint']
+    if not isinstance(checkpoint,str) or Path(checkpoint).name!=checkpoint or not checkpoint.startswith('step-000000-'):raise ValueError('Invalid initial hardware-profile checkpoint.')
+    initial=directory/checkpoint
+    if file_digest(initial/'manifest.json')!=record['initial_checkpoint_manifest_sha256']:raise ValueError('Hardware-profile initial checkpoint changed.')
+    _,_,manifest=training.decoder_bundle.load(initial)
+    if manifest['training']['approval_sha256']!=record['approval_sha256'] or manifest['training']['completed_steps']!=0:raise ValueError('Hardware-profile checkpoint receipt changed.')
+    for key in ('approved_feasibility','execution_feasibility'):
+        report=record[key]
+        if (report.get('format')!='almg-stream-training-feasibility-v1' or report.get('schema_version')!=1
+                or report.get('revision')!=digest({k:v for k,v in report.items() if k!='revision'}) or report.get('feasible') is not True
+                or report.get('training_review_sha256')!=record['training_review_sha256'] or report.get('windows_id')!=state['windows_id']
+                or report.get('training_approved') is not False or report.get('release_approved') is not False):raise ValueError('Saved feasibility snapshot changed.')
+    return {'available':True,'record':record}

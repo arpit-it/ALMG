@@ -169,6 +169,10 @@ void main() {
       request: (path, body) async {
         if (path.endsWith('/training-review')) return {'binding': 'reviewed'};
         if (path.endsWith('/training-feasibility')) return {'feasible': true, 'estimates': <String, dynamic>{}, 'blockers': <String>[]};
+        if (path.endsWith('/hardware-profile')) {
+          expect(body['confirmed'], true);
+          return {'available': true, 'record': {'device': 'Fixture GPU'}};
+        }
         if (path.endsWith('/training-begin')) {
           starts++;
           expect(body['reviewed'], {'binding': 'reviewed'});
@@ -190,6 +194,10 @@ void main() {
     await tester.tap(find.text('Approve manual streamed trial')); await tester.pumpAndSettle();
     await tester.tap(find.text('Approve twenty-step trial')); await tester.pumpAndSettle();
     expect(starts, 1); expect(steps, 0);
+    await tester.tap(find.text('View saved hardware profile')); await tester.pumpAndSettle();
+    expect(find.text('Saved streamed-trial hardware profile'), findsOneWidget);
+    expect(find.textContaining('Fixture GPU'), findsOneWidget);
+    await tester.tap(find.text('Close').last); await tester.pumpAndSettle();
     await tester.tap(find.text('Run next five updates')); await tester.pumpAndSettle();
     expect(steps, 1); expect(find.text('Saved progress: 5 / 20 updates · paused'), findsOneWidget);
   });

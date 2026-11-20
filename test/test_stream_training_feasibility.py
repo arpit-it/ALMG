@@ -42,5 +42,5 @@ class StreamTrainingFeasibilityTests(unittest.TestCase):
             with patch.object(feasibility.hardware,'hardware',return_value=low),patch.object(training,'begin') as begin:
                 with self.assertRaisesRegex(ValueError,'blocked'):feasibility.begin(root,record['id'],True,review,approved)
                 begin.assert_not_called()
-            with patch.object(feasibility.hardware,'hardware',return_value=hardware()),patch.object(training,'begin',return_value={'fixture':'started'}) as begin:
+            with patch.object(feasibility.hardware,'hardware',return_value=hardware()),patch.object(feasibility,'_save_profile'),patch.object(training,'begin',return_value={'fixture':'started'}) as begin:
                 self.assertEqual(feasibility.begin(root,record['id'],True,review,approved),{'fixture':'started'});begin.assert_called_once_with(root,record['id'],True,review)

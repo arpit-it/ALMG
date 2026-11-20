@@ -162,6 +162,19 @@ class _StreamModelBatchesDialogState extends State<StreamModelBatchesDialog> {
         if (error != null) Text(error!),
         SelectableText(const JsonEncoder.withIndent('  ').convert(run)),
       ])), actions: [
+        TextButton(onPressed: busy ? null : () async {
+          try {
+            final profile = await widget.request('/decoder-stream-training-runs/${run['id']}/hardware-profile', {'confirmed': true});
+            if (!context.mounted) return;
+            await showDialog<void>(context: context, builder: (context) => AlertDialog(
+              title: const Text('Saved streamed-trial hardware profile'), scrollable: true,
+              content: SizedBox(width: 660, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Text('Historical approval and execution snapshots, not current resource availability. The profile stays attached to the original initialization while checkpoints advance.'),
+                if (profile['available'] != true) Text(profile['reason'] as String)
+                else SelectableText(const JsonEncoder.withIndent('  ').convert(profile['record'])),
+              ])), actions: [TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close'))]));
+          } catch (failure) { if (context.mounted) update(() => error = failure.toString()); }
+        }, child: const Text('View saved hardware profile')),
         if (run['status'] == 'complete') TextButton(onPressed: busy ? null : () => showDialog<void>(context: context,
           builder: (context) => StreamTrialExportDialog(run: run, request: widget.request)), child: const Text('Export private streamed model')),
         if (run['status'] == 'complete') TextButton(onPressed: busy ? null : () => showDialog<void>(context: context,

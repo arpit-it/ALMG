@@ -5657,6 +5657,42 @@ P3-LMF-05 partial progress · feasibility before bounded streamed-training appro
   Unchanged hardware/user-action blockers remain open and skipped. No generated
   artifacts, private data, weights or unrelated user edits are committed.
 
+P3-LMF-05 partial progress · saved hardware approval profiles for streamed trials · 2026-11-20:
+- [ ] P3-LMF-05 remains open. Newly approved bounded streamed trials now retain
+  both the report the user approved and the fresh resource check taken before
+  initialization. A versioned, atomically published hardware-feasibility.json
+  sidecar binds the run ID, training review, approval digest and original zero-step
+  checkpoint manifest. The checkpoint/receipt schema and training implementation
+  remain unchanged. Profile reads validate the snapshot revisions, run approval
+  and initial checkpoint; they do not substitute current hardware for history.
+- Saved trial dialogs expose the profile after initialization and continuation.
+  Older trials without a profile show explicit absence, with no inferred hardware
+  values. Interrupted profile publication is distinguished as another possible
+  absence reason. If profile publication fails after initialization, the app
+  reports the run ID and retains its private checkpoint for recovery; it never
+  deletes training artifacts or claims that profile publication succeeded.
+- Native local verification: rebuilt and ran macOS ALMG on Apple M4 Max with the
+  existing Unigram stream fixture. Explicitly approved new run 1a7a4a8e9eca49299a0a978fb63c3665,
+  opened its hardware profile at zero and five updates, restarted both app and
+  fixture backend, reopened the paused trial/profile, resumed to ten updates and
+  reopened the profile again. Every captured profile was exactly equal, with
+  revision 5f5c7ea4a3638b741318afa24ace0ecff2039f53bec7567fc8fd030d35b931dd and original checkpoint
+  step-000000-9b938d8971bc485e860533db2bbf2e63. An older completed trial showed
+  the explicit no-profile message. All 203 pre-existing fixture file hashes
+  remained unchanged. No historical records were rewritten or migrated.
+- Verification: 547 Python tests passed with actual Metal and warnings as errors;
+  49 Flutter tests passed; analysis and diff checks clean. New tests cover saved
+  approval/execution snapshots, consent, continuation/restart identity, tamper
+  rejection, legacy absence, publication failure preserving initialized checkpoints,
+  and opening the saved-profile dialog. Evidence:
+  /tmp/almg-stream-hardware-profile-native-qa/verification.json and native/test logs.
+- Remaining: measured streamed-training calibration and duration prediction,
+  broader/full-epoch feasibility and per-continuation admission integration,
+  supported-recipe CPU fallback verification, and Windows/CUDA verification on
+  suitable hardware. Unchanged hardware/user-action blockers remain open and
+  skipped. No generated artifacts, private data, weights or unrelated edits
+  are included in this commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

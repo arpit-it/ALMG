@@ -2378,6 +2378,8 @@ class Handler(BaseHTTPRequestHandler):
             if len(parts) == 3 and parts[0] == 'decoder-stream-fitted-tokenizer-evaluations' and parts[2] == 'windows':
                 return self.respond(decoder_stream_learned_windows.begin(ROOT, parts[1], data.get('overlap_id'), data.get('confirmed'), data.get('reviewed')), 201)
             if len(parts) == 3 and parts[0] == 'decoder-stream-training-runs':
+                if parts[2] == 'hardware-profile':
+                    return self.respond(decoder_stream_training_feasibility.read_profile(ROOT, parts[1], data.get('confirmed')))
                 if parts[2] == 'step':
                     return self.respond(decoder_stream_training.step(ROOT, parts[1], data.get('confirmed'), data.get('expected_revision')))
                 if parts[2] == 'preview':
