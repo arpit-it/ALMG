@@ -9374,6 +9374,41 @@ P3-LMF-08 partial progress · immutable benchmark scoring reports and scoped his
   downloaded weights are preserved. No external collection, generated-artifact
   commit or push occurred.
 
+P3-LMF-08 partial progress · historical benchmark scoring snapshot comparison · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Saved benchmark scoring reports now expose read-only
+  compare with a baseline snapshot ID. Both snapshots are integrity-checked; their
+  benchmark bindings, scoring protocols/implementations, runtimes and held-out/
+  generation coverage must match. Historical model execution is not repeated.
+- Versioned output binds both snapshot/manifest/report revisions and model sources,
+  retains source declarations and bounded stored failures/continuations, and reports
+  direct candidate-minus-baseline trained-model metric differences. Embedded
+  initialization comparisons are not treated as trained-model deltas. Unavailable
+  metrics remain unavailable; training/release/quality/independence flags stay false.
+- Verified the running ALMG API at localhost:28961 from exported 908696c plus only
+  this module/route/tests. Saved SGD/AdamW benchmark reports compared directly and
+  in reverse with independently checked arithmetic; self-comparison returned zero
+  or unavailable values. Retained metrics/examples and snapshot/source hashes
+  matched the original evidence. Repeated responses and a separate CPU-process
+  comparison were identical, with no model loading/scoring or artifact publication.
+- Checksum-valid private historical-format fixtures with altered benchmark binding,
+  protocol, producer, runtime or metric coverage were rejected after successful
+  snapshot reads. Invalid/missing IDs and report-byte corruption also failed;
+  restoring the private report restored the exact comparison. All 4,606 existing
+  fixture files were preserved. Ten private negative-fixture files were prepared;
+  all 4,616 files stayed unchanged during comparison calls. Evidence:
+  /tmp/almg-saved-benchmark-comparison-api-qa/verification.json, verify-app.log,
+  comparison.json, reverse-comparison.json and self-comparison.json. Native desktop
+  interaction is not claimed; the running app comparison workflow was exercised.
+- Validation: all 762 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Three new tests cover invalid IDs, metric
+  coverage guards and real saved benchmark comparisons with direct/self deltas,
+  source bindings, historical reads without recomputation and artifact immutability.
+- Remaining: desktop benchmark comparison/history controls, broader independent
+  benchmarks, semantic/global-use leakage or memorization, assistant quality and
+  full evaluation acceptance. Existing desktop/hardware blockers remain open and
+  skipped. User edits, pending seeded work, training artifacts and downloaded
+  weights are preserved. No external collection, generated-artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
