@@ -233,7 +233,7 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
                     else:import decoder_corpus_interruptions
                     decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,values,state,None,None,logs,[],request_id,phase='reference_verification')
             def retain_training(values,state,logs):
-                if execution_mode=='fresh_process' and (parent is None or training_resume_id is not None):
+                if execution_mode=='fresh_process' and (parent is None or training_resume_id is not None or reference_resume_id is not None):
                     if __package__:from . import decoder_corpus_interruptions
                     else:import decoder_corpus_interruptions
                     decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,values,state,reference,reference_state,reference_log,logs,request_id)
@@ -255,10 +255,7 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
                 reference, reference_state, reference_log = optimize(reference_values, reference_initial_state, c['steps'])
                 reference_log = reference_prefix + reference_log
                 phase='checkpointed_training'
-                if parent is None and execution_mode=='fresh_process':
-                    if __package__:from . import decoder_corpus_interruptions
-                    else:import decoder_corpus_interruptions
-                    decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,initial_parameters,empty,reference,reference_state,reference_log,[],request_id)
+                retain_training(initial_parameters,empty,[])
                 values,state,first=optimize(initial_parameters,empty,midpoint)
             else:
                 reference,reference_state=training_resume.reference(root,parent)
@@ -348,7 +345,7 @@ def read(root, identifier, _seen=None):
     if __package__:from . import decoder_corpus_training_resume
     else:import decoder_corpus_training_resume
     decoder_corpus_training_resume.lineage(root,record,seen)
-    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6','almg-corpus-optimizer-run-v7','almg-corpus-optimizer-run-v8','almg-corpus-optimizer-run-v9','almg-corpus-optimizer-run-v10','almg-corpus-optimizer-run-v11','almg-corpus-optimizer-run-v12'):return run_cancellation.read(root,folder,record)
+    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6','almg-corpus-optimizer-run-v7','almg-corpus-optimizer-run-v8','almg-corpus-optimizer-run-v9','almg-corpus-optimizer-run-v10','almg-corpus-optimizer-run-v11','almg-corpus-optimizer-run-v12','almg-corpus-optimizer-run-v13'):return run_cancellation.read(root,folder,record)
     approved = record['review']; c = configuration(approved['config'], approved['config']['sequence_length'])
     midpoint = c['steps'] // 2
     expected = {'trained-model.json', 'tokenizer.json', *[f'step-{midpoint}/{name}' for name in ('model.json', 'optimizer.json', 'checkpoint.json')]}

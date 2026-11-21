@@ -210,6 +210,31 @@ void main() {
     }
   });
 
+  testWidgets('reference recovery training point requires recorded-training approval', (tester) async {
+    for(final counter in [20]) {
+    final paths=<String>[];
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(key:ValueKey(counter),initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
+      paths.add(path);
+      return {'records':[{'id':'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa','schema_version':13,'status':'interruption_checkpoint','checkpoint_origin':'resumed_reference_training_progress','cancellation_phase':'checkpointed_training','completed_steps':counter,'review':{'config':{'steps':40,'optimizer':'sgd'}},'initial_losses':{'train':2,'validation':2,'test':2},'final_losses':{'train':1,'validation':1.5,'test':1.6},'generated_text':'amber birch'}]};
+    })));
+    await tester.tap(find.text('Saved interruption checkpoints'));await tester.pumpAndSettle();
+    expect(paths.single,'/decoder-architecture-plans/plan/corpus-optimizer-interruptions');
+    await tester.tap(find.textContaining('aaaaaaaa ·'));await tester.pumpAndSettle();
+    expect(find.textContaining('Saved interruption checkpoint at update $counter of 40'),findsOneWidget);
+    expect(find.text('Review corpus checkpoint continuation'),findsNothing);
+    expect(find.text('Review retained corpus reference resume'),findsNothing);
+    expect(find.textContaining('Reference recovery reached recorded training: the saved training counter is 20'),findsOneWidget);
+    if(counter==0)expect(find.textContaining('saved training counter is zero'),findsOneWidget);
+    if(counter==10 || counter==30)expect(find.textContaining('Training progress checkpoint: the saved training counter is $counter'),findsOneWidget);
+    await tester.tap(find.text('Review retained corpus recorded training resume'));await tester.pumpAndSettle();
+    expect(find.text('Review recorded training resume resources'),findsOneWidget);
+    expect(find.text('Confirm resume retained corpus recorded training'),findsNothing);
+    expect(paths.length,1);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+    }
+  });
+
   for (final step in [0,20,30]) {
   testWidgets('reference interruption at $step requires a separate reference recovery review', (tester) async {
     final paths=<String>[];
