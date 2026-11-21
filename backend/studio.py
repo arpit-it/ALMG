@@ -2421,9 +2421,10 @@ class Handler(BaseHTTPRequestHandler):
                 if architecture_parts[2] == 'corpus-quick-trial-review':
                     if not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id')!=architecture_parts[1]:raise ValueError('Reopen the initialized model belonging to this architecture plan.')
                     return self.respond(decoder_corpus_budget.review_quick_trial(ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings')))
-                if architecture_parts[2] == 'corpus-budget-limit-review':
+                if architecture_parts[2] in ('corpus-budget-limit-review','corpus-budget-options-review'):
                     if not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id')!=architecture_parts[1]:raise ValueError('Reopen the initialized model belonging to this architecture plan.')
-                    return self.respond(decoder_corpus_budget.review_limit(
+                    budget_reviewer = decoder_corpus_budget.review_options if architecture_parts[2]=='corpus-budget-options-review' else decoder_corpus_budget.review_limit
+                    return self.respond(budget_reviewer(
                         ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings'),data.get('max_workflow_optimizer_target_tokens'),data.get('max_recorded_training_target_tokens'),data.get('max_estimated_workflow_seconds'),data.get('minimum_duration_samples',1),
                         max_required_available_memory_bytes=data.get('max_required_available_memory_bytes'),
                         max_required_free_disk_bytes=data.get('max_required_free_disk_bytes')))

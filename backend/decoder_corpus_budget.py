@@ -190,7 +190,12 @@ def assess_quick_trial(root, identifier, settings):
     return result
 
 
-def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None, max_estimated_workflow_seconds=None, minimum_duration_samples=1, *, max_required_available_memory_bytes=None, max_required_free_disk_bytes=None):
+def review_options(*args, **kwargs):
+    """Explain valid but unsatisfied planning limits without approving an action."""
+    return review_limit(*args, **kwargs, _diagnostic=True)
+
+
+def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None, max_estimated_workflow_seconds=None, minimum_duration_samples=1, *, max_required_available_memory_bytes=None, max_required_free_disk_bytes=None, _diagnostic=False):
     """Select a fresh budget satisfying supplied target, timing and reserve filters."""
     limits = {'full_workflow_optimizer_target_tokens': max_workflow_target_tokens,
               'recorded_training_target_tokens': max_recorded_training_target_tokens}
@@ -212,41 +217,64 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
     config = training.configuration(settings, reviewed_inputs['review'].get('sequence_length'))
     if config['schema_version'] not in (5, 6, 7, 8, 9):
         raise ValueError('Target-limit planning supports reviewed cyclic settings versions five through nine.')
-    _, current, _, windows, _ = training._source(root, initialized, reviewed_inputs)
+    saved, current, _, windows, _ = training._source(root, initialized, reviewed_inputs)
     candidates = []; previews = {}
     for candidate in smaller_budgets(config):
         counts = exposure(windows['train'], candidate, current['actual_parameter_count'])
         token_fit = all(limit is None or counts[key] <= limit for key, limit in limits.items())
+        reasons = [{'kind': 'target_limit', 'field': key, 'actual': counts[key], 'maximum': limit,
+                    'message': f'{key} exceeds the requested limit.'}
+                   for key, limit in limits.items() if limit is not None and counts[key] > limit]
         seconds = None; checked = False; sample_count = 0
         required = {key: None for key in resource_limits}; resource_checked = False
-        if token_fit and (max_estimated_workflow_seconds is not None or any(value is not None for value in resource_limits.values())):
+        admission_feasible = None; admission_blockers = None
+        if token_fit and (_diagnostic or max_estimated_workflow_seconds is not None or any(value is not None for value in resource_limits.values())):
             preview = review(root, initialized, reviewed_inputs, candidate)
             previews[candidate['steps']] = preview; resource_checked = True
+            admission_feasible = preview['feasible']; admission_blockers = preview['blockers']
             required = {key: preview[key] for key in resource_limits}
             checked = max_estimated_workflow_seconds is not None
             if checked and preview['workflow_optimizer_target_rate_estimate'] is not None:
                 seconds = preview['workflow_duration_estimate']['estimated_seconds']
                 sample_count = preview['workflow_optimizer_target_rate_estimate']['sample_count']
+            if checked:
+                if seconds is None:
+                    reasons.append({'kind': 'missing_duration_evidence', 'actual_samples': sample_count,
+                                    'minimum_samples': minimum_duration_samples, 'message': 'No compatible completed-worker timing is available.'})
+                else:
+                    if seconds > max_estimated_workflow_seconds:
+                        reasons.append({'kind': 'estimated_duration_limit', 'actual': seconds, 'maximum': max_estimated_workflow_seconds,
+                                        'message': 'The calibrated duration estimate exceeds the requested limit.'})
+                    if sample_count < minimum_duration_samples:
+                        reasons.append({'kind': 'insufficient_duration_samples', 'actual_samples': sample_count,
+                                        'minimum_samples': minimum_duration_samples, 'message': 'More exact-compatible completed trials are required.'})
+            reasons.extend({'kind': 'reserve_limit', 'field': key, 'actual': required[key], 'maximum': limit,
+                            'message': f'{key} exceeds the planning ceiling.'}
+                           for key, limit in resource_limits.items() if limit is not None and required[key] > limit)
         duration_fit = max_estimated_workflow_seconds is None or (seconds is not None and seconds <= max_estimated_workflow_seconds and sample_count >= minimum_duration_samples)
         resource_fit = all(limit is None or (required[key] is not None and required[key] <= limit) for key, limit in resource_limits.items())
         candidates.append({'config': candidate, **{key: counts[key] for key in limits},
                            'estimated_workflow_seconds': seconds, 'duration_evidence_checked': checked,
                            'compatible_duration_sample_count': sample_count,
                            **required, 'resource_review_checked': resource_checked,
+                           'limit_blockers': reasons, 'admission_feasible': admission_feasible, 'admission_blockers': admission_blockers,
                            'within_limit': token_fit and duration_fit and resource_fit})
     fitting = [candidate for candidate in candidates if candidate['within_limit']]
+    no_fit_message = None
     if not fitting:
         minimum = candidates[0]
-        raise ValueError(f"No supported update budget fits the supplied limits (minimum recorded training {minimum['recorded_training_target_tokens']}, workflow {minimum['full_workflow_optimizer_target_tokens']}); duration-capped planning also requires at least {minimum_duration_samples} compatible completed timing samples.")
-    selected_config = fitting[-1]['config']
-    selected = previews.get(selected_config['steps']) or review(root, initialized, reviewed_inputs, selected_config)
-    if any(limit is not None and selected['exposure'][key] > limit for key, limit in limits.items()):
+        no_fit_message = f"No supported update budget fits the supplied limits (minimum recorded training {minimum['recorded_training_target_tokens']}, workflow {minimum['full_workflow_optimizer_target_tokens']}); duration-capped planning also requires at least {minimum_duration_samples} compatible completed timing samples."
+        if not _diagnostic:
+            raise ValueError(no_fit_message)
+    selected_config = fitting[-1]['config'] if fitting else None
+    selected = (previews.get(selected_config['steps']) or review(root, initialized, reviewed_inputs, selected_config)) if fitting else None
+    if selected is not None and any(limit is not None and selected['exposure'][key] > limit for key, limit in limits.items()):
         raise ValueError('Corpus exposure changed during target-limit planning; reopen the saved inputs.')
-    if any(limit is not None and selected[key] > limit for key, limit in resource_limits.items()):
+    if selected is not None and any(limit is not None and selected[key] > limit for key, limit in resource_limits.items()):
         raise ValueError('Required admission reserves changed during limit planning; reopen the resource review.')
     result = {
-        'format': 'almg-corpus-target-limit-review-v1', 'schema_version': 1,
-        'source': selected['source'], 'corpus_id': selected['corpus_id'], 'corpus_revision': selected['corpus_revision'],
+        'format': 'almg-corpus-budget-options-review-v1' if _diagnostic else 'almg-corpus-target-limit-review-v1', 'schema_version': 1,
+        'source': saved['review']['source'], 'corpus_id': saved['id'], 'corpus_revision': saved['revision'],
         'requested_config': config, 'max_workflow_optimizer_target_tokens': max_workflow_target_tokens,
         'max_recorded_training_target_tokens': max_recorded_training_target_tokens,
         'max_estimated_workflow_seconds': max_estimated_workflow_seconds,
@@ -255,8 +283,9 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
         'max_required_free_disk_bytes': max_required_free_disk_bytes,
         'resource_ceiling_scope': 'Planning ceilings on current required admission reserves, retaining existing calibrated floors, headroom and checkpoint disk reserves. These do not reserve physical RAM/disk or introduce process-peak caps or runtime monitors. Existing resource admission/monitoring and separate approval remain required.',
         'duration_evidence_policy': 'Sample-count filter for duration-capped planning only, using existing exact-compatible completed observations in bounded history. Repeated trials do not establish a confidence interval, language quality or a future runtime guarantee; existing estimate headroom and limitations remain unchanged.',
-        'considered_budgets': candidates, 'selected_config': selected['config'], 'selected_budget_review': selected,
-        'feasible': selected['feasible'], 'blockers': selected['blockers'],
+        'considered_budgets': candidates, 'selection_available': selected is not None,
+        'selected_config': selected['config'] if selected else None, 'selected_budget_review': selected,
+        'feasible': selected['feasible'] if selected else False, 'blockers': selected['blockers'] if selected else [no_fit_message],
         'training_approved': False, 'release_approved': False,
         'limitations': 'Read-only fresh-run planning: recorded-training targets count one recorded trajectory; workflow targets include both newly executed reference and recorded-training trajectories. Padding/evaluation/inference are excluded. Every supplied limit must fit; an omitted limit is unconstrained. Duration caps require exact compatible completed timing evidence and compare existing headroom-adjusted estimates, not guaranteed wall time. Unknown timing cannot pass a duration cap. Selects the largest existing supported step budget no greater than requested; other recipe controls are retained. Limits become an existing fixed update budget, not a runtime deadline or early-stop policy. Training needs the selected settings, their current resource review and separate explicit confirmation. Changing settings or corpus requires renewed review; resource blockers remain blockers. No quality-token requirement is inferred.',
         'implementation_sha256': file_digest(Path(__file__)),

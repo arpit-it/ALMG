@@ -8933,6 +8933,45 @@ P3-LMF-06 partial progress · repeatable FP32 embedding gradients and checkpoint
   the changed producer before their own commit. P3-LMF-01 is already complete for
   its recorded architecture scope. No generated artifacts or downloads are committed.
 
+P3-LMF-07 partial progress · structured budget-options rejection diagnostics · 2026-11-21:
+- [ ] P3-LMF-07 remains open. The read-only corpus-budget-options-review endpoint
+  returns valid no-fit planning reports with no selected configuration/resource
+  review, feasible false and no training/release approval. Candidate-level reasons
+  distinguish target caps, missing compatible timing, insufficient timing samples,
+  excessive estimated duration and required-reserve ceilings, with actual/limit data.
+  Invalid requests still fail validation; strict corpus-budget-limit-review rejection
+  behavior remains intact. Diagnostic reports cannot serve as action approvals.
+- Resource/duration checks skipped because token limits already exclude a candidate
+  remain explicitly unchecked, rather than falsely labeled missing evidence.
+  Diagnostic mode reviews token-eligible candidates and separately reports current
+  hardware admission feasibility/blockers, preserving the distinction between filter
+  failure and current hardware denial. All existing estimate/runtime limitations hold.
+- Verified the actual ALMG API on localhost:28950 from exported committed base
+  1d7c439 plus only this source/tests, excluding pending seeded/desktop edits.
+  Ten no-fit reports covered all five failure kinds for SGD and AdamW; the strict
+  endpoint rejected the same requests. Wrong-plan and invalid requests, diagnostic
+  wrappers as approval, unconfirmed execution and changed settings were rejected
+  without writes. Planning and diagnostics never queued work automatically.
+- Eight separately approved fresh timing runs first rebuilt exact-compatible
+  ten/twenty-update evidence on the stabilized producer, two per budget/optimizer.
+  Two further separately confirmed 14,400-parameter ten-update fresh-worker trials used 252
+  total optimizer targets each and passed checkpoint parameter/optimizer checks
+  exactly (maximum errors zero). Their third compatible ten-step observations
+  resolved only that candidate's three-sample shortfall; twenty steps remained
+  ineligible with two samples. Updated diagnostics and strict planning selected ten
+  without granting approval or generating further artifacts. All 4,038 original
+  fixture files remained unchanged; generated outputs stay private.
+- All 718 backend tests passed with actual Metal enabled and warnings as errors,
+  without exclusions, including the formerly intermittent four-row restore check.
+  Tests cover valid no-fit vs invalid input, skipped checks, reserve/timing/hardware
+  distinctions, exact repeated evidence, confirmation and source immutability.
+  Evidence: /tmp/almg-budget-diagnostics-stable-qa/verification.json, verify-app.log,
+  python.log, saved diagnostic reports and new-runs.json.
+- Delivered scope is the planning diagnostics API. Desktop controls, runtime stops,
+  recovery limits, broader uncertainty/failure/quality validation, seeded budgeting
+  and energy guidance remain open. Unchanged desktop/hardware blockers stay skipped;
+  pending source/user edits preserved and excluded. No collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
