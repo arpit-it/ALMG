@@ -8529,6 +8529,39 @@ P3-LMF-07 partial progress · retained reference-phase budget planning API · 20
   pending source/user edits and generated artifacts are preserved and excluded.
   No external collection or push occurred.
 
+P3-LMF-07 partial progress · canceled continuation budget planning API · 2026-11-21:
+- [ ] P3-LMF-07 remains open. The read-only resume-budget-review endpoint for saved
+  corpus continuations plans only new work from a validated canceled continuation's
+  retained counter, preserving its original source and partial lineage binding.
+  It excludes completed updates and reference-training work, keeps conservative
+  resource reserves and uses exact-source continuation duration calibration.
+  Supported scope is cyclic settings versions five through nine and saved canceled
+  continuations; unsupported ordering and completed resume sources are rejected.
+- Verified the actual local ALMG API on localhost:28938 with exported committed
+  base e38df04 plus only this source/tests, excluding pending seeded/desktop edits.
+  Prepared genuine 14,400-parameter SGD/AdamW continuations canceled after three
+  updates (retained counter 13) using shared-backend fixture execution. Each API
+  report predicted seven remaining updates, 87 real target tokens, 112 dense positions,
+  25 padding positions and zero new reference targets. Separately confirmed fresh-
+  worker recoveries matched these counts and reproduced reference weights exactly
+  (maximum error zero), retaining the correct partial source and lineage depth two.
+- Planning and rejected/unconfirmed approval attempts wrote no files. Reports grant
+  no training/release approval and cannot replace action reviews. Both completed
+  recoveries entered subsequent exact-source duration calibration; calculated
+  estimates keep existing workflow-overhead/uncertainty limitations. Completed
+  continuation records were rejected as new partial-resume sources through the API.
+- All 681 backend tests passed with actual Metal enabled and warnings as errors.
+  Focused tests cover cancellation before any continuation updates and after three
+  updates for both optimizers, exact remaining target counts, separate confirmation,
+  resource blockers, unsupported ordering and source immutability. All 3,084 original
+  fixture files remained unchanged. Evidence: /tmp/almg-corpus-partial-resume-budget-api-qa/
+  verification.json, verify-app.log, prepare-fixture.log, python.log and saved reports.
+- Delivered scope is the local API. Desktop planning panels, seeded-order planning,
+  broader interruption coverage, energy/quality-token guidance and additional
+  limits/throughput validation remain open. Unchanged desktop/hardware blockers
+  remain skipped; pending source, user edits and generated artifacts are preserved
+  and excluded from this commit. No external collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

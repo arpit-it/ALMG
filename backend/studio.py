@@ -2379,6 +2379,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond({'records':decoder_optimizer_continuations.history(ROOT,optimizer_parts[1])})
             corpus_parts = self.path.strip('/').split('/')
             if len(corpus_parts) == 3 and corpus_parts[0] == 'decoder-corpus-continuations':
+                if corpus_parts[2] == 'resume-budget-review':
+                    return self.respond(decoder_corpus_budget.review_partial(ROOT,corpus_parts[1]))
                 if corpus_parts[2] == 'resume-review':
                     return self.respond(decoder_corpus_isolated.review_partial(ROOT,corpus_parts[1]))
                 if corpus_parts[2] == 'cancel-resume':

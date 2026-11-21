@@ -74,6 +74,11 @@ def review_continuation(root, identifier):
     if config['schema_version'] not in (5, 6, 7, 8, 9):
         raise ValueError('Continuation budget planning currently requires reviewed cyclic settings versions five through nine.')
     resources = isolated.review_continuation(root, identifier)
+    return _continuation_report(root, parent, resources)
+
+
+def _continuation_report(root, parent, resources):
+    config = parent['review']['config']
     if resources['source']['record_revision'] != parent['revision']:
         raise ValueError('Saved corpus source changed during continuation budget planning.')
     origin = parent['review']['source']
@@ -99,6 +104,22 @@ def review_continuation(root, identifier):
         'implementation_sha256': file_digest(Path(__file__)),
     }
     result['revision'] = digest(result)
+    return result
+
+
+def review_partial(root, identifier):
+    """Plan new work from a validated canceled continuation, retaining its lineage."""
+    partial = isolated._continuations().read(root, identifier)
+    parent = training.read(root, partial['review']['source']['record_id'])
+    if parent['review']['config']['schema_version'] not in (5, 6, 7, 8, 9):
+        raise ValueError('Partial-continuation budget planning requires reviewed cyclic settings versions five through nine.')
+    resources = isolated.review_partial(root, identifier)
+    if resources['resume_from']['record_revision'] != partial['revision']:
+        raise ValueError('Retained continuation changed during budget planning.')
+    result = _continuation_report(root, parent, resources)
+    result.update(format='almg-corpus-partial-resume-budget-review-v1',
+                  execution_scope='retained_canceled_continuation', resume_from=resources['resume_from'])
+    result['revision'] = digest({k: v for k, v in result.items() if k != 'revision'})
     return result
 
 
