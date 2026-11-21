@@ -8854,6 +8854,47 @@ P3-LMF-07 partial progress · admission-reserve planning ceilings · 2026-11-21:
   remain skipped; pending source/user edits preserved and excluded. No collection
   or push occurred.
 
+P3-LMF-08 partial progress · versioned held-out next-token evaluation API · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Added read-only heldout-evaluation for verified
+  completed bounded corpus models, with optional candidate/baseline comparison.
+  Protocol v1 scores saved validation/test windows using masked mean cross-entropy
+  in nats, perplexity and teacher-forced token accuracy. Zero-mask padding contributes
+  no targets, loss, accuracy or failure examples. Reports include at most eight
+  deterministic masked argmax mismatches per split; perplexity overflow is explicitly
+  unavailable rather than infinity. No training/release or language-quality approval.
+- Reports bind model record/revision/weight hash, reviewed dataset revision/hash,
+  tokenizer/window hashes, sequence length, protocol revision, runtime and producer
+  digests. Comparison requires identical protocol and evaluation-data bindings;
+  differing corpus IDs can legitimately represent identical data. Partial models
+  are rejected. Scope remains the existing bounded corpus engine/parameter limit,
+  and teacher-forced diagnostics are separate from assistant/generation quality.
+- Verified the independent updated ALMG API on localhost:28948 from exported
+  committed base a7ae8b3 plus only this evaluation module/route/tests. Pending budget
+  diagnostics, seeded source and user edits were excluded. Completed two-row
+  14,400-parameter SGD/AdamW twenty-update candidates were compared with their
+  ten-update baselines on the same reviewed local corpus. Validation/test counted
+  10/9 real targets (16 dense positions each), excluding 6/7 padding positions.
+  Losses, perplexities and candidate-minus-baseline deltas matched stored held-out
+  losses within 1e-9; self-comparison deltas were zero. Incompatible sixteen-token
+  data, invalid IDs and partial models were rejected. Repeat reports were identical;
+  a separate CPU process reloaded/re-evaluated both models. All 4,038 original
+  fixture files remained unchanged; no training or artifact generation was queued.
+- Four focused evaluation tests passed with real Metal-trained two-row fixtures.
+  The independent clean-base regression run passed 711 checks, with exactly one
+  explicitly excluded known-blocked check: test_decoder_corpus_four_rows.FourRowTest.
+  test_weighted_microbatches_restore_and_continue_for_both_optimizers. The preceding
+  unfiltered diagnostics run failed that checkpoint gate at 1.1920929e-7 vs 1e-7;
+  its focused four-row rerun passed, so stability remains unresolved. No test/gate
+  was edited or relaxed, and the budget diagnostics remain uncommitted. Evidence:
+  /tmp/almg-corpus-heldout-evaluation-api-qa/{verification.json,python.log,
+  excluded-tests.json,focused.log,verify-app.log,sgd-evaluation.json,
+  adamw-evaluation.json} and /tmp/almg-corpus-budget-options-api-qa/python.log.
+- Still open: desktop evaluation controls, broader/independent benchmarks, generation
+  and assistant quality, reasoning/coding/multilingual evaluation, leakage audits,
+  inference performance/memory reports and full acceptance verification. Four-row,
+  desktop and hardware blockers stay open; source/user changes and generated
+  artifacts preserved. No external collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
