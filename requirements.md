@@ -9574,6 +9574,22 @@ P3-LMF-06 partial progress · profiled 111,744-parameter six-layer FP32 recipe �
   open and skipped. Pending seeded work, user edits, training artifacts and
   downloaded weights are preserved. No collection, generated-artifact commit or push.
 
+P3-LMF-07 partial progress · quantified resource admission diagnostics · 2026-11-21:
+- [ ] Added read-only memory/disk availability, required reserve, exact shortfall,
+  fit/unknown status and observation time to corpus budget reviews. Values use
+  the same captured resource review; admission policy and separate training
+  confirmation remain unchanged. Invalid or unavailable values remain unknown.
+- Local app verification: clean HEAD source plus this change served on port
+  28967; the saved 111,744-parameter corpus budget returned matching availability
+  and reserve values with zero shortfall. All 4,918 existing fixture files were
+  byte-identical afterward. Evidence: /tmp/almg-resource-shortfall-api-qa/
+  response.json and verification.json. Focused budget regression: 9 tests,
+  8 passed and 1 optional Metal test skipped; includes shortage, threshold,
+  unknown-value and read-only blocker preservation coverage. No training queued.
+- Requirement remains open for its remaining acceptance criteria. The previous
+  compact-state disk failure remains historical, with that work uncommitted;
+  this app snapshot observed 7,033,012,224 free bytes, allowing a later retry.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

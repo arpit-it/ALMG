@@ -77,7 +77,33 @@ def workflow_target_rate(exposure, work):
     }
 
 
+def resource_admission(resources):
+    """Explain the captured reserve check without taking another hardware sample."""
+    hardware = resources.get('hardware') or {}
+    estimates = resources.get('estimates') or {}
+    checks = []
+    for name, available_field, required_field in (
+        ('memory', 'available_memory_bytes', 'required_available_memory_bytes'),
+        ('disk', 'free_disk_bytes', 'required_free_disk_bytes'),
+    ):
+        available, required = hardware.get(available_field), estimates.get(required_field)
+        available = available if type(available) is int and available >= 0 else None
+        required = required if type(required) is int and required >= 0 else None
+        known = available is not None and required is not None
+        checks.append({'resource': name, 'available_bytes': available, 'required_bytes': required,
+                       'shortfall_bytes': max(0, required - available) if known else None,
+                       'fits': available >= required if known else None})
+    return {
+        'format': 'almg-corpus-resource-admission-diagnostics-v1', 'schema_version': 1,
+        'checks': checks, 'shortfalls': [check for check in checks if check['fits'] is False],
+        'unknown_resources': [check['resource'] for check in checks if check['fits'] is None],
+        'observed_at': hardware.get('observed_at'),
+        'scope': 'Arithmetic on the captured conservative admission reserves. Not measured peak usage, a reservation or a future guarantee. Independent blockers remain in force; this does not approve training.',
+    }
+
+
 def _finish(result):
+    result['resource_admission'] = resource_admission(result['resource_review'])
     result['workflow_optimizer_target_rate_estimate'] = workflow_target_rate(result['exposure'], result['workflow_duration_estimate'])
     result['revision'] = digest({k: v for k, v in result.items() if k != 'revision'})
     return result
