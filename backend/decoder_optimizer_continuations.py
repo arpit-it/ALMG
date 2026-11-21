@@ -33,7 +33,7 @@ def review(root,identifier,resume_id=None):
         'config':c,'runtime':admission['runtime'],'hardware':admission['hardware'],'estimates':estimates,
         'feasible':admission['feasible'],'blockers':admission['blockers'],'training_approved':False,'release_approved':False,
         'scope':'restore_retained_canceled_partial_and_finish_original_budget' if partial is not None else 'restore_saved_midpoint_and_finish_original_synthetic_budget_in_new_private_artifact',
-        'implementation_sha256':fixture.digest({name:fixture.file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_continuations.py','decoder_optimizer_cancellations.py','decoder_optimizer_continuation_estimates.py','decoder_optimizer_isolated.py','decoder_optimizer_worker.py','decoder_optimizer_fixture.py','decoder_architecture_backward.py','decoder_mixed_precision.py','planned_decoder.py')})}
+        'implementation_sha256':fixture.digest({name:fixture.file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_continuations.py','decoder_optimizer_cancellations.py','decoder_optimizer_continuation_estimates.py','decoder_optimizer_isolated.py','decoder_optimizer_worker.py','decoder_optimizer_fixture.py','decoder_optimizer_state.py','decoder_architecture_backward.py','decoder_mixed_precision.py','planned_decoder.py')})}
     memory,work=measured_feedback.feedback(history(root,identifier),record)
     estimates['isolated_optimizer_memory']=memory;estimates['optimizer_work_estimate']=work
     if memory is not None:estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],memory['calculated_memory_floor_bytes'])

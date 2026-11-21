@@ -8,10 +8,12 @@ import uuid
 import numpy as np
 if __package__:
     from . import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision,decoder_optimizer_measurements as measurements,decoder_optimizer_estimates as work_estimates
+    from . import decoder_optimizer_state as optimizer_state
     from .planned_decoder import PlannedDecoder
     from .run_manifest import digest,file_digest
 else:
     import decoder_architecture_feasibility as hardware,decoder_architecture_initializations as initializations,decoder_architecture_backward as backward,decoder_mixed_precision as mixed_precision,decoder_optimizer_measurements as measurements,decoder_optimizer_estimates as work_estimates
+    import decoder_optimizer_state as optimizer_state
     from planned_decoder import PlannedDecoder
     from run_manifest import digest,file_digest
 DEFAULT={'schema_version':1,'optimizer':'sgd','learning_rate':.01,'schedule':'warmup_cosine','warmup_steps':2,'steps':10,'gradient_clip_norm':1.0,'weight_decay':0.0}
@@ -88,10 +90,11 @@ def update(parameters,gradients,state,c):
 
 
 def checkpoint(folder,model,state,c,review_revision):
+    version=2 if sum(value.size for value in model.parameters.values())>16384 else 1
+    payload=optimizer_state.encode(state,model.parameters,c,compact=version==2)
     folder.mkdir(parents=True,exist_ok=False);model.save(folder/'model.json')
-    payload={'step':state['step'],'m':{name:value.tolist() for name,value in state['m'].items()},'v':{name:value.tolist() for name,value in state['v'].items()}}
     (folder/'optimizer.json').write_text(json.dumps(payload,allow_nan=False))
-    record={'format':'almg-optimizer-fixture-checkpoint-v1','schema_version':1,'config':c,'review_revision':review_revision,'step':state['step'],
+    record={'format':f'almg-optimizer-fixture-checkpoint-v{version}','schema_version':version,'config':c,'review_revision':review_revision,'step':state['step'],
             'files':{name:file_digest(folder/name) for name in ('model.json','optimizer.json')}}
     record['revision']=digest(record);(folder/'checkpoint.json').write_text(json.dumps(record,allow_nan=False));return record
 
@@ -99,14 +102,12 @@ def checkpoint(folder,model,state,c,review_revision):
 def restore(folder,c,review_revision):
     if (folder/'checkpoint.json').stat().st_size>128000 or any((folder/name).stat().st_size>16*1024**2 for name in ('model.json','optimizer.json')):raise ValueError('Optimizer checkpoint exceeds bounded size.')
     record=json.loads((folder/'checkpoint.json').read_text())
-    if (record.get('format')!='almg-optimizer-fixture-checkpoint-v1' or record.get('schema_version')!=1 or record.get('config')!=c
+    if ((record.get('format'),record.get('schema_version')) not in (('almg-optimizer-fixture-checkpoint-v1',1),('almg-optimizer-fixture-checkpoint-v2',2)) or type(record.get('schema_version')) is not int or record.get('config')!=c
         or record.get('review_revision')!=review_revision or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
         or set(record['files'])!={'model.json','optimizer.json'} or any(file_digest(folder/name)!=sha for name,sha in record['files'].items())):raise ValueError('Optimizer checkpoint binding changed.')
     model=PlannedDecoder.load(folder/'model.json');saved=json.loads((folder/'optimizer.json').read_text());step=saved['step']
     if type(step) is not int or step!=record['step'] or not 0<step<c['steps']:raise ValueError('Invalid restored optimizer/scheduler counter.')
-    state={'step':step,**{kind:{name:np.asarray(value,dtype=np.float32) for name,value in saved[kind].items()} for kind in ('m','v')}}
-    expected=set(model.parameters) if c['optimizer']=='adamw' else set()
-    if any(set(state[kind])!=expected or any(value.shape!=model.parameters[name].shape or not np.isfinite(value).all() or (kind=='v' and np.any(value<0)) for name,value in state[kind].items()) for kind in ('m','v')):raise ValueError('Optimizer moments are missing or invalid.')
+    state=optimizer_state.decode(saved,model.parameters,c,version=record['schema_version'])
     return model,state
 
 
@@ -130,7 +131,7 @@ def review(root,plan_id,initialized,settings):
     record={'format':'almg-optimizer-fixture-review-v1','schema_version':1,'source':{'plan_id':plan_id,'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
         'config':c,'model_config':current['config'],'runtime':work_estimates.runtime(profile),'hardware':profile,'estimates':estimates,'feasible':not reasons,'blockers':reasons,
         'scope':'bounded_synthetic_updates_with_durable_optimizer_and_scheduler_checkpoint_not_general_pretraining','training_approved':False,'release_approved':False,
-        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_optimizer_isolated.py','decoder_optimizer_worker.py','decoder_optimizer_estimates.py','decoder_optimizer_measurements.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
+        'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_optimizer_fixture.py','decoder_optimizer_state.py','decoder_optimizer_isolated.py','decoder_optimizer_worker.py','decoder_optimizer_estimates.py','decoder_optimizer_measurements.py','decoder_mixed_precision.py','decoder_architecture_backward.py','planned_decoder.py','decoder_architecture_feasibility.py')})}
     prior=history(root,plan_id,current['id']);estimates['optimizer_work_estimate']=work_estimates.estimate(prior,record)
     estimates['calculated_memory_reserve_bytes']=estimates['required_available_memory_bytes']
     calibration=work_estimates.memory_calibration(prior,record);estimates['isolated_optimizer_memory']=calibration

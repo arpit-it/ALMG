@@ -9590,6 +9590,31 @@ P3-LMF-07 partial progress · quantified resource admission diagnostics · 2026-
   compact-state disk failure remains historical, with that work uncommitted;
   this app snapshot observed 7,033,012,224 free bytes, allowing a later retry.
 
+P3-LMF-06 partial progress · compact optimizer checkpoints · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Models above 16,384 parameters now save bounded,
+  versioned float32/base64 optimizer moments with explicit dtype/shape metadata.
+  Small checkpoints retain v1; genuine larger v1 checkpoints remain readable.
+  Restore rejects malformed metadata, byte counts, nonfinite/negative variance,
+  and invalid counters or hashes. No numeric tolerance or resource gate changed.
+- Verified in the running local ALMG app using the saved 111,744-parameter local
+  corpus fixture: SGD and AdamW each trained, restored compact midpoint state,
+  and completed separately confirmed continuation with zero parameter/moment/
+  continuation error and decreasing training loss. Both genuine legacy v1
+  checkpoints also continued successfully. A fresh app process reopened all four
+  checkpoints; all 5,154 retained files were preserved byte-for-byte on reopening.
+- AdamW optimizer payload measured 1,198,146 bytes versus 5,271,070 equivalent
+  legacy JSON bytes (22.73%). SGD carries no moments and is 96 versus 30 bytes;
+  no SGD size saving is claimed. Model serialization/file names remain unchanged.
+- Complete clean-export regression: 780 tests passed in 269.576 seconds with
+  ALMG_METAL_TESTS=1 and warnings treated as errors, no skips or exclusions.
+  Evidence: /tmp/almg-compact-optimizer-state-api-qa/{python-retry.log,
+  verify-retry.log,verification.json,reopen-verification.json}. App ports 28966
+  and fresh-process 28968; verification used the local API, not native GUI.
+- The earlier disk-capacity verification failure was resolved by the later
+  observed capacity recovery; no retained artifacts or weights were removed.
+  Broader model-scale profiling and other outstanding acceptance criteria remain
+  open. Pending seeded-order/native GUI work remains separate and uncommitted.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

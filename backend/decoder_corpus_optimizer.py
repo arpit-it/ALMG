@@ -182,7 +182,7 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
               'splits': saved['review']['splits'], 'estimates': reserve, 'hardware': profile,
               'feasible': not reasons, 'blockers': reasons, 'training_approved': False, 'release_approved': False,
               'implementation_sha256': digest({name: file_digest(Path(__file__).with_name(name)) for name in
-                  ('decoder_corpus_optimizer.py', 'decoder_corpus_inputs.py', 'decoder_optimizer_fixture.py', 'decoder_corpus_feedback.py', 'decoder_corpus_isolated.py', 'decoder_corpus_worker.py', 'decoder_corpus_run_cancellations.py', 'decoder_corpus_reference_resume.py', 'decoder_corpus_training_resume.py', 'decoder_corpus_phase_feedback.py', 'decoder_corpus_interruptions.py',
+                  ('decoder_corpus_optimizer.py', 'decoder_corpus_inputs.py', 'decoder_optimizer_fixture.py','decoder_optimizer_state.py', 'decoder_corpus_feedback.py', 'decoder_corpus_isolated.py', 'decoder_corpus_worker.py', 'decoder_corpus_run_cancellations.py', 'decoder_corpus_reference_resume.py', 'decoder_corpus_training_resume.py', 'decoder_corpus_phase_feedback.py', 'decoder_corpus_interruptions.py',
                    'decoder_architecture_backward.py', 'decoder_mixed_precision.py', 'planned_decoder.py', 'decoder_tokenizer.py')})}
     reserve['calculated_memory_reserve_bytes']=reserve['required_available_memory_bytes']
     memory,work=feedback.feedback(history(root,initialized,reviewed_inputs),result) if execution_mode=='fresh_process' else (None,None)
