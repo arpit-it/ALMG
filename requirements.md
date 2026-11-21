@@ -8437,6 +8437,31 @@ P3-LMF-07 partial progress · read-only cyclic-corpus budget planning API · 202
   additional limits/stopping criteria, and broader throughput/uncertainty validation.
   No external collection or push occurred.
 
+P3-LMF-07 partial progress · midpoint continuation budget planning API · 2026-11-21:
+- [ ] P3-LMF-07 remains open. The read-only continuation-budget-review endpoint
+  calculates only work remaining from the validated original midpoint checkpoint,
+  retaining the original cyclic window offsets and separating real targets from
+  dense padded positions. Saved reference training contributes zero new targets.
+  Scope is cyclic settings versions five through nine and ordinary midpoint
+  continuation; conservative memory/disk reserves and continuation-specific
+  calibrated duration retain their existing limitations. Planning grants no approval.
+- Verified the actual local ALMG API on localhost:28935 using an exported committed
+  base 5916fae plus only the reviewed source/tests. Both SGD and AdamW proposals
+  restored update 10 and predicted 10 remaining updates, 125 real target tokens,
+  160 dense positions and 35 padding positions. Separately confirmed continuations
+  matched those counts and the reference parameters exactly (maximum error 0).
+  Both new results entered subsequent continuation-duration calibration. Planning,
+  invalid-source rejection and rejected/unconfirmed approval attempts wrote no files.
+- All 674 backend tests passed with actual Metal enabled and warnings as errors.
+  All 2,902 original fixture files remained unchanged; the final 2,910 files include
+  only private verification outputs. Evidence: /tmp/almg-corpus-continuation-budget-api-qa/
+  verification.json, verify-app.log, python.log and saved proposals/continuations.
+- API-only delivered scope; desktop panel integration, seeded/canceled-phase budgets,
+  quality-token guidance, energy measurement and broader stopping/throughput
+  validation remain open. The separate seeded desktop-history blocker and pending
+  edits are preserved and excluded. P3-LMF-01 remains complete for its recorded
+  architecture scope. No external collection, generated artifacts or push included.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
