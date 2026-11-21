@@ -190,10 +190,14 @@ def assess_quick_trial(root, identifier, settings):
     return result
 
 
-def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None, max_estimated_workflow_seconds=None):
+def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None, max_estimated_workflow_seconds=None, minimum_duration_samples=1):
     """Select a fresh-run budget satisfying every supplied scoped target limit."""
     limits = {'full_workflow_optimizer_target_tokens': max_workflow_target_tokens,
               'recorded_training_target_tokens': max_recorded_training_target_tokens}
+    if type(minimum_duration_samples) is not int or not 1 <= minimum_duration_samples <= 20:
+        raise ValueError('Require one through twenty compatible duration samples from the existing bounded history.')
+    if minimum_duration_samples > 1 and max_estimated_workflow_seconds is None:
+        raise ValueError('A repeated-duration evidence requirement needs an estimated workflow-duration limit.')
     if all(value is None for value in limits.values()) and max_estimated_workflow_seconds is None:
         raise ValueError('Provide at least one target-token or estimated workflow-duration limit.')
     if max_estimated_workflow_seconds is not None and (type(max_estimated_workflow_seconds) not in (int, float) or not 0 < max_estimated_workflow_seconds <= 2**63 - 1 or not math.isfinite(max_estimated_workflow_seconds)):
@@ -211,20 +215,22 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
     for candidate in smaller_budgets(config):
         counts = exposure(windows['train'], candidate, current['actual_parameter_count'])
         token_fit = all(limit is None or counts[key] <= limit for key, limit in limits.items())
-        seconds = None; checked = False
+        seconds = None; checked = False; sample_count = 0
         if max_estimated_workflow_seconds is not None and token_fit:
             preview = review(root, initialized, reviewed_inputs, candidate)
             previews[candidate['steps']] = preview; checked = True
             if preview['workflow_optimizer_target_rate_estimate'] is not None:
                 seconds = preview['workflow_duration_estimate']['estimated_seconds']
-        duration_fit = max_estimated_workflow_seconds is None or (seconds is not None and seconds <= max_estimated_workflow_seconds)
+                sample_count = preview['workflow_optimizer_target_rate_estimate']['sample_count']
+        duration_fit = max_estimated_workflow_seconds is None or (seconds is not None and seconds <= max_estimated_workflow_seconds and sample_count >= minimum_duration_samples)
         candidates.append({'config': candidate, **{key: counts[key] for key in limits},
                            'estimated_workflow_seconds': seconds, 'duration_evidence_checked': checked,
+                           'compatible_duration_sample_count': sample_count,
                            'within_limit': token_fit and duration_fit})
     fitting = [candidate for candidate in candidates if candidate['within_limit']]
     if not fitting:
         minimum = candidates[0]
-        raise ValueError(f"No supported update budget fits the supplied limits (minimum recorded training {minimum['recorded_training_target_tokens']}, workflow {minimum['full_workflow_optimizer_target_tokens']}); duration-capped planning also requires compatible completed timing evidence.")
+        raise ValueError(f"No supported update budget fits the supplied limits (minimum recorded training {minimum['recorded_training_target_tokens']}, workflow {minimum['full_workflow_optimizer_target_tokens']}); duration-capped planning also requires at least {minimum_duration_samples} compatible completed timing samples.")
     selected_config = fitting[-1]['config']
     selected = previews.get(selected_config['steps']) or review(root, initialized, reviewed_inputs, selected_config)
     if any(limit is not None and selected['exposure'][key] > limit for key, limit in limits.items()):
@@ -235,6 +241,8 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
         'requested_config': config, 'max_workflow_optimizer_target_tokens': max_workflow_target_tokens,
         'max_recorded_training_target_tokens': max_recorded_training_target_tokens,
         'max_estimated_workflow_seconds': max_estimated_workflow_seconds,
+        'minimum_duration_samples': minimum_duration_samples,
+        'duration_evidence_policy': 'Sample-count filter for duration-capped planning only, using existing exact-compatible completed observations in bounded history. Repeated trials do not establish a confidence interval, language quality or a future runtime guarantee; existing estimate headroom and limitations remain unchanged.',
         'considered_budgets': candidates, 'selected_config': selected['config'], 'selected_budget_review': selected,
         'feasible': selected['feasible'], 'blockers': selected['blockers'],
         'training_approved': False, 'release_approved': False,

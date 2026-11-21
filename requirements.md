@@ -8779,6 +8779,43 @@ P3-LMF-07 partial progress · scoped quick-trial assessment and requested-budget
   desktop/hardware blockers remain skipped; pending source/user edits preserved
   and excluded. No external collection or push occurred.
 
+P3-LMF-07 partial progress · repeated compatible duration-evidence planning filter · 2026-11-21:
+- [ ] P3-LMF-07 remains open. Duration-capped fresh-run planning now accepts
+  minimum_duration_samples from one through twenty (default one), matching the
+  existing bounded observation history. Candidates report their exact-compatible
+  sample counts and cannot pass unless both their estimated duration and sample
+  threshold fit. A repeated-evidence policy without a duration cap is rejected
+  rather than silently ignored. Token-only and default one-sample behavior remain.
+- Counts use existing verified completed fresh-worker observations for the exact
+  source/config/runtime/producer/update budget. Other budgets, shared-worker and
+  incomplete observations do not satisfy the threshold. This is an evidence-count
+  planning filter, not a confidence interval, quality gate or runtime guarantee.
+  Existing duration headroom/limitations, resource blockers and approval controls
+  remain unchanged; reports grant no training/release approval.
+- Verified the actual ALMG API on localhost:28945 from exported committed base
+  3a4d135 plus only this source/tests, excluding pending seeded/desktop edits.
+  SGD/AdamW initially had one compatible ten-step and one twenty-step sample each.
+  Default duration planning selected twenty, while requiring two samples rejected
+  all candidates. Two separately confirmed 14,400-parameter repeated quick trials
+  then added a second ten-step observation for each optimizer (252 workflow targets
+  each, checkpoint parameter/optimizer errors zero).
+- Requiring two observations subsequently selected ten steps with exactly the
+  original and new ten-step source IDs; twenty steps remained ineligible with one
+  sample despite fitting the duration cap. Requiring three still rejected planning;
+  default one-sample requests continued selecting twenty. Read-only planning and
+  invalid-policy/unconfirmed-approval rejection wrote no files. All 3,726 original
+  fixture files remained unchanged; generated outputs stay private.
+- All 705 backend tests passed with actual Metal enabled and warnings as errors.
+  Tests cover invalid thresholds, absent evidence, legacy behavior, shared/other-
+  budget exclusion, real repeated calibration and source immutability. Evidence:
+  /tmp/almg-corpus-duration-evidence-api-qa/verification.json, verify-app.log,
+  python.log, saved repeated-evidence proposals and new-runs.json.
+- Delivered scope is duration-capped planning API evidence selection. Desktop
+  controls, statistical/large-scale uncertainty validation, runtime stops, recovery
+  limits, broader failure/quality coverage, seeded budgeting and energy guidance
+  remain open. Unchanged desktop/hardware blockers remain skipped; pending source/
+  user edits preserved and excluded. No external collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
