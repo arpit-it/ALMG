@@ -9409,6 +9409,45 @@ P3-LMF-08 partial progress · historical benchmark scoring snapshot comparison �
   skipped. User edits, pending seeded work, training artifacts and downloaded
   weights are preserved. No external collection, generated-artifact commit or push.
 
+P3-LMF-08 partial progress · reconstructed-document cross-window overlap audit · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Corpus inputs and saved benchmarks now expose
+  read-only document-overlap-audit. Protocol v1 reconstructs document token streams
+  from saved source hashes and absolute offsets, merging shared boundary tokens
+  and repeated/mixing copies. Conflicting positions, shifted inputs, invalid
+  coordinates or incomplete document gaps fail rather than imply independence.
+- Audits count whole-document duplicates and shared four-token spans across full
+  reconstructed streams, including saved-window boundaries. Reference token
+  sequences are deduplicated; all query counts are retained while examples are
+  capped at eight per comparison. Examples include document hashes, absolute span
+  offsets, token IDs/text and query/reference boundary-crossing flags. Reports show
+  both the earlier within-window finding and additional document-level findings.
+- Verified the running updated ALMG API at localhost:28962 from exported f1a4b8d
+  plus only this module/route/tests. A deliberately shared local negative benchmark
+  copied four tokens across an eight-token training-window boundary in the existing
+  twelve-word permutation corpus. Version-one within-window checks missed it; the
+  new document audit flagged the matching training document and crossing offset.
+  Independent raw-document token counts/spans matched all reported comparisons.
+  Existing corpus overlap and a genuinely non-overlapping local benchmark were
+  also checked. Repeated reports and a separate CPU-process audit were identical.
+- Invalid IDs and a modified private benchmark file were rejected; restoration
+  recovered exact reads. All 4,616 pre-existing files were preserved. Four private
+  negative-benchmark files were prepared; all 4,620 files stayed unchanged during
+  audit calls. Evidence: /tmp/almg-document-overlap-api-qa/verification.json,
+  verify-app.log, cross-window-audit.json, corpus-audit.json and
+  positive-benchmark-audit.json. Native desktop interaction is not claimed.
+- Validation: all 767 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Five new tests cover cross-window findings,
+  shared-boundary/padding/mixing reconstruction, conflicting/gapped/shifted inputs,
+  deduplicated counts/example caps and actual immutable corpus audits.
+- Scope is review evidence only: existing version-one preparation/scoring policies
+  and stored inputs are unchanged. Integrating this stricter audit into versioned
+  preparation/scoring admission remains open, as do desktop controls, semantic/
+  fuzzy/global-use leakage, model memorization and broader quality acceptance.
+  No independence, training or release certification is granted. Existing desktop/
+  hardware blockers remain open and skipped; user edits, pending seeded work,
+  training artifacts and downloaded weights are preserved. No external collection,
+  generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
