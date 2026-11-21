@@ -8,8 +8,8 @@ else:
 
 
 def snapshot(record):
-    if ((record.get('format'),record.get('status')) not in (('almg-corpus-optimizer-run-v4','canceled'),('almg-corpus-optimizer-run-v5','interruption_checkpoint'),('almg-corpus-optimizer-run-v6','interruption_checkpoint')) or record.get('cancellation_phase')!='checkpointed_training'):
-        raise ValueError('Select retained recorded training or a durable interrupted midpoint.')
+    if ((record.get('format'),record.get('status')) not in (('almg-corpus-optimizer-run-v4','canceled'),('almg-corpus-optimizer-run-v5','interruption_checkpoint'),('almg-corpus-optimizer-run-v6','interruption_checkpoint'),('almg-corpus-optimizer-run-v10','interruption_checkpoint')) or record.get('cancellation_phase')!='checkpointed_training'):
+        raise ValueError('Select retained recorded training or a durable interrupted training checkpoint.')
     depth=record.get('training_resume_depth',record.get('reference_resume_depth',0))
     if type(depth) is not int or not 0<=depth<=16:raise ValueError('Invalid recorded-training ancestry depth.')
     return {'record_id':record['id'],'record_revision':record['revision'],'files':record['files'],

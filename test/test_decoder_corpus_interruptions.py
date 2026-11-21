@@ -36,7 +36,7 @@ class InterruptionCheckpointTest(unittest.TestCase):
             root=Path(temporary);source,saved,settings=corpus(root);hooks=root/'hooks';hooks.mkdir();(hooks/'sitecustomize.py').write_text(HOOK)
             for kind,precision in (('sgd','float32'),('adamw','mixed_float16')):
                 c={**settings,'schema_version':6,'steps':40,'optimizer':kind,'weight_decay':.01 if kind=='adamw' else 0.,'batch_size':2,'gradient_accumulation_steps':2,'compute_precision':precision,'loss_scale':128. if precision=='mixed_float16' else 1.}
-                for phase_call,counter,reference_phase in ((1,0,True),(1,10,True),(1,20,True),(1,30,True),(2,0,False),(3,20,False)):
+                for phase_call,counter,reference_phase in ((1,0,True),(1,10,True),(1,20,True),(1,30,True),(2,0,False),(2,10,False),(3,20,False),(3,30,False)):
                     approved=isolated.review(root,source,saved,c);token=uuid.uuid4().hex;progress=root/'progress.json';progress.unlink(missing_ok=True)
                     env={**os.environ,'PYTHONPATH':str(hooks)+os.pathsep+str(Path(__file__).resolve().parent.parent),'ALMG_INTERRUPTION_TEST_ROOT':str(root),'ALMG_INTERRUPTION_TEST_PHASE':str(phase_call),'ALMG_INTERRUPTION_TEST_STEP':str(counter+1)}
                     process=subprocess.Popen([sys.executable,'-m','backend.decoder_corpus_worker'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env)
@@ -47,9 +47,9 @@ class InterruptionCheckpointTest(unittest.TestCase):
                             if process.poll() is not None:self.fail(process.communicate()[1])
                             self.assertLess(time.monotonic(),deadline);time.sleep(.02)
                         self.assertEqual(json.loads(progress.read_text()),{'pid':process.pid,'step':counter+1})
-                        paths=[p for p in (root/interruptions.DIRECTORY).glob('*/record.json') if json.loads(p.read_text())['owner_process_id']==process.pid];self.assertEqual(len(paths),(counter//10+1) if reference_phase else phase_call+3)
+                        paths=[p for p in (root/interruptions.DIRECTORY).glob('*/record.json') if json.loads(p.read_text())['owner_process_id']==process.pid];self.assertEqual(len(paths),counter//10+(1 if reference_phase else 5))
                         path=max(paths,key=lambda p:interruptions.progress(json.loads(p.read_text())));record=training.read(root,path.parent.name);self.assertEqual(record['status'],'interruption_checkpoint');self.assertEqual(record['completed_steps'],counter)
-                        self.assertEqual(record['schema_version'],(7 if counter==0 else 8 if counter==20 else 9) if reference_phase else 6 if counter==0 else 5);self.assertEqual(record['reference_completed_steps'],counter if reference_phase else 40);self.assertFalse(record['reference_verified']);self.assertFalse(record['release_approved'])
+                        self.assertEqual(record['schema_version'],(7 if counter==0 else 8 if counter==20 else 9) if reference_phase else 6 if counter==0 else 5 if counter==20 else 10);self.assertEqual(record['reference_completed_steps'],counter if reference_phase else 40);self.assertFalse(record['reference_verified']);self.assertFalse(record['release_approved'])
                         self.assertFalse(interruptions.recoverable(root,record));self.assertNotIn(record,interruptions.history(root,source,saved))
                         reviewer=isolated.review_reference_resume if reference_phase else isolated.review_training_resume
                         runner=isolated.run_reference_resume if reference_phase else isolated.run_training_resume
@@ -79,7 +79,7 @@ class InterruptionCheckpointTest(unittest.TestCase):
         with TemporaryDirectory() as temporary:
             root=Path(temporary);source,saved,c=corpus(root)
             record=isolated.run(root,True,source,saved,c,isolated.review(root,source,saved,c),uuid.uuid4().hex)
-            checkpoints=list((root/interruptions.DIRECTORY).glob('*/record.json'));self.assertEqual(len(checkpoints),6)
+            checkpoints=list((root/interruptions.DIRECTORY).glob('*/record.json'));self.assertEqual(len(checkpoints),8)
             retained=training.read(root,checkpoints[0].parent.name)
             self.assertEqual(retained['original_run_id'],record['id']);self.assertEqual(interruptions.history(root,source,saved),[])
             reviewer=isolated.review_reference_resume if retained['cancellation_phase']=='reference_verification' else isolated.review_training_resume

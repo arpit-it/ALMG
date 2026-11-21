@@ -130,8 +130,8 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
                    precision_scope='Conservative FP32 reserves retained; mixed FP16 matrix products do not establish memory savings.',
                    effective_batch_rows=c['batch_size'], gradient_accumulation_steps=c['gradient_accumulation_steps'],
                    gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if c['gradient_accumulation_steps'] > 1 else 0)
-    reserve['interruption_checkpoint_count']=6
-    reserve['interruption_checkpoint_extra_disk_bytes']=6*max(2*1024**2,current['actual_weight_bytes']*256)
+    reserve['interruption_checkpoint_count']=8
+    reserve['interruption_checkpoint_extra_disk_bytes']=8*max(2*1024**2,current['actual_weight_bytes']*256)
     reserve['required_free_disk_bytes']+=reserve['interruption_checkpoint_extra_disk_bytes']
     reserve['required_available_memory_bytes']+=current['actual_weight_bytes']*8
     reasons = list(profile['errors'])
@@ -227,14 +227,18 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
             if not math.isfinite(initial_compute_loss) or abs(initial_compute_loss - initial_fp32_loss) > .05 or causal_error > 1e-5:
                 raise ValueError('Corpus precision failed initial FP32 loss or causal-prefix checks; no completed run published.')
             gradient_error = 0.0
-            def retain_reference_progress(values,state,logs):
+            def retain_progress(values,state,logs):
                 if parent is None and execution_mode=='fresh_process' and phase=='reference_verification' and state['step'] in {c['steps']//4,c['steps']//2,3*c['steps']//4}:
                     if __package__:from . import decoder_corpus_interruptions
                     else:import decoder_corpus_interruptions
                     decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,values,state,None,None,logs,[],request_id,phase='reference_verification')
+                if parent is None and execution_mode=='fresh_process' and phase=='checkpointed_training' and state['step'] in {c['steps']//4,3*c['steps']//4}:
+                    if __package__:from . import decoder_corpus_interruptions
+                    else:import decoder_corpus_interruptions
+                    decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,values,state,reference,reference_state,reference_log,first+logs,request_id)
             def optimize(values, state, end):
                 nonlocal gradient_error
-                values, state, logs, error = train_updates(values, state, end, windows['train'], c, model.config, mx, observer,stop=lambda:run_cancellation.requested(root,approved,request_id),checkpoint=retain_reference_progress)
+                values, state, logs, error = train_updates(values, state, end, windows['train'], c, model.config, mx, observer,stop=lambda:run_cancellation.requested(root,approved,request_id),checkpoint=retain_progress)
                 gradient_error = max(gradient_error, error)
                 if state['step']<end:raise run_cancellation.Stopped(values,state,logs,phase)
                 return values, state, logs
@@ -342,7 +346,7 @@ def read(root, identifier, _seen=None):
     if __package__:from . import decoder_corpus_training_resume
     else:import decoder_corpus_training_resume
     decoder_corpus_training_resume.lineage(root,record,seen)
-    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6','almg-corpus-optimizer-run-v7','almg-corpus-optimizer-run-v8','almg-corpus-optimizer-run-v9'):return run_cancellation.read(root,folder,record)
+    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6','almg-corpus-optimizer-run-v7','almg-corpus-optimizer-run-v8','almg-corpus-optimizer-run-v9','almg-corpus-optimizer-run-v10'):return run_cancellation.read(root,folder,record)
     approved = record['review']; c = configuration(approved['config'], approved['config']['sequence_length'])
     midpoint = c['steps'] // 2
     expected = {'trained-model.json', 'tokenizer.json', *[f'step-{midpoint}/{name}' for name in ('model.json', 'optimizer.json', 'checkpoint.json')]}
