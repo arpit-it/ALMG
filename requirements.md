@@ -9665,6 +9665,34 @@ P3-LMF-06 partial progress · profiled seven-layer FP32 recipe · 2026-11-22:
   language-quality acceptance and larger storage support. Pending seeded-order
   work, user edits, training artifacts and downloaded weights are preserved.
 
+P3-LMF-06 partial progress · compact planned-model storage · 2026-11-22:
+- [ ] P3-LMF-06 remains open. Planned decoders above 16,384 parameters now write
+  version-two little-endian float32/base64 tensors with explicit dtype/shape
+  metadata. Small models retain version one; genuine legacy decimal-array models
+  remain readable. Existing 64 MiB bounds and atomic publication remain in place.
+  No automatic rewriting of legacy artifacts, recipe-cap or numeric-gate change.
+- Local app on port 28971 completed separately confirmed 20-update SGD/AdamW
+  runs and midpoint continuations for the 230,912-parameter fixture. Checkpoint
+  parameter/moment and continuation errors were zero, generation matched, and
+  losses matched the prior legacy-format runs. The 38 original new-fixture files
+  were preserved. Fresh app port 28973 reopened both compact model checkpoints
+  with all 150 files unchanged.
+- Fresh app port 28972 restored and continued both genuine legacy checkpoints
+  into compact derived models with zero error, preserving all 150 original
+  legacy files. Final trained parameter bits matched the corresponding legacy
+  runs exactly. Compact trained models measured 1,235,174 bytes versus 4,938,901
+  (SGD) / 4,937,256 (AdamW) legacy bytes, approximately 75% smaller.
+- Clean-export regression: all 791 tests passed in 260.033 seconds with Metal
+  enabled, warnings treated as errors, no skips or exclusions. New tests cover
+  exact float32 bits including negative zero, owned/writable arrays, CPU logits,
+  genuine legacy reads, malformed tensor/version/encoding rejection, nonfinite
+  values and failed writes preserving an existing destination. Evidence:
+  /tmp/almg-compact-planned-model-api-qa/{python.log,verification.json,
+  legacy-verification.json,reopen-verification.json,verify-app.log}.
+- Actual local API workflows verified; native GUI verification remains separately
+  blocked. Broader storage/scale work and other pretraining acceptance criteria
+  stay open. User edits, pending seeded-order work, artifacts and weights retained.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

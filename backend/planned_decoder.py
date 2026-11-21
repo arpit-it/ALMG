@@ -1,4 +1,6 @@
 """Versioned seeded multilayer/multihead CPU decoder; separate from legacy recipes."""
+import base64
+import binascii
 import json
 from pathlib import Path
 from tempfile import NamedTemporaryFile
@@ -39,12 +41,15 @@ class PlannedDecoder:
 
     def artifact(self):
         if set(self.parameters)!=set(self.shapes):raise ValueError('Planned decoder parameter names changed.')
+        compact=sum(np.prod(shape) for shape in self.shapes.values())>16384
         values={}
         for name,shape in self.shapes.items():
             array=np.asarray(self.parameters[name])
             if array.shape!=tuple(shape) or array.dtype!=np.float32 or not np.isfinite(array).all():raise ValueError('Planned decoder tensor shape/dtype/finite checks failed.')
-            values[name]=array.tolist()
-        return {'format':'almg-planned-decoder-v1','schema_version':1,'config':self.config,'parameters':values}
+            values[name]=({'dtype':'<f4','shape':list(shape),'data_base64':base64.b64encode(np.ascontiguousarray(array,dtype='<f4').tobytes(order='C')).decode('ascii')}
+                          if compact else array.tolist())
+        version=2 if compact else 1
+        return {'format':f'almg-planned-decoder-v{version}','schema_version':version,'config':self.config,'parameters':values}
 
     def save(self,path):
         path=Path(path);text=json.dumps(self.artifact(),allow_nan=False,separators=(',',':'))
@@ -62,12 +67,24 @@ class PlannedDecoder:
         with Path(path).open('rb') as stream:raw=stream.read(64*1024*1024+1)
         if len(raw)>64*1024*1024:raise ValueError('Planned decoder exceeds its artifact limit.')
         value=json.loads(raw)
-        if (not isinstance(value,dict) or set(value)!={'format','schema_version','config','parameters'} or value.get('format')!='almg-planned-decoder-v1'
-                or type(value.get('schema_version')) is not int or value['schema_version']!=1):raise ValueError('Unsupported planned decoder artifact.')
+        if (not isinstance(value,dict) or set(value)!={'format','schema_version','config','parameters'} or (value.get('format'),value.get('schema_version')) not in (('almg-planned-decoder-v1',1),('almg-planned-decoder-v2',2))
+                or type(value.get('schema_version')) is not int):raise ValueError('Unsupported planned decoder artifact.')
         model=cls(value['config'],initialize=False)
         if not isinstance(value['parameters'],dict) or set(value['parameters'])!=set(model.shapes):raise ValueError('Planned decoder parameter names changed.')
         for name,shape in model.shapes.items():
-            array=np.asarray(value['parameters'][name])
+            item=value['parameters'][name]
+            if value['schema_version']==2:
+                size=int(np.prod(shape))*4
+                if (not isinstance(item,dict) or set(item)!={'dtype','shape','data_base64'} or item['dtype']!='<f4'
+                        or item['shape']!=list(shape) or any(type(dimension) is not int for dimension in item['shape'])
+                        or not isinstance(item['data_base64'],str) or len(item['data_base64'])!=4*((size+2)//3)):
+                    raise ValueError('Invalid compact planned decoder tensor metadata or size.')
+                try:encoded=base64.b64decode(item['data_base64'],validate=True)
+                except (ValueError,binascii.Error):raise ValueError('Invalid compact planned decoder tensor encoding.') from None
+                if len(encoded)!=size:raise ValueError('Invalid compact planned decoder tensor byte count.')
+                array=np.frombuffer(encoded,dtype='<f4').reshape(shape).astype(np.float32,copy=True)
+            else:
+                array=np.asarray(item)
             if array.dtype.kind not in 'fi' or array.shape!=tuple(shape) or not np.isfinite(array).all() or np.any(np.abs(array)>np.finfo(np.float32).max):raise ValueError('Invalid planned decoder tensor.')
-            model.parameters[name]=array.astype(np.float32)
+            model.parameters[name]=array.astype(np.float32,copy=True)
         return model
