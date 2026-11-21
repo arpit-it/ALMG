@@ -9336,6 +9336,44 @@ P3-LMF-08 partial progress · saved evaluation-only benchmark scoring and baseli
   training artifacts and downloaded weights are preserved. No external collection,
   generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · immutable benchmark scoring reports and scoped history · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Saved benchmarks now expose separately confirmed
+  save-evaluation and benchmark/model-scoped evaluations history, with saved scoring
+  report read by ID. Saving recomputes the exact selected candidate/baseline report
+  and rejects unconfirmed, altered, wrong-model or wrong-baseline reviews before
+  publication. Existing benchmark scoring/input formats remain unchanged.
+- Report and timestamped manifest are staged, verified and atomically published in
+  a separate scoring snapshot collection. Model/benchmark source bindings, report
+  revisions, protocol hashes and file hashes are retained. Historical reads verify
+  stored evidence without recomputing scores or requiring current model/benchmark
+  execution. History returns at most twenty verified records for the selected
+  benchmark and model; invalid snapshots remain on disk but fail reads and are
+  omitted from verified history. Saving does not grant training/release approval.
+- Verified the running ALMG API on localhost:28960 from exported ce89a3a plus only
+  this module/route/tests. Saved original-initialization baseline reports for both
+  14,400-parameter SGD/AdamW models on the reviewed evaluation-only benchmark.
+  Immediate reads and scoped history matched exactly. Rejected unconfirmed,
+  modified, wrong-model and changed-baseline requests caused no writes.
+- After actually restarting only the isolated app server (process 5004 -> 7733),
+  both reports and scoped history reopened exactly. Report-byte corruption and a
+  rehashed manifest with an incorrect benchmark binding failed reads and disappeared
+  from verified history; restoring the private files restored exact reads. All
+  4,602 original fixture files were preserved. Four private snapshot files were
+  created; all 4,606 files stayed byte-identical through restart/tamper restoration.
+  Evidence: /tmp/almg-saved-benchmark-results-api-qa/verification.json,
+  verify-app.log, verify-restarted.log and *-saved-result.json. Native desktop
+  interaction is not claimed; actual app persistence and restart were exercised.
+- Validation: all 759 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Three new tests cover invalid/unconfirmed
+  requests, malformed reports, actual confirmed snapshots, stale/baseline rejection,
+  historical reads without recomputation, scoped history and tamper recovery.
+- Remaining: desktop benchmark history/comparison controls, broader independent
+  benchmarks, semantic/global-use leakage or memorization verification, assistant
+  quality and full evaluation acceptance. Existing desktop/hardware blockers remain
+  open and skipped. User edits, pending seeded work, training artifacts and
+  downloaded weights are preserved. No external collection, generated-artifact
+  commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
