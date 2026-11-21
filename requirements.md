@@ -9089,6 +9089,49 @@ P3-LMF-08 partial progress · versioned saved-window overlap audit · 2026-11-21
   skipped. User changes, seeded work, training artifacts and downloaded weights
   are preserved. No external collection, generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · measured warm CPU inference benchmark and model sizes · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Added read-only inference-benchmark for verified
+  completed corpus models. Protocol v1 takes up to four real input tokens from
+  the first saved validation window, performs one eight-token warmup and three
+  measured eight-token greedy runs, resetting the prompt per sample and cropping
+  growing contexts to the model limit without KV caching.
+- Raw perf_counter_ns observations include loaded-model NumPy forward execution,
+  greedy selection and context extension. Reports provide per-sample and aggregate
+  throughput, subsequent-token throughput, first-token minimum/median/maximum,
+  outputs, runtime/machine/clock details, protocol/data/model/producer hashes and
+  a report revision. All measured greedy outputs must match the warmup output.
+  Source validation/loading, tokenization, text decoding, serialization and network
+  are excluded. These are warm batch-one CPU observations, not UI streaming/cold
+  latency, GPU speed, statistical confidence bounds or future runtime guarantees.
+- Reports also measure parameter count, parameter tensor bytes and serialized model
+  artifact bytes. Peak memory is explicitly unavailable (null); tensor bytes exclude
+  container/allocator overhead and temporary workspaces. No training, release or
+  language-quality approval is granted and the endpoint writes no artifacts.
+- Verified the running updated ALMG API at localhost:28954 from exported 5758afc
+  plus only this module/route/tests. Two 14,400-parameter SGD/AdamW models each
+  produced three measured samples and repeated benchmark reports with identical
+  protocol/source/output bindings. Independent greedy replay matched every token;
+  all throughput/first-token arithmetic and actual artifact sizes were checked.
+  Both had 57,600 tensor bytes. Observed aggregate rates were approximately
+  6,431/6,507 tokens per second, with median first-token times 130,083/127,541 ns;
+  these small-fixture observations establish no larger-model deployment claim.
+- Invalid IDs, partial models, modified private model files and benchmark reports
+  supplied as training approval were rejected. The modified private fixture was
+  restored byte-for-byte; all 4,586 original files remained unchanged. Evidence:
+  /tmp/almg-corpus-inference-benchmark-api-qa/verification.json, verify-app.log,
+  sgd-benchmark.json and adamw-benchmark.json. Native desktop interaction is not
+  claimed; the actual running CPU inference workflow was exercised.
+- Validation: all 735 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Five new tests verify controlled-clock
+  arithmetic, greedy context feedback, invalid clocks/logits/IDs, real-model
+  source/size bindings and artifact immutability.
+- Remaining: desktop performance controls, isolated process/allocator peak-memory
+  profiling, cold/streaming and Metal/GPU inference benchmarks, larger/independent
+  quality benchmarks, semantic leakage/memorization, assistant-quality acceptance
+  and broader evaluation completion. Existing desktop/hardware blockers remain open
+  and skipped. User edits, seeded work, training artifacts and downloaded weights
+  are preserved. No external collection, generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
