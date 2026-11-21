@@ -9132,6 +9132,46 @@ P3-LMF-08 partial progress · measured warm CPU inference benchmark and model si
   and skipped. User edits, seeded work, training artifacts and downloaded weights
   are preserved. No external collection, generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · fresh-worker CPU inference process peak RSS · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Added read-only inference-profile, which runs the
+  existing bounded CPU benchmark in one fresh interpreter per request. Protocol v1
+  records resource.getrusage(RUSAGE_SELF).ru_maxrss after imports and after the
+  completed benchmark report, normalizing macOS bytes/Linux KiB to bytes.
+  The measured peak is the worker process lifetime high-water RSS, including
+  interpreter/imports, source validation, model loading, warmup and inference;
+  it is not incremental model or inference-only allocator memory. Those values
+  remain unavailable (null), as do GPU/Metal memory and parent UI/process memory.
+- The child returns the original benchmark report and a versioned memory profile
+  bound to its process ID, request nonce, completed model ID/source, protocol and
+  report hashes. The parent checks the binding before returning results. Worker
+  responses are bounded; malformed, failed or timed-out workers fail closed.
+  Timeouts terminate/drain only the worker and retain source artifacts. The worker
+  disables bytecode writes; no profiling artifacts or training runs are published.
+- Verified the actual ALMG API on localhost:28955 from exported bf42226 plus only
+  this module/route/tests, excluding pending seeded and user edits. Two requests
+  each for saved 14,400-parameter SGD/AdamW models created four distinct workers,
+  all separate from the app server. Process peaks were 41,336,832/41,041,920 bytes
+  for SGD and 41,926,656/44,859,392 bytes for AdamW, each at least its recorded
+  import baseline. These whole-worker observations are not deployment guarantees
+  or model-only memory estimates and are not added to tensor/Metal bytes.
+- Nested benchmark source revisions, greedy outputs and size measurements matched
+  the prior benchmark fixtures. Invalid IDs, partial models, a modified private
+  model file and use of a profile as training approval were rejected. The private
+  model file was restored byte-for-byte. All 4,586 fixture files stayed unchanged.
+  Evidence: /tmp/almg-corpus-inference-profile-api-qa/verification.json,
+  verify-app.log, sgd-profiles.json and adamw-profiles.json. Native desktop
+  interaction is not claimed; the running app and fresh CPU workers were exercised.
+- Validation: all 740 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Five new tests cover RSS unit conversion,
+  nonce/PID/source/revision binding, timeout kill/drain behavior, malformed/oversize
+  responses, distinct real workers, measured RSS and source immutability.
+- Remaining: desktop controls, inference-only allocator/incremental model peaks,
+  cold/streaming and Metal/GPU performance, broader/independent quality benchmarks,
+  semantic leakage/memorization and full evaluation acceptance. Existing desktop/
+  hardware blockers remain open and skipped. User edits, pending seeded work,
+  training artifacts and downloaded weights are preserved. No external collection,
+  generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
