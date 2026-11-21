@@ -110,6 +110,55 @@ def review(root, initialized, reviewed_inputs, settings):
     return _finish(result)
 
 
+def smaller_budgets(config):
+    """Keep the recipe controls while considering only existing budgets up to the request."""
+    for steps in (10, 20, 40, 80):
+        if steps > config['steps']:
+            continue
+        if config['sequence_length'] == 16 or config['batch_size'] == 4:
+            if steps > 20:
+                continue
+            version = 8 if config['sequence_length'] == 16 else 9
+        else:
+            version = 7 if steps == 80 else 6 if steps == 40 else 5
+        yield training.configuration({**config, 'schema_version': version, 'steps': steps}, config['sequence_length'])
+
+
+def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens):
+    """Select an existing fresh-run step budget under a calculated new-target cap."""
+    if type(max_workflow_target_tokens) is not int or not 0 < max_workflow_target_tokens <= 2**63 - 1:
+        raise ValueError('Use a positive integer workflow target-token limit within signed 64-bit range.')
+    if not isinstance(reviewed_inputs, dict) or not isinstance(reviewed_inputs.get('review'), dict):
+        raise ValueError('Reopen saved reviewed corpus inputs before limit planning.')
+    config = training.configuration(settings, reviewed_inputs['review'].get('sequence_length'))
+    if config['schema_version'] not in (5, 6, 7, 8, 9):
+        raise ValueError('Target-limit planning supports reviewed cyclic settings versions five through nine.')
+    _, current, _, windows, _ = training._source(root, initialized, reviewed_inputs)
+    candidates = []
+    for candidate in smaller_budgets(config):
+        targets = exposure(windows['train'], candidate, current['actual_parameter_count'])['full_workflow_optimizer_target_tokens']
+        candidates.append({'config': candidate, 'full_workflow_optimizer_target_tokens': targets,
+                           'within_limit': targets <= max_workflow_target_tokens})
+    fitting = [candidate for candidate in candidates if candidate['within_limit']]
+    if not fitting:
+        raise ValueError(f"No supported update budget fits this workflow target limit (minimum {candidates[0]['full_workflow_optimizer_target_tokens']}).")
+    selected = review(root, initialized, reviewed_inputs, fitting[-1]['config'])
+    if selected['exposure']['full_workflow_optimizer_target_tokens'] > max_workflow_target_tokens:
+        raise ValueError('Corpus exposure changed during target-limit planning; reopen the saved inputs.')
+    result = {
+        'format': 'almg-corpus-target-limit-review-v1', 'schema_version': 1,
+        'source': selected['source'], 'corpus_id': selected['corpus_id'], 'corpus_revision': selected['corpus_revision'],
+        'requested_config': config, 'max_workflow_optimizer_target_tokens': max_workflow_target_tokens,
+        'considered_budgets': candidates, 'selected_config': selected['config'], 'selected_budget_review': selected,
+        'feasible': selected['feasible'], 'blockers': selected['blockers'],
+        'training_approved': False, 'release_approved': False,
+        'limitations': 'Read-only fresh-run planning limit counts masked optimizer targets across both newly executed reference and recorded-training trajectories, excluding padding/evaluation/inference. Selects the largest existing supported step budget no greater than requested; other recipe controls are retained. The limit becomes an existing fixed update budget, not a new runtime early-stop policy. Training needs the selected settings, their current resource review and separate explicit confirmation. Changing settings or corpus requires renewed review; resource blockers remain blockers. No quality-token requirement is inferred.',
+        'implementation_sha256': file_digest(Path(__file__)),
+    }
+    result['revision'] = digest(result)
+    return result
+
+
 def review_continuation(root, identifier):
     """Plan only the remaining original midpoint continuation; never approve it."""
     parent = training.read(root, identifier)

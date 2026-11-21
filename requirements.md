@@ -8598,6 +8598,43 @@ P3-LMF-07 partial progress · trial-calibrated workflow target rates · 2026-11-
   guidance remain open. Unchanged desktop/hardware blockers remain skipped;
   pending source/user edits are preserved and excluded. No collection or push.
 
+P3-LMF-07 partial progress · fresh-run workflow target-limit planning · 2026-11-21:
+- [ ] P3-LMF-07 remains open. POST corpus-budget-limit-review selects the largest
+  existing supported fresh-run step budget that fits a positive signed-64-bit
+  workflow optimizer-target cap and never exceeds the originally requested steps.
+  Candidate budgets preserve all other recipe controls and use existing versioned
+  10/20/40/80-update recipes, including the narrower sixteen-token/four-row settings.
+  Counts include both new reference and recorded-training trajectories, excluding
+  padding/evaluation/inference. A cap below the smallest supported run is rejected.
+- The result is read-only and includes considered target counts, the selected
+  configuration and its full current resource/budget review. Resource blockers
+  remain blockers. The limit maps to an existing fixed fresh-run update budget;
+  it is not a new runtime token-monitor/early-stop policy. The selected settings
+  and current resource review still need separate confirmation. Expanding steps,
+  changing the corpus or substituting the planning report requires renewed review.
+- Verified the actual ALMG API on localhost:28940 from exported committed base
+  3a6d29d plus only this source/tests, excluding pending seeded/desktop edits.
+  For genuine 14,400-parameter SGD and AdamW local fixtures, a 300-target cap reduced
+  the proposed 20-update recipe (502 workflow targets) to ten updates (252 targets).
+  Both separately confirmed fresh-worker runs executed ten updates per trajectory,
+  matched the selected 252-target count within the cap and passed checkpoint weight/
+  optimizer comparisons exactly (maximum errors zero). Their measurements entered
+  subsequent selected-budget rate estimates. An exact 502 cap retained twenty steps.
+- Invalid/boolean/oversized limits, a 251-target cap, wrong-plan proposals, planning
+  reports as approval, unconfirmed training and reusing the ten-step resource review
+  for twenty steps were rejected through the local API without writes. All 3,206
+  original fixture files remained unchanged; generated outputs stay private.
+- All 689 backend tests passed with actual Metal enabled and warnings as errors.
+  Tests cover supported version/budget mappings, preserved controls, cap boundaries,
+  read-only planning, resource denials, approval binding and real capped training.
+  Evidence: /tmp/almg-corpus-token-limit-api-qa/verification.json, verify-app.log,
+  python.log, saved proposals and new-runs.json.
+- Delivered scope is the fresh-run planning API. Desktop controls, recovery-phase
+  caps, runtime stop policies, additional resource/uncertainty validation, seeded
+  budgeting and energy/quality-token guidance remain open. Unchanged desktop/hardware
+  blockers stay skipped; pending source/user edits are preserved and excluded.
+  No external collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
