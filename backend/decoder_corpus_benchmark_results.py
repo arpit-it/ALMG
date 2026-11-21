@@ -20,7 +20,7 @@ def _id(value):
 
 def _validate(report):
     try:
-        valid=(report['format']=='almg-corpus-benchmark-evaluation-v1' and type(report['schema_version']) is int and report['schema_version']==1
+        valid=((report['format'],report['schema_version']) in (('almg-corpus-benchmark-evaluation-v1',1),('almg-corpus-benchmark-evaluation-v2',2)) and type(report['schema_version']) is int
                and report['revision']==digest({k:v for k,v in report.items() if k!='revision'})
                and report['protocol_revision']==digest(report['protocol'])
                and all(report[key] is False for key in ('training_approved','release_approved','language_quality_validated','independent_evaluation_certified')))
@@ -28,6 +28,9 @@ def _validate(report):
         valid=valid and all(isinstance(value,str) and re.fullmatch('[a-f0-9]{64}',value) for value in
                            (report['source']['record_revision'],report['source']['model_sha256'],report['benchmark_binding']['revision'],report['benchmark_binding']['review_revision']))
         valid=valid and set(report['current_overlap_checks'])=={'train','validation','test'} and all(item['overlap_detected'] is False for item in report['current_overlap_checks'].values())
+        if report['schema_version']==2:
+            valid=valid and set(report['current_document_overlap_checks'])=={'train','validation','test'} and all(item['overlap_detected'] is False for item in report['current_document_overlap_checks'].values())
+            valid=valid and report['protocol']['schema_version']==2 and isinstance(report['protocol']['document_overlap_protocol_revision'],str) and re.fullmatch('[a-f0-9]{64}',report['protocol']['document_overlap_protocol_revision']) is not None
     except (KeyError,TypeError,ValueError):valid=False
     if not valid:raise ValueError('Saved benchmark evaluation integrity or source binding changed.')
 

@@ -49,17 +49,22 @@ def _review(root, corpus_id, documents):
     initialized=training.hardware.initializations.read(root,source['plan_id'],source['initialization_id'])
     _,_,_,existing,tokenizer=training._source(root,initialized,corpus)
     sources,windows,blockers=_prepare(documents,tokenizer,corpus['review']['sequence_length'])
+    if __package__:from . import decoder_corpus_document_overlap as document_overlap
+    else:import decoder_corpus_document_overlap as document_overlap
+    document_findings={split:document_overlap.audit_pair(windows,existing[split],tokenizer) for split in ('train','validation','test')}
     findings={split:overlap.audit_pair(windows,existing[split],tokenizer) for split in ('train','validation','test')}
     blockers+=['Benchmark windows overlap saved '+split+' windows; provide separate evaluation text.' for split,item in findings.items() if item['overlap_detected']]
-    result={'format':'almg-corpus-benchmark-review-v1','schema_version':1,'corpus_id':corpus['id'],'corpus_revision':corpus['revision'],
+    blockers+=['Benchmark documents overlap saved '+split+' documents, including across window boundaries.' for split,item in document_findings.items() if item['overlap_detected']]
+    result={'format':'almg-corpus-benchmark-review-v2','schema_version':2,'corpus_id':corpus['id'],'corpus_revision':corpus['revision'],
             'training_data_binding':heldout.data_binding(corpus),'sequence_length':corpus['review']['sequence_length'],
             'tokenizer_sha256':tokenizer.fingerprint(),'sources':sources,'documents_sha256':digest(documents),'windows_sha256':digest(windows),
             'window_count':len(windows),'target_tokens':sum(sum(row['target_mask']) for row in windows),
             'overlap_protocol_revision':digest(overlap.PROTOCOL),'overlap_checks':findings,
+            'document_overlap_protocol_revision':digest(document_overlap.PROTOCOL),'document_overlap_checks':document_findings,
             'compatible':not blockers,'blockers':blockers,'purpose':'evaluation_only','tokenizer_refitted':False,
             'independent_evaluation_certified':False,'training_approved':False,'release_approved':False,
-            'limitations':'Local user-provided benchmark text with recorded permissions and evaluation-only declarations. Uses the existing saved word tokenizer without refitting or adding training/improvement rows. Exact active-window and within-window four-token-span checks cover all existing corpus splits. No semantic/fuzzy/cross-window/global-usage independence certification. This stage prepares inputs only; it neither scores a model nor approves training/release. Benchmark execution and broader provenance verification remain separate.',
-            'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_corpus_benchmarks.py','decoder_corpus_inputs.py','decoder_corpus_leakage_audit.py','decoder_tokenizer.py')})}
+            'limitations':'Local user-provided benchmark text with recorded permissions and evaluation-only declarations. Uses the existing saved word tokenizer without refitting or adding training/improvement rows. Exact windows, reconstructed documents and four-token spans including cross-window boundaries are checked against every corpus split. No semantic/fuzzy/global-usage independence certification. This stage prepares inputs only; it neither scores a model nor approves training/release. Benchmark execution and broader provenance verification remain separate.',
+            'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_corpus_benchmarks.py','decoder_corpus_inputs.py','decoder_corpus_leakage_audit.py','decoder_corpus_document_overlap.py','decoder_tokenizer.py')})}
     result['revision']=digest(result)
     return result,windows,tokenizer.artifact()
 
@@ -78,7 +83,7 @@ def save(root, corpus_id, confirmed, documents, reviewed):
         folder=Path(temporary)/identifier;folder.mkdir()
         for name,value in (('documents.json',documents),('windows.json',windows),('tokenizer.json',tokenizer)):
             (folder/name).write_text(json.dumps(value,ensure_ascii=False,allow_nan=False),encoding='utf-8')
-        record={'format':'almg-saved-corpus-benchmark-v1','schema_version':1,'id':identifier,'review':current,
+        record={'format':'almg-saved-corpus-benchmark-v2','schema_version':2,'id':identifier,'review':current,
                 'files':{name:file_digest(folder/name) for name in ('documents.json','windows.json','tokenizer.json')}}
         record['revision']=digest(record);(folder/'record.json').write_text(json.dumps(record,allow_nan=False),encoding='utf-8')
         result=_read(folder);folder.rename(parent/identifier)
@@ -88,15 +93,15 @@ def save(root, corpus_id, confirmed, documents, reviewed):
 def _read(folder):
     if (folder/'record.json').stat().st_size>256000:raise ValueError('Benchmark record exceeds its bounded size.')
     record=json.loads((folder/'record.json').read_text(encoding='utf-8'))
-    if (not isinstance(record,dict) or record.get('format')!='almg-saved-corpus-benchmark-v1' or type(record.get('schema_version')) is not int
-        or record['schema_version']!=1 or record.get('id')!=folder.name or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
+    if (not isinstance(record,dict) or (record.get('format'),record.get('schema_version')) not in (('almg-saved-corpus-benchmark-v1',1),('almg-saved-corpus-benchmark-v2',2)) or type(record.get('schema_version')) is not int
+        or record.get('id')!=folder.name or record.get('revision')!=digest({k:v for k,v in record.items() if k!='revision'})
         or set(record.get('files',{}))!={'documents.json','windows.json','tokenizer.json'}):raise ValueError('Invalid saved benchmark manifest.')
     for name,sha in record['files'].items():
         if (folder/name).stat().st_size>2*1024**2 or file_digest(folder/name)!=sha:raise ValueError('Saved benchmark content changed.')
     reviewed=record['review'];documents=json.loads((folder/'documents.json').read_text(encoding='utf-8'))
     tokenizer=Tokenizer.restore(json.loads((folder/'tokenizer.json').read_text(encoding='utf-8')))
     sources,windows,blockers=_prepare(documents,tokenizer,reviewed['sequence_length'])
-    if (reviewed.get('format')!='almg-corpus-benchmark-review-v1' or type(reviewed.get('schema_version')) is not int or reviewed['schema_version']!=1
+    if (reviewed.get('format')!=f"almg-corpus-benchmark-review-v{record['schema_version']}" or type(reviewed.get('schema_version')) is not int or reviewed['schema_version']!=record['schema_version']
         or reviewed.get('revision')!=digest({k:v for k,v in reviewed.items() if k!='revision'}) or reviewed.get('compatible') is not True or blockers
         or reviewed['documents_sha256']!=digest(documents) or reviewed['windows_sha256']!=digest(windows) or reviewed['sources']!=sources
         or reviewed['tokenizer_sha256']!=tokenizer.fingerprint() or json.loads((folder/'windows.json').read_text(encoding='utf-8'))!=windows
@@ -105,6 +110,8 @@ def _read(folder):
         or reviewed.get('purpose')!='evaluation_only' or reviewed.get('tokenizer_refitted') is not False
         or any(reviewed.get(key) is not False for key in ('training_approved','release_approved','independent_evaluation_certified'))):
         raise ValueError('Saved benchmark review or input binding changed.')
+    if record['schema_version']==2 and (set(reviewed.get('document_overlap_checks',{}))!={'train','validation','test'} or any(item.get('overlap_detected') is not False for item in reviewed['document_overlap_checks'].values()) or not re.fullmatch('[a-f0-9]{64}',reviewed.get('document_overlap_protocol_revision',''))):
+        raise ValueError('Saved benchmark document-overlap admission changed.')
     return record
 
 

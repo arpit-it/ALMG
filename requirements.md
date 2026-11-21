@@ -9448,6 +9448,47 @@ P3-LMF-08 partial progress · reconstructed-document cross-window overlap audit 
   training artifacts and downloaded weights are preserved. No external collection,
   generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · version-two document-overlap benchmark admission · 2026-11-21:
+- [ ] P3-LMF-08 remains open. New benchmark preparation reviews/manifests use v2
+  and require clear reconstructed-document/four-token overlap findings across all
+  train/validation/test documents, including saved-window boundaries. Findings and
+  the document-audit protocol revision are retained alongside original window
+  checks. Old preparation reviews require fresh review/confirmation before saving.
+- Scoring now emits v2 reports/protocols and repeats document-level admission for
+  both v1 and v2 benchmark inputs before loss/generation execution. Legacy inputs
+  remain readable, but a prior within-window-only admission cannot bypass current
+  document checks. Scoring snapshots accept both v1/v2 reports in the existing
+  immutable manifest envelope; old historical reports are not rewritten or rescored.
+  Mixed old/new scoring-policy comparisons fail protocol/producer compatibility.
+- Verified the running ALMG API at localhost:28963 from exported cac9f3e plus only
+  the three changed source modules and new tests. The existing negative benchmark
+  passed legacy window checks but v2 preparation blocked its cross-boundary span.
+  After a separately reviewed/confirmed ten-update local twelve-word SGD fixture
+  run (30fa5e7ea4ef40e8b0a7409a7d2dbd9d), its genuine legacy benchmark remained
+  readable but scoring failed specifically at document-level overlap admission.
+- Safe v1 and newly saved v2 benchmarks scored under v2, with current clear document
+  findings. Their v2 scoring reports saved/reopened exactly, including a separate
+  CPU-process read. Genuine v1 benchmark inputs and stored scoring reports remained
+  byte-exactly readable; old/old comparisons still worked, old/new comparisons and
+  stale v1 preparation approval failed. All 4,620 pre-existing files were unchanged.
+  Sixty private fixture files were created for the approved local model, one v2
+  benchmark and two scoring snapshots (4,680 final files). Evidence:
+  /tmp/almg-document-admission-api-qa/verification.json, verify-app.log,
+  blocked-v2-review.json, trained-fixture-model.json and saved-v2-results.json.
+  Native desktop interaction is not claimed; actual app admission/scoring/save
+  workflows and real local fixture training were exercised.
+- Validation: all 770 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Three new tests verify v2 preparation and
+  safe legacy reads, stale-review rejection, cross-window admission for legacy
+  inputs before model forward, and v2 saved-score document-finding integrity.
+- Remaining: desktop controls, broader independent benchmark provenance, semantic/
+  fuzzy/global-use leakage and model memorization checks, assistant quality and
+  full evaluation acceptance. Narrow token checks do not certify global/semantic
+  independence or grant training/release approval. Existing desktop/hardware blockers
+  remain open and skipped. User edits, pending seeded work, training artifacts and
+  downloaded weights are preserved. No external collection, generated-artifact
+  commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
