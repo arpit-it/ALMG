@@ -12,17 +12,19 @@ DIRECTORY='decoder-corpus-interruption-checkpoints'
 
 def validate(root,folder,record):
     c=record['review']['config']
-    version=record.get('schema_version');origin={5:'fresh_worker_midpoint',6:'fresh_worker_training_start',7:'fresh_worker_reference_start',8:'fresh_worker_reference_midpoint',9:'fresh_worker_reference_progress',10:'fresh_worker_training_progress',11:'resumed_worker_training_progress'}.get(version)
+    version=record.get('schema_version');origin={5:'fresh_worker_midpoint',6:'fresh_worker_training_start',7:'fresh_worker_reference_start',8:'fresh_worker_reference_midpoint',9:'fresh_worker_reference_progress',10:'fresh_worker_training_progress',11:'resumed_worker_training_progress',12:'resumed_worker_reference_progress'}.get(version)
     steps={c['steps']//4,3*c['steps']//4} if version in (9,10) else {c['steps']//2 if version in (5,8) else 0}
     binding=record['review'].get('training_resume_from')
-    if version==11:
-        if not isinstance(binding,dict) or type(binding.get('completed_steps')) is not int:raise ValueError('Missing durable resumed-worker ancestry.')
-        steps={binding['completed_steps'],c['steps']//4,c['steps']//2,3*c['steps']//4}
-    phase='reference_verification' if version in (7,8,9) else 'checkpointed_training'
-    if (type(version) is not int or folder.parent!=Path(root)/DIRECTORY or (record.get('format'),version) not in (('almg-corpus-optimizer-run-v5',5),('almg-corpus-optimizer-run-v6',6),('almg-corpus-optimizer-run-v7',7),('almg-corpus-optimizer-run-v8',8),('almg-corpus-optimizer-run-v9',9),('almg-corpus-optimizer-run-v10',10),('almg-corpus-optimizer-run-v11',11)) or record.get('status')!='interruption_checkpoint'
+    reference_binding=record['review'].get('reference_resume_from')
+    if version in (11,12):
+        binding_for_phase=binding if version==11 else reference_binding
+        if not isinstance(binding_for_phase,dict) or type(binding_for_phase.get('completed_steps')) is not int:raise ValueError('Missing durable resumed-worker ancestry.')
+        steps={binding_for_phase['completed_steps'],c['steps']//4,c['steps']//2,3*c['steps']//4}
+    phase='reference_verification' if version in (7,8,9,12) else 'checkpointed_training'
+    if (type(version) is not int or folder.parent!=Path(root)/DIRECTORY or (record.get('format'),version) not in (('almg-corpus-optimizer-run-v5',5),('almg-corpus-optimizer-run-v6',6),('almg-corpus-optimizer-run-v7',7),('almg-corpus-optimizer-run-v8',8),('almg-corpus-optimizer-run-v9',9),('almg-corpus-optimizer-run-v10',10),('almg-corpus-optimizer-run-v11',11),('almg-corpus-optimizer-run-v12',12)) or record.get('status')!='interruption_checkpoint'
             or record.get('checkpoint_origin')!=origin or record.get('cancellation_phase')!=phase
             or record.get('completed_steps') not in steps or record['review'].get('execution_mode')!='fresh_process'
-            or record['review'].get('reference_resume_from') is not None or (version!=11 and binding is not None)
+            or (version!=12 and reference_binding is not None) or (version!=11 and binding is not None)
             or type(record.get('owner_process_id')) is not int or record['owner_process_id']<=0
             or type(record.get('owner_parent_process_id')) is not int or record['owner_parent_process_id']<=0):
         raise ValueError('Invalid durable fresh-worker training checkpoint.')
@@ -64,6 +66,7 @@ def publish(root,original_folder,initialized,corpus,approved,current,model,token
     identifier=uuid.uuid4().hex;folder=Path(root)/DIRECTORY/identifier;folder.mkdir(parents=True)
     midpoint=current['config']['steps']//2
     origin=('fresh_worker_reference_start' if state['step']==0 else 'fresh_worker_reference_midpoint' if state['step']==midpoint else 'fresh_worker_reference_progress') if phase=='reference_verification' else 'fresh_worker_training_start' if state['step']==0 else 'fresh_worker_midpoint' if state['step']==midpoint else 'fresh_worker_training_progress'
+    if approved.get('reference_resume_from') is not None:origin='resumed_worker_reference_progress'
     if approved.get('training_resume_from') is not None:origin='resumed_worker_training_progress'
     if phase=='checkpointed_training' and state['step']>=midpoint:shutil.copytree(original_folder/f'step-{midpoint}',folder/f'step-{midpoint}')
     retained=training.PlannedDecoder(model.config);retained.parameters=values

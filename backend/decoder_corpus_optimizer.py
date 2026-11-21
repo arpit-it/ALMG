@@ -227,16 +227,19 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
             if not math.isfinite(initial_compute_loss) or abs(initial_compute_loss - initial_fp32_loss) > .05 or causal_error > 1e-5:
                 raise ValueError('Corpus precision failed initial FP32 loss or causal-prefix checks; no completed run published.')
             gradient_error = 0.0
+            def retain_reference(values,state,logs):
+                if execution_mode=='fresh_process' and (parent is None or reference_resume_id is not None):
+                    if __package__:from . import decoder_corpus_interruptions
+                    else:import decoder_corpus_interruptions
+                    decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,values,state,None,None,logs,[],request_id,phase='reference_verification')
             def retain_training(values,state,logs):
                 if execution_mode=='fresh_process' and (parent is None or training_resume_id is not None):
                     if __package__:from . import decoder_corpus_interruptions
                     else:import decoder_corpus_interruptions
                     decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,values,state,reference,reference_state,reference_log,logs,request_id)
             def retain_progress(values,state,logs):
-                if parent is None and execution_mode=='fresh_process' and phase=='reference_verification' and state['step'] in {c['steps']//4,c['steps']//2,3*c['steps']//4}:
-                    if __package__:from . import decoder_corpus_interruptions
-                    else:import decoder_corpus_interruptions
-                    decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,values,state,None,None,logs,[],request_id,phase='reference_verification')
+                if phase=='reference_verification' and state['step'] in {c['steps']//4,c['steps']//2,3*c['steps']//4}:
+                    retain_reference(values,state,reference_prefix+logs)
                 if phase=='checkpointed_training' and state['step'] in {c['steps']//4,3*c['steps']//4}:
                     retain_training(values,state,first+logs)
             def optimize(values, state, end):
@@ -247,11 +250,8 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
                 return values, state, logs
             empty = {'step': 0, 'm': {}, 'v': {}}; midpoint = c['steps'] // 2
             if training_resume_id is None:
-                if parent is None and execution_mode=='fresh_process':
-                    if __package__:from . import decoder_corpus_interruptions
-                    else:import decoder_corpus_interruptions
-                    decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,initial_parameters,empty,None,None,[],[],request_id,phase='reference_verification')
                 reference_values, reference_initial_state = (initial_parameters, empty) if parent is None else reference_resume.state(root,parent)
+                retain_reference(reference_values,reference_initial_state,reference_prefix)
                 reference, reference_state, reference_log = optimize(reference_values, reference_initial_state, c['steps'])
                 reference_log = reference_prefix + reference_log
                 phase='checkpointed_training'
@@ -348,7 +348,7 @@ def read(root, identifier, _seen=None):
     if __package__:from . import decoder_corpus_training_resume
     else:import decoder_corpus_training_resume
     decoder_corpus_training_resume.lineage(root,record,seen)
-    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6','almg-corpus-optimizer-run-v7','almg-corpus-optimizer-run-v8','almg-corpus-optimizer-run-v9','almg-corpus-optimizer-run-v10','almg-corpus-optimizer-run-v11'):return run_cancellation.read(root,folder,record)
+    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6','almg-corpus-optimizer-run-v7','almg-corpus-optimizer-run-v8','almg-corpus-optimizer-run-v9','almg-corpus-optimizer-run-v10','almg-corpus-optimizer-run-v11','almg-corpus-optimizer-run-v12'):return run_cancellation.read(root,folder,record)
     approved = record['review']; c = configuration(approved['config'], approved['config']['sequence_length'])
     midpoint = c['steps'] // 2
     expected = {'trained-model.json', 'tokenizer.json', *[f'step-{midpoint}/{name}' for name in ('model.json', 'optimizer.json', 'checkpoint.json')]}
