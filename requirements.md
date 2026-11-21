@@ -9172,6 +9172,49 @@ P3-LMF-08 partial progress · fresh-worker CPU inference process peak RSS · 202
   training artifacts and downloaded weights are preserved. No external collection,
   generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · explicitly saved immutable evaluation snapshots · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Completed corpus models now expose evaluation-review,
+  save-evaluation and model-scoped evaluations history, with saved snapshot read
+  by ID. The deterministic review combines versioned held-out loss/perplexity,
+  bounded free-running generation and saved-window overlap evidence, using original
+  initialization baselines. Cross-section model, corpus, data/tokenizer/window,
+  protocol and report bindings are checked. Timing/process-memory observations
+  remain separate because recomputing them would change a deterministic save review.
+- Saving requires explicit confirmation and an exact fresh review. Stale or
+  other-model reviews fail before publication. A new private snapshot directory
+  contains report.json and a versioned timestamped manifest with source/model
+  revision, report revision and file hash. Files are staged, checked and atomically
+  published together. Saving grants no training, release or language-quality approval.
+- Reopening verifies the stored snapshot and its internal source/protocol/hash
+  bindings without recomputing historical metrics against current model/code.
+  History is model-scoped and returns at most twenty verified records; invalid
+  snapshots remain on disk but are omitted from history and fail explicit reads.
+  Existing training/model/checkpoint formats and artifacts are unchanged.
+- Verified the updated running ALMG API on localhost:28956 using exported 40f3eb1
+  plus only this module/route/tests. Saved one snapshot each for 14,400-parameter
+  SGD/AdamW models. Unconfirmed saves, altered reviews and other-model reviews were
+  rejected without writes. Immediate reads matched the reviewed evidence exactly.
+  After actually stopping/restarting the isolated app server (process 20154 ->
+  23550), both snapshots and model-scoped history reopened exactly.
+- Report-byte corruption and a rehashed manifest with an incorrect model source
+  failed reads and disappeared from verified history; restoring the private files
+  restored exact reads. Invalid IDs and partial-model reviews were rejected. All
+  4,586 original fixture files remained unchanged. Only four private snapshot files
+  were created; all 4,590 files remained identical through restart/tamper restoration.
+  Evidence: /tmp/almg-saved-corpus-evaluations-api-qa/verification.json,
+  verify-app.log, verify-restarted.log and *-saved-evaluation.json. Native desktop
+  interaction is not claimed; the running app persistence workflow was exercised.
+- Validation: all 743 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Three new tests cover invalid/unconfirmed
+  requests, malformed reports, real confirmed saves, stale/cross-source rejection,
+  historical reads without recomputation, scoped history and tamper recovery.
+- Remaining: desktop evaluation/history controls, broader independent benchmarks,
+  semantic leakage/model memorization, allocator/incremental inference-memory and
+  cold/Metal performance, assistant-quality and full evaluation acceptance. Existing
+  desktop/hardware blockers remain open and skipped. User edits, pending seeded
+  work, training artifacts and downloaded weights are preserved. No external
+  collection, generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
