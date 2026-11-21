@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'decoder_corpus_loss_trace.dart';
 import 'package:flutter/material.dart';
 
 class DecoderCorpusContinuationDialog extends StatefulWidget {
@@ -34,6 +35,7 @@ class _DecoderCorpusContinuationDialogState extends State<DecoderCorpusContinuat
       Text(record['status'] == 'canceled'
         ? 'Corpus continuation canceled at update ${record['completed_steps']}. Private model, optimizer state and counter retained; no final reference match is claimed.'
         : 'Restored update ${record['restored_step']} · finished update ${record['completed_steps']} · reference weight difference ${record['reference_parameter_max_error']}.'),
+      DecoderCorpusLossTrace(record: record),
       Text('Generated text: ${record['generated_text']}'),
       const Text('Separate private result; the original corpus run is preserved. No model release or broader language-quality acceptance is established.'),
       if (record['isolated_workflow_measurements'] case final Map measured) ...[

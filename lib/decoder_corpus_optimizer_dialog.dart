@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'decoder_corpus_loss_trace.dart';
 import 'decoder_corpus_continuation_dialog.dart';
 import 'package:flutter/material.dart';
 
@@ -58,6 +59,7 @@ class _DecoderCorpusOptimizerDialogState extends State<DecoderCorpusOptimizerDia
       for (final part in ['train', 'validation', 'test']) Text('$part loss: ${record['initial_losses'][part]} → ${record['final_losses'][part]}'),
       if ((record['schema_version'] as int? ?? 1) >= 2) Text('Effective batch rows: ${record['effective_batch_rows']} · microbatches per update: ${record['gradient_accumulation_steps']} · full-batch gradient difference: ${record['full_batch_gradient_max_error']}.'),
       if ((record['schema_version'] as int? ?? 1) >= 3) Text('Compute: ${record['compute_precision']} · loss scale: ${record['loss_scale']} · FP32 master weights, gradients and moments. Split losses use the saved FP32 master model.'),
+      DecoderCorpusLossTrace(record: record),
       Text('Generated text: ${record['generated_text']}'),
       const Text('Held-out losses are diagnostics on this small corpus. This private result does not establish language quality or release approval.'),
       if (record['isolated_workflow_measurements'] case final Map measured) ...[

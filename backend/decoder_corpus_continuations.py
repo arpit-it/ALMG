@@ -150,6 +150,7 @@ def read(root, identifier, _seen=None):
     if (folder/'record.json').stat().st_size > 256000:
         raise ValueError('Corpus continuation record exceeds size limit.')
     record = json.loads((folder/'record.json').read_text()); approved = record['review']
+    training.validate_batch_losses(record)
     if ((record.get('format'),record.get('schema_version')) not in (('almg-corpus-continuation-v1',1),('almg-corpus-continuation-v2',2),('almg-corpus-continuation-v3',3)) or record.get('id') != identifier
             or record.get('revision') != training.digest({k:v for k,v in record.items() if k != 'revision'})
             or set(record.get('files',{})) != {'trained-model.json','optimizer.json','tokenizer.json'}

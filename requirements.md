@@ -8327,6 +8327,42 @@ P3-LMF-06 partial progress · reviewed gradient clipping and AdamW decay · 2026
   coverage and physical power-loss verification. Recorded hardware/precision/budget
   blockers remain open and skipped.
 
+P3-LMF-06 partial progress · saved per-update batch-loss traces · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Corpus training now evaluates and saves the real
+  token-weighted current-effective-batch loss before each optimizer update.
+  FP32 and mixed-FP16 values are unscaled, independently of gradient loss scaling.
+  A non-finite or negative loss stops before the affected gradient, optimizer
+  update or checkpoint callback; previously published checkpoints remain intact.
+- Saved normal runs, continuations and retained phase logs carry additive
+  batch_loss_before_update telemetry. Readers reject invalid supplied values while
+  accepting older entries without telemetry. They do not reconstruct old losses.
+- Both native result dialogs now offer an expandable trace with actual update
+  counters, target-token counts and saved coverage. Reference-phase checkpoints
+  are labeled separately. Text explains the pre-update/current-batch scope and
+  keeps held-out split losses separate; partial legacy prefixes remain unfilled.
+- Rebuilt and exercised the native app on localhost:28931 using permission-reviewed
+  local eight-token windows and the seeded 704-parameter initialization. SGD FP32
+  and AdamW mixed FP16 each completed twenty updates with two rows/two microbatches.
+  Opened all twenty training-loss entries and the ten separately approved midpoint
+  continuation entries, correctly numbered eleven through twenty. First losses
+  matched the unscaled initial computation; checkpoint weight/state and continued
+  reference weight differences were zero, within unchanged numerical gates.
+- After app/backend restart, both new results and continuations reopened with
+  visible traces and correct counters. A legacy result reopened without invented
+  telemetry. All 429 saved records validated; all 2,555 original and 2,669 final
+  retained fixture files were unchanged.
+- Validation: 667 backend tests passed with ALMG_METAL_TESTS=1 and warnings treated
+  as errors; 99 Flutter tests passed; analysis found no issues. Focused GPU tests
+  compare masked losses with CPU computation, cover both optimizers/precisions and
+  restored counters, reject tampered telemetry, and inject NaN/infinite/negative
+  losses to prove no affected gradient, update or checkpoint publication occurs.
+- Local evidence: /tmp/almg-corpus-loss-trace-native-qa/verification.json,
+  train.log, restart.log and captured native loss traces/reviews/results. Generated
+  fixtures, models, checkpoints and logs are excluded from Git. No collection/push.
+- Remaining: larger-model/50M–100M and language-quality acceptance, broader recipe
+  coverage and physical power-loss verification. Recorded hardware/precision/budget
+  blockers stay open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

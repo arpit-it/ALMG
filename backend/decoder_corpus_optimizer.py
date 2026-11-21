@@ -50,7 +50,7 @@ def split_losses(model, windows):
 
 def train_updates(values, state, end, windows, c, model_config, mx, observer, stop=None, checkpoint=None):
     precision = c['compute_precision']; scale = c['loss_scale']
-    _, _, gradient = mixed.functions(model_config, mx, scale) if precision == 'mixed_float16' else backward.metal_functions(model_config, mx)
+    _, loss, gradient = mixed.functions(model_config, mx, scale) if precision == 'mixed_float16' else backward.metal_functions(model_config, mx)
     gradient_tolerance = 1e-3 if precision == 'mixed_float16' else 1e-5
     gradient_error = 0.0
     logs = []
@@ -62,6 +62,9 @@ def train_updates(values, state, end, windows, c, model_config, mx, observer, st
         def gradients_for(batch):
             grads = gradient(parameters, *[mx.array(value) for value in batch]); mx.eval(grads)
             return mixed.unscale({name: np.array(value) for name, value in grads.items()}, scale)
+        batch_loss = float(loss(parameters, *[mx.array(value) for value in arrays]).item())
+        if not math.isfinite(batch_loss) or batch_loss < 0:
+            raise ValueError(f'Invalid corpus batch loss before optimizer update {state["step"] + 1}; no affected update applied. Saved checkpoints are retained.')
         full = gradients_for(arrays)
         if c['gradient_accumulation_steps'] > 1:
             microbatch_rows=c['batch_size']//c['gradient_accumulation_steps']
@@ -76,10 +79,25 @@ def train_updates(values, state, end, windows, c, model_config, mx, observer, st
             gradients = full
         values, state, entry = optimizer.update(values, gradients, state, c)
         entry.update(window_index=indices[0], window_indices=indices, target_tokens=int(arrays[2].sum()),
-                     microbatches=c['gradient_accumulation_steps'])
+                     microbatches=c['gradient_accumulation_steps'], batch_loss_before_update=batch_loss)
         logs.append(entry); observer.sample(f"corpus_update_{state['step']}")
         if checkpoint is not None:checkpoint(values,state,logs)
     return values, state, logs, gradient_error
+
+
+def validate_batch_losses(record):
+    """Validate additive loss telemetry without inventing values for older logs."""
+    for name in ('step_log', 'reference_step_log'):
+        logs = record.get(name, [])
+        if not isinstance(logs, list):
+            raise ValueError('Invalid saved corpus loss log.')
+        for entry in logs:
+            if not isinstance(entry, dict):
+                raise ValueError('Invalid saved corpus loss entry.')
+            if 'batch_loss_before_update' in entry:
+                value = entry['batch_loss_before_update']
+                if type(value) not in (int, float) or not math.isfinite(value) or value < 0:
+                    raise ValueError('Invalid saved corpus batch-loss telemetry.')
 
 
 def _source(root, initialized, reviewed_inputs):
@@ -342,6 +360,7 @@ def read(root, identifier, _seen=None):
     if (folder / 'record.json').stat().st_size > 256000:
         raise ValueError('Corpus optimizer record exceeds size limit.')
     record = json.loads((folder / 'record.json').read_text())
+    validate_batch_losses(record)
     if __package__:from . import decoder_corpus_reference_resume as reference_resume
     else:import decoder_corpus_reference_resume as reference_resume
     reference_resume.lineage(root,record,seen)
