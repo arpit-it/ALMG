@@ -9296,6 +9296,46 @@ P3-LMF-08 partial progress · reviewed evaluation-only benchmark input snapshots
   seeded work, training artifacts and downloaded weights are preserved. No external
   collection, generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · saved evaluation-only benchmark scoring and baselines · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Saved benchmark snapshots now expose read-only
+  evaluate for verified completed corpus models. Scoring requires the reviewed
+  training-data/window binding, sequence length and fixed tokenizer, and repeats
+  exact-window/four-token overlap checks against current train/validation/test
+  windows. Benchmarks are never added to training or improvement data.
+- Versioned reports bind benchmark/manifest/review/file hashes, source permissions
+  and declarations, model revisions/weight hashes, kernel protocols, runtime and
+  producer digests. Loss/perplexity/teacher-forced accuracy use all saved benchmark
+  windows; free-running diagnostics use the first eight windows and at most four
+  tokens each. Padding is excluded. Saved-model and original-initialization baselines
+  share the same benchmark/protocol/runtime/implementation; conflicts and invalid
+  boolean controls fail. Reports grant no training, release, broad quality or
+  global/semantic independence certification and write no artifacts.
+- Verified the running updated ALMG API on localhost:28959 from exported ac65c1a
+  plus only this module/route/tests. Both 14,400-parameter SGD/AdamW models scored
+  the previously saved two-document evaluation-only snapshot: fourteen real targets,
+  sixteen dense positions/two padding positions, and eight free-running reference
+  tokens. Independent CPU logaddexp loss/perplexity/accuracy calculations and greedy
+  replay matched reported metrics/tokens; all baseline deltas matched direct
+  arithmetic. Initialization baselines matched independently loaded original weights;
+  self-comparison differences were zero. Repeats and separate CPU-process reports
+  were identical, without tokenizer refitting or optimizer updates.
+- Sixteen-token/incompatible training-data models, partial/invalid models, invalid
+  baseline controls and a modified private benchmark windows file were rejected.
+  Restoring the private file restored reads; all 4,602 original fixture files
+  remained unchanged. Evidence: /tmp/almg-corpus-benchmark-evaluation-api-qa/
+  verification.json, verify-app.log and *-benchmark-evaluation.json. Native desktop
+  interaction is not claimed; actual running app scoring was exercised.
+- Validation: all 756 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Three new tests cover strict baseline
+  controls, benchmark/protocol/runtime/producer compatibility and actual completed
+  models scored with saved/initial/self baselines, masked coverage and immutability.
+- Remaining: durable benchmark scoring snapshots/history, desktop benchmark controls,
+  larger/independent benchmark provenance, semantic/global-use leakage or memorization
+  verification, assistant-quality and full evaluation acceptance. Existing desktop/
+  hardware blockers remain open and skipped. User edits, pending seeded work,
+  training artifacts and downloaded weights are preserved. No external collection,
+  generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
