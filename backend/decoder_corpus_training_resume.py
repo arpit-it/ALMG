@@ -8,7 +8,7 @@ else:
 
 
 def snapshot(record):
-    if ((record.get('format'),record.get('status')) not in (('almg-corpus-optimizer-run-v4','canceled'),('almg-corpus-optimizer-run-v5','interruption_checkpoint'),('almg-corpus-optimizer-run-v6','interruption_checkpoint'),('almg-corpus-optimizer-run-v10','interruption_checkpoint')) or record.get('cancellation_phase')!='checkpointed_training'):
+    if ((record.get('format'),record.get('status')) not in (('almg-corpus-optimizer-run-v4','canceled'),('almg-corpus-optimizer-run-v5','interruption_checkpoint'),('almg-corpus-optimizer-run-v6','interruption_checkpoint'),('almg-corpus-optimizer-run-v10','interruption_checkpoint'),('almg-corpus-optimizer-run-v11','interruption_checkpoint')) or record.get('cancellation_phase')!='checkpointed_training'):
         raise ValueError('Select retained recorded training or a durable interrupted training checkpoint.')
     depth=record.get('training_resume_depth',record.get('reference_resume_depth',0))
     if type(depth) is not int or not 0<=depth<=16:raise ValueError('Invalid recorded-training ancestry depth.')
@@ -75,7 +75,7 @@ def lineage(root,record,seen):
             or record.get('reference_step_log')!=parent['reference_step_log']
             or record.get('step_log',[])[:binding['completed_steps']]!=parent['step_log']):
         raise ValueError('Carried reference/training state or executed counters changed.')
-    if record.get('status')=='canceled' and any(record['files'].get(name)!=parent['files'][name] for name in ('reference-model.json','reference-optimizer.json')):
+    if record.get('status') in ('canceled','interruption_checkpoint') and any(record['files'].get(name)!=parent['files'][name] for name in ('reference-model.json','reference-optimizer.json')):
         raise ValueError('Retained completed reference artifacts changed.')
     midpoint=c['steps']//2
     if binding['completed_steps']>=midpoint:

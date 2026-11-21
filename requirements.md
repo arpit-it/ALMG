@@ -7956,6 +7956,59 @@ P3-LMF-06 partial progress · quarter-budget recorded-training recovery · 2026-
   architecture scope. No external collection occurred; generated artifacts, downloaded
   weights and unrelated user edits remain excluded from Git.
 
+P3-LMF-06 partial progress · interrupted recorded-training recovery workers · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Separately approved, isolated recorded-training recovery
+  workers now retain their own immutable version-11 checkpoints. They publish the
+  restored entry state and later original quarter/midpoint training points. Each binds
+  the current approval, immediate retained parent, ancestry depth, carried/new update
+  counts, active FP32 weights/moments/scheduler, completed reference and tokenizer.
+  Midpoint artifacts are saved or rebound before publication when applicable. The
+  existing flushed, manifest-last publication and per-origin latest-point selection apply.
+- Version-11 validation requires recorded-training recovery ancestry and permits its
+  entry counter or original quarter/midpoint counters. Reopening a stopped recovery's
+  point requires another resource review and explicit confirmation, checks originating
+  worker liveness/terminal state, and preserves the existing sixteen-ancestor bound.
+  The reference-file lineage check now covers interrupted recovery snapshots as well
+  as canceled runs. Legacy version-5 through version-10 snapshots remain readable.
+  Reference-recovery workers still do not publish their own new recovery points.
+- Native verification used rebuilt ALMG with offline fixture backend port 28923 and
+  the existing 704-parameter, sequence-eight, two-row/two-microbatch forty-update corpus.
+  For both FP32 SGD and mixed FP16 AdamW, approved recovery from training ten was
+  interrupted after its own training-twenty point; recovery from training thirty was
+  interrupted after saving its restored thirty point. All four child PIDs, commands
+  and backend parents were checked before SIGKILL. Discovery exposed each failed
+  recovery's latest point with its own approval/parent/ownership, while retaining all
+  six new snapshots. No completed originating run or cancellation receipt was fabricated.
+- After app/backend restart, new phase-specific reviews/confirmations recovered all four
+  points. Training-twenty sources executed twenty remaining training updates; training-
+  thirty sources executed ten; all reused their full reference with zero reference
+  updates. Completed results had ancestry depth two, exact restored optimizer/scheduler
+  counters, zero final reference weight/moment error and matching reloaded CPU generation.
+  Every recovered model completed separately approved midpoint-20 to update-40 continuation
+  with zero reference weight difference. Successful recovery workers also retained their
+  own published points; their terminal result correctly excluded those from discovery.
+- A final app/backend restart reopened twenty ordinary records, four failed-recovery
+  checkpoints and four continuations exactly. Readers verified all 187 corpus, interruption
+  and continuation records. All 1,247 retained files stayed byte-identical, including
+  the original 1,091 and the 1,153 present after interruption. Evidence:
+  /tmp/almg-corpus-resumed-training-native-qa/verification.json, interrupt.log,
+  recover.log, restart.log and raw native captures. Temporary accessibility helpers now
+  raise ALMG's own window before reading/clicking it, addressing the prior occlusion issue;
+  their previous versions remain preserved outside Git.
+- Validation: 650 Python tests passed with Metal enabled and warnings as errors;
+  89 Flutter tests passed and analysis was clean. New real-worker coverage interrupts
+  approved training recovery before/after midpoint for both optimizers, rejects active
+  owners and missing reapproval, checks parent/state/counters/depth and receipt-free
+  snapshots, then recovers to an exact completed result without changing any retained file.
+  UI coverage labels resumed-worker state and requires another recorded-training approval.
+- Remaining: reference-recovery worker durability, arbitrary interruption/admission/
+  publication points, physical OS/power-loss verification, broader model/sequence/batch/
+  budget support, profiling and language-quality/50M–100M acceptance. This validates
+  process interruption for recorded-training recovery only, not general OS recovery.
+  Independent hardware/user-action blockers remain open and skipped; P3-LMF-01 remains
+  complete for its recorded architecture scope. No external collection occurred;
+  generated artifacts, weights and unrelated user edits are excluded from Git.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
