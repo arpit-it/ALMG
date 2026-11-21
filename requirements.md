@@ -9255,6 +9255,47 @@ P3-LMF-08 partial progress · compatible historical evaluation snapshot comparis
   artifacts and downloaded weights are preserved. No external collection,
   generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · reviewed evaluation-only benchmark input snapshots · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Saved corpus inputs now expose benchmark-review and
+  separately confirmed save-benchmark for one to eight local text documents, at
+  most 32 document-bound windows, using the exact existing saved word tokenizer
+  and reviewed sequence length (4/8/16). The tokenizer is never refitted. Unknown
+  vocabulary, duplicate tokenized documents, invalid metadata and oversized inputs
+  are rejected. This stage prepares benchmark inputs only; execution remains open.
+- Source names, raw-text hashes, permission bases/notes and explicit evaluation-only
+  declarations are versioned with the original corpus/data/tokenizer bindings.
+  Unreviewed permissions or missing evaluation-only declarations block saving.
+  Exact active-window and within-window four-token-span overlap checks against
+  every existing train/validation/test split also block saving. These narrow checks
+  and user declarations do not certify global/semantic independence; certification
+  and training/release approval remain false. No training/improvement rows are added.
+- Saving requires an exact fresh review and explicit confirmation. Documents,
+  masked windows, fixed tokenizer and a hash-bound manifest are staged, checked
+  and atomically saved in a separate benchmark collection. Reopening verifies file
+  hashes, text/window/tokenizer relationships, declarations and review bindings.
+- Verified the running ALMG API at localhost:28958 from exported 4ad91fc plus only
+  this module/route/tests. Saved/reopened a two-document local benchmark with two
+  windows, fourteen real targets and two padding positions. The stored tokenizer
+  exactly matched the original corpus tokenizer. Permission, declaration, overlap,
+  out-of-vocabulary, duplicate, window-limit, unconfirmed and stale-review requests
+  failed before writes. A modified private windows file and invalid IDs failed
+  reads; restoring the private file restored exact reads. A separate CPU process
+  reopened the snapshot identically. All 4,598 existing files were preserved; only
+  four private benchmark files were created (4,602 final files).
+  Evidence: /tmp/almg-corpus-benchmark-preparation-api-qa/verification.json,
+  verify-app.log, review.json, saved-benchmark.json and *-blocked.json. Native
+  desktop interaction is not claimed; the running app workflow was exercised.
+- Validation: all 753 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Five new tests cover fixed-tokenizer
+  masks/bounds/duplicates, permission/declaration blockers, real corpus overlap,
+  confirmation/stale-review rejection, immutable snapshot reload and tamper checks.
+- Remaining: benchmark model execution/comparison and durable scoring reports,
+  desktop preparation controls, broader independent benchmark provenance, semantic/
+  cross-window/global-use leakage checks and full language-quality acceptance.
+  Existing desktop/hardware blockers remain open and skipped. User changes, pending
+  seeded work, training artifacts and downloaded weights are preserved. No external
+  collection, generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
