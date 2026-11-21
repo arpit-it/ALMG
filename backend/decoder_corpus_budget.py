@@ -137,3 +137,59 @@ def review_training_resume(root, identifier):
     }
     result['revision'] = digest(result)
     return result
+
+
+def reference_recovery_exposure(windows, config, parameter_count, restore_step):
+    """The reference resumes its cursor; recorded training still starts at zero."""
+    recorded = exposure(windows, config, parameter_count, reference_comparison=False)
+    reference = exposure(windows, config, parameter_count, restore_step=restore_step, reference_comparison=False)
+    return {
+        **recorded,
+        'reference_restore_step': restore_step,
+        'reference_optimizer_updates': reference['optimizer_updates'],
+        'reference_initial_window_offset': reference['initial_window_offset'],
+        'reference_final_window_offset': reference['final_window_offset'],
+        'comparison_reference_target_tokens': reference['recorded_training_target_tokens'],
+        'comparison_reference_dense_token_positions': reference['dense_training_token_positions'],
+        'comparison_reference_padding_target_positions': reference['padding_target_positions'],
+        'full_workflow_optimizer_updates': recorded['optimizer_updates'] + reference['optimizer_updates'],
+        'full_workflow_optimizer_target_tokens': recorded['recorded_training_target_tokens'] + reference['recorded_training_target_tokens'],
+        'full_workflow_dense_token_positions': recorded['dense_training_token_positions'] + reference['dense_training_token_positions'],
+        'scope': 'Calculated new work only: remaining cyclic reference verification begins at reference_restore_step; the full recorded-training trajectory begins at restore_step zero. Training tokens per parameter describe only recorded training. Carried reference updates and evaluation/inference targets are excluded.',
+    }
+
+
+def review_reference_resume(root, identifier):
+    """Plan remaining reference verification plus full original recorded training."""
+    parent = training.read(root, identifier)
+    config = parent['review']['config']
+    if config['schema_version'] not in (5, 6, 7, 8, 9):
+        raise ValueError('Reference-recovery budget planning requires reviewed cyclic settings versions five through nine.')
+    resources = isolated.review_reference_resume(root, identifier)
+    binding = resources['reference_resume_from']
+    if binding['record_revision'] != parent['revision']:
+        raise ValueError('Retained reference source changed during budget planning.')
+    origin = parent['review']['source']
+    initialized = training.hardware.initializations.read(root, origin['plan_id'], origin['initialization_id'])
+    saved = training.inputs.read(root, resources['corpus_id'])
+    _, current, _, windows, _ = training._source(root, initialized, saved)
+    estimates = resources['estimates']
+    result = {
+        'format': 'almg-corpus-reference-resume-budget-review-v1', 'schema_version': 1,
+        'execution_scope': 'retained_reference_then_original_recorded_training',
+        'source': resources['source'], 'reference_resume_from': binding,
+        'corpus_id': saved['id'], 'corpus_revision': saved['revision'],
+        'config': config, 'reference_restore_step': binding['completed_steps'],
+        'exposure': reference_recovery_exposure(windows['train'], config, current['actual_parameter_count'], binding['completed_steps']),
+        'resource_review': resources, 'feasible': resources['feasible'], 'blockers': resources['blockers'],
+        'required_available_memory_bytes': estimates['required_available_memory_bytes'],
+        'required_free_disk_bytes': estimates['required_free_disk_bytes'],
+        'durable_checkpoint_disk_reserve_bytes': estimates['interruption_checkpoint_extra_disk_bytes'],
+        'workflow_duration_estimate': estimates.get('phase_resume_work_estimate'),
+        'optimizer_only_tokens_per_second': None, 'estimated_energy_wh': None, 'quality_token_requirement': None,
+        'training_approved': False, 'release_approved': False,
+        'limitations': 'Calculated new cyclic reference targets start at the retained reference counter; recorded training still executes its complete original budget from initialization. Carried reference work is excluded. Resource reserves remain conservative. Duration uses exact compatible completed reference-phase recoveries and includes worker/restore/lineage/checkpoint/evaluation/inference overhead, not optimizer-only throughput or a wall-time guarantee. Energy and quality-token requirements remain unmeasured. This read-only report does not approve recovery; use its current resource review and separate explicit confirmation.',
+        'implementation_sha256': file_digest(Path(__file__)),
+    }
+    result['revision'] = digest(result)
+    return result

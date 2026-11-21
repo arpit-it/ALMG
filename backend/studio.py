@@ -2386,6 +2386,8 @@ class Handler(BaseHTTPRequestHandler):
                 if corpus_parts[2] == 'resume':
                     return self.respond(inference.WORKER.submit(decoder_corpus_isolated.run_partial,ROOT,corpus_parts[1],data.get('confirmed'),data.get('reviewed'),data.get('request_id')).result())
             if len(corpus_parts) == 3 and corpus_parts[0] == 'decoder-corpus-optimizer-runs':
+                if corpus_parts[2] == 'reference-resume-budget-review':
+                    return self.respond(decoder_corpus_budget.review_reference_resume(ROOT,corpus_parts[1]))
                 if corpus_parts[2] == 'reference-resume-review':
                     return self.respond(decoder_corpus_isolated.review_reference_resume(ROOT,corpus_parts[1]))
                 if corpus_parts[2] == 'reference-resume':

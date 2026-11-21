@@ -8495,6 +8495,40 @@ P3-LMF-07 partial progress · retained training-phase budget planning API · 202
   pending source and unrelated user edits are preserved and excluded from this commit.
   No external collection, generated artifacts or push included.
 
+P3-LMF-07 partial progress · retained reference-phase budget planning API · 2026-11-21:
+- [ ] P3-LMF-07 remains open. The read-only reference-resume-budget-review endpoint
+  separates remaining reference verification from the full original recorded-training
+  trajectory. The reference begins at its validated retained counter; recorded training
+  starts at zero. Carried reference work is excluded from new updates/targets. Reports
+  expose separate reference/recorded cursors, masked real targets, dense positions,
+  padding and combined workflow totals. Training tokens per parameter describe only
+  the recorded trajectory. Scope is reviewed cyclic settings versions five through nine.
+- Verified the actual ALMG API on localhost:28937 using exported committed base
+  86278aa plus only this change, excluding pending seeded/desktop edits. Prepared
+  two real 14,400-parameter Metal fixtures canceled during reference update seven,
+  with shared-backend fixture preparation. Through the API, both SGD and AdamW
+  reports predicted 13 new reference updates plus 20 recorded updates: 163 reference
+  targets plus 251 recorded targets, 414 total real targets and 528 dense positions.
+  Separately confirmed fresh-worker recoveries matched those counts and reproduced
+  the final reference weights and optimizer state exactly (maximum errors zero),
+  preserving all seven carried reference-log entries.
+- Planning and invalid/unconfirmed approvals wrote no files. Reports grant no
+  training/release approval and cannot substitute for an action review. The app
+  rejected reference-phase records submitted to the training-phase budget planner.
+  Both completed recoveries entered subsequent phase-specific duration calibration;
+  estimates stay labeled calculated and include existing workflow-overhead limits.
+- All 679 backend tests passed with actual Metal enabled and warnings as errors.
+  Focused tests cover masked asymmetric phase budgets, zero/all reference progress,
+  invalid counters, both optimizers before/after midpoint, resource blockers, unknown
+  ordering, source immutability and separate consent. All 2,978 original fixture
+  files remained unchanged. Evidence: /tmp/almg-corpus-reference-resume-budget-api-qa/
+  verification.json, verify-app.log, prepare-fixture.log, python.log and saved reports.
+- Delivered scope is the local API. Desktop planning-panel integration, seeded-order
+  planning, energy/quality-token guidance and broader limits/throughput validation
+  remain open. Existing desktop-history and hardware blockers remain skipped;
+  pending source/user edits and generated artifacts are preserved and excluded.
+  No external collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
