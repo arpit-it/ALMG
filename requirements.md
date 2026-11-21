@@ -9049,6 +9049,46 @@ P3-LMF-08 partial progress · bounded free-running continuation diagnostics · 2
   seeded work, training artifacts and downloaded weights are preserved. No external
   collection, generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · versioned saved-window overlap audit · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Added read-only leakage-audit for reviewed corpus
+  input snapshots. Protocol v1 compares validation/train, test/train and
+  test/validation, counting exact active-window duplicates and shared four-token
+  spans within saved window boundaries. Active tokens retain real token ID zero
+  while excluding masked padding. Identical reference sequences, including training
+  mixing copies, are deduplicated without truncating query counts.
+- Reports bind corpus revision, dataset/tokenizer/window hashes and protocol/producer
+  revisions. Each comparison includes total and unique reference counts, affected
+  query counts, short-window coverage, pair counts and at most eight deterministic
+  examples with source hashes, window/document offsets and shared token text.
+  Short windows can match exactly but cannot supply four-token-span evidence.
+  Findings request overlap review; absence of overlap never certifies independent
+  evaluation or model memorization. Existing document checks/training gates remain.
+- Verified the running ALMG API at localhost:28953 using exported c8d05d0 plus only
+  this module/route/tests. Audited the saved repeated-word corpus and a newly
+  prepared local twelve-word permutation fixture. All six split comparisons matched
+  independent counts; example hashes/offsets/spans matched saved data. The repeated
+  corpus flagged one query window per comparison with shared four-token spans
+  (five, five and one unique-reference window pairs); the permutation fixture had
+  no exact-window or four-token-span overlap. Neither case received independence,
+  memorization, training or release approval. Invalid IDs and a modified private
+  window file were rejected; the private file was restored byte-for-byte.
+- Repeated reports and separate CPU-process reloads were identical. Every one of
+  4,586 files present before audit calls stayed unchanged, including all 4,558
+  pre-existing fixture files. The additional 28 files are private local fixture
+  preparation outputs. Evidence: /tmp/almg-corpus-leakage-audit-api-qa/
+  verification.json, verify-app.log, overlap-audit.json and clean-audit.json.
+  The running API was exercised; native desktop interaction is not claimed.
+- Validation: all 730 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Five new tests cover padding/real zero
+  tokens, reference-copy deduplication, shifted spans, provenance, example caps,
+  short/cross-window coverage, invalid masks and real snapshot immutability.
+- Remaining: desktop audit controls, broader independent benchmark provenance,
+  semantic/fuzzy/cross-window overlap, model memorization tests, assistant-quality
+  and reasoning/coding/multilingual evaluation, measured inference performance/
+  memory and full acceptance. Unchanged desktop/hardware blockers remain open and
+  skipped. User changes, seeded work, training artifacts and downloaded weights
+  are preserved. No external collection, generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
