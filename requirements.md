@@ -9489,6 +9489,48 @@ P3-LMF-08 partial progress · version-two document-overlap benchmark admission �
   downloaded weights are preserved. No external collection, generated-artifact
   commit or push occurred.
 
+P3-LMF-06 partial progress · profiled 25,344-parameter FP32 corpus recipe · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Corpus input/model reading now permits up to 32,768
+  parameters, while training above the prior 16,384 limit is admitted only for the
+  profiled 25,344-parameter recipe: three layers, hidden 32, four heads/head dimension
+  eight, feed-forward 64, context sixteen, four vocabulary IDs, planning batch four
+  and initialization seed seven. Training uses cyclic version-five FP32, eight
+  tokens, two effective rows/two microbatches, ten/twenty updates, learning rate
+  0.001, three warmup updates, clip one and decay zero (SGD)/0.01 (AdamW).
+- Other larger architectures/settings remain blocked in feasibility review; inputs
+  above 32,768 parameters are rejected. Existing smaller recipes retain their
+  behavior. Numerical/checkpoint gates, resource reserves, worker isolation and
+  separate training/continuation confirmations are unchanged. Synthetic optimizer
+  fixture limits are unchanged. This is an incremental corpus-engine scale check,
+  not a 50M–100M or language-quality acceptance claim.
+- Verified the actual ALMG API on localhost:28964 from exported f380b0e plus only
+  the two source changes/new tests, excluding pending seeded source/UI work.
+  Fresh initialization used newly seeded weights, not Qwen/downloaded weights.
+  Separately reviewed/confirmed twenty-update SGD and AdamW runs decreased training
+  loss 1.3957624105 -> 1.3627740960 and 0.7998643148 respectively. Both restored
+  midpoint checkpoints and separately approved ten-to-twenty continuations;
+  parameter, optimizer-state and continuation errors were all zero under the
+  unchanged 1e-7 gate. Own CPU generation matched continuation references.
+- Existing isolated worker observations recorded SGD/AdamW Metal allocator peaks
+  627,228/640,316 bytes and process peak RSS 115,310,592/132,382,720 bytes. These
+  include runtime/workflow overhead, can overlap in unified memory and are not
+  summed or extrapolated to large-model feasibility. Unsupported settings, stale
+  approvals and unconfirmed execution were rejected before writes. Both runs and
+  continuations reopened exactly in a separate CPU process. All 4,687 source/baseline
+  fixture files were preserved; 4,799 final retained files remain private.
+  Evidence: /tmp/almg-corpus-larger-recipe-api-qa/verification.json, verify-app.log,
+  profile-summary.json, runs.json and continuations.json. Native desktop interaction
+  is not claimed; the running training and continuation workflow was exercised.
+- Validation: all 773 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Three new tests cover precise larger-recipe
+  admission, unsupported settings/architectures and the absolute cap, real SGD/AdamW
+  training, checkpoint restoration, independent continuation and source immutability.
+- Remaining: 50M–100M engineering, broader architecture/precision/budget coverage,
+  larger-recipe desktop integration, language quality and physical power-loss
+  acceptance. Existing hardware/desktop blockers stay open and skipped. Pending
+  seeded work, user edits, training artifacts and downloaded weights are preserved
+  and excluded. No collection, generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

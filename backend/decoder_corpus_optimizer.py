@@ -114,7 +114,7 @@ def _source(root, initialized, reviewed_inputs):
     folder = Path(root) / 'decoder-corpus-inputs' / saved['id']
     windows = json.loads((folder / 'windows.json').read_text())
     tokenizer = Tokenizer.restore(json.loads((folder / 'tokenizer.json').read_text()))
-    if current['config']['vocab_size'] != len(tokenizer.vocabulary) or current['actual_parameter_count'] > 16384:
+    if current['config']['vocab_size'] != len(tokenizer.vocabulary) or current['actual_parameter_count'] > 32768:
         raise ValueError('Corpus tokenizer/model dimensions are incompatible.')
     length = saved['review']['sequence_length']
     if set(windows) != {'train', 'validation', 'test'} or length > current['config']['context_length']:
@@ -156,6 +156,14 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
     reserve['required_free_disk_bytes']+=reserve['interruption_checkpoint_extra_disk_bytes']
     reserve['required_available_memory_bytes']+=current['actual_weight_bytes']*8
     reasons = list(profile['errors'])
+    if current['actual_parameter_count'] > 16384:
+        larger_model={'layers':3,'hidden_size':32,'attention_heads':4,'head_dim':8,'feed_forward_size':64,
+                      'context_length':16,'vocab_size':4,'seed':7,'batch_size':4}
+        larger_settings={'schema_version':5,'compute_precision':'float32','batch_size':2,'gradient_accumulation_steps':2,
+                         'sequence_length':8,'learning_rate':.001,'warmup_steps':3,'gradient_clip_norm':1.,
+                         'weight_decay':.01 if c['optimizer']=='adamw' else 0.}
+        if any(current['config'].get(key)!=value for key,value in larger_model.items()) or any(c.get(key)!=value for key,value in larger_settings.items()):
+            reasons.append('Above 16384 parameters, use the reviewed 25344-parameter three-layer/four-head FP32 recipe: eight tokens, two rows/two microbatches, cyclic version five, learning rate 0.001, warmup three, clip one and AdamW decay 0.01 (SGD zero).')
     if len(windows['train']) > c['steps'] * c['batch_size']:
         reasons.append('Choose enough optimizer updates to visit every saved training window at least once.')
     if c['batch_size'] > current['config']['batch_size']:

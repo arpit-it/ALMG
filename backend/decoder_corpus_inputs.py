@@ -38,8 +38,8 @@ def review(root, plan_id, initialized, dataset, length):
     if type(length) is not int or length not in (4, 8, 16):
         raise ValueError('Choose sequence length four, eight or sixteen.')
     _, source, _ = architecture._source(root, plan_id, initialized)
-    if source['actual_parameter_count'] > 16384:
-        raise ValueError('Corpus optimizer inputs support at most 16384 model parameters.')
+    if source['actual_parameter_count'] > 32768:
+        raise ValueError('Corpus optimizer inputs support at most 32768 model parameters; training requires a supported reviewed recipe.')
     manifest, tokenizer, records, _ = datasets.preflight(root, dataset)
     declarations = manifest.get('license_declarations', {})
     pending = [item['source_sha256'] for item in manifest['sources']
