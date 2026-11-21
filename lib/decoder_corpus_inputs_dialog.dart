@@ -68,7 +68,7 @@ class _DecoderCorpusInputsDialogState extends State<DecoderCorpusInputsDialog> {
       const Text('Select a prepared local dataset with reviewed source permissions. Check its tokenizer against this fresh initialization and save private input windows. Saving does not start or approve training. Training these inputs requires a separate optimizer review and confirmation from the saved record.'),
       Text(_dataset == null ? 'No local text dataset selected.' : 'Selected dataset: ${_dataset!['id']}'),
       TextButton(onPressed: _busy ? null : _select, child: const Text('Choose prepared text dataset')),
-      DropdownButton<int>(value: _length, items: const [DropdownMenuItem(value: 4, child: Text('Corpus sequence length 4')), DropdownMenuItem(value: 8, child: Text('Corpus sequence length 8'))],
+      DropdownButton<int>(value: _length, items: const [DropdownMenuItem(value: 4, child: Text('Corpus sequence length 4')), DropdownMenuItem(value: 8, child: Text('Corpus sequence length 8')), DropdownMenuItem(value: 16, child: Text('Corpus sequence length 16'))],
         onChanged: _busy ? null : (value) => setState(() { _length = value!; _review = null; })),
       if (_busy) const LinearProgressIndicator(),
       if (_error != null) Text(_error!),

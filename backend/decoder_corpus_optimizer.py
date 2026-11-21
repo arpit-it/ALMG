@@ -24,8 +24,8 @@ else:
 
 def configuration(settings, length):
     c = optimizer.configuration(settings)
-    if c['schema_version'] not in (5,6,7) or c['sequence_length'] != length:
-        raise ValueError('Corpus training currently requires version-5, version-6 or version-7 precision settings and the saved sequence length.')
+    if c['schema_version'] not in (5,6,7,8) or c['sequence_length'] != length:
+        raise ValueError('Corpus training currently requires version-5 through version-8 precision settings and the saved sequence length.')
     return c
 
 
@@ -290,7 +290,7 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
     final_losses = cpu_scores(values)
     if (not all(math.isfinite(value) for value in [*initial_losses.values(), *final_losses.values()])
             or final_losses['train'] >= initial_losses['train'] or parameter_error > 1e-7 or moment_error > 1e-7 or cpu_error > 1e-5 or not math.isfinite(compute_error) or compute_error > .05):
-        raise ValueError('Corpus training failed loss/checkpoint/CPU checks. Saved checkpoints are retained for inspection.')
+        raise ValueError(f"Corpus training failed loss/checkpoint/CPU checks: train loss {initial_losses['train']:.9g} -> {final_losses['train']:.9g}; weight error {parameter_error:.9g}; optimizer error {moment_error:.9g}; CPU error {cpu_error:.9g}; compute error {compute_error:.9g}. Saved checkpoints are retained for inspection.")
     model.parameters = values; model.save(folder / 'trained-model.json')
     (folder / 'tokenizer.json').write_text(json.dumps(tokenizer.artifact(), ensure_ascii=False), encoding='utf-8')
     loaded = PlannedDecoder.load(folder / 'trained-model.json')

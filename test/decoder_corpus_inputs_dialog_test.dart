@@ -29,4 +29,19 @@ void main() {
     expect(find.text('Confirm save private corpus inputs'), findsNothing);
     expect(calls.where((path) => path.endsWith('save')).length, 1);
   });
+  testWidgets('sixteen-token preparation requires a new review and saves separately from training', (tester) async {
+    final calls=<String>[];
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusInputsDialog(initialized:const {'id':'init','plan_id':'plan'},request:(path,body) async {
+      calls.add(path);
+      if(path.endsWith('datasets'))return {'datasets':[{'id':'12345678dataset','tokenizer':{'vocabulary_size':4}}]};
+      if(path.endsWith('save')) { expect(body['sequence_length'],16);expect((body['reviewed_inputs'] as Map)['schema_version'],2);expect(body['confirmed'],true);return {'id':'saved'}; }
+      return {'schema_version':body['sequence_length']==16?2:1,'compatible':true,'splits':{for(final part in ['train','validation','test'])part:{'windows':2,'target_tokens':19}},'blockers':[]};
+    })));
+    await tester.tap(find.text('Choose prepared text dataset'));await tester.pumpAndSettle();await tester.tap(find.text('12345678 · 4 vocabulary IDs'));await tester.pumpAndSettle();
+    await tester.tap(find.text('Check corpus compatibility'));await tester.pumpAndSettle();expect(find.text('Confirm save private corpus inputs'),findsOneWidget);
+    await tester.ensureVisible(find.text('Corpus sequence length 8'));await tester.tap(find.text('Corpus sequence length 8'));await tester.pumpAndSettle();await tester.tap(find.text('Corpus sequence length 16').last);await tester.pumpAndSettle();expect(find.text('Confirm save private corpus inputs'),findsNothing);
+    await tester.tap(find.text('Check corpus compatibility'));await tester.pumpAndSettle();await tester.tap(find.text('Confirm save private corpus inputs'));await tester.pump();await tester.pump(const Duration(milliseconds:300));expect(find.text('Saved text corpus inputs'),findsOneWidget);expect(calls.where((path)=>path.contains('optimizer')),isEmpty);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
 }

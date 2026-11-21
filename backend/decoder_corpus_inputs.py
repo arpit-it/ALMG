@@ -35,8 +35,8 @@ def _inputs(records, tokenizer, manifest, length):
 
 
 def review(root, plan_id, initialized, dataset, length):
-    if type(length) is not int or length not in (4, 8):
-        raise ValueError('Choose sequence length four or eight.')
+    if type(length) is not int or length not in (4, 8, 16):
+        raise ValueError('Choose sequence length four, eight or sixteen.')
     _, source, _ = architecture._source(root, plan_id, initialized)
     if source['actual_parameter_count'] > 16384:
         raise ValueError('Corpus optimizer inputs support at most 16384 model parameters.')
@@ -52,7 +52,8 @@ def review(root, plan_id, initialized, dataset, length):
     if length > source['config']['context_length']:
         reasons.append('Selected sequence length exceeds the initialized model context.')
     windows = _inputs(records, tokenizer, manifest, length)
-    record = {'format': 'almg-decoder-corpus-input-review-v1', 'schema_version': 1,
+    version=2 if length==16 else 1
+    record = {'format': f'almg-decoder-corpus-input-review-v{version}', 'schema_version': version,
               'source': {'plan_id': plan_id, 'initialization_id': source['id'],
                          'initialization_revision': source['revision'], 'model_sha256': source['model_sha256']},
               'dataset_id': manifest['id'], 'dataset_revision': digest(manifest),
@@ -87,7 +88,7 @@ def save(root, plan_id, confirmed, initialized, dataset, length, reviewed):
         folder.mkdir()
         for name, value in (('dataset.json', manifest), ('tokenizer.json', tokenizer.artifact()), ('windows.json', windows)):
             (folder / name).write_text(json.dumps(value, ensure_ascii=False, allow_nan=False), encoding='utf-8')
-        record = {'format': 'almg-decoder-corpus-inputs-v1', 'schema_version': 1, 'id': identifier,
+        record = {'format': f"almg-decoder-corpus-inputs-v{current['schema_version']}", 'schema_version': current['schema_version'], 'id': identifier,
                   'review': current, 'files': {name: file_digest(folder / name) for name in ('dataset.json', 'tokenizer.json', 'windows.json')}}
         record['revision'] = digest(record)
         (folder / 'record.json').write_text(json.dumps(record, ensure_ascii=False, allow_nan=False), encoding='utf-8')
@@ -100,7 +101,7 @@ def _read(folder):
     if (folder / 'record.json').stat().st_size > 128000:
         raise ValueError('Corpus input record exceeds its bounded size.')
     record = json.loads((folder / 'record.json').read_text(encoding='utf-8'))
-    if (record.get('format') != 'almg-decoder-corpus-inputs-v1' or record.get('schema_version') != 1
+    if ((record.get('format'),record.get('schema_version')) not in (('almg-decoder-corpus-inputs-v1',1),('almg-decoder-corpus-inputs-v2',2))
             or record.get('id') != folder.name or record.get('revision') != digest({k: v for k, v in record.items() if k != 'revision'})
             or set(record.get('files', {})) != {'dataset.json', 'tokenizer.json', 'windows.json'}):
         raise ValueError('Invalid corpus input record.')
@@ -108,6 +109,8 @@ def _read(folder):
         if (folder / name).stat().st_size > 2 * 1024 ** 2 or file_digest(folder / name) != expected:
             raise ValueError('Saved corpus input content changed.')
     approved = record['review']
+    version=record['schema_version']
+    if (approved.get('format'),approved.get('schema_version'))!=(f'almg-decoder-corpus-input-review-v{version}',version) or type(approved.get('sequence_length')) is not int or approved.get('sequence_length') not in ((16,) if version==2 else (4,8)):raise ValueError('Corpus input version/sequence binding changed.')
     if approved.get('revision') != digest({k: v for k, v in approved.items() if k != 'revision'}) or approved.get('compatible') is not True:
         raise ValueError('Invalid saved corpus input review.')
     manifest = json.loads((folder / 'dataset.json').read_text(encoding='utf-8'))

@@ -8167,6 +8167,64 @@ P3-LMF-06 partial progress · reviewed eighty-update corpus budget · 2026-11-21
   scope. No external collection occurred; generated artifacts, weights and unrelated edits
   remain excluded from Git.
 
+P3-LMF-06 partial progress · reviewed sixteen-token FP32 corpus inputs · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Prepared local text now supports separately reviewed
+  sixteen-token input windows when the saved model context permits them. New input
+  review/snapshot version two is restricted to length sixteen; version-one four/eight-
+  token records remain readable and unchanged. Readers bind input format/version to
+  review version and integer sequence length. Existing permission, contamination,
+  vocabulary, document-boundary, split, padding-mask and window-count gates remain intact.
+- New corpus-only optimizer version eight supports sixteen-token FP32 training with
+  ten/twenty updates, one/two rows and existing accumulation/clipping/scheduler semantics.
+  Its UI requires a new input review/save, then separate optimizer review/confirmation.
+  Unsupported mixed FP16 and longer sixteen-token budgets are rejected before queueing.
+  The synthetic fixture rejects version eight before source loading. Legacy version-5
+  through version-7 four/eight-token precision and budget limits remain unchanged.
+- Native verification used rebuilt ALMG and offline fixture backend port 28927. Six
+  generated twenty-to-twenty-five-word documents use independent four-word cycles, pass
+  the existing cross-split contamination gate, and have recorded user-created permissions.
+  Native review/save produced version-two windows: train eight/87 real targets, validation
+  two/23, test two/19. Full sixteen-target windows and masked tails were verified. Saving
+  inputs did not create or approve a training run. The prior version-one source was retained.
+- Explicit FP32 SGD and AdamW reviews/confirmations each completed twenty updates with
+  midpoint-ten restoration, decreasing training loss and matching reloaded CPU generation.
+  Observed maximum checkpoint weight error was 2.23517418e-8 and optimizer-state error
+  2.98023224e-8, both inside the unchanged 1e-7 gate. Independently approved midpoint-ten
+  to update-twenty continuations passed that same bound. Two additional owned workers
+  were interrupted after training midpoint ten; PID/command/backend ownership was checked
+  before SIGKILL. Discovery selected the advanced training phase/counter, retained fourteen
+  new snapshots and fabricated no cancellation receipt or terminal originating run.
+- After app/backend restart, new recorded-training reviews/confirmations carried ten
+  updates, executed ten remaining updates and reused the completed reference with zero
+  reference updates. Both recovered models and their independent continuations passed
+  existing comparison/CPU reload gates. Final restart reopened four new ordinary records,
+  two interruption points and all four continuations. A separate native legacy pass
+  reopened the version-one input and twenty prior optimizer records. Readers verified
+  all 327 corpus/checkpoint/continuation records and both input versions. All 2,076 files
+  remained byte-identical, including the original 1,801 and 2,020 present after interruption.
+  Evidence: /tmp/almg-corpus-sixteen-native-qa/verification.json, prepare-and-train.log,
+  recover.log, restart.log, legacy-reopen.log and raw native review/result captures.
+- Validation: 658 Python tests passed with Metal enabled and warnings as errors;
+  94 Flutter tests passed and analysis was clean. New coverage checks versioned legacy
+  reads, permissions/context limits, real sixteen-token targets and masked tails,
+  strict corpus-only settings, both FP32 optimizers at ten/twenty updates, continuation,
+  actual worker interruption/recovery, immutable sources and separate UI approvals.
+  Failed training diagnostics now report the actual loss/checkpoint/CPU comparison metrics.
+- Blocked new variants remain open: sixteen-token mixed FP16 failed the existing combined
+  validation gate and needs isolated numerical diagnosis. FP32 AdamW at eighty sixteen-
+  token updates produced weight difference 1.2665987e-7, exceeding the unchanged 1e-7 gate;
+  its loss decreased, but it was not published as complete. The initial sixteen-token
+  release remains ten/twenty FP32 only. Details and retained diagnostic artifacts are in
+  /tmp/almg-corpus-sixteen-native-qa/unsupported-variants.json and
+  /tmp/almg-sixteen-diagnostics-918f8a0d. Revisit these paths with a numerical-consistency
+  change or new diagnostic evidence; do not repeat unchanged failing runs.
+- Remaining: those precision/budget variants, arbitrary interruption/admission/publication
+  points, physical OS/power-loss verification, broader model/batch support, profiling and
+  language-quality/50M–100M acceptance. Independent hardware/user-action blockers remain
+  open and skipped; P3-LMF-01 remains complete for its recorded architecture scope.
+  No external collection occurred; generated artifacts, weights and unrelated edits
+  remain excluded from Git.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

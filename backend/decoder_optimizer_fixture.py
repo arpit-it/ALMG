@@ -19,18 +19,19 @@ DEFAULT={'schema_version':1,'optimizer':'sgd','learning_rate':.01,'schedule':'wa
 
 def configuration(values):
     if not isinstance(values,dict):raise ValueError('Provide every versioned optimizer fixture setting.')
-    keys=set(DEFAULT)|({'gradient_accumulation_steps'} if values.get('schema_version') in (2,3,4,5,6,7) else set())
-    if values.get('schema_version') in (3,4,5,6,7):keys|={'compute_precision','loss_scale'}
-    if values.get('schema_version')in (4,5,6,7):keys|={'batch_size','sequence_length'}
+    keys=set(DEFAULT)|({'gradient_accumulation_steps'} if values.get('schema_version') in (2,3,4,5,6,7,8) else set())
+    if values.get('schema_version') in (3,4,5,6,7,8):keys|={'compute_precision','loss_scale'}
+    if values.get('schema_version')in (4,5,6,7,8):keys|={'batch_size','sequence_length'}
     if set(values)!=keys:raise ValueError('Provide every versioned optimizer fixture setting.')
     c=dict(values)
-    if type(c['schema_version']) is not int or c['schema_version'] not in (1,2,3,4,5,6,7) or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose supported versioned SGD or AdamW with warmup/cosine scheduling.')
+    if type(c['schema_version']) is not int or c['schema_version'] not in (1,2,3,4,5,6,7,8) or c['optimizer'] not in ('sgd','adamw') or c['schedule']!='warmup_cosine':raise ValueError('Choose supported versioned SGD or AdamW with warmup/cosine scheduling.')
     if type(c.get('gradient_accumulation_steps',1)) is not int or c.get('gradient_accumulation_steps',1) not in (1,2):raise ValueError('Choose one or two microbatches per optimizer update.')
-    if c['schema_version'] in (4,5,6,7) and (type(c['batch_size']) is not int or c['batch_size'] not in (1,2) or type(c['sequence_length']) is not int or c['sequence_length'] not in (4,8)):raise ValueError('Choose a bounded batch of one/two rows and sequence length four/eight.')
+    if c['schema_version'] in (4,5,6,7,8) and (type(c['batch_size']) is not int or c['batch_size'] not in (1,2) or type(c['sequence_length']) is not int or c['sequence_length'] not in ((16,) if c['schema_version']==8 else (4,8))):raise ValueError('Choose one/two rows and sequence four/eight, or sixteen with version-8 corpus settings.')
     if c.get('compute_precision','float32') not in ('float32','mixed_float16'):raise ValueError('Only FP32 or bounded mixed FP16 computation is supported.')
+    if c['schema_version']==8 and c['compute_precision']!='float32':raise ValueError('Sixteen-token corpus settings currently require FP32 computation.')
     scale=c.get('loss_scale',1.0);expected=128.0 if c.get('compute_precision')=='mixed_float16' else 1.0
     if type(scale) not in (int,float) or not math.isfinite(scale) or scale!=expected:raise ValueError('Use loss scale 128 for mixed FP16 or 1 for FP32.')
-    if type(c['steps']) is not int or c['steps'] not in ((80,) if c['schema_version']==7 else (40,) if c['schema_version']==6 else (10,20) if c['schema_version']==5 else (10,)) or type(c['warmup_steps']) is not int or not 0<=c['warmup_steps']<=3:raise ValueError('Choose ten updates, ten/twenty with version-5 settings, forty with version-6 corpus settings, or eighty with version-7 corpus settings, and zero to three warmup updates.')
+    if type(c['steps']) is not int or c['steps'] not in ((10,20) if c['schema_version']==8 else (80,) if c['schema_version']==7 else (40,) if c['schema_version']==6 else (10,20) if c['schema_version']==5 else (10,)) or type(c['warmup_steps']) is not int or not 0<=c['warmup_steps']<=3:raise ValueError('Choose ten updates, ten/twenty with version-5 settings, forty with version-6 corpus settings, or eighty with version-7 corpus settings, or ten/twenty with version-8 sixteen-token FP32 corpus settings, and zero to three warmup updates.')
     for key,maximum in (('learning_rate',.1),('gradient_clip_norm',10),('weight_decay',.1)):
         value=c[key]
         if type(value) not in (float,int) or not math.isfinite(value) or not (0<=value<=maximum if key=='weight_decay' else 0<value<=maximum):raise ValueError('Invalid finite optimizer setting: '+key)
@@ -111,7 +112,7 @@ def restore(folder,c,review_revision):
 
 def review(root,plan_id,initialized,settings):
     c=configuration(settings)
-    if c['schema_version'] in (6,7):raise ValueError('Extended-update settings require the reviewed corpus workflow.')
+    if c['schema_version'] in (6,7,8):raise ValueError('Corpus-only settings require the reviewed corpus workflow.')
     plan,current,json_bytes=hardware._source(root,plan_id,initialized)
     if current['actual_parameter_count']>16384:raise ValueError('This optimizer fixture supports at most 16384 parameters; save and initialize a smaller plan.')
     profile=hardware.hardware(root);estimates=hardware.estimate(current['config'],json_bytes);moments=current['actual_weight_bytes']*(2 if c['optimizer']=='adamw' else 0)
