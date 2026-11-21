@@ -180,6 +180,29 @@ void main() {
     await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
   });
 
+  testWidgets('learning rate and warmup require renewed approval and are submitted unchanged', (tester) async {
+    Map<String,dynamic>? submitted;
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
+      if(path.endsWith('train')) { submitted=body;return {'initial_losses':{'train':2,'validation':2,'test':2},'final_losses':{'train':1,'validation':1.5,'test':1.6},'generated_text':'amber birch'}; }
+      return {'feasible':true,'estimates':{},'blockers':[]};
+    })));
+    Future<void> choose(String from,String to) async {
+      await tester.ensureVisible(find.text(from));await tester.tap(find.text(from));await tester.pumpAndSettle();
+      await tester.tap(find.text(to).last);await tester.pumpAndSettle();
+    }
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await choose('Corpus learning rate 0.01','Corpus learning rate 0.005');
+    expect(find.text('Confirm train and save corpus model'),findsNothing);
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await choose('2 corpus warmup updates','0 corpus warmup updates');
+    expect(find.text('Confirm train and save corpus model'),findsNothing);
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm train and save corpus model'));await tester.pump();await tester.pump(const Duration(milliseconds:300));
+    final settings=submitted!['settings'] as Map;
+    expect(settings['learning_rate'],0.005);expect(settings['warmup_steps'],0);expect(settings['schema_version'],5);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
   testWidgets('four rows require FP32 bounded budgets and renewed microbatch approval', (tester) async {
     Map<String,dynamic>? reviewed;
     await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {

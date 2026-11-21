@@ -8265,6 +8265,35 @@ P3-LMF-06 partial progress · four-row FP32 corpus batches · 2026-11-21:
   Blocked sixteen-token mixed-FP16 and eighty-update variants remain open and
   skipped; numerical gates were not relaxed. No external collection or push occurred.
 
+P3-LMF-06 partial progress · reviewed learning-rate and warmup controls · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Fresh corpus training now exposes peak learning
+  rates 0.001/0.005/0.01 and zero/one/two/three warmup updates. Defaults remain
+  0.01 and two updates; each control change clears prior resource approval.
+  Saved continuation/recovery retains its original schedule and configuration.
+- Controls submit the existing versioned optimizer fields; cosine decay ends at
+  ten percent of the selected peak. No numerical gate or existing recipe limit
+  was relaxed. Backend regressions train both optimizers across eight schedule
+  cases, reject stale approval without writes, verify warmup/decay rates and
+  restore actual optimizer/scheduler counters for midpoint continuation.
+- Rebuilt and exercised the native macOS app on localhost:28929 with local,
+  permission-reviewed eight-token corpus inputs and the seeded 704-parameter
+  initialization. In-app review/confirmation trained SGD at 0.005 with zero
+  warmup and AdamW at 0.001 with three warmup updates, for twenty updates each.
+  Changing either control removed the prior confirmation. Both reduced training
+  loss, restored update-ten checkpoints and passed separately approved update-ten
+  to update-twenty continuation with zero checkpoint weight/optimizer-state error.
+- After app/backend restart, both new results, one legacy result and both new
+  continuations reopened in native history. All 389 saved backend records validated;
+  all 2,327 original fixture files and 2,441 final retained files were unchanged.
+- Validation: 663 backend tests passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors; 96 Flutter tests passed and Flutter analysis found no issues.
+- Local evidence: /tmp/almg-corpus-schedule-native-qa/verification.json,
+  train.log, restart.log and captured native reviews/results. Generated fixtures,
+  models, checkpoints and logs remain outside Git. No external collection or push.
+- Remaining: larger-model/50M–100M and language-quality acceptance, broader recipe
+  coverage and physical power-loss verification. Previously recorded unavailable
+  hardware and blocked precision/budget criteria stay open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
