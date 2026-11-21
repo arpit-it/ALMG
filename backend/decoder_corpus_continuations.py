@@ -33,10 +33,15 @@ def _snapshot(record):
             'completed_steps':record['completed_steps'],'lineage_depth':_depth(record)}
 
 
+def _load_state(folder, model, config):
+    saved=json.loads((folder/'optimizer.json').read_text())
+    version=2 if isinstance(saved,dict) and 'format' in saved else 1
+    return training.optimizer.optimizer_state.decode(saved,model.parameters,config,version=version,allow_completed=True)
+
+
 def _partial_state(root, record):
     folder=_folder(root,record['id']);model=training.PlannedDecoder.load(folder/'trained-model.json')
-    data=json.loads((folder/'optimizer.json').read_text())
-    return model,{'step':data['step'],**{kind:{name:np.asarray(value,dtype=np.float32) for name,value in data[kind].items()} for kind in ('m','v')}}
+    return model,_load_state(folder,model,record['review']['config'])
 
 
 def review(root, identifier, resume_id=None, execution_mode='shared_backend'):
@@ -116,7 +121,8 @@ def run(root, identifier, confirmed, approved, request_id=None, resume_id=None, 
                 or generated != parent['generated_token_ids'] or text != parent['generated_text']))):
         raise ValueError('Corpus continuation failed loss/reference/inference checks; source artifacts remain unchanged.')
     model.save(folder/'trained-model.json')
-    (folder/'optimizer.json').write_text(json.dumps({'step': state['step'], **{kind:{name:value.tolist() for name,value in state[kind].items()} for kind in ('m','v')}}, allow_nan=False))
+    payload=training.optimizer.optimizer_state.encode(state,model.parameters,c,compact=sum(value.size for value in model.parameters.values())>16384,allow_completed=True)
+    (folder/'optimizer.json').write_text(json.dumps(payload,allow_nan=False))
     (folder/'tokenizer.json').write_text(json.dumps(tokenizer.artifact(), ensure_ascii=False), encoding='utf-8')
     if (partial is not None and read(root,resume_id)!=partial) or training.read(root, identifier) != parent:
         raise ValueError('Source corpus run changed during continuation; new artifacts retained for review.')
@@ -185,17 +191,9 @@ def read(root, identifier, _seen=None):
             or approved['source']['model_sha256'] != parent['files']['trained-model.json']
             or record['restored_step'] != restored or record['scheduler_completed_steps'] != completed):
         raise ValueError('Corpus continuation source/counter binding changed.')
-    model = training.PlannedDecoder.load(folder/'trained-model.json'); state = json.loads((folder/'optimizer.json').read_text())
-    expected = set(model.parameters) if c['optimizer']=='adamw' else set()
-    if model.config != parent['review']['model_config'] or type(state['step']) is not int or state['step'] != completed:
+    model = training.PlannedDecoder.load(folder/'trained-model.json'); state = _load_state(folder,model,c)
+    if model.config != parent['review']['model_config'] or state['step'] != completed:
         raise ValueError('Invalid final corpus optimizer counter or model configuration.')
-    for kind in ('m','v'):
-        if set(state[kind]) != expected:
-            raise ValueError('Missing final corpus optimizer moments.')
-        for name, value in state[kind].items():
-            array = np.asarray(value,dtype=np.float32)
-            if array.shape != model.parameters[name].shape or not np.isfinite(array).all() or (kind=='v' and np.any(array<0)):
-                raise ValueError('Invalid final corpus optimizer moments.')
     snapshot_folder = Path(root)/'decoder-corpus-inputs'/approved['corpus_id']
     windows = json.loads((snapshot_folder/'windows.json').read_text())['train']
     if len(record['step_log']) != completed-restored:

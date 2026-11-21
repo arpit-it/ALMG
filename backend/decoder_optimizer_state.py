@@ -6,9 +6,10 @@ import numpy as np
 FORMAT='almg-float32-optimizer-state-v2'
 
 
-def _validate(state, parameters, config):
+def _validate(state, parameters, config, *, allow_completed=False):
     if config.get('optimizer') not in ('sgd','adamw'):raise ValueError('Unsupported checkpoint optimizer.')
-    if type(state.get('step')) is not int or not 0<state['step']<config['steps']:raise ValueError('Invalid restored optimizer/scheduler counter.')
+    last_step=config['steps'] if allow_completed else config['steps']-1
+    if type(state.get('step')) is not int or not 0<state['step']<=last_step:raise ValueError('Invalid restored optimizer/scheduler counter.')
     expected=set(parameters) if config['optimizer']=='adamw' else set()
     for kind in ('m','v'):
         if not isinstance(state.get(kind),dict) or set(state[kind])!=expected:raise ValueError('Optimizer moments are missing or invalid.')
@@ -17,8 +18,8 @@ def _validate(state, parameters, config):
                 or not np.isfinite(value).all() or (kind=='v' and np.any(value<0))):raise ValueError('Optimizer moment dtype, shape or finite checks failed.')
 
 
-def encode(state, parameters, config, *, compact):
-    _validate(state,parameters,config)
+def encode(state, parameters, config, *, compact, allow_completed=False):
+    _validate(state,parameters,config,allow_completed=allow_completed)
     if not compact:return {'step':state['step'],**{kind:{name:value.tolist() for name,value in state[kind].items()} for kind in ('m','v')}}
     return {'format':FORMAT,'schema_version':2,'step':state['step'],
             **{kind:{name:{'dtype':'<f4','shape':list(value.shape),
@@ -26,7 +27,7 @@ def encode(state, parameters, config, *, compact):
                      for name,value in state[kind].items()} for kind in ('m','v')}}
 
 
-def decode(saved, parameters, config, *, version):
+def decode(saved, parameters, config, *, version, allow_completed=False):
     if not isinstance(saved,dict):raise ValueError('Invalid saved optimizer state.')
     state={'step':saved.get('step'),'m':{},'v':{}}
     expected=set(parameters) if config['optimizer']=='adamw' else set()
@@ -54,5 +55,5 @@ def decode(saved, parameters, config, *, version):
                     state[kind]={name:np.asarray(value,dtype=np.float32) for name,value in saved[kind].items()}
         except (TypeError,ValueError,FloatingPointError):raise ValueError('Invalid legacy optimizer moment values.') from None
     else:raise ValueError('Unsupported optimizer checkpoint version.')
-    _validate(state,parameters,config)
+    _validate(state,parameters,config,allow_completed=allow_completed)
     return state

@@ -9693,6 +9693,35 @@ P3-LMF-06 partial progress · compact planned-model storage · 2026-11-22:
   blocked. Broader storage/scale work and other pretraining acceptance criteria
   stay open. User edits, pending seeded-order work, artifacts and weights retained.
 
+P3-LMF-06 partial progress · compact continuation optimizer state · 2026-11-22:
+- [ ] P3-LMF-06 remains open. Larger completed/canceled corpus continuations now
+  save version-two compact float32 optimizer state. Final and retained-partial
+  readers support both compact and genuine legacy list states. Small states
+  retain legacy writes. Completed counters require explicit continuation scope;
+  ordinary checkpoint loading still rejects the terminal optimizer counter.
+  Existing hash, shape, finite, variance, lineage and numeric checks remain.
+- Running local app port 28974 verified both SGD and AdamW: genuine legacy final
+  states remained readable; new completed continuations had exact moment-bit
+  equality with their legacy counterparts. Separately confirmed update-boundary
+  cancellation retained compact state at step ten before further updates; a new
+  explicit resume finished step twenty with zero reference error and matching
+  generation. Unconfirmed continuation/resume requests wrote nothing.
+- AdamW completed state measured 2,470,450 bytes versus 10,905,759 legacy bytes
+  (about 77% smaller). SGD has no moments: 96 versus 30 bytes; no size saving
+  claimed. All 150 original files remained unchanged; 176 final files retained.
+  Fresh local app port 28975 reopened all six new compact final/partial records
+  and reviewed both partial restores without changing any of those 176 files.
+- Clean-export regression: all 794 tests passed in 249.430 seconds with Metal
+  enabled, warnings treated as errors, no skips or exclusions. New tests cover
+  terminal-counter scope, invalid counters, exact legacy/compact state restores,
+  identical next updates, unknown formats and negative variance rejection.
+  Evidence: /tmp/almg-compact-continuation-state-api-qa/{python.log,
+  verify-app.log,verification.json,reopen-verification.json}.
+- This slice verified local API workflows; native GUI checks remain separately
+  blocked. Other phase-state storage, physical interruption, larger-scale and
+  remaining acceptance criteria stay open. User/seeded-order edits, artifacts
+  and downloaded weights preserved; no external collection or artifact commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
