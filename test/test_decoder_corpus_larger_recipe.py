@@ -40,9 +40,9 @@ class LargerCorpusRecipeTest(unittest.TestCase):
             changed={**source['config'],'seed':8};plan=plans.save(root,True,plans.review(changed));other=initializations.run(root,plan['id'],True,plan)
             corpus=inputs.save(root,plan['id'],True,other,dataset,8,inputs.review(root,plan['id'],other,dataset,8))
             self.assertFalse(isolated.review(root,other,corpus,base)['feasible'])
-            config={**source['config'],'hidden_size':40,'attention_heads':5,'feed_forward_size':80};plan=plans.save(root,True,plans.review(config));too_large=initializations.run(root,plan['id'],True,plan)
-            self.assertGreater(too_large['actual_parameter_count'],32768)
-            with self.assertRaisesRegex(ValueError,'32768'):inputs.review(root,plan['id'],too_large,dataset,8)
+            config={**source['config'],'layers':4,'hidden_size':64,'attention_heads':8,'feed_forward_size':128};plan=plans.save(root,True,plans.review(config));too_large=initializations.run(root,plan['id'],True,plan)
+            self.assertGreater(too_large['actual_parameter_count'],131072)
+            with self.assertRaisesRegex(ValueError,'131072'):inputs.review(root,plan['id'],too_large,dataset,8)
 
     @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS')=='1','Requires actual larger-model Metal training and checkpoint continuation')
     def test_both_optimizers_restore_continue_and_generate_with_unchanged_numeric_gate(self):
