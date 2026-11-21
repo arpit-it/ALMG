@@ -8462,6 +8462,39 @@ P3-LMF-07 partial progress · midpoint continuation budget planning API · 2026-
   edits are preserved and excluded. P3-LMF-01 remains complete for its recorded
   architecture scope. No external collection, generated artifacts or push included.
 
+P3-LMF-07 partial progress · retained training-phase budget planning API · 2026-11-21:
+- [ ] P3-LMF-07 remains open. The read-only training-resume-budget-review endpoint
+  plans the remaining recorded-training trajectory of a canceled or recoverable
+  interrupted run. It binds the retained source/revision/counter, keeps the original
+  cyclic window offsets and counts zero new reference updates. Scope is reviewed
+  cyclic settings versions five through nine. Reference-phase recovery and seeded
+  ordering remain outside this report. Existing resource denials remain denials;
+  conservative reserves and phase-specific duration estimates retain their limits.
+- Ran the updated local ALMG API on localhost:28936, independently of pending seeded
+  edits, from exported committed base 8c13120 plus only this change. Prepared two
+  genuine Metal training fixtures canceled after update 11 (SGD and AdamW, 14,400
+  parameters, shared-backend fixture preparation). Through the running API, each
+  report predicted nine remaining updates, 114 real target tokens, 144 dense positions
+  and 30 padding positions. Separately confirmed fresh-worker recoveries matched
+  those counts, reused the complete reference log, preserved the retained training
+  prefix and reproduced reference weights and optimizer state exactly (max error 0).
+- Planning and rejected/unconfirmed approval attempts wrote no files. Reports grant
+  no training/release approval and cannot serve as action reviews. Both completed
+  recoveries updated subsequent phase-duration calibration. An obsolete interruption
+  source whose original run already published a terminal result was rejected without
+  writes; no recovery eligibility gate was bypassed to create the fixture.
+- All 676 backend tests passed with actual Metal enabled and warnings as errors.
+  Tests cover recovery before/after midpoint with both optimizers, exact target counts,
+  resource blockers, unsupported-order rejection, source immutability and separate
+  consent. All 2,910 original fixture files remain unchanged; generated outputs stay
+  private. Evidence: /tmp/almg-corpus-training-resume-budget-api-qa/verification.json,
+  verify-app.log, prepare-fixture.log, rejected-terminal-source.json and python.log.
+- Delivered scope is the local API. Desktop planning-panel integration, reference-phase
+  and seeded budgeting, quality-token guidance, energy measurement and broader
+  stopping/throughput validation remain open. The unchanged desktop-history blocker,
+  pending source and unrelated user edits are preserved and excluded from this commit.
+  No external collection, generated artifacts or push included.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

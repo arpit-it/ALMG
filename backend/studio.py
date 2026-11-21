@@ -2390,6 +2390,8 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond(decoder_corpus_isolated.review_reference_resume(ROOT,corpus_parts[1]))
                 if corpus_parts[2] == 'reference-resume':
                     return self.respond(inference.WORKER.submit(decoder_corpus_isolated.run_reference_resume,ROOT,corpus_parts[1],data.get('confirmed'),data.get('reviewed'),data.get('request_id')).result())
+                if corpus_parts[2] == 'training-resume-budget-review':
+                    return self.respond(decoder_corpus_budget.review_training_resume(ROOT,corpus_parts[1]))
                 if corpus_parts[2] == 'training-resume-review':
                     return self.respond(decoder_corpus_isolated.review_training_resume(ROOT,corpus_parts[1]))
                 if corpus_parts[2] == 'training-resume':

@@ -100,3 +100,40 @@ def review_continuation(root, identifier):
     }
     result['revision'] = digest(result)
     return result
+
+
+def review_training_resume(root, identifier):
+    """Count retained recorded-training work without repeating its saved reference."""
+    parent = training.read(root, identifier)
+    config = parent['review']['config']
+    if config['schema_version'] not in (5, 6, 7, 8, 9):
+        raise ValueError('Recorded-training budget planning requires reviewed cyclic settings versions five through nine.')
+    resources = isolated.review_training_resume(root, identifier)
+    binding = resources['training_resume_from']
+    if binding['record_revision'] != parent['revision']:
+        raise ValueError('Retained training source changed during budget planning.')
+    origin = parent['review']['source']
+    initialized = training.hardware.initializations.read(root, origin['plan_id'], origin['initialization_id'])
+    saved = training.inputs.read(root, resources['corpus_id'])
+    _, current, _, windows, _ = training._source(root, initialized, saved)
+    estimates = resources['estimates']
+    result = {
+        'format': 'almg-corpus-training-resume-budget-review-v1', 'schema_version': 1,
+        'execution_scope': 'retained_recorded_training',
+        'source': resources['source'], 'training_resume_from': binding,
+        'corpus_id': saved['id'], 'corpus_revision': saved['revision'],
+        'config': config, 'restore_step': binding['completed_steps'],
+        'exposure': exposure(windows['train'], config, current['actual_parameter_count'],
+                             restore_step=binding['completed_steps'], reference_comparison=False),
+        'resource_review': resources, 'feasible': resources['feasible'], 'blockers': resources['blockers'],
+        'required_available_memory_bytes': estimates['required_available_memory_bytes'],
+        'required_free_disk_bytes': estimates['required_free_disk_bytes'],
+        'durable_checkpoint_disk_reserve_bytes': estimates['interruption_checkpoint_extra_disk_bytes'],
+        'workflow_duration_estimate': estimates.get('phase_resume_work_estimate'),
+        'optimizer_only_tokens_per_second': None, 'estimated_energy_wh': None, 'quality_token_requirement': None,
+        'training_approved': False, 'release_approved': False,
+        'limitations': 'Calculated remaining cyclic recorded-training targets begin at the validated retained counter and end at the original budget. The completed reference is reused without new reference updates. Resource reserves remain conservative. Duration requires exact compatible completed training-phase resumes, includes worker/restore/lineage/evaluation/inference overhead and is not an optimizer-only throughput or a wall-time guarantee. Reference-phase recovery, energy and quality-token requirements are outside this report. Planning is read-only; resuming requires its current resource review and separate explicit confirmation.',
+        'implementation_sha256': file_digest(Path(__file__)),
+    }
+    result['revision'] = digest(result)
+    return result
