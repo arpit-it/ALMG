@@ -9753,6 +9753,37 @@ P3-LMF-06 partial progress · compact phase-recovery optimizer state · 2026-11-
   Native GUI verification remains separately blocked; actual local API workflows
   were exercised. User edits, seeded-order work, artifacts and weights preserved.
 
+P3-LMF-06 partial progress · byte-preserving legacy midpoint recovery · 2026-11-22:
+- [ ] P3-LMF-06 remains open. Recorded-training recovery at or after the retained
+  midpoint now copies validated model/optimizer files without re-encoding them.
+  The checkpoint header retains its original format version and binds those exact
+  file hashes to the newly confirmed review. Source validation precedes copying;
+  copied bytes and the rebound checkpoint are validated before continuing.
+- Actual local app verification used genuine legacy 230,912-parameter fixtures:
+  SGD resumed at step ten and AdamW at step fifteen after controlled termination
+  of only the matching fixture worker at a published durable checkpoint. The
+  updated app completed step twenty with zero parameter/moment error; midpoint
+  bytes/hashes stayed identical in the derived run and new progress snapshots.
+  Unconfirmed recovery requests wrote nothing. This is controlled process
+  interruption, not physical OS/power-loss verification.
+- Final workflows used app ports 28982 / 28984. Separate fresh app processes on
+  28985 / 28986 reopened both recovered checkpoints and preserved all 102 files
+  in each fixture tree. Legacy writers were isolated per case after the old
+  writer encountered a newer derived-model format in the combined QA namespace;
+  both final recovery cases passed independently, with all artifacts retained.
+- Clean-export regression: all 800 tests passed in 266.793 seconds with Metal
+  enabled, warnings treated as errors, no skips or exclusions. New tests verify
+  exact legacy/compact tensor-file bytes under a new review, stale source rejection
+  before destination creation, copy corruption rejection before header publication,
+  and unchanged source artifacts. Existing numeric gates remain unchanged.
+  Evidence: /tmp/almg-retained-midpoint-api-qa/{python.log,
+  sgd-verification.json,adam-verification.json,verify-adam.log,
+  reopen-verification.json}; initial combined-run log retained in verify-app.log.
+- Remaining: broader layout/optimizer migration cases, arbitrary/physical
+  interruption, larger-scale engineering and remaining acceptance criteria.
+  Native GUI verification remains separately blocked. User edits, seeded-order
+  work, retained training artifacts and downloaded weights are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

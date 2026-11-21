@@ -4,6 +4,7 @@ import json
 import math
 from pathlib import Path
 import re
+import shutil
 import uuid
 import numpy as np
 if __package__:
@@ -109,6 +110,22 @@ def restore(folder,c,review_revision):
     if type(step) is not int or step!=record['step'] or not 0<step<c['steps']:raise ValueError('Invalid restored optimizer/scheduler counter.')
     state=optimizer_state.decode(saved,model.parameters,c,version=record['schema_version'])
     return model,state
+
+
+
+def copy_checkpoint(source,folder,c,source_revision,review_revision):
+    """Rebind a validated retained checkpoint without re-encoding its tensor files."""
+    restore(source,c,source_revision)
+    record=json.loads((source/'checkpoint.json').read_text())
+    folder.mkdir(parents=True,exist_ok=False)
+    for name in ('model.json','optimizer.json'):
+        shutil.copyfile(source/name,folder/name)
+        if file_digest(folder/name)!=record['files'][name]:raise ValueError('Retained checkpoint changed while copying.')
+    record['review_revision']=review_revision
+    record['revision']=digest({key:value for key,value in record.items() if key!='revision'})
+    (folder/'checkpoint.json').write_text(json.dumps(record,allow_nan=False))
+    restore(folder,c,review_revision)
+    return record
 
 
 def review(root,plan_id,initialized,settings):

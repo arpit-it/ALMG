@@ -297,13 +297,15 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
                     first=first+new_logs
             if state['step']==midpoint:
                 model.parameters=values
-                optimizer.checkpoint(folder/f'step-{midpoint}',model,state,c,approved['revision'])
+                if training_resume_id is not None and parent['completed_steps']==midpoint:
+                    optimizer.copy_checkpoint(_folder(root,parent['id'])/f'step-{midpoint}',folder/f'step-{midpoint}',c,parent['review']['revision'],approved['revision'])
+                else:
+                    optimizer.checkpoint(folder/f'step-{midpoint}',model,state,c,approved['revision'])
                 retain_training(values,state,first)
                 restored,state=optimizer.restore(folder/f'step-{midpoint}',c,approved['revision'])
                 values=restored.parameters
             elif training_resume_id is not None:
-                checkpoint_model,checkpoint_state=optimizer.restore(_folder(root,parent['id'])/f'step-{midpoint}',c,parent['review']['revision'])
-                optimizer.checkpoint(folder/f'step-{midpoint}',checkpoint_model,checkpoint_state,c,approved['revision'])
+                optimizer.copy_checkpoint(_folder(root,parent['id'])/f'step-{midpoint}',folder/f'step-{midpoint}',c,parent['review']['revision'],approved['revision'])
                 retain_training(values,state,first)
             values, state, last = optimize(values, state, c['steps'])
             parameter_error = max(float(np.max(np.abs(values[name] - reference[name]))) for name in values)
