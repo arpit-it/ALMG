@@ -8114,6 +8114,59 @@ P3-LMF-06 partial progress · durable reference-to-training transition · 2026-1
   skipped; P3-LMF-01 remains complete for its recorded architecture scope. No external
   collection occurred; generated artifacts, weights and unrelated edits are outside Git.
 
+P3-LMF-06 partial progress · reviewed eighty-update corpus budget · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Reviewed corpus training now offers eighty optimizer
+  updates through exact version-7 settings. Both reference and recorded trajectories
+  use the approved eighty-update cosine schedule; the restorable midpoint is forty,
+  with quarter points twenty/sixty. Changing the dropdown clears approval and requires
+  a new resource review. Version-5 ten/twenty and version-6 forty settings retain their
+  existing bounds. Version seven rejects other counts and noninteger/bool budgets.
+- The shared optimizer configuration parser recognizes version seven for corpus state,
+  checkpoints and continuations. The separate synthetic fixture still rejects extended
+  version-6/version-7 settings before source loading or queueing. No fixture-training
+  approval or model-size/sequence/batch/precision limit was widened. Existing checkpoint
+  formats derive counters from their frozen configuration without rewriting old records.
+- Native verification used rebuilt ALMG and offline fixture backend port 28926 with the
+  existing 704-parameter, sequence-eight, two-row/two-microbatch corpus. Explicit eighty-
+  update reviews were captured before confirmation for FP32 SGD and mixed FP16 AdamW.
+  Both full runs completed eighty updates, restored midpoint forty, decreased training
+  loss, matched reference weights/moments exactly and generated identical reloaded CPU
+  text. Each completed independently approved update-forty to update-eighty continuation
+  with zero reference weight difference. These successful runs were not paced fixtures.
+- Two additional original eighty-update workers were interrupted after publishing
+  reference midpoint forty, one per optimizer. Child PID, command and backend ownership
+  were checked before SIGKILL. Discovery selected forty over reference zero/twenty,
+  retained all six new interrupted snapshots, and fabricated neither a terminal original
+  run nor a cancellation receipt. After app/backend restart, separate reference reviews
+  required new confirmation and showed forty reference plus eighty recorded updates.
+  Both recoveries carried forty reference updates, executed forty remaining reference
+  updates, completed eighty recorded updates and matched weights/moments exactly.
+  Their independent forty-to-eighty continuations also matched exactly.
+- A final app/backend restart reopened twenty ordinary records, two selected interruption
+  points and all four new continuations exactly. Readers verified all 285 corpus,
+  interruption and continuation records. All 1,801 retained files stayed byte-identical,
+  including the original 1,567 and the 1,705 present after interruption. Exact full-run
+  feedback retained one sample per optimizer and excluded the reference recoveries.
+  Evidence: /tmp/almg-corpus-eighty-native-qa/verification.json,
+  full-and-interrupt-remaining.log, recover.log, restart.log and raw review/completed/checkpoint captures.
+  The new option was visible in the native menu but absent from the driver's initial
+  accessibility rows; native keyboard selection and the captured review verified eighty
+  before any training approval. The original selector diagnostic remains preserved.
+- Validation: 655 Python tests passed with Metal enabled and warnings as errors;
+  92 Flutter tests passed and analysis was clean. New coverage includes strict versioned
+  admission and synthetic pre-load rejection, both optimizers/precisions, actual worker
+  interruption at reference forty, full eighty-update training, forty-to-eighty continuation,
+  cooperative cancellation/recovery in both phases, schedule/moment restoration, exact
+  profile separation and unchanged source bytes. UI coverage requires a new review and
+  emits version seven only for the eighty-update selection.
+- Remaining: arbitrary interruption/admission/publication points, physical OS/power-loss
+  verification, broader model/sequence/batch/budget support, profiling and language-quality/
+  50M–100M acceptance. This extends a bounded engineering fixture and does not establish
+  large-model memory, throughput or language quality. Independent hardware/user-action
+  blockers remain open and skipped; P3-LMF-01 remains complete for its recorded architecture
+  scope. No external collection occurred; generated artifacts, weights and unrelated edits
+  remain excluded from Git.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

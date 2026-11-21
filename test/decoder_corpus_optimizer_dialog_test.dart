@@ -163,6 +163,23 @@ void main() {
     await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
   });
 
+  testWidgets('eighty update budget clears approval and requires version-seven settings', (tester) async {
+    Map<String,dynamic>? submitted;
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
+      if(path.endsWith('train')) { submitted=body;return {'initial_losses':{'train':2,'validation':2,'test':2},'final_losses':{'train':1,'validation':1.5,'test':1.6},'generated_text':'amber birch'}; }
+      return {'feasible':true,'estimates':{},'blockers':[]};
+    })));
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    expect(find.text('Confirm train and save corpus model'),findsOneWidget);
+    await tester.ensureVisible(find.text('20 corpus optimizer updates'));await tester.tap(find.text('20 corpus optimizer updates'));await tester.pumpAndSettle();
+    await tester.tap(find.text('80 corpus optimizer updates').last);await tester.pumpAndSettle();
+    expect(find.text('Confirm train and save corpus model'),findsNothing);
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm train and save corpus model'));await tester.pump();await tester.pump(const Duration(milliseconds:300));
+    expect((submitted!['settings'] as Map)['schema_version'],7);expect((submitted!['settings'] as Map)['steps'],80);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
   testWidgets('interruption history exposes midpoint recovery with fresh approval and no completed-run action', (tester) async {
     for(final counter in [20,0,10,30]) {
     final paths=<String>[];
