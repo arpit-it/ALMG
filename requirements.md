@@ -8399,6 +8399,44 @@ P3-LMF-06 partial progress · compact three-layer corpus recipe · 2026-11-21:
   and precision coverage, and physical power-loss verification. Previously recorded
   hardware/precision/budget blockers remain open and skipped. No collection or push.
 
+P3-LMF-07 partial progress · read-only cyclic-corpus budget planning API · 2026-11-21:
+- [ ] P3-LMF-07 remains open. POST /decoder-architecture-plans/<id>/corpus-budget-review
+  now combines the existing full resource review with calculated training-window
+  draws, completed passes, masked real targets, dense padded positions, tokens per
+  actual model parameter and the additional comparison-reference token workload.
+  It copies existing conservative memory/disk/checkpoint reserves and compatible
+  trial-calibrated workflow duration; those values keep their existing limitations.
+- Counts describe the proposed cyclic budget, not a language-quality data target.
+  Dedicated optimizer-only throughput, energy and quality-token requirements remain
+  unavailable rather than being presented as measurements. Scope is existing
+  reviewed cyclic settings versions five through nine; pending seeded settings are
+  rejected before resource review so their partial-pass exposure is not miscounted.
+- Planning is read-only and does not approve training. It returns a separately
+  identifiable report with training_approved/release_approved false and the current
+  resource review. Training still requires that review and explicit confirmation.
+  Wrong-plan proposals, planning reports used as training approval and unconfirmed
+  training were rejected through the running local application API without writes.
+- Verified independently of the uncommitted P3-LMF-06 seed work: exported committed
+  base 43eda28 to a private application fixture, applied only this module/route/tests
+  and ran the actual ALMG studio Handler on localhost:28934. Manual HTTP planning,
+  separately confirmed SGD/AdamW training and midpoint continuation all succeeded.
+  Each 14,400-parameter, twenty-update, two-row proposal calculated 251 real targets,
+  320 dense positions, 69 padding positions and 502 optimizer targets across both
+  fresh verification trajectories. Actual training logs matched the real-target
+  count. Both new trials appeared in subsequent calibrated duration estimates.
+- All 671 backend tests passed on the clean committed base plus this change, with
+  ALMG_METAL_TESTS=1 and warnings treated as errors. Read-only/blocker tests verify
+  resource denials remain denials and no unmeasured values or approval are invented.
+  All 2,790 original fixture files remained unchanged; generated models/logs stay
+  outside Git. Local evidence: /tmp/almg-corpus-budget-api-qa/verification.json,
+  verify-app.log, server.log, python.log and saved proposals/results.
+- Delivered and verified scope is the local planning API; desktop planning-panel
+  integration remains open. The separate seeded-order desktop-history blocker and
+  pending source edits are preserved and excluded from this commit. Still open:
+  broader/seeded/resumed budget planning, quality-token guidance, energy measurement,
+  additional limits/stopping criteria, and broader throughput/uncertainty validation.
+  No external collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

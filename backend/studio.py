@@ -43,7 +43,7 @@ if __package__:
     from . import decoder_architecture_feasibility, decoder_architecture_backward, decoder_architecture_initializations, decoder_architecture_plans, decoder_stream_imports, decoder_stream_archives, decoder_stream_evaluations, decoder_stream_previews, decoder_stream_training, decoder_stream_persistence, decoder_stream_unigram, decoder_stream_unigram_candidates, decoder_stream_character_bpe, decoder_stream_learned_optimization, decoder_stream_learned_windows, decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
     from . import decoder_stream_training_feasibility
     from . import decoder_stream_training_measurements
-    from . import decoder_optimizer_fixture,decoder_optimizer_continuations,decoder_optimizer_isolated,decoder_corpus_inputs,decoder_corpus_optimizer,decoder_corpus_continuations,decoder_corpus_isolated
+    from . import decoder_optimizer_fixture,decoder_optimizer_continuations,decoder_optimizer_isolated,decoder_corpus_inputs,decoder_corpus_optimizer,decoder_corpus_continuations,decoder_corpus_isolated,decoder_corpus_budget
     from . import decoder_trial_feasibility
     from . import classifier_feasibility
     from . import image_feasibility
@@ -82,7 +82,7 @@ else:
     import decoder_stream_training
     import decoder_stream_training_feasibility
     import decoder_stream_training_measurements
-    import decoder_optimizer_fixture,decoder_optimizer_continuations,decoder_optimizer_isolated,decoder_corpus_inputs,decoder_corpus_optimizer,decoder_corpus_continuations,decoder_corpus_isolated
+    import decoder_optimizer_fixture,decoder_optimizer_continuations,decoder_optimizer_isolated,decoder_corpus_inputs,decoder_corpus_optimizer,decoder_corpus_continuations,decoder_corpus_isolated,decoder_corpus_budget
     import decoder_trial_feasibility
     import classifier_feasibility
     import image_feasibility
@@ -2406,6 +2406,9 @@ class Handler(BaseHTTPRequestHandler):
             if len(architecture_parts) == 3 and architecture_parts[0] == 'decoder-architecture-plans':
                 if architecture_parts[2].startswith('corpus-optimizer-') and architecture_parts[2]!='corpus-optimizer-cancel' and (not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id') != architecture_parts[1]):
                     raise ValueError('Reopen the initialized model belonging to this architecture plan.')
+                if architecture_parts[2] == 'corpus-budget-review':
+                    if not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id')!=architecture_parts[1]:raise ValueError('Reopen the initialized model belonging to this architecture plan.')
+                    return self.respond(decoder_corpus_budget.review(ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings')))
                 if architecture_parts[2] == 'corpus-optimizer-review':
                     return self.respond(decoder_corpus_isolated.review(ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings')))
                 if architecture_parts[2] == 'corpus-optimizer-cancel':
