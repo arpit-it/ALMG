@@ -9007,6 +9007,48 @@ P3-LMF-08 partial progress · original-initialization held-out baseline · 2026-
   work, user changes, training artifacts and downloaded weights are preserved.
   No external collection, generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · bounded free-running continuation diagnostics · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Added read-only generation-evaluation for verified
+  completed corpus models, separate from teacher-forced loss evaluation. Protocol
+  v1 uses the first eight saved windows per validation/test split, a one-token
+  prompt and up to four greedy tokens, limited by the real reference target count.
+  Generated tokens alone extend the context; references are never fed back.
+  Reports bind protocol, model/initialization lineage, dataset/tokenizer/windows,
+  runtime and producer hashes. No EOS behavior or inference speed is inferred.
+- Reports include bounded prompt/reference/generated tokens and decoded text,
+  exact continuation matches, matching prefix lengths, free-running positional
+  reference-match rates and adjacent repetition counts/rates. A single generated
+  token has no repetition-rate denominator and reports unavailable (null).
+  Optional saved-model or original-initialization comparisons require identical
+  protocol/data bindings; self-comparison deltas are zero. Strict boolean and
+  mutually exclusive baseline controls match the held-out endpoint.
+- Verified the running ALMG API at localhost:28952 from exported d8cb861 plus only
+  this module/shared context/route/tests, excluding pending seeded and user edits.
+  For both 14,400-parameter SGD/AdamW models, independent greedy replay matched
+  every generated token and all match/repetition counts. Each split used two
+  windows, generating six validation and five test tokens, with padding excluded.
+  AdamW matched both validation continuations but neither test continuation; the
+  report exposes these narrow results without asserting general capability.
+- Initialization, saved-model and self baselines passed. Invalid flags, conflicting
+  baselines, partial models, invalid IDs and incompatible sixteen-token evaluation
+  data were rejected. Existing held-out loss metrics remained within 1e-9 of saved
+  losses after sharing validated context loading. Repeat reports and separate CPU
+  process reloads were identical. All 4,558 original fixture files stayed unchanged;
+  no training, release or language-quality approval or artifact writes occurred.
+  Evidence: /tmp/almg-generation-evaluation-api-qa/verification.json,
+  verify-app.log, sgd-generation.json and adamw-generation.json. Native desktop
+  interaction is not claimed.
+- Validation: all 725 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Six new tests cover generated-history
+  feedback, padding, fixed bounds, repetition denominators, invalid logits/masks,
+  protocol/data matching, baseline validation and real-model source immutability.
+- Remaining: desktop evaluation controls, independent/larger generation benchmarks,
+  semantic and assistant-quality review, reasoning/coding/multilingual evaluation,
+  leakage audits, measured inference performance/memory and full acceptance.
+  Existing desktop/hardware blockers remain open and skipped. User edits, pending
+  seeded work, training artifacts and downloaded weights are preserved. No external
+  collection, generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

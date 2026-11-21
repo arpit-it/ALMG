@@ -52,7 +52,7 @@ def score_split(model, windows, vocabulary):
             'failure_examples':failures}
 
 
-def _evaluate_one(root, identifier, *, original_initialization=False):
+def evaluation_context(root, identifier, *, original_initialization=False):
     record=training.read(root,identifier)
     if record.get('status','completed')!='completed':raise ValueError('Evaluate a verified completed corpus model, not partial training.')
     origin=record['review']['source']
@@ -68,12 +68,21 @@ def _evaluate_one(root, identifier, *, original_initialization=False):
         model_path=training._folder(root,identifier)/'trained-model.json'
         source={'record_id':record['id'],'record_revision':record['revision'],'model_sha256':record['files']['trained-model.json']}
     model=training.PlannedDecoder.load(model_path)
+    return model,windows,tokenizer,source,corpus
+
+
+def data_binding(corpus):
     binding={key:corpus['review'][key] for key in ('dataset_id','dataset_revision','dataset_sha256','sequence_length')}
     binding.update(windows_sha256=corpus['files']['windows.json'],tokenizer_sha256=corpus['files']['tokenizer.json'])
+    return binding
+
+
+def _evaluate_one(root, identifier, *, original_initialization=False):
+    model,windows,tokenizer,source,corpus=evaluation_context(root,identifier,original_initialization=original_initialization)
     return {'format':'almg-corpus-heldout-evaluation-v1','schema_version':1,
             'protocol':dict(PROTOCOL,splits=list(PROTOCOL['splits'])),'protocol_revision':digest(PROTOCOL),
             'source':source,
-            'corpus_id':corpus['id'],'corpus_revision':corpus['revision'],'evaluation_data_binding':binding,
+            'corpus_id':corpus['id'],'corpus_revision':corpus['revision'],'evaluation_data_binding':data_binding(corpus),
             'metrics':{split:score_split(model,windows[split],tokenizer.vocabulary) for split in PROTOCOL['splits']},
             'runtime':{'numpy':np.__version__,'precision':'float32_model_logits_float64_loss_accumulation'},
             'training_approved':False,'release_approved':False,'language_quality_validated':False,
