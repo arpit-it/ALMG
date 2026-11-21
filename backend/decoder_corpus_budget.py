@@ -124,10 +124,15 @@ def smaller_budgets(config):
         yield training.configuration({**config, 'schema_version': version, 'steps': steps}, config['sequence_length'])
 
 
-def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens):
-    """Select an existing fresh-run step budget under a calculated new-target cap."""
-    if type(max_workflow_target_tokens) is not int or not 0 < max_workflow_target_tokens <= 2**63 - 1:
-        raise ValueError('Use a positive integer workflow target-token limit within signed 64-bit range.')
+def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None):
+    """Select a fresh-run budget satisfying every supplied scoped target limit."""
+    limits = {'full_workflow_optimizer_target_tokens': max_workflow_target_tokens,
+              'recorded_training_target_tokens': max_recorded_training_target_tokens}
+    if all(value is None for value in limits.values()):
+        raise ValueError('Provide at least one recorded-training or workflow target-token limit.')
+    for value in limits.values():
+        if value is not None and (type(value) is not int or not 0 < value <= 2**63 - 1):
+            raise ValueError('Use positive integer target-token limits within signed 64-bit range.')
     if not isinstance(reviewed_inputs, dict) or not isinstance(reviewed_inputs.get('review'), dict):
         raise ValueError('Reopen saved reviewed corpus inputs before limit planning.')
     config = training.configuration(settings, reviewed_inputs['review'].get('sequence_length'))
@@ -136,23 +141,25 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
     _, current, _, windows, _ = training._source(root, initialized, reviewed_inputs)
     candidates = []
     for candidate in smaller_budgets(config):
-        targets = exposure(windows['train'], candidate, current['actual_parameter_count'])['full_workflow_optimizer_target_tokens']
-        candidates.append({'config': candidate, 'full_workflow_optimizer_target_tokens': targets,
-                           'within_limit': targets <= max_workflow_target_tokens})
+        counts = exposure(windows['train'], candidate, current['actual_parameter_count'])
+        candidates.append({'config': candidate, **{key: counts[key] for key in limits},
+                           'within_limit': all(limit is None or counts[key] <= limit for key, limit in limits.items())})
     fitting = [candidate for candidate in candidates if candidate['within_limit']]
     if not fitting:
-        raise ValueError(f"No supported update budget fits this workflow target limit (minimum {candidates[0]['full_workflow_optimizer_target_tokens']}).")
+        minimum = candidates[0]
+        raise ValueError(f"No supported update budget fits these target limits (minimum recorded training {minimum['recorded_training_target_tokens']}, workflow {minimum['full_workflow_optimizer_target_tokens']}).")
     selected = review(root, initialized, reviewed_inputs, fitting[-1]['config'])
-    if selected['exposure']['full_workflow_optimizer_target_tokens'] > max_workflow_target_tokens:
+    if any(limit is not None and selected['exposure'][key] > limit for key, limit in limits.items()):
         raise ValueError('Corpus exposure changed during target-limit planning; reopen the saved inputs.')
     result = {
         'format': 'almg-corpus-target-limit-review-v1', 'schema_version': 1,
         'source': selected['source'], 'corpus_id': selected['corpus_id'], 'corpus_revision': selected['corpus_revision'],
         'requested_config': config, 'max_workflow_optimizer_target_tokens': max_workflow_target_tokens,
+        'max_recorded_training_target_tokens': max_recorded_training_target_tokens,
         'considered_budgets': candidates, 'selected_config': selected['config'], 'selected_budget_review': selected,
         'feasible': selected['feasible'], 'blockers': selected['blockers'],
         'training_approved': False, 'release_approved': False,
-        'limitations': 'Read-only fresh-run planning limit counts masked optimizer targets across both newly executed reference and recorded-training trajectories, excluding padding/evaluation/inference. Selects the largest existing supported step budget no greater than requested; other recipe controls are retained. The limit becomes an existing fixed update budget, not a new runtime early-stop policy. Training needs the selected settings, their current resource review and separate explicit confirmation. Changing settings or corpus requires renewed review; resource blockers remain blockers. No quality-token requirement is inferred.',
+        'limitations': 'Read-only fresh-run planning: recorded-training targets count one recorded trajectory; workflow targets include both newly executed reference and recorded-training trajectories. Padding/evaluation/inference are excluded. Every supplied limit must fit; an omitted limit is unconstrained. Selects the largest existing supported step budget no greater than requested; other recipe controls are retained. Limits become an existing fixed update budget, not a new runtime early-stop policy. Training needs the selected settings, their current resource review and separate explicit confirmation. Changing settings or corpus requires renewed review; resource blockers remain blockers. No quality-token requirement is inferred.',
         'implementation_sha256': file_digest(Path(__file__)),
     }
     result['revision'] = digest(result)

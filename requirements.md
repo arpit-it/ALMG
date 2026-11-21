@@ -8635,6 +8635,41 @@ P3-LMF-07 partial progress · fresh-run workflow target-limit planning · 2026-1
   blockers stay skipped; pending source/user edits are preserved and excluded.
   No external collection or push occurred.
 
+P3-LMF-07 partial progress · independently scoped training/verification token caps · 2026-11-21:
+- [ ] P3-LMF-07 remains open. Fresh-run limit planning now accepts an optional
+  max_recorded_training_target_tokens independently of the existing workflow cap.
+  At least one cap is required; every supplied cap must fit. Recorded-training
+  counts describe one trajectory; workflow counts include the new reference and
+  recorded trajectories. Candidate reports expose both counts. Omitted caps are
+  unconstrained, and legacy workflow-only requests retain their behavior.
+- Selection still uses existing fixed update budgets, retains other recipe controls,
+  returns current resource/blocker information and grants no training/release approval.
+  This is a planning control mapped to an approved step budget, not a new runtime
+  early-stop policy. Changing the selected recipe requires renewed review.
+- Verified the actual ALMG API on localhost:28941 from exported committed base
+  1783164 plus only this source/tests, excluding pending seeded/desktop edits.
+  Both SGD and AdamW fixtures exercised recorded-only, workflow-only, combined and
+  exact-boundary caps. A recorded cap of 130 selected ten steps even when a workflow
+  cap of 1,000 permitted twenty; a workflow cap of 300 selected ten when a recorded
+  cap of 260 permitted twenty. An exact recorded cap of 251 permitted twenty steps.
+- Two separately confirmed 14,400-parameter fresh-worker runs with recorded cap 130
+  and workflow cap 300 each executed ten steps per trajectory: 126 recorded targets
+  and 252 total optimizer targets, within both caps. Checkpoint parameter/optimizer
+  errors were zero and subsequent selected-budget rates included the new trials.
+  Invalid and below-minimum caps, wrong-plan proposals, unconfirmed training, reports
+  as approvals and expanding steps with the old review were rejected without writes.
+- All 692 backend tests passed with actual Metal enabled and warnings as errors.
+  Focused tests cover independent/combined cap boundaries, validation of each supplied
+  cap, resource denials, source immutability and real selected-budget execution.
+  All 3,310 original fixture files remained unchanged. Evidence:
+  /tmp/almg-corpus-scoped-token-limits-api-qa/verification.json, verify-app.log,
+  python.log, saved proposals and new-runs.json. Generated outputs stay private.
+- Delivered scope is the fresh-run planning API. Desktop controls, recovery caps,
+  runtime stop policies, broader resource/uncertainty validation, seeded budgeting
+  and energy/quality guidance remain open. Unchanged desktop/hardware blockers
+  remain skipped; pending source/user edits preserved and excluded. No collection
+  or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

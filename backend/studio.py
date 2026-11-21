@@ -2416,7 +2416,7 @@ class Handler(BaseHTTPRequestHandler):
                     raise ValueError('Reopen the initialized model belonging to this architecture plan.')
                 if architecture_parts[2] == 'corpus-budget-limit-review':
                     if not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id')!=architecture_parts[1]:raise ValueError('Reopen the initialized model belonging to this architecture plan.')
-                    return self.respond(decoder_corpus_budget.review_limit(ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings'),data.get('max_workflow_optimizer_target_tokens')))
+                    return self.respond(decoder_corpus_budget.review_limit(ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings'),data.get('max_workflow_optimizer_target_tokens'),data.get('max_recorded_training_target_tokens')))
                 if architecture_parts[2] == 'corpus-budget-review':
                     if not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id')!=architecture_parts[1]:raise ValueError('Reopen the initialized model belonging to this architecture plan.')
                     return self.respond(decoder_corpus_budget.review(ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings')))
