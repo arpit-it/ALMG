@@ -1,5 +1,6 @@
 """Read-only budget geometry for existing reviewed cyclic corpus recipes."""
 from pathlib import Path
+import math
 if __package__:
     from . import decoder_corpus_optimizer as training, decoder_corpus_isolated as isolated
     from .run_manifest import digest, file_digest
@@ -39,6 +40,49 @@ def exposure(windows, config, parameter_count, *, restore_step=0, reference_comp
     }
 
 
+def workflow_target_rate(exposure, work):
+    """Derive a workflow rate from compatible measured durations, never kernel timing."""
+    if not isinstance(work, dict) or work.get('measured') is not False:
+        return None
+    targets = exposure.get('full_workflow_optimizer_target_tokens')
+    samples = work.get('source_records')
+    if type(targets) is not int or targets <= 0 or not isinstance(samples, list) or not samples:
+        return None
+    try:
+        times = [sample['elapsed_seconds'] for sample in samples]
+        estimate = work['estimated_seconds']
+        if any(type(value) not in (int, float) or not math.isfinite(value) or value <= 0 for value in [estimate, *times]):
+            return None
+        if estimate < max(times):
+            return None
+        rates = [targets / value for value in times]
+        estimated_rate = targets / estimate
+        if not all(math.isfinite(value) and value > 0 for value in [estimated_rate, *rates]):
+            return None
+        sources = [{'record_id': sample['record_id'], 'record_revision': sample['record_revision'],
+                    'elapsed_seconds': elapsed, 'workflow_optimizer_targets_per_second': rate}
+                   for sample, elapsed, rate in zip(samples, times, rates)]
+    except (KeyError, TypeError, OverflowError):
+        return None
+    return {
+        'format': 'almg-corpus-workflow-target-rate-estimate-v1', 'schema_version': 1,
+        'measured': False, 'basis': 'exact_compatible_completed_workflow_observations',
+        'full_workflow_optimizer_target_tokens': targets, 'sample_count': len(sources),
+        'estimated_workflow_optimizer_targets_per_second': estimated_rate,
+        'observed_min_workflow_optimizer_targets_per_second': min(rates),
+        'observed_max_workflow_optimizer_targets_per_second': max(rates),
+        'source_records': sources,
+        'duration_limitations': work.get('limitations'),
+        'limitations': 'Calculated masked optimizer-target counts divided by measured complete-worker durations, including reference work only when newly executed and including restore/admission/checkpoint/evaluation/inference overhead. Not direct optimizer-only throughput, unique corpus tokens, a confidence interval or a future speed guarantee. Observed range covers only the exact compatible completed samples; the estimate uses the existing duration headroom. No compatible positive timing or no remaining targets means no rate estimate.',
+    }
+
+
+def _finish(result):
+    result['workflow_optimizer_target_rate_estimate'] = workflow_target_rate(result['exposure'], result['workflow_duration_estimate'])
+    result['revision'] = digest({k: v for k, v in result.items() if k != 'revision'})
+    return result
+
+
 def review(root, initialized, reviewed_inputs, settings):
     if not isinstance(reviewed_inputs, dict) or not isinstance(reviewed_inputs.get('review'), dict):
         raise ValueError('Reopen saved reviewed corpus inputs before budget planning.')
@@ -63,8 +107,7 @@ def review(root, initialized, reviewed_inputs, settings):
         'limitations': 'Token exposure is calculated from saved masks and approved cyclic window draws, not a language-quality token requirement. Memory/disk values are existing conservative admission reserves. Duration is unavailable without exact compatible completed trials; calibrated duration includes worker, reference, checkpoint/evaluation and inference overhead. No theoretical throughput or energy value is presented as measured. This read-only proposal does not queue or approve training; use a current resource review and separate explicit training confirmation.',
         'implementation_sha256': file_digest(Path(__file__)),
     }
-    result['revision'] = digest(result)
-    return result
+    return _finish(result)
 
 
 def review_continuation(root, identifier):
@@ -103,8 +146,7 @@ def _continuation_report(root, parent, resources):
         'limitations': 'Calculated remaining cyclic optimizer-target exposure starts at the validated restored counter and ends at the original approved budget. Completed work and the saved reference are not counted as new updates. Existing resource reserves remain conservative. Duration uses only exact compatible continuation trials and includes restore, lineage, evaluation and inference overhead; it is not an optimizer-only throughput or a wall-time guarantee. Energy and quality-token requirements remain unmeasured. Planning does not approve continuation; use its current resource review and separate explicit confirmation.',
         'implementation_sha256': file_digest(Path(__file__)),
     }
-    result['revision'] = digest(result)
-    return result
+    return _finish(result)
 
 
 def review_partial(root, identifier):
@@ -119,8 +161,7 @@ def review_partial(root, identifier):
     result = _continuation_report(root, parent, resources)
     result.update(format='almg-corpus-partial-resume-budget-review-v1',
                   execution_scope='retained_canceled_continuation', resume_from=resources['resume_from'])
-    result['revision'] = digest({k: v for k, v in result.items() if k != 'revision'})
-    return result
+    return _finish(result)
 
 
 def review_training_resume(root, identifier):
@@ -156,8 +197,7 @@ def review_training_resume(root, identifier):
         'limitations': 'Calculated remaining cyclic recorded-training targets begin at the validated retained counter and end at the original budget. The completed reference is reused without new reference updates. Resource reserves remain conservative. Duration requires exact compatible completed training-phase resumes, includes worker/restore/lineage/evaluation/inference overhead and is not an optimizer-only throughput or a wall-time guarantee. Reference-phase recovery, energy and quality-token requirements are outside this report. Planning is read-only; resuming requires its current resource review and separate explicit confirmation.',
         'implementation_sha256': file_digest(Path(__file__)),
     }
-    result['revision'] = digest(result)
-    return result
+    return _finish(result)
 
 
 def reference_recovery_exposure(windows, config, parameter_count, restore_step):
@@ -212,5 +252,4 @@ def review_reference_resume(root, identifier):
         'limitations': 'Calculated new cyclic reference targets start at the retained reference counter; recorded training still executes its complete original budget from initialization. Carried reference work is excluded. Resource reserves remain conservative. Duration uses exact compatible completed reference-phase recoveries and includes worker/restore/lineage/checkpoint/evaluation/inference overhead, not optimizer-only throughput or a wall-time guarantee. Energy and quality-token requirements remain unmeasured. This read-only report does not approve recovery; use its current resource review and separate explicit confirmation.',
         'implementation_sha256': file_digest(Path(__file__)),
     }
-    result['revision'] = digest(result)
-    return result
+    return _finish(result)

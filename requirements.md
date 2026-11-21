@@ -8562,6 +8562,42 @@ P3-LMF-07 partial progress · canceled continuation budget planning API · 2026-
   remain skipped; pending source, user edits and generated artifacts are preserved
   and excluded from this commit. No external collection or push occurred.
 
+P3-LMF-07 partial progress · trial-calibrated workflow target rates · 2026-11-21:
+- [ ] P3-LMF-07 remains open. All five cyclic budget-report paths now include an
+  optional workflow_optimizer_target_rate_estimate derived from their exact compatible
+  completed-worker timing samples and new masked optimizer-target counts. Reports
+  preserve the observed sample-rate range, each source ID/revision/duration and the
+  existing headroom-adjusted duration estimate. Rates remain labeled calculated;
+  optimizer-only throughput remains unknown. The denominator includes workflow
+  overhead and newly executed reference work belongs in the numerator only when
+  that phase actually runs. Carried work and padded positions are not new targets.
+- No compatible positive timing or no remaining targets produces no rate. Invalid,
+  boolean, nonfinite or nonpositive timings, missing source data and nonfinite
+  derived rates also produce no estimate. Observed ranges are not confidence
+  intervals or future-speed guarantees; exact-source/config/runtime/producer scope
+  and the original duration limitations are retained. No training/release approval
+  or resource constraints change.
+- Verified the updated ALMG API locally on localhost:28939 using exported committed
+  base cc063fa plus only this module/tests, excluding pending seeded/desktop edits.
+  Ten read-only reports covered SGD and AdamW fresh training, midpoint continuation,
+  retained training-phase recovery, retained reference-phase recovery and canceled
+  continuation recovery. Every source duration/revision matched its saved measured
+  worker record, and rates used the correct 502/125/114/414/87 new-target workloads.
+  Planning wrote no files. Two separately confirmed new 14,400-parameter SGD/AdamW
+  trials completed, matched existing numeric gates and entered subsequent rate
+  estimates, increasing each fresh estimate's sample count from two to three.
+  Planning reports and unconfirmed training remained invalid action approvals.
+- All 685 backend tests passed with actual Metal enabled and warnings as errors.
+  Tests cover range/headroom arithmetic, phase-specific workloads, absent/invalid
+  evidence, real completed-worker calibration and source immutability. All 3,102
+  original fixture files remained unchanged. Evidence:
+  /tmp/almg-corpus-workflow-rate-api-qa/verification.json, verify-app.log, python.log,
+  saved planning reports and new-runs.json. Generated artifacts remain private.
+- Delivered scope is the planning API. Desktop panels, direct optimizer timing,
+  broader uncertainty/limits validation, seeded budgeting, energy and quality-token
+  guidance remain open. Unchanged desktop/hardware blockers remain skipped;
+  pending source/user edits are preserved and excluded. No collection or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
