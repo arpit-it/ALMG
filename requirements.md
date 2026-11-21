@@ -7746,6 +7746,63 @@ P3-LMF-06 partial progress · training-start interruption recovery and latest po
   Unchanged independent hardware/user-action blockers remain open and skipped;
   P3-LMF-01 remains complete for its recorded architecture scope.
 
+P3-LMF-06 partial progress · reference-start interruption recovery and phase ordering · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Fresh isolated corpus workers now publish an immutable
+  version-7 reference-start checkpoint after initial source/resource/precision checks
+  and before reference optimization begins. It retains initial FP32 weights, empty
+  optimizer state and reference counter zero, tokenizer, frozen approval/input bindings
+  and originating worker/run IDs. Data/manifest publication uses the existing flushed,
+  manifest-last protocol. Separate reference-recovery review and explicit confirmation
+  replay the remaining reference trajectory and original recorded-training budget.
+  Later uncheckpointed reference work is replayed; no intermediate progress is implied.
+- Version-5 midpoint and version-6 training-start records remain readable. Admission
+  reserves disk for all three durable points. Discovery prefers the advanced phase
+  (recorded training over reference verification), then its highest counter, before
+  considering timestamps. Thus a completed reference's training-start state wins over
+  reference-start even when both counters are zero or clocks regress. Conflicting
+  origin/approval bindings are rejected; older valid generations remain immutable but
+  are omitted from the latest-point list. Active and terminal origins stay excluded.
+  The UI identifies reference-start state and routes it to reference recovery only.
+- Native verification used the rebuilt ALMG app and offline fixture backend on port
+  28919 with the existing 704-parameter, eight-token, two-row/two-microbatch forty-update
+  fixture. Owned FP32 SGD and mixed FP16 AdamW workers were terminated with SIGKILL
+  during reference optimization after reference-start publication. Both exposed saved
+  reference counter zero, with no recorded training or fabricated cancellation receipt.
+  Two additional SGD interruptions during recorded training exposed training-start
+  counter zero and midpoint counter twenty. Native discovery omitted their earlier
+  phase/counter generations while retaining all seven newly published snapshot records.
+  Every child PID, parent backend and command was checked before termination.
+- After app/backend restart, phase-specific resource reviews required new confirmation.
+  Each reference-start source executed forty reference updates plus forty recorded
+  updates; training-start reused its full reference and executed forty training updates,
+  and midpoint reused its full reference and executed twenty remaining updates. All four
+  completed models had zero final weight/moment error against their reference trajectories
+  and matching reloaded CPU generation. Each also completed independently approved
+  update-20 to update-40 midpoint continuation with zero reference weight difference.
+- A final app/backend restart reopened the latest twenty ordinary records, four selected
+  interruption points and four continuations exactly, preserving phase/counter precedence.
+  Backend readers verified all 85 corpus/checkpoint/continuation records. All 667 retained
+  files stayed byte-identical, including the original 585 and all 627 files present after
+  interruption. Evidence: /tmp/almg-corpus-reference-start-native-qa/verification.json,
+  interrupt.log, expected-worker-failure UI captures, recover.log, restart.log and raw
+  selected/review/recovered/continuation captures. No external collection occurred;
+  generated models, snapshots and QA files remain outside Git.
+- Validation: 649 Python tests passed with warnings as errors and Metal enabled; all
+  86 Flutter tests passed and analysis was clean. Actual worker-termination tests now
+  cover reference-start, training-start and midpoint recovery for both optimizers,
+  exact replay counts, ownership/approval gates, source bytes, artifact integrity and
+  receipt-free interruption state. Phase ordering is tested under clock regression,
+  alongside conflicting-origin rejection, incomplete publication and non-POSIX guards.
+  UI tests require separate reference approval and exclude training/completed-run actions
+  for reference-start sources.
+- Remaining: interruption during admission/initial checks or before successful checkpoint
+  publication, periodic reference/training checkpoints that retain newer progress,
+  resumed-worker lifecycle/arbitrary interruption points, physical OS/power-loss
+  verification, larger model/sequence/batch/budget support, profiling and quality/
+  50M–100M acceptance. This verifies fresh-worker process recovery from the three published
+  start/midpoint points only. Unchanged independent hardware/user-action blockers remain
+  open and skipped; P3-LMF-01 remains complete for its recorded architecture scope.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

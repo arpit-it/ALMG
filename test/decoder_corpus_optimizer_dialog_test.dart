@@ -185,4 +185,19 @@ void main() {
     }
   });
 
+  testWidgets('reference-start interruption requires a separate reference recovery review', (tester) async {
+    final paths=<String>[];
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
+      paths.add(path);return {'records':[{'id':'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb','schema_version':7,'status':'interruption_checkpoint','checkpoint_origin':'fresh_worker_reference_start','cancellation_phase':'reference_verification','completed_steps':0,'review':{'execution_mode':'fresh_process','config':{'steps':40,'optimizer':'sgd'}},'initial_losses':{'train':2,'validation':2,'test':2},'final_losses':{'train':2,'validation':2,'test':2},'generated_text':'amber'}]};
+    })));
+    await tester.tap(find.text('Saved interruption checkpoints'));await tester.pumpAndSettle();
+    await tester.tap(find.textContaining('bbbbbbbb ·'));await tester.pumpAndSettle();
+    expect(find.textContaining('Reference-start checkpoint: the saved reference counter is zero'),findsOneWidget);
+    expect(find.text('Review retained corpus recorded training resume'),findsNothing);
+    expect(find.text('Review corpus checkpoint continuation'),findsNothing);
+    await tester.tap(find.text('Review retained corpus reference resume'));await tester.pumpAndSettle();
+    expect(find.text('Review reference resume resources'),findsOneWidget);expect(find.text('Confirm resume retained corpus reference'),findsNothing);expect(paths.length,1);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+  });
+
 }

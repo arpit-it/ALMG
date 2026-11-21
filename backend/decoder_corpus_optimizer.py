@@ -129,8 +129,8 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
                    precision_scope='Conservative FP32 reserves retained; mixed FP16 matrix products do not establish memory savings.',
                    effective_batch_rows=c['batch_size'], gradient_accumulation_steps=c['gradient_accumulation_steps'],
                    gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if c['gradient_accumulation_steps'] > 1 else 0)
-    reserve['interruption_checkpoint_count']=2
-    reserve['interruption_checkpoint_extra_disk_bytes']=2*max(2*1024**2,current['actual_weight_bytes']*256)
+    reserve['interruption_checkpoint_count']=3
+    reserve['interruption_checkpoint_extra_disk_bytes']=3*max(2*1024**2,current['actual_weight_bytes']*256)
     reserve['required_free_disk_bytes']+=reserve['interruption_checkpoint_extra_disk_bytes']
     reserve['required_available_memory_bytes']+=current['actual_weight_bytes']*8
     reasons = list(profile['errors'])
@@ -234,6 +234,10 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
                 return values, state, logs
             empty = {'step': 0, 'm': {}, 'v': {}}; midpoint = c['steps'] // 2
             if training_resume_id is None:
+                if parent is None and execution_mode=='fresh_process':
+                    if __package__:from . import decoder_corpus_interruptions
+                    else:import decoder_corpus_interruptions
+                    decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,initial_parameters,empty,None,None,[],[],request_id,phase='reference_verification')
                 reference_values, reference_initial_state = (initial_parameters, empty) if parent is None else reference_resume.state(root,parent)
                 reference, reference_state, reference_log = optimize(reference_values, reference_initial_state, c['steps'])
                 reference_log = reference_prefix + reference_log
@@ -332,7 +336,7 @@ def read(root, identifier, _seen=None):
     if __package__:from . import decoder_corpus_training_resume
     else:import decoder_corpus_training_resume
     decoder_corpus_training_resume.lineage(root,record,seen)
-    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6'):return run_cancellation.read(root,folder,record)
+    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6','almg-corpus-optimizer-run-v7'):return run_cancellation.read(root,folder,record)
     approved = record['review']; c = configuration(approved['config'], approved['config']['sequence_length'])
     midpoint = c['steps'] // 2
     expected = {'trained-model.json', 'tokenizer.json', *[f'step-{midpoint}/{name}' for name in ('model.json', 'optimizer.json', 'checkpoint.json')]}
