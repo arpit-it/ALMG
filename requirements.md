@@ -7853,6 +7853,54 @@ P3-LMF-06 partial progress · durable reference-midpoint recovery · 2026-11-21:
   P3-LMF-01 remains complete for its recorded architecture scope. No external collection
   occurred; generated artifacts, weights and unrelated user edits are excluded from Git.
 
+P3-LMF-06 partial progress · quarter-budget reference recovery points · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Fresh isolated corpus runs now retain additional
+  reference checkpoints at floor(budget/4) and floor(3*budget/4), alongside reference
+  start/midpoint and recorded-training start/midpoint. For forty updates these add
+  reference counters ten and thirty. Version-9 immutable records bind the active FP32
+  weights, optimizer moments/scheduler counter, reference log, tokenizer and exact
+  frozen source/approval/worker ownership. Existing flushed, manifest-last publication
+  and separate reference-recovery approval apply. Admission reserves six checkpoints.
+- Readers retain version-5 through version-8 compatibility. Discovery still prefers
+  the advanced phase and then its highest saved counter, preserving older generations.
+  The native UI labels saved reference progress and requires a new reference review
+  and confirmation. These points retain only completed published work; updates after
+  the latest point must replay. Resumed workers do not yet publish new recovery points.
+- Native verification used rebuilt ALMG with the offline 704-parameter corpus fixture
+  on port 28921: forty updates, sequence eight, two rows and two microbatches. Owned
+  FP32 SGD and mixed FP16 AdamW workers were terminated after reference checkpoint 30
+  was published. Discovery selected counter thirty and omitted earlier 0/10/20 points.
+  Additional SGD interruptions during recorded training selected training start zero
+  and training midpoint twenty ahead of all reference points. Every child PID, command
+  and parent backend was checked before termination. All nineteen new snapshot records
+  were retained; no completed origin or cancellation receipt was fabricated.
+- After app/backend restart, each selected point required phase-specific resource review
+  and new confirmation. Reference recovery carried thirty updates, executed ten remaining
+  reference updates and completed forty recorded updates for both optimizers. Training
+  start executed forty training updates; training midpoint executed twenty; both reused
+  their completed reference. All four final models matched reference weights/moments
+  exactly and passed reloaded CPU generation checks. Independently approved update-20
+  to update-40 continuation also matched exactly for each recovered model.
+- A final app/backend restart reopened twenty ordinary records, four selected interruption
+  checkpoints and four continuations exactly. Readers verified all 131 corpus, interruption
+  and continuation records. All 895 retained files remained byte-identical, including
+  the original 765 and the 855 present after interruption. Evidence:
+  /tmp/almg-corpus-reference-progress-native-qa/verification.json, interrupt.log,
+  recover.log, restart.log, restart-remaining.log and raw native captures. One final
+  capture briefly had no accessible app window; the expected existing record became
+  readable again. The remaining driver resumed from that record, preserved successful
+  captures and the failure diagnostics, and did not rerun training or recoveries.
+- Validation: 649 Python tests passed with Metal enabled and warnings as errors;
+  88 Flutter tests passed and analysis was clean. Actual worker-termination coverage
+  now exercises reference 0/10/20/30 and training 0/20 for both optimizers, separate
+  approval, exact remaining update counts, liveness/integrity gates and source immutability.
+- Remaining: newer recorded-training checkpoints, arbitrary interruption/admission/
+  publication points, resumed-worker lifecycle, physical OS/power-loss verification,
+  broader model/sequence/batch/budget support, profiling and language-quality/50M–100M
+  acceptance. Independent hardware/user-action blockers stay open and skipped.
+  P3-LMF-01 remains complete for its documented architecture scope. No external
+  collection occurred; generated artifacts, weights and unrelated edits are outside Git.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
