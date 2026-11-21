@@ -8895,6 +8895,44 @@ P3-LMF-08 partial progress · versioned held-out next-token evaluation API · 20
   desktop and hardware blockers stay open; source/user changes and generated
   artifacts preserved. No external collection or push occurred.
 
+P3-LMF-06 partial progress · repeatable FP32 embedding gradients and checkpoints · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Replaced the bounded FP32 embedding gather with a
+  fixed selection-matrix reduction, preserving lookup values and the existing
+  optimizer, checkpoint formats and numerical gates. Mixed-precision source is
+  unchanged. This addresses the intermittent four-row checkpoint restore failure;
+  it does not establish broader model-size or language-quality acceptance.
+- Reproduced the cause with 128 identical gradient evaluations at initialization
+  and after ten AdamW updates: only token-embedding gradients varied (18 and 15
+  distinct hashes). With this change, every parameter had one identical gradient
+  hash in both phases, with zero repeat difference. A CPU grouped-sum comparison
+  also passed. Evidence: /tmp/almg-corpus-checkpoint-stability-qa/
+  baseline-gradient-repeat.json and updated-gradient-repeat.json.
+- Ran the updated ALMG API locally on port 28949 from a clean committed-base
+  export with only this source/test change. Eighteen fresh four-row training runs
+  and eighteen separately approved midpoint continuations covered SGD/AdamW,
+  microbatch counts 1/2/4 and three repeats per configuration. All checkpoint weight,
+  optimizer and continuation errors were zero; final model and midpoint checkpoint
+  tensor hashes matched across repeats. Each recorded trajectory used 506 real
+  masked targets. All 28 original fixture files remained unchanged. Old reviews
+  differing only in implementation hash were rejected before writes; separate
+  training and continuation confirmation remained required.
+- Four representative old checkpoints (four-row FP32 and two-row mixed precision,
+  each with SGD/AdamW) resumed within the unchanged 1e-7 gate; maximum error was
+  3.725290298461914e-9. All 4,038 original legacy fixture files remained unchanged.
+  Evidence: verification.json, verify-app.log and legacy-verification.json in the
+  same private QA directory. Verification exercised the running API and Metal
+  workers; native desktop interaction was not used or claimed.
+- Validation: three new Metal regression tests passed in focused-clean.log.
+  The complete Metal-enabled Python suite passed 715 tests in 248.265 seconds,
+  with warnings treated as errors and no exclusions, including the previously
+  failing four-row test and existing mixed-precision tests (python.log).
+- Remaining: broader seed controls, profiled 50M–100M training, language-quality
+  acceptance and complete engine integration. Existing hardware/desktop blockers
+  remain open and skipped. Pending seeded-order and budget-diagnostic source/tests
+  are excluded from this commit. Budget diagnostics need fresh verification against
+  the changed producer before their own commit. P3-LMF-01 is already complete for
+  its recorded architecture scope. No generated artifacts or downloads are committed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

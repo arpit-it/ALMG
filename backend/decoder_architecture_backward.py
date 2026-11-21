@@ -18,11 +18,18 @@ else:
     from run_manifest import digest,file_digest
 
 
+def token_embeddings(embedding,tokens,mx):
+    """Use a fixed matrix reduction instead of repeated-index gradient accumulation."""
+    rows,length=tokens.shape
+    selection=(tokens.reshape(-1,1)==mx.arange(embedding.shape[0])[None,:]).astype(embedding.dtype)
+    return (selection@embedding).reshape(rows,length,embedding.shape[1])
+
+
 def metal_functions(config,mx):
     def norm(x):return (x-mx.mean(x,axis=-1,keepdims=True))/mx.sqrt(mx.var(x,axis=-1,keepdims=True)+1e-5)
     def logits(p,tokens):
         rows,length=tokens.shape;heads,dim=config['attention_heads'],config['head_dim']
-        hidden=p['token_embedding'][tokens]+p['position_embedding'][:length]
+        hidden=token_embeddings(p['token_embedding'],tokens,mx)+p['position_embedding'][:length]
         for layer in range(config['layers']):
             prefix=f'layers.{layer}.';x=norm(hidden)
             q,k,v=[(x@p[prefix+name]).reshape(rows,length,heads,dim).transpose(0,2,1,3) for name in ('query','key','value')]
