@@ -8294,6 +8294,39 @@ P3-LMF-06 partial progress · reviewed learning-rate and warmup controls · 2026
   coverage and physical power-loss verification. Previously recorded unavailable
   hardware and blocked precision/budget criteria stay open and skipped.
 
+P3-LMF-06 partial progress · reviewed gradient clipping and AdamW decay · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Fresh corpus training now offers global gradient
+  clip norms 0.1/0.5/1.0 and AdamW weight decay 0/0.01/0.05. Defaults remain
+  clipping 1.0 and AdamW decay 0.01. Decay controls appear only for AdamW; switching
+  to SGD submits zero decay even after an AdamW selection. Either control change
+  invalidates prior resource approval. Saved continuation retains its configuration.
+- Controls use existing versioned optimizer fields. Global clipping remains after
+  loss unscaling/token-weighted accumulation and before the single optimizer step;
+  AdamW decay applies to FP32 master weights. Numerical gates remain unchanged.
+- Rebuilt and exercised the native macOS app on localhost:28930 using local,
+  permission-reviewed eight-token inputs and the seeded 704-parameter initialization.
+  In-app review/confirmation trained SGD with clip 0.1/decay zero and AdamW with
+  clip 0.1/decay 0.05 for twenty updates each. Every recorded update was actively
+  clipped to norm 0.1. Training loss fell from 1.380119 to 1.368311 for SGD and
+  0.796797 for AdamW. Changing each new control removed prior confirmation.
+- Both runs restored update-ten checkpoints and completed separately approved
+  update-ten to update-twenty continuations. Checkpoint weight and optimizer-state
+  errors were zero; continuation reference weight differences were also zero.
+  After app/backend restart, both results, a legacy result and both continuations
+  reopened. All 409 saved records validated; all 2,441 original and 2,555 final
+  retained fixture files were unchanged.
+- Validation: 664 backend tests passed with ALMG_METAL_TESTS=1 and warnings treated
+  as errors; 97 Flutter tests passed; Flutter analysis found no issues. Six focused
+  GPU cases cover exposed clipping/decay values, actual clipping scales, stale
+  approval rejection without writes, distinct trained weights when only AdamW
+  decay changes, exact checkpoint continuation and immutable source artifacts.
+- Local evidence: /tmp/almg-corpus-regularization-native-qa/verification.json,
+  train.log, restart.log and native review/result captures. Generated models,
+  fixtures, checkpoints and logs are excluded from Git. No collection or push.
+- Remaining: larger-model/50M–100M and language-quality acceptance, broader recipe
+  coverage and physical power-loss verification. Recorded hardware/precision/budget
+  blockers remain open and skipped.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

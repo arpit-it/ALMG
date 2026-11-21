@@ -180,6 +180,35 @@ void main() {
     await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
   });
 
+  testWidgets('clipping and AdamW decay require approval and SGD submits zero decay', (tester) async {
+    Map<String,dynamic>? submitted;
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
+      submitted=body;
+      if(path.endsWith('train'))return {'initial_losses':{'train':2,'validation':2,'test':2},'final_losses':{'train':1,'validation':1.5,'test':1.6},'generated_text':'amber birch'};
+      return {'feasible':true,'estimates':{},'blockers':[]};
+    })));
+    Future<void> choose(String from,String to) async {
+      await tester.ensureVisible(find.text(from));await tester.tap(find.text(from));await tester.pumpAndSettle();
+      await tester.tap(find.text(to).last);await tester.pumpAndSettle();
+    }
+    expect(find.text('AdamW weight decay 0.01'),findsNothing);
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await choose('Corpus gradient clip norm 1.0','Corpus gradient clip norm 0.1');
+    expect(find.text('Confirm train and save corpus model'),findsNothing);
+    await choose('Corpus SGD','Corpus AdamW');
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await choose('AdamW weight decay 0.01','AdamW weight decay 0.05');
+    expect(find.text('Confirm train and save corpus model'),findsNothing);
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await tester.tap(find.text('Confirm train and save corpus model'));await tester.pump();await tester.pump(const Duration(milliseconds:300));
+    expect((submitted!['settings'] as Map)['gradient_clip_norm'],0.1);expect((submitted!['settings'] as Map)['weight_decay'],0.05);
+    await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
+    await choose('Corpus AdamW','Corpus SGD');
+    expect(find.text('AdamW weight decay 0.05'),findsNothing);
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    expect((submitted!['settings'] as Map)['weight_decay'],0.0);
+  });
+
   testWidgets('learning rate and warmup require renewed approval and are submitted unchanged', (tester) async {
     Map<String,dynamic>? submitted;
     await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
