@@ -8816,6 +8816,44 @@ P3-LMF-07 partial progress · repeated compatible duration-evidence planning fil
   remain open. Unchanged desktop/hardware blockers remain skipped; pending source/
   user edits preserved and excluded. No external collection or push occurred.
 
+P3-LMF-07 partial progress · admission-reserve planning ceilings · 2026-11-21:
+- [ ] P3-LMF-07 remains open. Fresh-run budget-limit planning now accepts optional
+  max_required_available_memory_bytes and max_required_free_disk_bytes, independently
+  or with token/duration controls. Candidates that pass token filters receive current
+  resource reviews when needed, expose required memory/disk reserves and must fit
+  every supplied ceiling. Invalid/nonpositive/boolean/noninteger/oversized byte
+  ceilings are rejected before source access. Resource-only requests are supported.
+- Ceilings compare existing required admission reserves, retaining measured floors,
+  headroom and checkpoint disk reserves. They do not reserve physical resources or
+  create process-peak caps/runtime monitors. Existing hardware/resource denials,
+  monitoring and separate confirmation remain required. Token-rejected candidates
+  skip unnecessary resource reviews. Reports grant no training/release approval.
+- Verified the actual ALMG API on localhost:28946 using exported committed base
+  aeb0540 plus only this source/tests, excluding pending seeded/desktop edits.
+  SGD/AdamW each passed memory-only, disk-only and combined exact-boundary plans;
+  ceilings below all candidates were rejected without writes. Combined token/reserve
+  plans selected ten updates under a 130 recorded-target cap. Resource-only exact
+  ceilings retained the requested twenty-update 14,400-parameter recipe.
+  Token/duration/two-observation/reserve controls also composed correctly through
+  the API; lowering the memory ceiling still rejected the combined plan.
+- Two separately confirmed fresh-worker runs completed twenty steps per trajectory,
+  used 502 total optimizer targets each and passed checkpoint parameter/optimizer
+  comparisons exactly (maximum errors zero). Planning report wrappers, unconfirmed
+  execution, changed settings with old reviews and stale reviews after new trial
+  measurements were rejected without writes. No runtime peak guarantee is inferred.
+- All 708 backend tests passed with actual Metal enabled and warnings as errors.
+  Focused tests cover exact boundaries, too-small/invalid ceilings, resource-only
+  and combined requests, current hardware denials despite generous ceilings,
+  confirmation binding, real execution and source immutability. All 3,830 original
+  fixture files remained unchanged. Evidence:
+  /tmp/almg-corpus-resource-limits-api-qa/verification.json, verify-app.log, python.log,
+  saved reserve proposals and new-runs.json. Generated outputs stay private.
+- Delivered scope is the fresh-run planning API. Desktop controls, runtime stop/peak
+  policies, recovery limits, broader uncertainty/failure/quality validation, seeded
+  budgeting and energy guidance remain open. Unchanged desktop/hardware blockers
+  remain skipped; pending source/user edits preserved and excluded. No collection
+  or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

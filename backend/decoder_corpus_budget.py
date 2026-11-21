@@ -190,21 +190,23 @@ def assess_quick_trial(root, identifier, settings):
     return result
 
 
-def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None, max_estimated_workflow_seconds=None, minimum_duration_samples=1):
-    """Select a fresh-run budget satisfying every supplied scoped target limit."""
+def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None, max_estimated_workflow_seconds=None, minimum_duration_samples=1, *, max_required_available_memory_bytes=None, max_required_free_disk_bytes=None):
+    """Select a fresh budget satisfying supplied target, timing and reserve filters."""
     limits = {'full_workflow_optimizer_target_tokens': max_workflow_target_tokens,
               'recorded_training_target_tokens': max_recorded_training_target_tokens}
+    resource_limits = {'required_available_memory_bytes': max_required_available_memory_bytes,
+                       'required_free_disk_bytes': max_required_free_disk_bytes}
     if type(minimum_duration_samples) is not int or not 1 <= minimum_duration_samples <= 20:
         raise ValueError('Require one through twenty compatible duration samples from the existing bounded history.')
     if minimum_duration_samples > 1 and max_estimated_workflow_seconds is None:
         raise ValueError('A repeated-duration evidence requirement needs an estimated workflow-duration limit.')
-    if all(value is None for value in limits.values()) and max_estimated_workflow_seconds is None:
-        raise ValueError('Provide at least one target-token or estimated workflow-duration limit.')
+    if all(value is None for value in [*limits.values(), *resource_limits.values()]) and max_estimated_workflow_seconds is None:
+        raise ValueError('Provide at least one target-token, estimated-duration or required-reserve limit.')
     if max_estimated_workflow_seconds is not None and (type(max_estimated_workflow_seconds) not in (int, float) or not 0 < max_estimated_workflow_seconds <= 2**63 - 1 or not math.isfinite(max_estimated_workflow_seconds)):
         raise ValueError('Use a positive finite estimated workflow-duration limit in seconds.')
-    for value in limits.values():
+    for value in [*limits.values(), *resource_limits.values()]:
         if value is not None and (type(value) is not int or not 0 < value <= 2**63 - 1):
-            raise ValueError('Use positive integer target-token limits within signed 64-bit range.')
+            raise ValueError('Use positive integer token/reserve limits within signed 64-bit range.')
     if not isinstance(reviewed_inputs, dict) or not isinstance(reviewed_inputs.get('review'), dict):
         raise ValueError('Reopen saved reviewed corpus inputs before limit planning.')
     config = training.configuration(settings, reviewed_inputs['review'].get('sequence_length'))
@@ -216,17 +218,22 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
         counts = exposure(windows['train'], candidate, current['actual_parameter_count'])
         token_fit = all(limit is None or counts[key] <= limit for key, limit in limits.items())
         seconds = None; checked = False; sample_count = 0
-        if max_estimated_workflow_seconds is not None and token_fit:
+        required = {key: None for key in resource_limits}; resource_checked = False
+        if token_fit and (max_estimated_workflow_seconds is not None or any(value is not None for value in resource_limits.values())):
             preview = review(root, initialized, reviewed_inputs, candidate)
-            previews[candidate['steps']] = preview; checked = True
-            if preview['workflow_optimizer_target_rate_estimate'] is not None:
+            previews[candidate['steps']] = preview; resource_checked = True
+            required = {key: preview[key] for key in resource_limits}
+            checked = max_estimated_workflow_seconds is not None
+            if checked and preview['workflow_optimizer_target_rate_estimate'] is not None:
                 seconds = preview['workflow_duration_estimate']['estimated_seconds']
                 sample_count = preview['workflow_optimizer_target_rate_estimate']['sample_count']
         duration_fit = max_estimated_workflow_seconds is None or (seconds is not None and seconds <= max_estimated_workflow_seconds and sample_count >= minimum_duration_samples)
+        resource_fit = all(limit is None or (required[key] is not None and required[key] <= limit) for key, limit in resource_limits.items())
         candidates.append({'config': candidate, **{key: counts[key] for key in limits},
                            'estimated_workflow_seconds': seconds, 'duration_evidence_checked': checked,
                            'compatible_duration_sample_count': sample_count,
-                           'within_limit': token_fit and duration_fit})
+                           **required, 'resource_review_checked': resource_checked,
+                           'within_limit': token_fit and duration_fit and resource_fit})
     fitting = [candidate for candidate in candidates if candidate['within_limit']]
     if not fitting:
         minimum = candidates[0]
@@ -235,6 +242,8 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
     selected = previews.get(selected_config['steps']) or review(root, initialized, reviewed_inputs, selected_config)
     if any(limit is not None and selected['exposure'][key] > limit for key, limit in limits.items()):
         raise ValueError('Corpus exposure changed during target-limit planning; reopen the saved inputs.')
+    if any(limit is not None and selected[key] > limit for key, limit in resource_limits.items()):
+        raise ValueError('Required admission reserves changed during limit planning; reopen the resource review.')
     result = {
         'format': 'almg-corpus-target-limit-review-v1', 'schema_version': 1,
         'source': selected['source'], 'corpus_id': selected['corpus_id'], 'corpus_revision': selected['corpus_revision'],
@@ -242,6 +251,9 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
         'max_recorded_training_target_tokens': max_recorded_training_target_tokens,
         'max_estimated_workflow_seconds': max_estimated_workflow_seconds,
         'minimum_duration_samples': minimum_duration_samples,
+        'max_required_available_memory_bytes': max_required_available_memory_bytes,
+        'max_required_free_disk_bytes': max_required_free_disk_bytes,
+        'resource_ceiling_scope': 'Planning ceilings on current required admission reserves, retaining existing calibrated floors, headroom and checkpoint disk reserves. These do not reserve physical RAM/disk or introduce process-peak caps or runtime monitors. Existing resource admission/monitoring and separate approval remain required.',
         'duration_evidence_policy': 'Sample-count filter for duration-capped planning only, using existing exact-compatible completed observations in bounded history. Repeated trials do not establish a confidence interval, language quality or a future runtime guarantee; existing estimate headroom and limitations remain unchanged.',
         'considered_budgets': candidates, 'selected_config': selected['config'], 'selected_budget_review': selected,
         'feasible': selected['feasible'], 'blockers': selected['blockers'],
