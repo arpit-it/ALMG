@@ -2414,6 +2414,9 @@ class Handler(BaseHTTPRequestHandler):
             if len(architecture_parts) == 3 and architecture_parts[0] == 'decoder-architecture-plans':
                 if architecture_parts[2].startswith('corpus-optimizer-') and architecture_parts[2]!='corpus-optimizer-cancel' and (not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id') != architecture_parts[1]):
                     raise ValueError('Reopen the initialized model belonging to this architecture plan.')
+                if architecture_parts[2] == 'corpus-quick-trial-review':
+                    if not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id')!=architecture_parts[1]:raise ValueError('Reopen the initialized model belonging to this architecture plan.')
+                    return self.respond(decoder_corpus_budget.review_quick_trial(ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings')))
                 if architecture_parts[2] == 'corpus-budget-limit-review':
                     if not isinstance(data.get('reviewed'),dict) or data['reviewed'].get('plan_id')!=architecture_parts[1]:raise ValueError('Reopen the initialized model belonging to this architecture plan.')
                     return self.respond(decoder_corpus_budget.review_limit(ROOT,data.get('reviewed'),data.get('corpus'),data.get('settings'),data.get('max_workflow_optimizer_target_tokens'),data.get('max_recorded_training_target_tokens'),data.get('max_estimated_workflow_seconds')))

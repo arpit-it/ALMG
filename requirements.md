@@ -8705,6 +8705,42 @@ P3-LMF-07 partial progress · evidence-bound estimated-duration planning limits 
   and energy/quality guidance remain open. Unchanged desktop/hardware blockers stay
   skipped; pending source/user edits preserved and excluded. No collection or push.
 
+P3-LMF-07 partial progress · independently approved quick-trial calibration proposals · 2026-11-21:
+- [ ] P3-LMF-07 remains open. The read-only corpus-quick-trial-review endpoint
+  proposes the smallest existing supported fresh-run budget while retaining other
+  requested controls. It includes the trial's current resource/budget review,
+  blockers, exact compatible timing availability and explicit validation/calibration
+  purpose. Scope is cyclic recipe settings versions five through nine. The result
+  grants no training/release approval and inherits no approval or limit guarantee
+  from another proposal; trial settings and a separate confirmation are required.
+- Completed trials use the existing numerical, checkpoint/optimizer and inference
+  gates. Their observations calibrate only exact compatible trial settings. No
+  timing is invented for an unexecuted larger budget, no language quality is inferred
+  and neither full training nor release starts automatically after a trial.
+- Verified the actual ALMG API on localhost:28943 using exported committed base
+  5923b48 plus only this source/tests, excluding pending seeded/desktop edits.
+  Both SGD and AdamW used a previously unmeasured 14,400-parameter recipe at learning
+  rate 0.00025. Duration-capped planning initially rejected absent timing. Independent
+  quick-trial proposals selected ten updates from the requested twenty. Separately
+  confirmed fresh workers completed both trajectories (252 total optimizer targets)
+  with checkpoint parameter/optimizer errors zero and produced compatible timing.
+- Reopening duration-limited planning then selected the measured ten-update budget;
+  twenty-update timing remained unavailable and that candidate remained ineligible.
+  Read-only proposals and replanning wrote no files or automatically queued runs.
+  Invalid settings, wrong-plan requests, proposal wrappers as action approval,
+  unconfirmed training and using a ten-step review for twenty steps were rejected.
+- All 699 backend tests passed with actual Metal enabled and warnings as errors.
+  Tests cover smallest-budget/control preservation, resource denials, invalid inputs,
+  unsupported ordering, separate consent, exact timing scope and source immutability.
+  All 3,518 original fixture files remained unchanged. Evidence:
+  /tmp/almg-corpus-quick-trial-api-qa/verification.json, verify-app.log, python.log,
+  saved quick-trial/duration proposals and new-runs.json. Generated outputs stay private.
+- Delivered scope is the planning API and existing bounded trial execution. Desktop
+  integration, broader configuration-failure coverage, runtime stops, recovery limits,
+  larger-scale validation, seeded budgeting and energy/quality guidance remain open.
+  Unchanged desktop/hardware blockers remain skipped; pending source/user edits
+  preserved and excluded. No external collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

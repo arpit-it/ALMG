@@ -124,6 +124,30 @@ def smaller_budgets(config):
         yield training.configuration({**config, 'schema_version': version, 'steps': steps}, config['sequence_length'])
 
 
+def review_quick_trial(root, initialized, reviewed_inputs, settings):
+    """Propose an independently approved minimum-budget validation/calibration run."""
+    if not isinstance(reviewed_inputs, dict) or not isinstance(reviewed_inputs.get('review'), dict):
+        raise ValueError('Reopen saved reviewed corpus inputs before quick-trial planning.')
+    config = training.configuration(settings, reviewed_inputs['review'].get('sequence_length'))
+    if config['schema_version'] not in (5, 6, 7, 8, 9):
+        raise ValueError('Quick-trial planning supports reviewed cyclic settings versions five through nine.')
+    trial_config = next(smaller_budgets(config))
+    trial = review(root, initialized, reviewed_inputs, trial_config)
+    result = {
+        'format': 'almg-corpus-quick-trial-review-v1', 'schema_version': 1,
+        'source': trial['source'], 'corpus_id': trial['corpus_id'], 'corpus_revision': trial['corpus_revision'],
+        'requested_config': config, 'trial_config': trial_config, 'trial_budget_review': trial,
+        'trial_purpose': 'bounded_configuration_validation_and_exact_budget_timing_calibration',
+        'compatible_trial_timing_available': trial['workflow_duration_estimate'] is not None,
+        'feasible': trial['feasible'], 'blockers': trial['blockers'],
+        'training_approved': False, 'release_approved': False,
+        'limitations': 'Independent read-only proposal for the smallest existing supported fresh-run budget, retaining other recipe controls. The trial executes both reference and recorded-training trajectories and existing numerical/checkpoint/inference gates. It needs its own current resource review, trial settings and separate explicit confirmation; it does not inherit approval or duration/token guarantees from another proposal. Unknown timing remains unknown until measured. Completed trial observations calibrate only exact compatible trial settings, never an unexecuted larger budget or language quality. Reopen duration-limited planning after the trial; no automatic full training or release follows.',
+        'implementation_sha256': file_digest(Path(__file__)),
+    }
+    result['revision'] = digest(result)
+    return result
+
+
 def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None, max_estimated_workflow_seconds=None):
     """Select a fresh-run budget satisfying every supplied scoped target limit."""
     limits = {'full_workflow_optimizer_target_tokens': max_workflow_target_tokens,
