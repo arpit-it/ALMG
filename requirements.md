@@ -9215,6 +9215,46 @@ P3-LMF-08 partial progress · explicitly saved immutable evaluation snapshots ·
   work, training artifacts and downloaded weights are preserved. No external
   collection, generated-artifact commit or push occurred.
 
+P3-LMF-08 partial progress · compatible historical evaluation snapshot comparison · 2026-11-21:
+- [ ] P3-LMF-08 remains open. Saved evaluation snapshots now expose read-only
+  compare with a baseline snapshot ID. Comparison requires identical reviewed
+  data/tokenizer/windows, each section's protocol and scoring implementation hashes,
+  scoring runtimes and metric coverage. Source snapshots are verified before use;
+  no current model weights are reloaded and no historical metrics are recomputed.
+- Versioned results bind both snapshot IDs, manifest/report revisions and model
+  sources. Direct candidate-minus-baseline deltas cover held-out loss, perplexity,
+  teacher-forced accuracy, free-running exact/token match and adjacent repetition.
+  Unavailable metrics remain null. Bounded stored failures/continuations from both
+  sides accompany deltas; they are not exhaustive regression counts or semantic
+  quality review. Overlap-review status remains visible and all approval flags false.
+- Verified the running ALMG API at localhost:28957 from exported 0a41fd8 plus only
+  this module/route/tests. The saved SGD/AdamW snapshots compared directly and in
+  reverse with independently checked deltas for every metric/split. Self-comparison
+  returned zero or unavailable differences, examples matched the stored snapshots,
+  and report/source hashes were verified. Repeated reports and a separate CPU
+  process comparison were identical. No model execution or artifact publication
+  is part of the comparison endpoint.
+- Checksum-valid private fixtures with changed producer, protocol or runtime were
+  rejected after successful snapshot reads. A separately confirmed sixteen-token
+  snapshot supplied incompatible-data coverage and was rejected as a baseline.
+  Invalid IDs, missing baseline IDs and report-byte corruption also failed; restoring
+  the private report restored the exact comparison. All 4,590 pre-existing files
+  were preserved. Eight private fixture files were prepared for rejection tests;
+  all 4,598 files stayed unchanged during comparison calls.
+  Evidence: /tmp/almg-saved-evaluation-comparison-api-qa/verification.json,
+  verify-app.log, comparison.json, reverse-comparison.json and self-comparison.json.
+  Native desktop interaction is not claimed; the running app workflow was exercised.
+- Validation: all 748 Python tests passed with actual Metal enabled, warnings as
+  errors and no exclusions (python.log). Five new tests cover signed/null/invalid
+  metrics, protocol/producer/runtime/data and coverage guards, invalid IDs, real
+  saved-model comparisons without recomputation, deterministic reads and immutability.
+- Remaining: desktop comparison/history controls, independent/larger benchmarks,
+  semantic leakage/model memorization, inference allocator/cold/Metal verification,
+  assistant-quality and full evaluation acceptance. Existing desktop/hardware
+  blockers remain open and skipped. User edits, pending seeded work, training
+  artifacts and downloaded weights are preserved. No external collection,
+  generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
