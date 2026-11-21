@@ -8741,6 +8741,44 @@ P3-LMF-07 partial progress · independently approved quick-trial calibration pro
   Unchanged desktop/hardware blockers remain skipped; pending source/user edits
   preserved and excluded. No external collection or push occurred.
 
+P3-LMF-07 partial progress · scoped quick-trial assessment and requested-budget review · 2026-11-21:
+- [ ] P3-LMF-07 remains open. The read-only quick-trial-assessment endpoint reads
+  a verified completed ten-update fresh-worker corpus trial and reports its training-
+  loss, checkpoint/optimizer, CPU/Metal and saved-generation checks. It binds the
+  trial ID/revision, verifies requested recipe controls match, and includes a current
+  resource/budget review for the requested independent fresh run from initialization.
+  Incomplete, longer-budget, shared-worker, resumed and unmeasured trials cannot
+  substitute for that bounded fresh-worker evidence.
+- Assessment separates whether the saved trial covered the requested update budget
+  from whether separate compatible requested-budget timing exists. A ten-step
+  result does not verify twenty steps, language quality or release. Reports grant
+  no training/release approval, preserve current resource blockers and require
+  separate confirmation/settings for any requested fresh run. Changed controls
+  require separate trial evidence; no trial weights are silently promoted/continued.
+- Verified the actual ALMG API on localhost:28944 using exported committed base
+  33eedce plus only this source/tests, excluding pending seeded/desktop edits.
+  SGD/AdamW ten-update 14,400-parameter trials at learning rate 0.00025 passed
+  assessment; a twenty-update request initially had no compatible timing. Same-
+  budget assessments correctly recognized the ten-update coverage and measurements.
+- Two separately confirmed twenty-update workers then ran from the original
+  initialization, executing 502 total optimizer targets each and passing checkpoint
+  parameter/optimizer comparisons exactly (maximum errors zero). Updated assessments
+  found those new twenty-update timing sources while continuing to label the original
+  trial as ten-step evidence. All assessment/replanning remained read-only. Canceled,
+  longer and incompatible evidence, assessment wrappers as approval, unconfirmed
+  execution and reusing the quick-trial resource review for twenty steps were rejected.
+- All 702 backend tests passed with actual Metal enabled and warnings as errors.
+  Tests cover evidence eligibility, requested-control binding, current resource
+  denials, separate confirmation, timing provenance and source immutability. All
+  3,622 original fixture files remained unchanged. Evidence:
+  /tmp/almg-corpus-trial-assessment-api-qa/verification.json, verify-app.log, python.log,
+  saved assessments and new-runs.json. Generated outputs stay private.
+- Delivered scope is the planning/assessment API. Desktop integration, broader
+  configuration-failure/quality evaluation, runtime stops, recovery limits, larger-
+  scale validation, seeded budgeting and energy guidance remain open. Unchanged
+  desktop/hardware blockers remain skipped; pending source/user edits preserved
+  and excluded. No external collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

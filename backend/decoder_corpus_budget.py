@@ -148,6 +148,48 @@ def review_quick_trial(root, initialized, reviewed_inputs, settings):
     return result
 
 
+def assess_quick_trial(root, identifier, settings):
+    """Explain verified bounded trial evidence without promoting it to a larger run."""
+    trial = training.read(root, identifier)
+    approved = trial.get('review', {})
+    if (trial.get('status') != 'completed' or trial.get('completed_steps') != 10
+            or approved.get('config', {}).get('steps') != 10
+            or approved.get('reference_resume_from') is not None or approved.get('training_resume_from') is not None
+            or approved.get('execution_mode') != 'fresh_process' or training.feedback.measurements(trial) is None):
+        raise ValueError('Select a completed ten-update fresh-worker corpus trial with measured timing.')
+    saved = training.inputs.read(root, approved['corpus_id'])
+    config = training.configuration(settings, saved['review']['sequence_length'])
+    if config['schema_version'] not in (5, 6, 7, 8, 9) or next(smaller_budgets(config)) != approved['config']:
+        raise ValueError('Requested recipe controls do not match this bounded trial; review a separate quick trial.')
+    origin = approved['source']
+    initialized = training.hardware.initializations.read(root, origin['plan_id'], origin['initialization_id'])
+    requested = review(root, initialized, saved, config)
+    result = {
+        'format': 'almg-corpus-quick-trial-assessment-v1', 'schema_version': 1,
+        'trial_source': {'record_id': trial['id'], 'record_revision': trial['revision']},
+        'trial_config': approved['config'], 'requested_config': config,
+        'trial_validation': {
+            'training_loss_decreased': trial['final_losses']['train'] < trial['initial_losses']['train'],
+            'initial_training_loss': trial['initial_losses']['train'], 'final_training_loss': trial['final_losses']['train'],
+            'checkpoint_restored_steps': trial['checkpoint_restored_steps'],
+            'checkpoint_parameter_max_error': trial['checkpoint_parameter_max_error'],
+            'checkpoint_optimizer_max_error': trial['checkpoint_optimizer_max_error'],
+            'cpu_metal_max_error': trial['cpu_metal_max_error'],
+            'saved_cpu_generation_verified': True,
+        },
+        'requested_update_budget_covered_by_trial': config == approved['config'],
+        'requested_budget_review': requested,
+        'compatible_requested_budget_timing_available': requested['workflow_duration_estimate'] is not None,
+        'requested_execution_scope': 'independent_fresh_run_from_original_initialization',
+        'feasible': requested['feasible'], 'blockers': requested['blockers'],
+        'training_approved': False, 'release_approved': False,
+        'limitations': 'Read-only assessment of a verified ten-update fresh-worker trial, not evidence of language quality or a larger update budget. Numeric/checkpoint/generation checks describe only that saved trial. Requested-budget timing requires its own exact compatible completed observations. The requested resource review is current and requires separate explicit confirmation of its settings for an independent fresh run from the original initialization. Trial weights are not automatically promoted, continued or released; changing other recipe controls requires separate trial evidence.',
+        'implementation_sha256': file_digest(Path(__file__)),
+    }
+    result['revision'] = digest(result)
+    return result
+
+
 def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None, max_estimated_workflow_seconds=None):
     """Select a fresh-run budget satisfying every supplied scoped target limit."""
     limits = {'full_workflow_optimizer_target_tokens': max_workflow_target_tokens,
