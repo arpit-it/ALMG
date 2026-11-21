@@ -9637,6 +9637,34 @@ P3-LMF-05 partial progress · architecture resource shortfalls · 2026-11-22:
   Native GUI verification remains separately blocked; this slice exercised the
   running local app API. User edits, seeded-order work and artifacts preserved.
 
+P3-LMF-06 partial progress · profiled seven-layer FP32 recipe · 2026-11-22:
+- [ ] P3-LMF-06 remains open. Corpus input/model reads permit up to 262,144
+  parameters; the new admitted recipe has 230,912 parameters, seven layers,
+  width 64, eight heads, FFN 128, context 16, vocabulary four and seed seven.
+  Above 16,384 parameters only the three explicitly profiled shapes qualify;
+  FP32 cyclic version-five settings, eight tokens, two rows/two microbatches,
+  learning rate 0.001, warmup three, clip one and optimizer-specific decay remain
+  required. Unsupported shapes/settings and insufficient resources stay blocked.
+- Running local app verification on port 28970: separately confirmed SGD and
+  AdamW each completed 20 updates and a separate midpoint continuation. Training
+  loss decreased from 1.3965645704 to 1.3573810601 (SGD) / 0.3330219413 (AdamW).
+  Compact checkpoint parameter/moment and continuation errors were zero, with
+  the existing 1e-7 gate unchanged; generated tokens matched after continuation.
+  Unsupported settings, unconfirmed and stale requests failed before writes.
+  All 38 original local fixture files were preserved; 150 final files retained.
+- Fresh-worker measurements: SGD / AdamW Metal peaks 4,155,136 / 4,167,424 bytes,
+  process RSS peaks 208,650,240 / 361,070,592 bytes and worker elapsed times
+  3.1105 / 5.7082 seconds. Peaks may overlap in unified memory and include runtime
+  overhead; these bounded observations are not larger-model feasibility claims.
+- Clean-export regression: all 788 tests passed in 284.119 seconds with Metal
+  enabled, warnings treated as errors, no skips or exclusions. Evidence:
+  /tmp/almg-corpus-seven-layer-recipe-api-qa/{python.log,verify-app.log,
+  verification.json,profile-summary.json}. Actual local app API exercised;
+  native GUI verification remains separately blocked and skipped.
+- Remaining: 50M–100M engineering, broader architecture/precision/budget coverage,
+  language-quality acceptance and larger storage support. Pending seeded-order
+  work, user edits, training artifacts and downloaded weights are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
