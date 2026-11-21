@@ -8363,6 +8363,42 @@ P3-LMF-06 partial progress · saved per-update batch-loss traces · 2026-11-21:
   coverage and physical power-loss verification. Recorded hardware/precision/budget
   blockers stay open and skipped.
 
+P3-LMF-06 partial progress · compact three-layer corpus recipe · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Architecture planning now offers a compact corpus
+  preset with three layers, hidden width 24, three heads of dimension eight,
+  feed-forward width 48, context sixteen, four vocabulary IDs, seed seven and
+  planning batch four: 14,400 parameters and 57,600 actual FP32 weight bytes.
+  Choosing it clears prior plan review/saved selection. Text identifies its
+  four-ID tokenizer dependency and engineering scope. Existing parameter caps,
+  resource admission, independent confirmations and numerical gates are unchanged.
+- Rebuilt and exercised the native app on localhost:28932. Selected/reviewed/saved
+  the preset, separately confirmed fresh initialization, verified CPU causal/reload
+  checks and saved compatible permission-reviewed local eight-token corpus inputs.
+  Saving inputs did not start training. No Qwen/downloaded weights initialized
+  the student; fresh initialization 9122e1a9 and corpus inputs 4a966340 were retained.
+- Independently reviewed/confirmed FP32 SGD and AdamW training with learning rate
+  0.001, three warmup updates, two effective rows/two microbatches and twenty
+  updates. Training loss decreased from 1.452296 to 1.431370 for SGD and 0.992312
+  for AdamW. Both saved/restored update-ten checkpoints, passed CPU/Metal checks
+  and generated text through the saved model's own CPU runtime. Separately approved
+  update-ten to update-twenty continuations matched their references exactly;
+  checkpoint weight and optimizer-state differences were zero.
+- After app/backend restart, the new initialization, inputs, both results and both
+  continuations reopened unchanged. A premature trace-animation assertion in the
+  verification driver was corrected with a bounded wait; completed training was
+  preserved and not repeated. All 449 saved corpus records validated, all 2,669
+  original files and all 2,790 final retained fixture files remained unchanged.
+- Validation: 668 backend tests passed with ALMG_METAL_TESTS=1 and warnings treated
+  as errors; 100 Flutter tests passed; Flutter analysis found no issues. Tests bind
+  the exact preset fields, require renewed review, exercise both real optimizers,
+  verify checkpoint/scheduler restoration, CPU inference and source immutability.
+- Local evidence: /tmp/almg-corpus-three-layer-native-qa/verification.json,
+  prepare-and-train.log, restart-remaining.log and captured plan/initialization/
+  input/training results. Generated fixtures/models/checkpoints/logs are not committed.
+- Remaining: 50M–100M engineering and language-quality acceptance, broader recipe
+  and precision coverage, and physical power-loss verification. Previously recorded
+  hardware/precision/budget blockers remain open and skipped. No collection or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -27,6 +27,7 @@ class _DecoderArchitecturePlanDialogState extends State<DecoderArchitecturePlanD
   void _usePreset(String value) {
     final values = {...defaults};
     if (value == 'Two-layer / two-head') values.addAll({'layers': 2, 'hidden_size': 16, 'attention_heads': 2, 'head_dim': 8, 'feed_forward_size': 32, 'context_length': 32, 'vocab_size': 128});
+    if (value == 'Corpus three-layer / three-head') values.addAll({'layers': 3, 'hidden_size': 24, 'attention_heads': 3, 'head_dim': 8, 'feed_forward_size': 48, 'context_length': 16, 'vocab_size': 4});
     if (value == 'Four-layer / four-head') values.addAll({'layers': 4, 'hidden_size': 64, 'attention_heads': 4, 'head_dim': 16, 'feed_forward_size': 256, 'context_length': 128, 'vocab_size': 512});
     setState(() { _preset = value; for (final entry in values.entries) { _fields[entry.key]!.text = '${entry.value}'; } _review = null; _saved = null; _error = null; });
   }
@@ -175,7 +176,8 @@ class _DecoderArchitecturePlanDialogState extends State<DecoderArchitecturePlanD
     content: SizedBox(width: 680, child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
       const Text('Review and save layouts without allocating weights or approving training. Separate confirmations can initialize fresh weights, check CPU forward execution and run a Metal backward diagnostic that discards updated weights. '
         'Validate dimensions and calculate parameter and memory estimates before allocation. This version supports bias-free dense layers, untied embeddings/head, learned absolute positions, parameter-free LayerNorm, ReLU and normal(0, 0.02) initialization.'),
-      DropdownButton<String>(value: _preset, items: [for (final name in ['Tiny single-layer', 'Two-layer / two-head', 'Four-layer / four-head']) DropdownMenuItem(value: name, child: Text(name))], onChanged: _busy ? null : (value) { if (value != null) _usePreset(value); }),
+      DropdownButton<String>(value: _preset, items: [for (final name in ['Tiny single-layer', 'Two-layer / two-head', 'Four-layer / four-head', 'Corpus three-layer / three-head']) DropdownMenuItem(value: name, child: Text(name))], onChanged: _busy ? null : (value) { if (value != null) _usePreset(value); }),
+      if (_preset == 'Corpus three-layer / three-head') const Text('Compact corpus-engine recipe: 14,400 parameters across three layers and three attention heads, context 16, four vocabulary IDs, planning batch four and seed seven. Match the four-ID tokenizer in reviewed corpus inputs. Fresh initialization and training require separate confirmations; this engineering fixture does not establish language quality or a 50M–100M model.'),
       Wrap(spacing: 12, runSpacing: 8, children: [for (final entry in _fields.entries) SizedBox(width: 200, child: entry.key == 'attention_heads'
         ? Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [const Text('Attention heads'), DropdownButton<int>(isExpanded: true,
           value: int.tryParse(entry.value.text), items: [for (var count = 1; count <= 8; count++) DropdownMenuItem(value: count, child: Text('$count heads'))],

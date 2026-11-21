@@ -3,6 +3,23 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:idle_model_studio/decoder_architecture_plan_dialog.dart';
 
 void main() {
+  testWidgets('compact corpus recipe submits its exact layout and clears saved approval', (tester) async {
+    Map<String,dynamic>? submitted;
+    final review={'config':<String,dynamic>{},'calculated_parameter_count':14400,'estimates':{'weight_bytes':57600,'training_layout_bytes':460800}};
+    await tester.pumpWidget(MaterialApp(home:Scaffold(body:DecoderArchitecturePlanDialog(request:(path,body) async {
+      submitted=body;if(path.endsWith('/save'))return {'id':'a123456789','review':review};return review;
+    }))));
+    await tester.tap(find.text('Review architecture estimate'));await tester.pumpAndSettle();
+    await tester.tap(find.text('Save reviewed architecture plan'));await tester.pumpAndSettle();
+    await tester.ensureVisible(find.text('Tiny single-layer'));await tester.tap(find.text('Tiny single-layer'));await tester.pumpAndSettle();
+    await tester.tap(find.text('Corpus three-layer / three-head').last);await tester.pumpAndSettle();
+    expect(find.text('Initialize fresh planned model'),findsNothing);
+    expect(find.textContaining('14,400 parameters across three layers'),findsOneWidget);
+    await tester.tap(find.text('Review architecture estimate'));await tester.pumpAndSettle();
+    final c=submitted!['config'] as Map;
+    expect(c['layers'],3);expect(c['hidden_size'],24);expect(c['attention_heads'],3);expect(c['head_dim'],8);expect(c['feed_forward_size'],48);expect(c['context_length'],16);expect(c['vocab_size'],4);expect(c['batch_size'],4);expect(c['seed'],7);
+  });
+
   testWidgets('backward diagnostic needs separate confirmation and discards updated weights', (tester) async {
     var checks = 0;
     final review = {'config': <String, dynamic>{}, 'calculated_parameter_count': 1664, 'estimates': {'weight_bytes': 6656, 'training_layout_bytes': 59392}};
