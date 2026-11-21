@@ -21,7 +21,9 @@ def profile(frame,event,arg):
   if calls==int(os.environ.get('ALMG_INTERRUPTION_TEST_PHASE','3')):
    original=frame.f_globals['optimizer'].update
    def paced(*args,**kwargs):
-    result=original(*args,**kwargs);(root/'progress.json').write_text(json.dumps({'pid':os.getpid(),'step':result[1]['step']}));time.sleep(30);return result
+    result=original(*args,**kwargs)
+    if result[1]['step']>=int(os.environ.get('ALMG_INTERRUPTION_TEST_STEP','0')):(root/'progress.json').write_text(json.dumps({'pid':os.getpid(),'step':result[1]['step']}));time.sleep(30)
+    return result
    frame.f_globals['optimizer'].update=paced;sys.setprofile(None)
 sys.setprofile(profile)
 '''
@@ -34,9 +36,9 @@ class InterruptionCheckpointTest(unittest.TestCase):
             root=Path(temporary);source,saved,settings=corpus(root);hooks=root/'hooks';hooks.mkdir();(hooks/'sitecustomize.py').write_text(HOOK)
             for kind,precision in (('sgd','float32'),('adamw','mixed_float16')):
                 c={**settings,'schema_version':6,'steps':40,'optimizer':kind,'weight_decay':.01 if kind=='adamw' else 0.,'batch_size':2,'gradient_accumulation_steps':2,'compute_precision':precision,'loss_scale':128. if precision=='mixed_float16' else 1.}
-                for phase_call,counter,reference_phase in ((1,0,True),(2,0,False),(3,20,False)):
+                for phase_call,counter,reference_phase in ((1,0,True),(1,20,True),(2,0,False),(3,20,False)):
                     approved=isolated.review(root,source,saved,c);token=uuid.uuid4().hex;progress=root/'progress.json';progress.unlink(missing_ok=True)
-                    env={**os.environ,'PYTHONPATH':str(hooks)+os.pathsep+str(Path(__file__).resolve().parent.parent),'ALMG_INTERRUPTION_TEST_ROOT':str(root),'ALMG_INTERRUPTION_TEST_PHASE':str(phase_call)}
+                    env={**os.environ,'PYTHONPATH':str(hooks)+os.pathsep+str(Path(__file__).resolve().parent.parent),'ALMG_INTERRUPTION_TEST_ROOT':str(root),'ALMG_INTERRUPTION_TEST_PHASE':str(phase_call),'ALMG_INTERRUPTION_TEST_STEP':str(counter+1)}
                     process=subprocess.Popen([sys.executable,'-m','backend.decoder_corpus_worker'],stdin=subprocess.PIPE,stdout=subprocess.PIPE,stderr=subprocess.PIPE,text=True,env=env)
                     try:
                         process.stdin.write(json.dumps({'root':str(root),'initialized':source,'corpus':saved,'settings':c,'approved':approved,'request_id':token,'nonce':uuid.uuid4().hex,'action':'full'}));process.stdin.close();process.stdin=None
@@ -45,9 +47,9 @@ class InterruptionCheckpointTest(unittest.TestCase):
                             if process.poll() is not None:self.fail(process.communicate()[1])
                             self.assertLess(time.monotonic(),deadline);time.sleep(.02)
                         self.assertEqual(json.loads(progress.read_text()),{'pid':process.pid,'step':counter+1})
-                        paths=[p for p in (root/interruptions.DIRECTORY).glob('*/record.json') if json.loads(p.read_text())['owner_process_id']==process.pid];self.assertEqual(len(paths),phase_call)
+                        paths=[p for p in (root/interruptions.DIRECTORY).glob('*/record.json') if json.loads(p.read_text())['owner_process_id']==process.pid];self.assertEqual(len(paths),(1 if counter==0 else 2) if reference_phase else phase_call+1)
                         path=max(paths,key=lambda p:interruptions.progress(json.loads(p.read_text())));record=training.read(root,path.parent.name);self.assertEqual(record['status'],'interruption_checkpoint');self.assertEqual(record['completed_steps'],counter)
-                        self.assertEqual(record['reference_completed_steps'],0 if reference_phase else 40);self.assertFalse(record['reference_verified']);self.assertFalse(record['release_approved'])
+                        self.assertEqual(record['reference_completed_steps'],counter if reference_phase else 40);self.assertFalse(record['reference_verified']);self.assertFalse(record['release_approved'])
                         self.assertFalse(interruptions.recoverable(root,record));self.assertNotIn(record,interruptions.history(root,source,saved))
                         reviewer=isolated.review_reference_resume if reference_phase else isolated.review_training_resume
                         runner=isolated.run_reference_resume if reference_phase else isolated.run_training_resume
@@ -65,7 +67,7 @@ class InterruptionCheckpointTest(unittest.TestCase):
                         spawn.assert_not_called()
                     resumed=runner(root,record['id'],True,reviewer(root,record['id']),uuid.uuid4().hex)
                     if not reference_phase:self.assertEqual(resumed['training_steps_carried'],counter);self.assertEqual(resumed['training_updates_executed'],40-counter)
-                    self.assertEqual(resumed['reference_updates_executed'],40 if reference_phase else 0)
+                    self.assertEqual(resumed['reference_updates_executed'],40-counter if reference_phase else 0)
                     self.assertEqual(resumed['completed_steps'],40);self.assertLessEqual(resumed['checkpoint_parameter_max_error'],1e-7);self.assertLessEqual(resumed['checkpoint_optimizer_max_error'],1e-7)
                     self.assertEqual(training.read(root,resumed['id']),resumed);self.assertEqual(training.read(root,record['id']),record)
                     self.assertTrue(all(p.read_bytes()==data for p,data in before.items()))
@@ -77,7 +79,7 @@ class InterruptionCheckpointTest(unittest.TestCase):
         with TemporaryDirectory() as temporary:
             root=Path(temporary);source,saved,c=corpus(root)
             record=isolated.run(root,True,source,saved,c,isolated.review(root,source,saved,c),uuid.uuid4().hex)
-            checkpoints=list((root/interruptions.DIRECTORY).glob('*/record.json'));self.assertEqual(len(checkpoints),3)
+            checkpoints=list((root/interruptions.DIRECTORY).glob('*/record.json'));self.assertEqual(len(checkpoints),4)
             retained=training.read(root,checkpoints[0].parent.name)
             self.assertEqual(retained['original_run_id'],record['id']);self.assertEqual(interruptions.history(root,source,saved),[])
             reviewer=isolated.review_reference_resume if retained['cancellation_phase']=='reference_verification' else isolated.review_training_resume
@@ -110,6 +112,9 @@ class LatestCheckpointTest(unittest.TestCase):
         early={'id':'a','original_run_id':'origin','completed_steps':0,'created_at':'2026-11-21','review':{'revision':'approval'},'owner_process_id':123,'cancellation_phase':'checkpointed_training'}
         reference={**early,'id':'reference','created_at':'2026-11-22','cancellation_phase':'reference_verification'}
         self.assertEqual(interruptions.latest([early,reference]),[early])
+        reference_midpoint={**reference,'id':'reference-midpoint','completed_steps':20}
+        self.assertEqual(interruptions.latest([reference,reference_midpoint]),[reference_midpoint])
+        self.assertEqual(interruptions.latest([early,reference_midpoint]),[early])
         midpoint={**early,'id':'b','completed_steps':20,'created_at':'2026-11-20'}
         other={**early,'id':'c','original_run_id':'other'}
         self.assertEqual(interruptions.latest([midpoint,early,other]),[midpoint,other])

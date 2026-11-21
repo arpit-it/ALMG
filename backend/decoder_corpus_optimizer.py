@@ -48,7 +48,7 @@ def split_losses(model, windows):
     return result
 
 
-def train_updates(values, state, end, windows, c, model_config, mx, observer, stop=None):
+def train_updates(values, state, end, windows, c, model_config, mx, observer, stop=None, checkpoint=None):
     precision = c['compute_precision']; scale = c['loss_scale']
     _, _, gradient = mixed.functions(model_config, mx, scale) if precision == 'mixed_float16' else backward.metal_functions(model_config, mx)
     gradient_tolerance = 1e-3 if precision == 'mixed_float16' else 1e-5
@@ -77,6 +77,7 @@ def train_updates(values, state, end, windows, c, model_config, mx, observer, st
         entry.update(window_index=indices[0], window_indices=indices, target_tokens=int(arrays[2].sum()),
                      microbatches=c['gradient_accumulation_steps'])
         logs.append(entry); observer.sample(f"corpus_update_{state['step']}")
+        if checkpoint is not None:checkpoint(values,state,logs)
     return values, state, logs, gradient_error
 
 
@@ -129,8 +130,8 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
                    precision_scope='Conservative FP32 reserves retained; mixed FP16 matrix products do not establish memory savings.',
                    effective_batch_rows=c['batch_size'], gradient_accumulation_steps=c['gradient_accumulation_steps'],
                    gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if c['gradient_accumulation_steps'] > 1 else 0)
-    reserve['interruption_checkpoint_count']=3
-    reserve['interruption_checkpoint_extra_disk_bytes']=3*max(2*1024**2,current['actual_weight_bytes']*256)
+    reserve['interruption_checkpoint_count']=4
+    reserve['interruption_checkpoint_extra_disk_bytes']=4*max(2*1024**2,current['actual_weight_bytes']*256)
     reserve['required_free_disk_bytes']+=reserve['interruption_checkpoint_extra_disk_bytes']
     reserve['required_available_memory_bytes']+=current['actual_weight_bytes']*8
     reasons = list(profile['errors'])
@@ -226,9 +227,14 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
             if not math.isfinite(initial_compute_loss) or abs(initial_compute_loss - initial_fp32_loss) > .05 or causal_error > 1e-5:
                 raise ValueError('Corpus precision failed initial FP32 loss or causal-prefix checks; no completed run published.')
             gradient_error = 0.0
+            def retain_reference_midpoint(values,state,logs):
+                if parent is None and execution_mode=='fresh_process' and phase=='reference_verification' and state['step']==c['steps']//2:
+                    if __package__:from . import decoder_corpus_interruptions
+                    else:import decoder_corpus_interruptions
+                    decoder_corpus_interruptions.publish(root,folder,initialized,reviewed_inputs,approved,current,model,tokenizer,windows,initial_losses,values,state,None,None,logs,[],request_id,phase='reference_verification')
             def optimize(values, state, end):
                 nonlocal gradient_error
-                values, state, logs, error = train_updates(values, state, end, windows['train'], c, model.config, mx, observer,stop=lambda:run_cancellation.requested(root,approved,request_id))
+                values, state, logs, error = train_updates(values, state, end, windows['train'], c, model.config, mx, observer,stop=lambda:run_cancellation.requested(root,approved,request_id),checkpoint=retain_reference_midpoint)
                 gradient_error = max(gradient_error, error)
                 if state['step']<end:raise run_cancellation.Stopped(values,state,logs,phase)
                 return values, state, logs
@@ -336,7 +342,7 @@ def read(root, identifier, _seen=None):
     if __package__:from . import decoder_corpus_training_resume
     else:import decoder_corpus_training_resume
     decoder_corpus_training_resume.lineage(root,record,seen)
-    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6','almg-corpus-optimizer-run-v7'):return run_cancellation.read(root,folder,record)
+    if record.get('format') in ('almg-corpus-optimizer-run-v4','almg-corpus-optimizer-run-v5','almg-corpus-optimizer-run-v6','almg-corpus-optimizer-run-v7','almg-corpus-optimizer-run-v8'):return run_cancellation.read(root,folder,record)
     approved = record['review']; c = configuration(approved['config'], approved['config']['sequence_length'])
     midpoint = c['steps'] // 2
     expected = {'trained-model.json', 'tokenizer.json', *[f'step-{midpoint}/{name}' for name in ('model.json', 'optimizer.json', 'checkpoint.json')]}

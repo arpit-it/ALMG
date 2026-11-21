@@ -8,7 +8,7 @@ else:
 
 
 def snapshot(record):
-    if ((record.get('format'),record.get('status')) not in (('almg-corpus-optimizer-run-v4','canceled'),('almg-corpus-optimizer-run-v7','interruption_checkpoint')) or record.get('cancellation_phase')!='reference_verification'):
+    if ((record.get('format'),record.get('status')) not in (('almg-corpus-optimizer-run-v4','canceled'),('almg-corpus-optimizer-run-v7','interruption_checkpoint'),('almg-corpus-optimizer-run-v8','interruption_checkpoint')) or record.get('cancellation_phase')!='reference_verification'):
         raise ValueError('Select retained reference verification or a durable reference-start checkpoint.')
     depth=record.get('reference_resume_depth',0)
     if type(depth) is not int or not 0<=depth<=16:raise ValueError('Invalid retained reference ancestry depth.')

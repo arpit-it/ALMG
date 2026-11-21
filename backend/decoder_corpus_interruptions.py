@@ -12,10 +12,10 @@ DIRECTORY='decoder-corpus-interruption-checkpoints'
 
 def validate(root,folder,record):
     c=record['review']['config']
-    version=record.get('schema_version');origin={5:'fresh_worker_midpoint',6:'fresh_worker_training_start',7:'fresh_worker_reference_start'}.get(version)
-    step=c['steps']//2 if version==5 else 0
-    phase='reference_verification' if version==7 else 'checkpointed_training'
-    if (type(version) is not int or folder.parent!=Path(root)/DIRECTORY or (record.get('format'),version) not in (('almg-corpus-optimizer-run-v5',5),('almg-corpus-optimizer-run-v6',6),('almg-corpus-optimizer-run-v7',7)) or record.get('status')!='interruption_checkpoint'
+    version=record.get('schema_version');origin={5:'fresh_worker_midpoint',6:'fresh_worker_training_start',7:'fresh_worker_reference_start',8:'fresh_worker_reference_midpoint'}.get(version)
+    step=c['steps']//2 if version in (5,8) else 0
+    phase='reference_verification' if version in (7,8) else 'checkpointed_training'
+    if (type(version) is not int or folder.parent!=Path(root)/DIRECTORY or (record.get('format'),version) not in (('almg-corpus-optimizer-run-v5',5),('almg-corpus-optimizer-run-v6',6),('almg-corpus-optimizer-run-v7',7),('almg-corpus-optimizer-run-v8',8)) or record.get('status')!='interruption_checkpoint'
             or record.get('checkpoint_origin')!=origin or record.get('cancellation_phase')!=phase
             or record.get('completed_steps')!=step or record['review'].get('execution_mode')!='fresh_process'
             or record['review'].get('reference_resume_from') is not None or record['review'].get('training_resume_from') is not None
@@ -59,10 +59,10 @@ class _CheckpointObservation:
 def publish(root,original_folder,initialized,corpus,approved,current,model,tokenizer,windows,initial,values,state,reference,reference_state,reference_log,first,token,phase='checkpointed_training'):
     identifier=uuid.uuid4().hex;folder=Path(root)/DIRECTORY/identifier;folder.mkdir(parents=True)
     midpoint=current['config']['steps']//2
-    origin='fresh_worker_reference_start' if phase=='reference_verification' else 'fresh_worker_training_start' if state['step']==0 else 'fresh_worker_midpoint'
+    origin=('fresh_worker_reference_start' if state['step']==0 else 'fresh_worker_reference_midpoint') if phase=='reference_verification' else 'fresh_worker_training_start' if state['step']==0 else 'fresh_worker_midpoint'
     if phase=='checkpointed_training' and state['step']!=0:shutil.copytree(original_folder/f'step-{midpoint}',folder/f'step-{midpoint}')
     retained=training.PlannedDecoder(model.config);retained.parameters=values
-    event=training.run_cancellation.Stopped(values,state,[],phase)
+    event=training.run_cancellation.Stopped(values,state,reference_log if phase=='reference_verification' else [],phase)
     return training.run_cancellation.save(root,folder,identifier,initialized,corpus,approved,current,retained,tokenizer,windows,initial,event,reference,reference_state,reference_log,first,_CheckpointObservation(),token,
         checkpoint_owner={'checkpoint_origin':origin,'original_run_id':original_folder.name,'owner_process_id':os.getpid(),'owner_parent_process_id':os.getppid()})
 
