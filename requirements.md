@@ -9722,6 +9722,37 @@ P3-LMF-06 partial progress · compact continuation optimizer state · 2026-11-22
   remaining acceptance criteria stay open. User/seeded-order edits, artifacts
   and downloaded weights preserved; no external collection or artifact commit.
 
+P3-LMF-06 partial progress · compact phase-recovery optimizer state · 2026-11-22:
+- [ ] P3-LMF-06 remains open. Nonzero larger-model reference/training interruption
+  and cancellation states now use compact float32 moments. Zero-update states
+  keep their empty legacy layout. Phase readers restore both legacy and compact
+  states with counter, shape, finite and variance validation. Recorded-training
+  recovery carries completed-reference files byte-for-byte instead of rewriting
+  their format, preserving existing immutable lineage hashes.
+- Local app port 28976 exercised the 230,912-parameter fixture: SGD and AdamW
+  each canceled at step five during reference verification and recorded training.
+  Separately confirmed recovery finished step twenty with zero checkpoint
+  parameter/moment error and decreasing loss. Only the matching fixture worker
+  was briefly paused to schedule cooperative cancellation through app controls;
+  this is not physical power-loss verification. All 38 original files preserved;
+  290 final files retained. Fresh final app port 28977 reopened all four compact
+  phase parents without changing any of those 290 files.
+- Genuine legacy AdamW phase state was produced by the previous app writer in an
+  isolated fixture tree, then recovered through final app port 28979 from step
+  five with zero error. All original legacy files were preserved; all three new
+  progress snapshots retained the exact original completed-reference hashes
+  while their new active optimizer state used compact encoding.
+- Final clean-export regression: all 797 tests passed in 266.207 seconds with
+  Metal enabled and warnings treated as errors, no skips or exclusions. New tests
+  cover zero-update state rejection rules, legacy/compact phase loaders, exact
+  moment bits, counter mismatches and invalid state preserving the destination.
+  Evidence: /tmp/almg-compact-phase-state-api-qa/{python.log,verify-app.log,
+  verification.json,reopen-verification.json,legacy-recovery.json}.
+- Remaining: broader legacy midpoint-format migration, arbitrary/physical
+  interruption, larger-scale engineering and remaining acceptance criteria.
+  Native GUI verification remains separately blocked; actual local API workflows
+  were exercised. User edits, seeded-order work, artifacts and weights preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

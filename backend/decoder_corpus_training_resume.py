@@ -47,8 +47,7 @@ def review(root,identifier,execution_mode='fresh_process'):
 
 def reference(root,parent):
     folder=training._folder(root,parent['id']);model=training.PlannedDecoder.load(folder/'reference-model.json')
-    value=json.loads((folder/'reference-optimizer.json').read_text())
-    return model.parameters,{'step':value['step'],**{kind:{name:np.asarray(array,dtype=np.float32) for name,array in value[kind].items()} for kind in ('m','v')}}
+    return model.parameters,training.run_cancellation._state(folder,'reference-optimizer.json',model,parent['review']['config'],parent['review']['config']['steps'])
 
 
 def metadata(approved,step):

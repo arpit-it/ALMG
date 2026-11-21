@@ -5,6 +5,7 @@ import math
 import os
 from pathlib import Path
 import re
+import shutil
 from tempfile import NamedTemporaryFile
 import threading
 import numpy as np
@@ -74,8 +75,13 @@ def _training():
     return decoder_corpus_optimizer
 
 
-def _save_state(path,state):
-    path.write_text(json.dumps({'step':state['step'],**{kind:{name:value.tolist() for name,value in state[kind].items()} for kind in ('m','v')}},allow_nan=False))
+def _save_state(path,state,model,c):
+    if state['step']==0:
+        payload={'step':0,'m':{},'v':{}}
+        if type(state['step']) is not int or state['m'] or state['v']:raise ValueError('Invalid zero-update optimizer state.')
+    else:
+        payload=_training().optimizer.optimizer_state.encode(state,model.parameters,c,compact=sum(value.size for value in model.parameters.values())>16384,allow_completed=True)
+    path.write_text(json.dumps(payload,allow_nan=False))
 
 
 def save(root,folder,identifier,initialized,corpus,approved,current,model,tokenizer,windows,initial,event,reference,reference_state,reference_log,first,observer,token,checkpoint_owner=None):
@@ -83,11 +89,16 @@ def save(root,folder,identifier,initialized,corpus,approved,current,model,tokeni
     if checkpoint_owner is None and not requested(root,approved,token):raise ValueError('Missing confirmed fresh-run cancellation.')
     model.parameters=event.values;final=training.split_losses(model,windows)
     if not all(math.isfinite(value) for value in [*initial.values(),*final.values()]):raise ValueError('Canceled corpus state has nonfinite losses; artifacts require review.')
-    model.save(folder/'trained-model.json');_save_state(folder/'optimizer.json',event.state)
+    model.save(folder/'trained-model.json');_save_state(folder/'optimizer.json',event.state,model,c)
     (folder/'tokenizer.json').write_text(json.dumps(tokenizer.artifact(),ensure_ascii=False),encoding='utf-8')
     if event.phase=='checkpointed_training':
         reference_model=training.PlannedDecoder(model.config);reference_model.parameters=reference
-        reference_model.save(folder/'reference-model.json');_save_state(folder/'reference-optimizer.json',reference_state)
+        carried=approved.get('training_resume_from')
+        if carried is not None:
+            parent=training._folder(root,carried['record_id'])
+            for name in ('reference-model.json','reference-optimizer.json'):shutil.copyfile(parent/name,folder/name)
+        else:
+            reference_model.save(folder/'reference-model.json');_save_state(folder/'reference-optimizer.json',reference_state,reference_model,c)
     generated,text=training._generated(model,tokenizer);midpoint=c['steps']//2
     observed=observer.finish();observed['scope']='canceled_corpus_phase_in_fresh_worker' if approved.get('execution_mode')=='fresh_process' else 'canceled_corpus_phase_in_shared_backend'
     observed['limitations']='Synchronized samples for the canceled active phase and prior verification work; not completed training, isolated lifetime peaks or future-duration evidence. Fresh-process lifetime peaks are separate when published.'
@@ -131,13 +142,12 @@ def save(root,folder,identifier,initialized,corpus,approved,current,model,tokeni
 
 
 def _state(folder,name,model,c,step):
-    data=json.loads((folder/name).read_text());expected=set(model.parameters) if c['optimizer']=='adamw' and step else set()
-    if type(data['step']) is not int or data['step']!=step:raise ValueError('Canceled corpus optimizer counter changed.')
-    for kind in ('m','v'):
-        if set(data[kind])!=expected:raise ValueError('Canceled corpus moments are missing.')
-        for key,value in data[kind].items():
-            array=np.asarray(value,dtype=np.float32)
-            if array.shape!=model.parameters[key].shape or not np.isfinite(array).all() or (kind=='v' and np.any(array<0)):raise ValueError('Canceled corpus moments are invalid.')
+    data=json.loads((folder/name).read_text())
+    if not isinstance(data,dict) or type(data.get('step')) is not int or data['step']!=step:raise ValueError('Canceled corpus optimizer counter changed.')
+    if step==0:
+        if 'format' in data or data.get('m')!={} or data.get('v')!={}:raise ValueError('Invalid zero-update optimizer state.')
+        return {'step':0,'m':{},'v':{}}
+    return _training().optimizer.optimizer_state.decode(data,model.parameters,c,version=2 if 'format' in data else 1,allow_completed=True)
 
 
 def read(root,folder,record):
