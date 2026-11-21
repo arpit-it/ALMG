@@ -8972,6 +8972,41 @@ P3-LMF-07 partial progress · structured budget-options rejection diagnostics ·
   and energy guidance remain open. Unchanged desktop/hardware blockers stay skipped;
   pending source/user edits preserved and excluded. No collection or push occurred.
 
+P3-LMF-08 partial progress · original-initialization held-out baseline · 2026-11-21:
+- [ ] P3-LMF-08 remains open. The read-only heldout-evaluation API now accepts
+  baseline_initialization: true to compare a verified completed corpus model with
+  its own original, zero-update initialization on the exact same saved validation
+  and test windows. Reports bind baseline initialization ID/revision/weight hash,
+  retain protocol/data/tokenizer bindings, and report loss/perplexity differences.
+  The baseline is selected from candidate lineage, not supplied arbitrary weights.
+- The option requires a strict boolean and cannot accompany baseline_id. Existing
+  saved-model comparison and omitted/false baseline modes retain their behavior.
+  Existing initialization validation rejects tampered weights. Evaluation creates
+  no training run or model artifacts and grants no training/release/quality approval.
+- Verified the updated running ALMG API at localhost:28951 using an isolated export
+  of c4f44c2 plus only this module/route/tests. For both 14,400-parameter SGD/AdamW
+  models, initialization loss/perplexity and candidate-minus-initialization deltas
+  matched saved initial/final validation/test losses within 1e-9. Both sides counted
+  10/9 masked targets and excluded 6/7 padding positions. Baseline lineage matched
+  the original initialization; repeated reports and separate CPU-process reloads
+  were identical. Existing self-comparison returned zero differences.
+- Invalid flags, conflicting baselines, invalid run IDs, partial models and a
+  deliberately modified private initialization fixture were rejected. The private
+  fixture was restored byte-for-byte; all 4,558 original files remained unchanged.
+  Evidence: /tmp/almg-initialization-baseline-api-qa/verification.json,
+  verify-app.log, sgd-evaluation.json and adamw-evaluation.json. The running API was
+  exercised; native desktop interaction is not claimed.
+- Validation: all 719 Python tests passed with actual Metal enabled and warnings
+  treated as errors, without exclusions (python.log). The evaluation tests cover
+  strict option validation, real trained SGD/AdamW initial losses, lineage and
+  artifact immutability alongside existing comparison behavior.
+- Remaining: desktop evaluation controls, independent benchmarks, free-running
+  generation and assistant quality, reasoning/coding/multilingual evaluation,
+  leakage audits, inference performance/memory and full acceptance verification.
+  Independent desktop/hardware blockers remain open and skipped. Pending seeded
+  work, user changes, training artifacts and downloaded weights are preserved.
+  No external collection, generated-artifact commit or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

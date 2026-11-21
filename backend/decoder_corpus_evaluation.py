@@ -52,19 +52,27 @@ def score_split(model, windows, vocabulary):
             'failure_examples':failures}
 
 
-def _evaluate_one(root, identifier):
+def _evaluate_one(root, identifier, *, original_initialization=False):
     record=training.read(root,identifier)
     if record.get('status','completed')!='completed':raise ValueError('Evaluate a verified completed corpus model, not partial training.')
     origin=record['review']['source']
     initialized=training.hardware.initializations.read(root,origin['plan_id'],origin['initialization_id'])
     corpus=training.inputs.read(root,record['review']['corpus_id'])
     _,_,_,windows,tokenizer=training._source(root,initialized,corpus)
-    model=training.PlannedDecoder.load(training._folder(root,identifier)/'trained-model.json')
+    if original_initialization:
+        model_path=training.hardware.initializations._folder(root,origin['plan_id'])/initialized['id']/'model.json'
+        source={'kind':'original_initialization','initialization_id':initialized['id'],
+                'initialization_revision':initialized['revision'],'model_sha256':initialized['model_sha256'],
+                'optimizer_updates':0}
+    else:
+        model_path=training._folder(root,identifier)/'trained-model.json'
+        source={'record_id':record['id'],'record_revision':record['revision'],'model_sha256':record['files']['trained-model.json']}
+    model=training.PlannedDecoder.load(model_path)
     binding={key:corpus['review'][key] for key in ('dataset_id','dataset_revision','dataset_sha256','sequence_length')}
     binding.update(windows_sha256=corpus['files']['windows.json'],tokenizer_sha256=corpus['files']['tokenizer.json'])
     return {'format':'almg-corpus-heldout-evaluation-v1','schema_version':1,
             'protocol':dict(PROTOCOL,splits=list(PROTOCOL['splits'])),'protocol_revision':digest(PROTOCOL),
-            'source':{'record_id':record['id'],'record_revision':record['revision'],'model_sha256':record['files']['trained-model.json']},
+            'source':source,
             'corpus_id':corpus['id'],'corpus_revision':corpus['revision'],'evaluation_data_binding':binding,
             'metrics':{split:score_split(model,windows[split],tokenizer.vocabulary) for split in PROTOCOL['splits']},
             'runtime':{'numpy':np.__version__,'precision':'float32_model_logits_float64_loss_accumulation'},
@@ -85,8 +93,15 @@ def compare(candidate, baseline):
     return {'baseline_source':baseline['source'],'baseline_metrics':baseline['metrics'],'candidate_minus_baseline':deltas}
 
 
-def evaluate(root, identifier, baseline_id=None):
+def evaluate(root, identifier, baseline_id=None, *, baseline_initialization=False):
+    if type(baseline_initialization) is not bool:
+        raise ValueError('baseline_initialization must be a boolean.')
+    if baseline_initialization and baseline_id is not None:
+        raise ValueError('Choose either a saved model baseline or the original initialization.')
     result=_evaluate_one(root,identifier)
-    result['comparison']=None if baseline_id is None else compare(result,_evaluate_one(root,baseline_id))
+    if baseline_initialization:
+        result['comparison']=compare(result,_evaluate_one(root,identifier,original_initialization=True))
+    else:
+        result['comparison']=None if baseline_id is None else compare(result,_evaluate_one(root,baseline_id))
     result['revision']=digest(result)
     return result

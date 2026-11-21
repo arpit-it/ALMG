@@ -37,6 +37,13 @@ class HeldoutEvaluationTest(unittest.TestCase):
         for changed in ({**report,'protocol_revision':'other'},{**report,'evaluation_data_binding':{'windows_sha256':'different'}}):
             with self.assertRaises(ValueError):evaluation.compare(report,changed)
 
+    def test_initialization_baseline_requires_boolean_and_excludes_saved_baseline(self):
+        for value in (None,0,1,'true',[],{}):
+            with self.subTest(value=value),self.assertRaises(ValueError):
+                evaluation.evaluate(Path('/unused'),'unused',baseline_initialization=value)
+        with self.assertRaises(ValueError):
+            evaluation.evaluate(Path('/unused'),'unused','baseline',baseline_initialization=True)
+
     @unittest.skipUnless(os.environ.get('ALMG_METAL_TESTS')=='1','Requires real completed two-row models with saved held-out corpus')
     def test_real_models_re_evaluate_compare_and_preserve_all_source_artifacts(self):
         with TemporaryDirectory() as temporary:
@@ -60,4 +67,17 @@ class HeldoutEvaluationTest(unittest.TestCase):
             self.assertEqual(report,evaluation.evaluate(root,records[1]['id'],records[0]['id']))
             report['protocol']['splits'].append('train')
             self.assertEqual(evaluation.evaluate(root,records[1]['id'])['protocol']['splits'],['validation','test'])
+            for record in records:
+                original=evaluation.evaluate(root,record['id'],baseline_initialization=True)
+                baseline=original['comparison']['baseline_source']
+                self.assertEqual(baseline['kind'],'original_initialization')
+                self.assertEqual(baseline['initialization_id'],source['id'])
+                self.assertEqual(baseline['initialization_revision'],source['revision'])
+                self.assertEqual(baseline['model_sha256'],source['model_sha256'])
+                self.assertEqual(baseline['optimizer_updates'],0)
+                for split in ('validation','test'):
+                    initial=original['comparison']['baseline_metrics'][split]['cross_entropy_nats_per_target']
+                    self.assertAlmostEqual(initial,record['initial_losses'][split],places=9)
+                    self.assertAlmostEqual(original['comparison']['candidate_minus_baseline'][split]['cross_entropy_nats_per_target'],record['final_losses'][split]-initial,places=9)
+                self.assertEqual(original,evaluation.evaluate(root,record['id'],baseline_initialization=True))
             self.assertEqual(before,{p:p.read_bytes() for p in root.rglob('*') if p.is_file()})
