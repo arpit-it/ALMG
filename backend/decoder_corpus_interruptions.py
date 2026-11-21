@@ -1,4 +1,4 @@
-"""Immutable, flushed midpoint snapshots for interrupted fresh corpus workers."""
+"""Immutable, flushed training-start and midpoint snapshots for interrupted fresh corpus workers."""
 import os
 from pathlib import Path
 import shutil
@@ -12,14 +12,15 @@ DIRECTORY='decoder-corpus-interruption-checkpoints'
 
 def validate(root,folder,record):
     c=record['review']['config']
-    if (folder.parent!=Path(root)/DIRECTORY or record.get('format')!='almg-corpus-optimizer-run-v5'
-            or record.get('schema_version')!=5 or record.get('status')!='interruption_checkpoint'
-            or record.get('checkpoint_origin')!='fresh_worker_midpoint' or record.get('cancellation_phase')!='checkpointed_training'
-            or record.get('completed_steps')!=c['steps']//2 or record['review'].get('execution_mode')!='fresh_process'
+    version=record.get('schema_version');origin='fresh_worker_training_start' if version==6 else 'fresh_worker_midpoint'
+    step=0 if version==6 else c['steps']//2
+    if (type(version) is not int or folder.parent!=Path(root)/DIRECTORY or (record.get('format'),version) not in (('almg-corpus-optimizer-run-v5',5),('almg-corpus-optimizer-run-v6',6)) or record.get('status')!='interruption_checkpoint'
+            or record.get('checkpoint_origin')!=origin or record.get('cancellation_phase')!='checkpointed_training'
+            or record.get('completed_steps')!=step or record['review'].get('execution_mode')!='fresh_process'
             or record['review'].get('reference_resume_from') is not None or record['review'].get('training_resume_from') is not None
             or type(record.get('owner_process_id')) is not int or record['owner_process_id']<=0
             or type(record.get('owner_parent_process_id')) is not int or record['owner_parent_process_id']<=0):
-        raise ValueError('Invalid durable fresh-worker midpoint checkpoint.')
+        raise ValueError('Invalid durable fresh-worker training checkpoint.')
     training.run_cancellation.validate(record.get('original_run_id'))
     if record['original_run_id']==record['id']:raise ValueError('Checkpoint and originating run must have different identities.')
 
@@ -57,11 +58,12 @@ class _CheckpointObservation:
 def publish(root,original_folder,initialized,corpus,approved,current,model,tokenizer,windows,initial,values,state,reference,reference_state,reference_log,first,token):
     identifier=uuid.uuid4().hex;folder=Path(root)/DIRECTORY/identifier;folder.mkdir(parents=True)
     midpoint=current['config']['steps']//2
-    shutil.copytree(original_folder/f'step-{midpoint}',folder/f'step-{midpoint}')
+    origin='fresh_worker_training_start' if state['step']==0 else 'fresh_worker_midpoint'
+    if state['step']!=0:shutil.copytree(original_folder/f'step-{midpoint}',folder/f'step-{midpoint}')
     retained=training.PlannedDecoder(model.config);retained.parameters=values
     event=training.run_cancellation.Stopped(values,state,[],'checkpointed_training')
     return training.run_cancellation.save(root,folder,identifier,initialized,corpus,approved,current,retained,tokenizer,windows,initial,event,reference,reference_state,reference_log,first,_CheckpointObservation(),token,
-        checkpoint_owner={'original_run_id':original_folder.name,'owner_process_id':os.getpid(),'owner_parent_process_id':os.getppid()})
+        checkpoint_owner={'checkpoint_origin':origin,'original_run_id':original_folder.name,'owner_process_id':os.getpid(),'owner_parent_process_id':os.getppid()})
 
 
 def history(root,initialized,corpus):
@@ -71,4 +73,13 @@ def history(root,initialized,corpus):
         record=training.read(root,path.parent.name)
         validate(root,path.parent,record)
         if (record['review']['corpus_id']==saved['id'] and record['review']['source']['initialization_id']==source['id'] and recoverable(root,record)):records.append(record)
-    return sorted(records,key=lambda record:record['created_at'])[-20:]
+    return latest(records)[-20:]
+
+
+def latest(records):
+    selected={}
+    for record in records:
+        previous=selected.get(record['original_run_id'])
+        if previous is not None and (previous['review']['revision']!=record['review']['revision'] or previous['owner_process_id']!=record['owner_process_id']):raise ValueError('Conflicting checkpoint origin or approval binding.')
+        if previous is None or (record['completed_steps'],record['created_at'],record['id'])>(previous['completed_steps'],previous['created_at'],previous['id']):selected[record['original_run_id']]=record
+    return sorted(selected.values(),key=lambda record:record['created_at'])
