@@ -180,6 +180,29 @@ void main() {
     await tester.tap(find.text('Close').last);await tester.pumpAndSettle();
   });
 
+  testWidgets('four rows require FP32 bounded budgets and renewed microbatch approval', (tester) async {
+    Map<String,dynamic>? reviewed;
+    await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':8}},request:(path,body) async {
+      reviewed=body;return {'feasible':true,'estimates':{},'blockers':[]};
+    })));
+    Future<void> choose(String from,String to) async {
+      await tester.ensureVisible(find.text(from));await tester.tap(find.text(from));await tester.pumpAndSettle();
+      await tester.tap(find.text(to).last);await tester.pumpAndSettle();
+    }
+    await choose('Corpus FP32 compute','Corpus mixed FP16 compute');
+    await choose('20 corpus optimizer updates','80 corpus optimizer updates');
+    await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    await choose('Corpus batch size 1','Corpus batch size 4');
+    expect(find.text('Confirm train and save corpus model'),findsNothing);
+    expect(find.text('Corpus FP32 compute'),findsOneWidget);expect(find.text('20 corpus optimizer updates'),findsOneWidget);
+    await choose('1 corpus microbatch per update','4 corpus microbatches per update');
+    await tester.ensureVisible(find.text('Review corpus training resources'));await tester.tap(find.text('Review corpus training resources'));await tester.pumpAndSettle();
+    final settings=reviewed!['settings'] as Map;
+    expect(settings['schema_version'],9);expect(settings['batch_size'],4);expect(settings['gradient_accumulation_steps'],4);expect(settings['compute_precision'],'float32');expect(settings['steps'],20);
+    await choose('Corpus batch size 4','Corpus batch size 2');
+    expect(find.text('1 corpus microbatch per update'),findsOneWidget);expect(find.text('Confirm train and save corpus model'),findsNothing);
+  });
+
   testWidgets('sixteen-token inputs require version-eight FP32 settings and renewed budget approval', (tester) async {
     Map<String,dynamic>? submitted;
     await tester.pumpWidget(MaterialApp(home:DecoderCorpusOptimizerDialog(initialized:const {'id':'init','plan_id':'plan'},corpus:const {'id':'corpus','review':{'sequence_length':16}},request:(path,body) async {

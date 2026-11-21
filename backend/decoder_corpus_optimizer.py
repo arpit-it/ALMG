@@ -24,8 +24,8 @@ else:
 
 def configuration(settings, length):
     c = optimizer.configuration(settings)
-    if c['schema_version'] not in (5,6,7,8) or c['sequence_length'] != length:
-        raise ValueError('Corpus training currently requires version-5 through version-8 precision settings and the saved sequence length.')
+    if c['schema_version'] not in (5,6,7,8,9) or c['sequence_length'] != length:
+        raise ValueError('Corpus training currently requires version-5 through version-9 precision settings and the saved sequence length.')
     return c
 
 
@@ -64,8 +64,9 @@ def train_updates(values, state, end, windows, c, model_config, mx, observer, st
             return mixed.unscale({name: np.array(value) for name, value in grads.items()}, scale)
         full = gradients_for(arrays)
         if c['gradient_accumulation_steps'] > 1:
-            pieces = [(gradients_for([array[index:index + 1] for array in arrays]), int(arrays[2][index].sum()))
-                      for index in range(c['batch_size'])]
+            microbatch_rows=c['batch_size']//c['gradient_accumulation_steps']
+            pieces = [(gradients_for([array[index:index + microbatch_rows] for array in arrays]), int(arrays[2][index:index + microbatch_rows].sum()))
+                      for index in range(0,c['batch_size'],microbatch_rows)]
             gradients = optimizer.accumulate(pieces)
             error = max(float(np.max(np.abs(full[name] - gradients[name]))) for name in full)
             gradient_error = max(gradient_error, error)
@@ -122,14 +123,16 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
     moments = current['actual_weight_bytes'] * (2 if c['optimizer'] == 'adamw' else 0)
     reserve.update(optimizer_state_bytes=moments, dataset_storage_bytes=corpus_bytes,
                    dataset_storage_scope='immutable_reviewed_text_corpus_inputs',
-                   required_available_memory_bytes=reserve['required_available_memory_bytes'] + moments * 4 + corpus_bytes * 8 + (current['actual_weight_bytes'] * 2 if c['gradient_accumulation_steps'] > 1 else 0),
+                   required_available_memory_bytes=reserve['required_available_memory_bytes'] + moments * 4 + corpus_bytes * 8 + (current['actual_weight_bytes'] * c['gradient_accumulation_steps'] if c['gradient_accumulation_steps'] > 1 else 0),
                    required_free_disk_bytes=reserve['required_free_disk_bytes'] + max(2 * 1024 ** 2, current['actual_weight_bytes'] * 128),
                    assumptions='Conservative FP32 model/runtime reserves plus corpus snapshots and CPU optimizer moments; shared process observations are not isolated peaks.',
                    optimizer_updates=c['steps'], checkpoint_step=c['steps'] // 2,
                    compute_precision=c['compute_precision'], loss_scale=c['loss_scale'], master_parameter_dtype='float32',
                    precision_scope='Conservative FP32 reserves retained; mixed FP16 matrix products do not establish memory savings.',
                    effective_batch_rows=c['batch_size'], gradient_accumulation_steps=c['gradient_accumulation_steps'],
-                   gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if c['gradient_accumulation_steps'] > 1 else 0)
+                   gradient_accumulation_buffer_bytes=current['actual_weight_bytes'] if c['gradient_accumulation_steps'] > 1 else 0,
+                   gradient_microbatch_buffer_bytes=current['actual_weight_bytes']*c['gradient_accumulation_steps'] if c['gradient_accumulation_steps']>1 else 0,
+                   microbatch_rows=c['batch_size']//c['gradient_accumulation_steps'] if c['batch_size']%c['gradient_accumulation_steps']==0 else None)
     reserve['interruption_checkpoint_count']=8
     reserve['interruption_checkpoint_extra_disk_bytes']=8*max(2*1024**2,current['actual_weight_bytes']*256)
     reserve['required_free_disk_bytes']+=reserve['interruption_checkpoint_extra_disk_bytes']
@@ -140,7 +143,7 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
     if c['batch_size'] > current['config']['batch_size']:
         reasons.append('Selected corpus batch exceeds the initialized model planning batch.')
     if c['batch_size'] % c['gradient_accumulation_steps']:
-        reasons.append('Two corpus microbatches require an effective batch of two rows.')
+        reasons.append('The effective batch must divide evenly into the selected microbatches.')
     if profile['system'] != 'Darwin' or profile['machine'] != 'arm64' or not profile['metal_available']:
         reasons.append('Corpus gradients require Apple silicon with MLX Metal.')
     if not hardware._fits(profile, reserve):
@@ -321,7 +324,7 @@ def run(root, confirmed, initialized, reviewed_inputs, settings, approved, execu
               'inference_runtime': 'planned_decoder_numpy_cpu', 'pretrained_student_weights_loaded': False,
               'training_approved': True, 'release_approved': False, 'source_initialization_modified': False,
               'workflow_measurements': observed,
-              'limitations': 'Small reviewed text corpus, FP32 or bounded mixed FP16 SGD/AdamW, FP32 masters, one/two effective rows and one/two token-weighted microbatches only. Held-out losses are diagnostics; no quality/release gate. Fresh runs execute both comparison trajectories. Reference resume carries saved updates and executes only the reference remainder before original checkpointed training. Saved midpoint continuation and retained reference resume require separate approval; recorded-training partial resume likewise requires its own exact-state approval. Fixed-scale mixed precision is validated only for bounded corpus fixtures; split losses use the saved FP32 master model, not a general quality or memory-savings claim.',
+              'limitations': 'Small reviewed text corpus, FP32 or bounded mixed FP16 SGD/AdamW, FP32 masters, one/two effective rows with one/two token-weighted microbatches, or four FP32 rows with one/two/four microbatches at ten/twenty updates. Held-out losses are diagnostics; no quality/release gate. Fresh runs execute both comparison trajectories. Reference resume carries saved updates and executes only the reference remainder before original checkpointed training. Saved midpoint continuation and retained reference resume require separate approval; recorded-training partial resume likewise requires its own exact-state approval. Fixed-scale mixed precision is validated only for bounded corpus fixtures; split losses use the saved FP32 master model, not a general quality or memory-savings claim.',
               'files': {str(path.relative_to(folder)): file_digest(path) for path in folder.rglob('*') if path.is_file()}}
     record.update(reference_resume.metadata(approved,c['steps']))
     record.update(training_resume.metadata(approved,state['step']))

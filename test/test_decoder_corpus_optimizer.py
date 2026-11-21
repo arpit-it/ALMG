@@ -31,7 +31,7 @@ class CorpusOptimizerTest(unittest.TestCase):
                 with self.assertRaises(ValueError): training.run(root, True, source, saved, settings, changed)
                 blocked = training.review(root, source, saved, {**settings, 'gradient_accumulation_steps': 2})
                 self.assertFalse(blocked['feasible'])
-                self.assertTrue(any('effective batch of two' in reason for reason in blocked['blockers']))
+                self.assertTrue(any('divide evenly' in reason for reason in blocked['blockers']))
                 profile['available_memory_bytes'] = 1
                 with self.assertRaises(ValueError): training.run(root, True, source, saved, settings, approved)
             self.assertFalse((root/'decoder-corpus-optimizer-runs').exists())

@@ -8225,6 +8225,46 @@ P3-LMF-06 partial progress · reviewed sixteen-token FP32 corpus inputs · 2026-
   No external collection occurred; generated artifacts, weights and unrelated edits
   remain excluded from Git.
 
+P3-LMF-06 partial progress · four-row FP32 corpus batches · 2026-11-21:
+- [ ] P3-LMF-06 remains open. Version-9 corpus settings now support four effective
+  rows with one, two or four microbatches, four/eight-token saved inputs and
+  ten/twenty optimizer updates. Both SGD and AdamW use FP32 computation and masters.
+- Actual gradient batches divide the four rows evenly; real target-token counts
+  weight masked microbatches before one clipping/optimizer/scheduler update.
+  Resource review includes the selected microbatch buffers and rejects batches
+  larger than the initialization's planning batch. Synthetic training rejects
+  this corpus-only version before loading model/hardware sources.
+- Selecting four rows resets unsupported precision/budgets, invalidates prior
+  approval and offers four microbatches. Leaving four rows clears an incompatible
+  microbatch selection. Existing one/two-row and sixteen-token scopes are preserved.
+- Rebuilt and exercised the native macOS app on localhost:28928 with local,
+  permission-reviewed eight-token inputs and the existing seeded 704-parameter
+  initialization. In-app resource review and confirmation completed SGD with two
+  microbatches and AdamW with four, each for twenty updates. Independently approved
+  midpoint continuations restored update ten and completed update twenty.
+- Terminated each newly approved worker during post-midpoint training, preserving
+  seven durable points per worker. After app/backend restart, history selected
+  training update ten ahead of reference update fifteen. Separate in-app recovery
+  approval reused the completed reference, executed only ten remaining training
+  updates and supported another independently approved midpoint continuation.
+- Final app/backend restart reopened four new results, one legacy result, both
+  interruption points and all four continuations. All 369 saved backend records
+  validated; all 2,076 original and 2,327 final retained fixture files were unchanged.
+  Maximum checkpoint weight error was 3.725290298461914e-09; optimizer-state error
+  was zero, within the unchanged 1e-7 gate. Both optimizers reduced training loss.
+- Focused Metal tests additionally cover actual gradient batch shapes for one,
+  two and four microbatches, masked weighting, four-token/ten-update training,
+  planning-batch rejection, strict configuration scope and checkpoint continuation.
+- Validation: 662 backend tests passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors; 95 Flutter tests passed; Flutter analysis reported no issues.
+- Local evidence: /tmp/almg-corpus-four-row-native-qa/verification.json,
+  train-remaining.log, recover-remaining.log, restart.log and captured native reviews.
+  Fixtures, generated models, checkpoints and logs are not committed.
+- Remaining: larger-model/50M–100M engineering and language-quality acceptance,
+  broader precision/budget combinations and physical power-loss verification.
+  Blocked sixteen-token mixed-FP16 and eighty-update variants remain open and
+  skipped; numerical gates were not relaxed. No external collection or push occurred.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
