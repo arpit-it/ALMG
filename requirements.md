@@ -9615,6 +9615,28 @@ P3-LMF-06 partial progress · compact optimizer checkpoints · 2026-11-21:
   Broader model-scale profiling and other outstanding acceptance criteria remain
   open. Pending seeded-order/native GUI work remains separate and uncommitted.
 
+P3-LMF-05 partial progress · architecture resource shortfalls · 2026-11-22:
+- [ ] P3-LMF-05 remains open. Architecture feasibility now reports separate
+  memory, disk and Metal working-set checks, observed availability/recommendation,
+  conservative required reserves, exact shortfalls, unknown values and whether
+  each check is enforced. Diagnostics use the same captured hardware snapshot
+  and calibrated estimates as admission; no additional probe or gate change.
+  The Metal working-set recommendation is explicitly not free GPU memory.
+- Local app verification on port 28969: the retained 111,744-parameter initialized
+  model returned matching memory/disk/Metal reserve arithmetic. An unsupported
+  CPU backward request remained blocked despite fitting resources. No training
+  or weight allocation was requested; all 4,918 retained fixture files remained
+  byte-identical. Evidence: /tmp/almg-architecture-resource-diagnostics-qa/
+  {metal-report.json,cpu-report.json,verification.json}.
+- Clean-export verification: all 11 affected architecture tests passed with real
+  Metal enabled and warnings treated as errors; all 5 feasibility calibration
+  tests passed. New coverage checks calibrated Metal peaks, exact thresholds,
+  shortages, unknown recommendations, single-snapshot provenance, independent
+  blockers and read-only behavior. No skipped tests in those final checks.
+- Broader hardware/runtime support and remaining acceptance criteria stay open.
+  Native GUI verification remains separately blocked; this slice exercised the
+  running local app API. User edits, seeded-order work and artifacts preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

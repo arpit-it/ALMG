@@ -70,6 +70,31 @@ def _fits(hardware_info,estimates):
             and (type(working) is not int or estimates.get('calibrated_gpu_working_bytes',estimates['estimated_gpu_working_bytes'])<=working))
 
 
+
+def resource_diagnostics(profile, estimates):
+    """Explain the same captured reserves used by _fits, without probing again."""
+    working = (profile.get('metal_device') or {}).get('max_recommended_working_set_size')
+    checks = []
+    for name, available, required, enforced in (
+        ('memory', profile.get('available_memory_bytes'), estimates['required_available_memory_bytes'], True),
+        ('disk', profile.get('free_disk_bytes'), estimates['required_free_disk_bytes'], True),
+        ('metal_working_set', working, estimates.get('calibrated_gpu_working_bytes', estimates['estimated_gpu_working_bytes']), type(working) is int),
+    ):
+        available = available if type(available) is int and available >= 0 else None
+        required = required if type(required) is int and required >= 0 else None
+        known = available is not None and required is not None
+        checks.append({'resource': name, 'available_bytes': available, 'required_bytes': required,
+                       'shortfall_bytes': max(0, required - available) if known else None,
+                       'fits': available >= required if known else None, 'enforced': enforced})
+    return {
+        'format': 'almg-architecture-resource-diagnostics-v1', 'schema_version': 1,
+        'observed_at': profile.get('observed_at'), 'checks': checks,
+        'shortfalls': [check for check in checks if check['fits'] is False],
+        'unknown_resources': [check['resource'] for check in checks if check['fits'] is None],
+        'scope': 'Captured conservative synthetic backward-diagnostic reserves, including compatible peak calibration. Metal availability is the device working-set recommendation, not free GPU memory. A missing Metal recommendation remains unknown and is not enforced by the existing admission policy. Resource fits do not clear independent runtime/device/precision blockers or approve training.',
+    }
+
+
 def _calibrate(root,plan_id,current,profile,estimates):
     """Only compatible, immutable isolated diagnostics may raise admission reserves."""
     implementation=digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_architecture_backward.py','decoder_architecture_feasibility.py','decoder_diagnostic_measurements.py','decoder_diagnostic_worker.py','planned_decoder.py')})
@@ -136,7 +161,7 @@ def review(root,plan_id,confirmed,reviewed,precision='float32',device='metal'):
     report={'format':'almg-architecture-feasibility-v2','schema_version':2,
             'source':{'plan_id':plan_id,'plan_revision':plan['revision'],'initialization_id':current['id'],'initialization_revision':current['revision'],'model_sha256':current['model_sha256']},
             'scope':'bounded_synthetic_backward_diagnostic_only_not_full_training','device':device,'precision':precision,'hardware':profile,'estimates':estimates,
-            'calibration':calibration,'feasible':not reasons,'blockers':reasons,'recommendation':recommendation,'training_approved':False,'release_approved':False,
+            'calibration':calibration,'resource_diagnostics':resource_diagnostics(profile,estimates),'feasible':not reasons,'blockers':reasons,'recommendation':recommendation,'training_approved':False,'release_approved':False,
             'implementation_sha256':digest({name:file_digest(Path(__file__).with_name(name)) for name in ('decoder_architecture_feasibility.py','decoder_architecture_plans.py','training_resources.py')})}
     report['revision']=digest(report)
     return report
