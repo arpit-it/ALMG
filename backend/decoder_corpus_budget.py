@@ -124,12 +124,14 @@ def smaller_budgets(config):
         yield training.configuration({**config, 'schema_version': version, 'steps': steps}, config['sequence_length'])
 
 
-def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None):
+def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_target_tokens=None, max_recorded_training_target_tokens=None, max_estimated_workflow_seconds=None):
     """Select a fresh-run budget satisfying every supplied scoped target limit."""
     limits = {'full_workflow_optimizer_target_tokens': max_workflow_target_tokens,
               'recorded_training_target_tokens': max_recorded_training_target_tokens}
-    if all(value is None for value in limits.values()):
-        raise ValueError('Provide at least one recorded-training or workflow target-token limit.')
+    if all(value is None for value in limits.values()) and max_estimated_workflow_seconds is None:
+        raise ValueError('Provide at least one target-token or estimated workflow-duration limit.')
+    if max_estimated_workflow_seconds is not None and (type(max_estimated_workflow_seconds) not in (int, float) or not 0 < max_estimated_workflow_seconds <= 2**63 - 1 or not math.isfinite(max_estimated_workflow_seconds)):
+        raise ValueError('Use a positive finite estimated workflow-duration limit in seconds.')
     for value in limits.values():
         if value is not None and (type(value) is not int or not 0 < value <= 2**63 - 1):
             raise ValueError('Use positive integer target-token limits within signed 64-bit range.')
@@ -139,16 +141,26 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
     if config['schema_version'] not in (5, 6, 7, 8, 9):
         raise ValueError('Target-limit planning supports reviewed cyclic settings versions five through nine.')
     _, current, _, windows, _ = training._source(root, initialized, reviewed_inputs)
-    candidates = []
+    candidates = []; previews = {}
     for candidate in smaller_budgets(config):
         counts = exposure(windows['train'], candidate, current['actual_parameter_count'])
+        token_fit = all(limit is None or counts[key] <= limit for key, limit in limits.items())
+        seconds = None; checked = False
+        if max_estimated_workflow_seconds is not None and token_fit:
+            preview = review(root, initialized, reviewed_inputs, candidate)
+            previews[candidate['steps']] = preview; checked = True
+            if preview['workflow_optimizer_target_rate_estimate'] is not None:
+                seconds = preview['workflow_duration_estimate']['estimated_seconds']
+        duration_fit = max_estimated_workflow_seconds is None or (seconds is not None and seconds <= max_estimated_workflow_seconds)
         candidates.append({'config': candidate, **{key: counts[key] for key in limits},
-                           'within_limit': all(limit is None or counts[key] <= limit for key, limit in limits.items())})
+                           'estimated_workflow_seconds': seconds, 'duration_evidence_checked': checked,
+                           'within_limit': token_fit and duration_fit})
     fitting = [candidate for candidate in candidates if candidate['within_limit']]
     if not fitting:
         minimum = candidates[0]
-        raise ValueError(f"No supported update budget fits these target limits (minimum recorded training {minimum['recorded_training_target_tokens']}, workflow {minimum['full_workflow_optimizer_target_tokens']}).")
-    selected = review(root, initialized, reviewed_inputs, fitting[-1]['config'])
+        raise ValueError(f"No supported update budget fits the supplied limits (minimum recorded training {minimum['recorded_training_target_tokens']}, workflow {minimum['full_workflow_optimizer_target_tokens']}); duration-capped planning also requires compatible completed timing evidence.")
+    selected_config = fitting[-1]['config']
+    selected = previews.get(selected_config['steps']) or review(root, initialized, reviewed_inputs, selected_config)
     if any(limit is not None and selected['exposure'][key] > limit for key, limit in limits.items()):
         raise ValueError('Corpus exposure changed during target-limit planning; reopen the saved inputs.')
     result = {
@@ -156,10 +168,11 @@ def review_limit(root, initialized, reviewed_inputs, settings, max_workflow_targ
         'source': selected['source'], 'corpus_id': selected['corpus_id'], 'corpus_revision': selected['corpus_revision'],
         'requested_config': config, 'max_workflow_optimizer_target_tokens': max_workflow_target_tokens,
         'max_recorded_training_target_tokens': max_recorded_training_target_tokens,
+        'max_estimated_workflow_seconds': max_estimated_workflow_seconds,
         'considered_budgets': candidates, 'selected_config': selected['config'], 'selected_budget_review': selected,
         'feasible': selected['feasible'], 'blockers': selected['blockers'],
         'training_approved': False, 'release_approved': False,
-        'limitations': 'Read-only fresh-run planning: recorded-training targets count one recorded trajectory; workflow targets include both newly executed reference and recorded-training trajectories. Padding/evaluation/inference are excluded. Every supplied limit must fit; an omitted limit is unconstrained. Selects the largest existing supported step budget no greater than requested; other recipe controls are retained. Limits become an existing fixed update budget, not a new runtime early-stop policy. Training needs the selected settings, their current resource review and separate explicit confirmation. Changing settings or corpus requires renewed review; resource blockers remain blockers. No quality-token requirement is inferred.',
+        'limitations': 'Read-only fresh-run planning: recorded-training targets count one recorded trajectory; workflow targets include both newly executed reference and recorded-training trajectories. Padding/evaluation/inference are excluded. Every supplied limit must fit; an omitted limit is unconstrained. Duration caps require exact compatible completed timing evidence and compare existing headroom-adjusted estimates, not guaranteed wall time. Unknown timing cannot pass a duration cap. Selects the largest existing supported step budget no greater than requested; other recipe controls are retained. Limits become an existing fixed update budget, not a runtime deadline or early-stop policy. Training needs the selected settings, their current resource review and separate explicit confirmation. Changing settings or corpus requires renewed review; resource blockers remain blockers. No quality-token requirement is inferred.',
         'implementation_sha256': file_digest(Path(__file__)),
     }
     result['revision'] = digest(result)

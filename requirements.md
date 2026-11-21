@@ -8670,6 +8670,41 @@ P3-LMF-07 partial progress · independently scoped training/verification token c
   remain skipped; pending source/user edits preserved and excluded. No collection
   or push occurred.
 
+P3-LMF-07 partial progress · evidence-bound estimated-duration planning limits · 2026-11-21:
+- [ ] P3-LMF-07 remains open. Fresh-run budget-limit planning now accepts an optional
+  max_estimated_workflow_seconds, alone or alongside recorded/workflow token caps.
+  Eligible candidates need compatible completed-worker evidence and must fit the
+  existing headroom-adjusted duration estimate. Missing timing cannot pass; no
+  theoretical extrapolation substitutes for a trial. Invalid/nonfinite/nonpositive
+  or oversized numeric caps are rejected before source access.
+- Candidate reports identify whether timing evidence was checked and its calculated
+  duration. Token-ineligible candidates skip unnecessary timing/resource reviews.
+  Selection remains the largest existing step budget no greater than requested;
+  current resource blockers and separate approval remain intact. This is an
+  estimate-based planning filter, not a guaranteed wall-time bound, runtime deadline
+  or early-stop policy; reports retain that limitation explicitly.
+- Verified the actual ALMG API on localhost:28942 using exported committed base
+  59e0844 plus only this source/tests, excluding pending seeded/desktop edits.
+  Both SGD and AdamW duration-only plans capped at their current ten-update estimate
+  selected ten updates; wider caps permitted twenty. Unknown recipe timing and
+  caps below all compatible estimates were rejected without writes. Combined
+  token/duration plans retained the selected resource review and approval controls.
+- Two separately confirmed 14,400-parameter fresh-worker runs selected ten updates
+  per trajectory and used 126 recorded/252 total optimizer targets within the 130/300
+  token caps, with checkpoint parameter/optimizer errors zero. Subsequent selected-
+  budget calibration included the new trials. No runtime duration guarantee is
+  inferred from those results. All 3,414 original fixture files remained unchanged.
+- All 696 backend tests passed with actual Metal enabled and warnings as errors.
+  Focused tests cover absent/invalid timing, legacy token-only planning, avoiding
+  ineligible timing reviews, real duration-based selection, combined limits and
+  renewed approval for changed settings. Evidence:
+  /tmp/almg-corpus-duration-limit-api-qa/verification.json, verify-app.log, python.log,
+  saved duration proposals and new-runs.json. Generated outputs stay private.
+- Delivered scope is the fresh-run planning API. Desktop controls, recovery limits,
+  runtime stop policies, broader uncertainty/resource validation, seeded budgeting
+  and energy/quality guidance remain open. Unchanged desktop/hardware blockers stay
+  skipped; pending source/user edits preserved and excluded. No collection or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
