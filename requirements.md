@@ -10427,6 +10427,42 @@ P3-LMF-02 partial progress · evidence-gated lexical input access · 2026-11-22:
   open and skipped. User edits, training artifacts and weights are preserved;
   no external collection, generated artifact commit or push.
 
+P3-LMF-02 partial progress · contact-pattern-gated mixed inputs · 2026-11-23:
+- [ ] P3-LMF-02 remains open. Added a separately confirmed local API path that
+  layers complete current contact-pattern audits over the existing lexical input
+  gate. Every mixture source needs matching all-record/all-split coverage, current
+  source/index hashes and producer, supported method and valid counters. Known
+  contact findings block this path before input emission. Evidence is revalidated
+  before and after each read; reviews and cursors bind the full evidence snapshot.
+- This bounded policy covers configured ASCII email and formatted phone patterns;
+  it does not provide comprehensive PII, semantic, hygiene or legal clearance.
+  Hygiene finding counts remain visible, hygiene_gate_applied stays false and all
+  permission/quality/training/release approval flags remain false. Existing private
+  candidate and lexical inspection paths remain unchanged. No training admission,
+  source filtering or rewriting is claimed.
+- Actual local app verification used an isolated copy of committed source plus
+  these reviewed changes and retained local fixtures. A new JSONL source had one
+  synthetic email finding exclusively in its held-out test split; its committed
+  training receipt contained no contact. Lexical review passed, then contact review
+  and attempted gated batch access returned HTTP 400. The source, finding spans,
+  audits and receipts were preserved; this corpus remains blocked pending a newly
+  prepared/reviewed source. An independent zero-contact mixture proceeded in the
+  same run. Unconfirmed review, incomplete evidence, malformed source selections
+  and stale cursors were rejected.
+- Restarted the updated app backend: the saved review and first input page replayed
+  identically. Verified all 38 pages against original UTF-8 adjacent-byte targets
+  (2,376 real targets), including padding masks and false approval flags. All 156
+  data files stayed byte-identical during reads, including all 136 prior fixtures.
+  All 137 focused regression tests passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors. Evidence:
+  /tmp/almg-stream-mixture-contact-gate-api-qa/verification.json and python.log.
+- P3-LMF-01 already has verified bounded acceptance; skipped completed work and
+  unchanged hardware, native UI and oversized-ingestion blockers. This verifies
+  the running local backend workflow, not native GUI behavior. Broader PII
+  detection/filtering, hygiene/semantic admission, larger-than-RAM proof and full
+  model-training integration remain open. User edits, training artifacts and
+  downloaded weights are preserved; no external collection or push was performed.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

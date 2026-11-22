@@ -40,6 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
+    from . import decoder_stream_mixture_contact_gate
     from . import decoder_stream_mixture_lexical_gate
     from . import decoder_stream_mixture_inputs
     from . import decoder_stream_mixture_sessions
@@ -57,6 +58,7 @@ if __package__:
     from . import image_resource_trials
     from . import classifier_resource_trials
 else:
+    import decoder_stream_mixture_contact_gate
     import decoder_stream_mixture_lexical_gate
     import decoder_stream_mixture_inputs
     import decoder_stream_mixture_sessions
@@ -2393,6 +2395,10 @@ class Handler(BaseHTTPRequestHandler):
                 if mixture_parts[2] == 'sampling-sessions':
                     return self.respond(decoder_stream_mixture_sessions.begin(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed')))
             if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixture-sessions':
+                if mixture_parts[2] == 'contact-input-review':
+                    return self.respond(decoder_stream_mixture_contact_gate.review(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed_lexical'), data.get('contact_audits')))
+                if mixture_parts[2] == 'contact-input-batch':
+                    return self.respond(decoder_stream_mixture_contact_gate.batch(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed'), data.get('cursor'), data.get('batch_size', 4)))
                 if mixture_parts[2] == 'lexical-input-review':
                     return self.respond(decoder_stream_mixture_lexical_gate.review(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed_input'), data.get('evidence')))
                 if mixture_parts[2] == 'lexical-input-batch':
