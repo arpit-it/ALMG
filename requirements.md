@@ -9813,6 +9813,39 @@ P3-LMF-07 partial progress · observed retained-checkpoint storage · 2026-11-22
   Native GUI verification remains separately blocked; this slice exercised the
   actual local API. User edits, seeded-order work, artifacts and weights preserved.
 
+P3-LMF-06 partial progress · profiled sixteen-ID vocabulary recipe · 2026-11-22:
+- [ ] P3-LMF-06 remains open. The seven-layer/width-64/eight-head FP32 recipe
+  additionally supports exactly sixteen word IDs (232,448 parameters, 64x16 head).
+  Existing four-ID profiles remain supported. Parameter caps, fixed seed seven,
+  cyclic version-five eight-token/two-row/two-microbatch settings, optimizer decay,
+  resource checks and numeric tolerances are unchanged; other larger shapes and
+  unsupported precision/budget settings remain blocked.
+- Six locally generated, independently ordered sixteen-word documents passed the
+  existing contamination gate with zero cross-split near-duplicate pairs and
+  recorded source permissions. The initial rotated fixture was correctly rejected;
+  only fixture data changed. Tests verify all sixteen active target IDs, including
+  valid ID zero alongside masked right padding. No supervisory weights were loaded.
+- Final local app verification on port 28989 completed separately confirmed
+  20-update SGD/AdamW runs and midpoint continuations. Training loss decreased
+  from 2.7686369742 to 2.7591354074 / 2.0010499423; checkpoint parameter/moment and
+  continuation errors were zero. Generated IDs include values above three and
+  round-trip through the saved sixteen-word tokenizer. Unsupported, stale and
+  unconfirmed requests were rejected before writes. Final complete verification
+  preserved all 140 existing fixture files and retained 252 files afterward;
+  fresh app port 28990 reopened both checkpoints with all 252 files unchanged.
+- Fresh-worker SGD / AdamW Metal peaks were 4,169,728 / 4,169,728 bytes, RSS peaks
+  176,865,280 / 240,926,720 bytes and elapsed times 1.5647 / 1.7224 seconds. These
+  bounded workflow observations do not establish general language quality or
+  larger-model feasibility; unified-memory peaks may overlap.
+- Clean-export regression: all 805 tests passed in 270.503 seconds with Metal
+  enabled, warnings treated as errors, no skips or exclusions. Evidence:
+  /tmp/almg-sixteen-vocab-recipe-api-qa/{python.log,verify-app.log,
+  verification.json,profile-summary.json,reopen-verification.json}.
+- Remaining: broader vocabulary/layout/budget profiling, 50M–100M engineering,
+  language-quality and remaining acceptance criteria. Native GUI verification
+  remains separately blocked; actual local API workflows were exercised. User
+  edits, seeded-order work, retained training artifacts and weights preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -158,13 +158,13 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
     reasons = list(profile['errors'])
     if current['actual_parameter_count'] > 16384:
         larger_models=[{'layers':layers,'hidden_size':width,'attention_heads':heads,'head_dim':8,'feed_forward_size':feed,
-                        'context_length':16,'vocab_size':4,'seed':7,'batch_size':4}
-                       for layers,width,heads,feed in ((3,32,4,64),(6,48,6,96),(7,64,8,128))]
+                        'context_length':16,'vocab_size':vocabulary,'seed':7,'batch_size':4}
+                       for layers,width,heads,feed,vocabulary in ((3,32,4,64,4),(6,48,6,96,4),(7,64,8,128,4),(7,64,8,128,16))]
         larger_settings={'schema_version':5,'compute_precision':'float32','batch_size':2,'gradient_accumulation_steps':2,
                          'sequence_length':8,'learning_rate':.001,'warmup_steps':3,'gradient_clip_norm':1.,
                          'weight_decay':.01 if c['optimizer']=='adamw' else 0.}
         if not any(all(current['config'].get(key)==value for key,value in model.items()) for model in larger_models) or any(c.get(key)!=value for key,value in larger_settings.items()):
-            reasons.append('Above 16384 parameters, use the reviewed 25344-parameter three-layer/four-head 111744-parameter six-layer/six-head or 230912-parameter seven-layer/eight-head FP32 recipe: eight tokens, two rows/two microbatches, cyclic version five, learning rate 0.001, warmup three, clip one and AdamW decay 0.01 (SGD zero).')
+            reasons.append('Above 16384 parameters, use the reviewed 25344-parameter three-layer/four-head, 111744-parameter six-layer/six-head, 230912-parameter seven-layer/eight-head (four IDs), or 232448-parameter seven-layer/eight-head (sixteen IDs) FP32 recipe: eight tokens, two rows/two microbatches, cyclic version five, learning rate 0.001, warmup three, clip one and AdamW decay 0.01 (SGD zero).')
     if len(windows['train']) > c['steps'] * c['batch_size']:
         reasons.append('Choose enough optimizer updates to visit every saved training window at least once.')
     if c['batch_size'] > current['config']['batch_size']:
