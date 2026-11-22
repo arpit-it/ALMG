@@ -131,12 +131,33 @@ def _source(root, initialized, reviewed_inputs):
     return saved, current, model_bytes, windows, tokenizer
 
 
+
+def _activation_reserve(model_config,c,reserve):
+    """Budget dense verification geometry while retaining the synthetic reserve floor."""
+    rows,length=c['batch_size'],c['sequence_length']
+    d,f=model_config['hidden_size'],model_config['feed_forward_size']
+    layers,heads=model_config['layers'],model_config['attention_heads']
+    selected=4*rows*layers*(8*length*d+2*length*f+2*heads*length*length)
+    original=reserve['activation_layout_bytes'];extra=max(0,selected-original)
+    reserve.update(synthetic_probe_activation_layout_bytes=original,
+                   corpus_verification_batch_shape=[rows,length],corpus_activation_layout_bytes=selected,
+                   activation_layout_bytes=max(original,selected),additional_activation_layout_bytes=extra,
+                   activation_memory_reserve_delta_bytes=3*extra,
+                   estimated_gpu_working_bytes=reserve['estimated_gpu_working_bytes']+extra,
+                   estimated_cpu_load_and_reference_bytes=reserve['estimated_cpu_load_and_reference_bytes']+2*extra,
+                   required_available_memory_bytes=reserve['required_available_memory_bytes']+3*extra,
+                   corpus_activation_scope='Calculated FP32 dense full-effective-batch layout, including padded positions and numerical full-batch gradient verification even when accumulating microbatches. Retains the original synthetic layout as a floor. Adds one GPU and two CPU/reference activation deltas conservatively; kernel/allocator/framework overhead is not measured and mixed precision does not imply savings.')
+    if 'calibrated_gpu_working_bytes' in reserve:
+        reserve['calibrated_gpu_working_bytes']=max(reserve['calibrated_gpu_working_bytes'],reserve['estimated_gpu_working_bytes'])
+
+
 def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_backend'):
     if execution_mode not in ('shared_backend','fresh_process'):raise ValueError('Choose a supported corpus execution mode.')
     saved, current, model_bytes, windows, _ = _source(root, initialized, reviewed_inputs)
     c = configuration(settings, saved['review']['sequence_length'])
     profile = hardware.hardware(root)
     reserve = hardware.estimate(current['config'], model_bytes)
+    _activation_reserve(current['config'],c,reserve)
     corpus_bytes = sum((Path(root) / 'decoder-corpus-inputs' / saved['id'] / name).stat().st_size for name in saved['files'])
     moments = current['actual_weight_bytes'] * (2 if c['optimizer'] == 'adamw' else 0)
     reserve.update(optimizer_state_bytes=moments, dataset_storage_bytes=corpus_bytes,

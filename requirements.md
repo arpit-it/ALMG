@@ -9991,6 +9991,36 @@ P3-LMF-05 partial progress · calibrated Metal budget diagnostics · 2026-11-22:
   Native GUI verification remains separately blocked; actual local API workflows
   were exercised. User edits, seeded-order work, artifacts and weights preserved.
 
+P3-LMF-05 partial progress · geometry-aware corpus activation reserves · 2026-11-22:
+- [ ] P3-LMF-05 remains open. Corpus reviews now calculate activation layout for
+  the selected full effective batch and sequence length, including quadratic
+  attention and padded positions, rather than relying only on the smaller
+  synthetic probe. Full-batch numerical verification remains reserved even for
+  one-row microbatches. The larger of original/selected layouts is retained;
+  added GPU and CPU/reference activation deltas only raise RAM/GPU reserves.
+  Disk reserves, recipe limits and numeric tolerances are unchanged. These are
+  calculated FP32 layouts, not measured peaks or kernel/allocator guarantees.
+- Actual local app port 29000 verified four-row/eight-token and two-row/sixteen-
+  token workflows with both SGD and AdamW: all four confirmed runs and separately
+  confirmed continuations passed with zero parameter/moment/recovery error and
+  matching generated tokens. One-row microbatches still reported the correct
+  full verification shapes. Unconfirmed requests wrote nothing.
+- The former 7,168-byte probe activation layout became a 14,336-byte corpus
+  layout for four rows, adding 21,504 conservative RAM-reserve bytes. Sixteen-token
+  layout was 16,384 bytes, adding 27,648 RAM bytes. GPU deltas were 7,168 / 9,216
+  bytes and CPU/reference deltas 14,336 / 18,432 bytes. Smaller selected geometry
+  never reduced the original reserve. All 59 original files were preserved;
+  283 final fixture files retained.
+- Final clean-export regression: all 816 tests passed in 772.376 seconds with
+  Metal enabled, warnings treated as errors, no skips or exclusions. New tests
+  cover attention geometry, reserve monotonicity, full-batch versus microbatch
+  dimensions, actual training and checkpoint continuation. During the slow run,
+  35 completed idle temporary verification servers were closed without deleting
+  any files. Evidence: /tmp/almg-corpus-activation-reserve-api-qa/
+  {python.log,verify-app.log,verification.json,closed-idle-servers.json}.
+- Broader hardware/scale and native GUI acceptance remains open or independently
+  blocked. User edits, seeded-order work, artifacts and weights are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
