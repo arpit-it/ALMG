@@ -10384,6 +10384,49 @@ P3-LMF-02 partial progress · receipt-bound byte-token model-input inspection ·
   remain open and skipped. User changes, training artifacts and weights are preserved;
   no external collection, generated artifact commit or push.
 
+P3-LMF-02 partial progress · evidence-gated lexical input access · 2026-11-22:
+- [ ] P3-LMF-02 remains open. Added a separate confirmed lexical-gated path for
+  committed mixed-receipt candidate model inputs. It requires matching complete
+  current-producer within-source shingle audits for every source, a saved current
+  cross-source exact audit and a complete matching cross-source near-overlap audit.
+  Counts must cover every unique record pair across all saved splits. Every source
+  must retain nonempty train/validation/test populations. Known cross-split findings,
+  incomplete/mismatched evidence or unsupported methods/producers block gated access.
+- Gate reviews bind input/receipt/tokenizer revisions, selected audit IDs/revisions,
+  source populations and policy implementation. Cursors bind the lexical gate as
+  well as the underlying input review. Each input page rechecks evidence before and
+  after reading. Existing ungated inspection remains explicitly diagnostic; this
+  new path does not approve model training. Same-split duplicates remain retained,
+  short pairs unassessed are counted, and semantic/PII quality, verified permission,
+  training and release clearance remain false/separate.
+- Local app verification: ran the updated backend on loopback port 29010 from a
+  clean source snapshot plus this change. Through confirmed ingestion/declaration,
+  audit, tokenizer and session APIs, prepared a local train/test near-duplicate
+  fixture. Its one known cross-source split finding blocked both gate review and
+  gated input emission (HTTP 400), without changing the corpus, receipt or evidence.
+  This corpus remains blocked until its affected source is replaced/reprocessed and
+  fresh matching audits pass; its original source and reports are preserved.
+- Immediately continued with an independent noncontaminated local text/JSONL
+  mixture, reusing only the unchanged valid anchor source and tokenizer. Complete
+  within-source audits covered 28 and 21 pairs; cross-source audit covered 56 pairs,
+  with zero cross-split findings and zero short pairs skipped. Incomplete evidence,
+  unconfirmed review and a stale gate cursor rejected. After app restart, the exact
+  gate review and cursor replay matched. All 2,376 causal targets over 38 input pages
+  matched independent byte-transition checks; the sampler receipt was unchanged.
+  All 136 input/retained data files, including 99 prior artifacts, stayed byte-
+  identical through gated reads and restart. No training ran. Evidence:
+  /tmp/almg-stream-mixture-lexical-gate-api-qa/{verification.json,blocked.json}.
+- Verification: 124 focused Python tests passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors. Eight new tests cover complete evidence, within/cross-source
+  contamination rejection before emission, partial/foreign/method/producer rejection,
+  consent/cursors, missing evaluation splits, evidence changes during batching and
+  app routes. No native GUI or large-scale performance verification claimed.
+- Remaining: integration with mixed model training approval/execution, broader
+  semantic/PII/quality admission, learned joint codecs, packing/randomized epochs and
+  desktop controls. Larger-than-RAM, physical hardware and UI-control blockers stay
+  open and skipped. User edits, training artifacts and weights are preserved;
+  no external collection, generated artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
