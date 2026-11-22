@@ -10166,6 +10166,43 @@ P3-LMF-02 partial progress · complete exact-overlap finding pages · 2026-11-22
   skipped. User edits, training artifacts and weights are preserved; no external
   collection, generated artifact commit or push.
 
+P3-LMF-02 partial progress · saved exact-overlap audit history · 2026-11-22:
+- [ ] P3-LMF-02 remains open. Added separately confirmed, immutable version-1
+  snapshots of the exact cross-source overlap report, with UTC capture time,
+  mixture/report revisions, producer digests and explicit no-training/release scope.
+  New local API routes save, list verified history and reopen a snapshot. Atomic
+  staged publication preserves earlier evidence on failure. History is bounded to
+  32 snapshots per mixture, each at most 256 KiB; full history rejects new writes
+  instead of replacing evidence. Corrupt or unexpected entries fail the whole
+  history rather than silently yielding a partial list.
+- Reading revalidates retained source bindings and versioned report results.
+  Prior producer provenance remains readable without rewriting saved manifests
+  when those results still match; new saves require a current exact report review.
+  This is retained-source evidence, not an independent offline archive or clearance
+  for training. Existing plans/reports/finding cursors and sources are unchanged.
+- Local app verification: ran the updated backend from a clean source snapshot on
+  loopback port 29005, using the prior committed three-source, 93-record-pair report.
+  Unconfirmed and stale saves returned 400 without creating history. Saved/reopened
+  all 32 snapshots, verified ordered complete history, and confirmed a 33rd save
+  returned 400 with no rewrite. A deliberately corrupted new fixture returned 404
+  for read/history and blocked saving; restoring its original bytes restored the
+  full history. After app restart, all 32 snapshots and history matched exactly.
+  A retained finding cursor worked with a saved snapshot's report. All 23 original
+  source/index/plan files remained byte-identical; all 55 resulting data files were
+  unchanged after restart. No training ran. Evidence:
+  /tmp/almg-stream-mixture-audit-history-api-qa/verification.json.
+- Verification: 71 focused Python tests passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors. Nine new tests cover immutable ordered history, consent/stale
+  reviews, failed publication cleanup, tamper detection, prior producer reads,
+  bounds/capacity, unavailable sources and app routes. No native GUI verification
+  is claimed. Snapshots contain bounded report metadata/references, not source text.
+- Remaining: cross-source near-duplicate/semantic checks, permission and training-
+  admission integration, mixed sampling, desktop controls and broader incremental
+  policies. Larger-than-RAM acceptance retains its recorded scratch-space blocker;
+  physical hardware and UI-control blockers stay open and skipped. User changes,
+  training artifacts and weights are preserved; no external collection, generated
+  artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
