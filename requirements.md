@@ -10080,6 +10080,50 @@ P3-LMF-02 partial progress · source-bound streamed mixture plans · 2026-11-22:
   hardware and UI-control blockers stay open and skipped. Existing user edits,
   training artifacts and weights are preserved; no external collection or push.
 
+P3-LMF-02 partial progress · exact cross-source mixture overlap review · 2026-11-22:
+- [ ] P3-LMF-02 remains open. Added a separate confirmed local API inspection for
+  saved streamed mixture plans. The read-only report checks every unordered source
+  pair across all saved splits using the existing normalized-record identity hashes,
+  without assuming that a matching record has the same split in both sources.
+- Reports bind the mixture/review revisions and source index/database/original
+  hashes. They count exact overlapping record pairs, cross-split pairs and overlap
+  within the plan's selected split. At most five affected-record references per
+  source pair include group hash, both saved splits, first line/byte offset,
+  raw-line hash and occurrence count. Cross-split findings appear first; omitted
+  findings are counted explicitly. A record in three sources counts in three
+  pairs; totals do not claim globally distinct record counts. Occurrences are not
+  expanded, and near-duplicate/semantic contamination and permissions stay unchecked.
+- The implementation uses read-only SQLite attachments, 2 MiB page caches per
+  source and file-backed temporary storage; result buffers bound split-count
+  rows and retain at most five sample records per pair. Source/plan file guards and
+  complete binding revalidation surround inspection. Unconfirmed/stale reviews,
+  unavailable/corrupt sources or concurrent file changes reject without a complete
+  report. Saved plans, source bytes, splits, weights and approval flags are unchanged.
+- Local app verification: ran the updated backend on loopback port 29003 from a
+  clean committed-source snapshot plus this change. Uploaded/prepared three local
+  sources, including JSONL and equivalent decomposed/NFC and whitespace text, through
+  the app's confirmed storage/preparation APIs. Each source had 131 unique records;
+  31 were shared across all three. The report correctly returned 93 exact record
+  pairs across three source pairs, including all train/validation/test counts,
+  five sample references and 26 omitted findings per pair. Independently verified
+  each sampled raw-line hash and byte offset. All 23 existing fixture files stayed
+  byte-identical. Unconfirmed and stale requests returned 400. A retained prior-
+  commit plan reopened unchanged and its disjoint sources reported zero overlap.
+- After restarting the app in a fresh process, the complete report and revision
+  matched exactly. Evidence: /tmp/almg-stream-mixture-overlap-api-qa/
+  {verification.json,report.json,python.log}. All 54 focused Python tests passed
+  with ALMG_METAL_TESTS=1 and warnings treated as errors. Seven new tests cover
+  exhaustive pair counts, truncation/provenance, disjoint and alternate-split
+  fixtures, consent/stale reviews, integrity/concurrent-change rejection, SQLite
+  failure and the app route. No Flutter/native GUI verification is claimed.
+- Remaining: complete finding pagination/history, cross-source near-duplicate and
+  semantic checks, permission/training-admission integration, actual mixed sampling,
+  desktop controls and broader incremental policies. This report neither filters
+  duplicates nor grants training/release approval. Larger-than-RAM verification
+  remains blocked by the recorded scratch-space requirement; physical hardware and
+  UI-control blockers remain open and skipped. User edits, training artifacts and
+  downloaded weights are preserved. No external collection, artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
