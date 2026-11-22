@@ -40,6 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
+    from . import decoder_stream_mixture_sampling
     from . import decoder_stream_mixture_near_overlap
     from . import decoder_stream_mixture_audits
     from . import decoder_stream_mixtures, decoder_stream_mixture_overlap, decoder_stream_mixture_findings
@@ -53,6 +54,7 @@ if __package__:
     from . import image_resource_trials
     from . import classifier_resource_trials
 else:
+    import decoder_stream_mixture_sampling
     import decoder_stream_mixture_near_overlap
     import decoder_stream_mixture_audits
     import decoder_stream_mixtures, decoder_stream_mixture_overlap, decoder_stream_mixture_findings
@@ -2374,6 +2376,11 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/decoder-stream-mixtures':
                 return self.respond(decoder_stream_mixtures.save(ROOT, data.get('confirmed'), data.get('reviewed')))
             mixture_parts = self.path.strip('/').split('/')
+            if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixtures':
+                if mixture_parts[2] == 'sampling-review':
+                    return self.respond(decoder_stream_mixture_sampling.review(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed')))
+                if mixture_parts[2] == 'sampling-preview':
+                    return self.respond(decoder_stream_mixture_sampling.preview(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed'), data.get('cursor'), data.get('limit', 8)))
             if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixtures' and mixture_parts[2] == 'near-overlap-audits':
                 return self.respond(decoder_stream_mixture_near_overlap.begin(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed')))
             if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixture-near-overlap':

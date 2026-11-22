@@ -10249,6 +10249,50 @@ P3-LMF-02 partial progress · resumable cross-source near-overlap diagnostics ·
   User edits, training artifacts and weights are preserved; no external collection,
   generated artifact commit or push.
 
+P3-LMF-02 partial progress · declaration-bound weighted record previews · 2026-11-22:
+- [ ] P3-LMF-02 remains open. Added separately confirmed sampling review and private
+  normalized-text preview for saved training-split mixtures. Smooth integer weighted
+  round-robin applies source weights to the record prefix; canonical source order
+  breaks ties and each source is read by group hash without replacement. Exhausted
+  sources leave the active schedule. Final source-pass counts follow capacities,
+  not requested weight ratios. Held-out plans reject rather than reweight evaluation.
+- Reviews bind current source-declaration histories, mixture/index revisions,
+  implementation/runtime and policy. Every source needs a current user_created or
+  permission_recorded declaration through the existing controls; needs_review,
+  changed declarations or stale review/cursor bindings reject before returning text.
+  Declarations remain unverified user statements. Preview results explicitly retain
+  permission_verified, quality_clearance, training_approved and release_approved false.
+- Pages return 1–16 records with complete source/line/hash/declaration provenance.
+  Stateless cursors replay a deterministic prefix capped at 256 records. The cap
+  ends preview, not necessarily a source pass; separate flags distinguish these.
+  Per-request source/declaration guards and full binding rechecks reject changes.
+  No source text is persisted by the sampler. Cross-source duplicate groups remain
+  separate references, and original occurrence counts are not expanded.
+- Local app verification: ran the updated backend on loopback port 29007 from a
+  clean committed-source snapshot plus this change. On the retained plain-text/
+  JSONL mixture, missing declarations blocked review. Used existing confirmed
+  declaration APIs; weights 1:3 selected two/light and six/heavy records in the
+  first eight draws. Changing one declaration to needs_review blocked preview;
+  renewing it required a fresh review/cursor. After app restart, the saved review
+  and next-page cursor reproduced identical results. Five pages traversed all 19
+  training-source references (18 normalized groups), without within-source repeats.
+  Independently verified text, source hashes, original line hashes/offsets and
+  declaration bindings. Final counts matched source capacities 10 and 9; no held-out
+  records appeared. All 66 prior files stayed byte-identical; all 70 data files, including
+  the explicit declaration history, stayed unchanged through restart/preview.
+  No training ran. Evidence: /tmp/almg-stream-mixture-sampling-api-qa/verification.json.
+- Verification: 89 focused Python tests passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors. Nine new tests cover weight ratios, page-size-independent
+  replay, source exhaustion, provenance, declaration/cursor/reader guards, held-out
+  rejection, real 256-record truncation, concurrent declaration changes and routes.
+  No native GUI verification claimed.
+- Remaining: full streaming/randomized sampling, quality/permission training-
+  admission integration, mixed model-input batches/training and desktop controls.
+  This bounded preview does not deduplicate, clear contamination or approve a model.
+  Larger-than-RAM, physical hardware and UI-control blockers remain open and skipped.
+  User edits, artifacts and weights are preserved; no external collection, generated
+  artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
