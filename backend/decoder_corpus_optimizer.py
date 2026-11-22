@@ -175,7 +175,7 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
     if profile['system'] != 'Darwin' or profile['machine'] != 'arm64' or not profile['metal_available']:
         reasons.append('Corpus gradients require Apple silicon with MLX Metal.')
     if not hardware._fits(profile, reserve):
-        reasons.append('Current memory/disk does not cover corpus optimizer reserves.')
+        reasons.append('Current memory/disk or Metal working-set recommendation does not cover corpus optimizer reserves.')
     result = {'format': 'almg-corpus-optimizer-review-v4' if execution_mode=='fresh_process' else 'almg-corpus-optimizer-review-v3', 'schema_version': 4 if execution_mode=='fresh_process' else 3,
               'execution_mode':execution_mode,
               'source': saved['review']['source'], 'corpus_id': saved['id'], 'corpus_revision': saved['revision'],
@@ -188,8 +188,8 @@ def review(root, initialized, reviewed_inputs, settings, execution_mode='shared_
     reserve['calculated_memory_reserve_bytes']=reserve['required_available_memory_bytes']
     memory,work=feedback.feedback(history(root,initialized,reviewed_inputs),result) if execution_mode=='fresh_process' else (None,None)
     reserve['isolated_corpus_memory']=memory;reserve['corpus_work_estimate']=work
-    if memory is not None:reserve['required_available_memory_bytes']=max(reserve['required_available_memory_bytes'],memory['calculated_memory_floor_bytes'])
-    if not hardware._fits(profile,reserve) and not any('memory/disk' in reason for reason in reasons):reasons.append('Current memory/disk does not cover measured corpus worker calibration reserves.')
+    feedback.apply_memory_floor(reserve,memory)
+    if not hardware._fits(profile,reserve) and not any('memory/disk' in reason for reason in reasons):reasons.append('Current memory/disk or Metal working-set recommendation does not cover measured corpus worker calibration reserves.')
     result['feasible']=not reasons
     result['revision'] = digest(result)
     return result

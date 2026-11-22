@@ -48,3 +48,17 @@ def feedback(records,current):
             'calculated_memory_floor_bytes':math.ceil((rss+metal)*1.25),'headroom_multiplier':1.25,'source_records':samples,
             'limitations':'Calculated floor sums fresh-process RSS and Metal peaks with 25% headroom; unified-memory overlap makes this conservative. Never reduces calculated reserves. Exact corpus/config/runtime/producer only, latest twenty verified runs for this corpus; changing host load can still exhaust resources.'}
     return memory,work
+
+
+def apply_memory_floor(estimates,memory):
+    """Keep RAM and Metal admission at least as high as compatible measured floors."""
+    estimates['calibrated_gpu_working_bytes']=max(estimates['estimated_gpu_working_bytes'],estimates.get('calibrated_gpu_working_bytes',0))
+    estimates.setdefault('calculated_metal_working_floor_bytes',None)
+    estimates['metal_working_floor_policy']='Compatible isolated Metal peak plus 25 percent headroom; never lowers calculated or previously calibrated working bytes. Not free GPU memory or a future capacity guarantee.'
+    if memory is None:return
+    estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],memory['calculated_memory_floor_bytes'])
+    peak=memory.get('isolated_metal_peak_bytes')
+    if type(peak) is int and peak>=0:
+        floor=math.ceil(peak*1.25)
+        estimates['calculated_metal_working_floor_bytes']=max(estimates['calculated_metal_working_floor_bytes'] or 0,floor)
+        estimates['calibrated_gpu_working_bytes']=max(estimates['calibrated_gpu_working_bytes'],estimates['calculated_metal_working_floor_bytes'])

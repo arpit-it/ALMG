@@ -72,8 +72,8 @@ def review(root, identifier, resume_id=None, execution_mode='shared_backend'):
     estimates['calculated_memory_reserve_bytes']=estimates['required_available_memory_bytes']
     memory,work=measured_feedback.feedback(history(root,identifier),record) if execution_mode=='fresh_process' else (None,None)
     estimates['isolated_continuation_memory']=memory;estimates['corpus_continuation_work_estimate']=work
-    if memory is not None:estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],memory['calculated_memory_floor_bytes'])
-    if not training.hardware._fits(record['hardware'],estimates) and not any('memory/disk' in reason for reason in record['blockers']):record['blockers'].append('Current memory/disk does not cover isolated corpus continuation calibration reserves.')
+    training.feedback.apply_memory_floor(estimates,memory)
+    if not training.hardware._fits(record['hardware'],estimates) and not any('memory/disk' in reason for reason in record['blockers']):record['blockers'].append('Current memory/disk or Metal working-set recommendation does not cover isolated corpus continuation calibration reserves.')
     record['feasible']=not record['blockers']
     record['revision'] = training.digest(record)
     return record

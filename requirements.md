@@ -9934,6 +9934,36 @@ P3-LMF-07 partial progress · measured quick-trial resource assessment · 2026-1
   Native GUI verification remains separately blocked; actual local API workflows
   were exercised. User edits, seeded-order work, artifacts and weights preserved.
 
+P3-LMF-05 partial progress · measured Metal working-set admission floors · 2026-11-22:
+- [ ] P3-LMF-05 remains open. Fresh corpus, continuation and retained-phase
+  reviews now apply a shared Metal working-set floor from compatible isolated
+  peaks plus 25% headroom, alongside the existing RAM floor. The final working
+  bytes never fall below calculated or previously calibrated values. Missing
+  peak evidence stays unknown. Existing device-recommendation admission now
+  checks this calibrated value; blocker text explicitly includes Metal working
+  sets. A recommendation is not free GPU memory or a future capacity guarantee.
+- Actual local app port 28996 completed SGD/AdamW training and continuations
+  with zero recovery error on the 232,448-parameter fixture. Follow-up fresh
+  working estimates rose from 4,120,576 bytes to 5,227,520 / 5,212,160 bytes.
+  Continuation observations implied lower floors, so their original 4,120,576-byte
+  estimates were retained. Port 28997 exercised small AdamW reference/training
+  phase cancellation and confirmed recovery from steps eight/seven with zero
+  error. Both phase floors rose from 18,432 to 31,195 bytes.
+- All six live review contexts matched peak/headroom arithmetic and retained
+  feasible/approval semantics. Read-only follow-up reviews preserved all 140
+  main-fixture and 167 phase-fixture files. Only matching fixture workers were
+  briefly paused to schedule cooperative app cancellation; physical power-loss
+  verification is not claimed. No admission reserve was lowered.
+- Final clean-export regression: all 812 tests passed in 268.688 seconds with
+  Metal enabled, warnings treated as errors, no skips or exclusions. New checks
+  cover monotonic/unknown floors, actual fresh/continuation measurements, and a
+  simulated Metal-only shortfall with sufficient RAM/disk that rejects execution
+  before worker launch. Evidence: /tmp/almg-corpus-metal-floor-api-qa/
+  {python.log,verify-app.log,verify-phase.log,floor-verification.json}.
+- Other hardware/runtime, broader-scale and native GUI acceptance remains open
+  or independently blocked. User edits, pending seeded-order work, all retained
+  training artifacts and downloaded weights are preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

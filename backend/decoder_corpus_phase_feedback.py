@@ -47,6 +47,6 @@ def apply(root,initialized,corpus,result,phase):
     else:import decoder_corpus_optimizer as training
     memory,work=feedback(training.history(root,initialized,corpus),result,phase) if result['execution_mode']=='fresh_process' else (None,None)
     estimates=result['estimates'];estimates['isolated_phase_resume_memory']=memory;estimates['phase_resume_work_estimate']=work
-    if memory is not None:estimates['required_available_memory_bytes']=max(estimates['required_available_memory_bytes'],memory['calculated_memory_floor_bytes'])
-    if not training.hardware._fits(result['hardware'],estimates) and not any('memory/disk' in reason for reason in result['blockers']):result['blockers'].append('Current memory/disk does not cover measured phase-resume calibration reserves.')
+    training.feedback.apply_memory_floor(estimates,memory)
+    if not training.hardware._fits(result['hardware'],estimates) and not any('memory/disk' in reason for reason in result['blockers']):result['blockers'].append('Current memory/disk or Metal working-set recommendation does not cover measured phase-resume calibration reserves.')
     result['feasible']=not result['blockers']
