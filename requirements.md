@@ -10124,6 +10124,48 @@ P3-LMF-02 partial progress · exact cross-source mixture overlap review · 2026-
   UI-control blockers remain open and skipped. User edits, training artifacts and
   downloaded weights are preserved. No external collection, artifact commit or push.
 
+P3-LMF-02 partial progress · complete exact-overlap finding pages · 2026-11-22:
+- [ ] P3-LMF-02 remains open. Added separately confirmed local API pages for every
+  exact-overlap record pair in a saved streamed mixture, extending the report's
+  five-reference samples without changing existing plans, reports or source indexes.
+  Pages return 1–100 references ordered by source-pair index then normalized group
+  hash, with at most one lookahead record and an explicit terminal next_cursor null.
+- Each reference preserves both source index IDs, saved split labels, first line/
+  byte offset, raw-line hash and occurrence count. Cursors bind the mixture revision,
+  exact-report revision and reader implementation digest. Invalid/nonexistent
+  anchors, stale readers/reports, other-mixture cursors, invalid limits, unconfirmed
+  requests and source changes reject. Queries use read-only SQLite attachments;
+  file guards and complete source binding checks surround every page. Full exact
+  report revalidation per request is conservative and not a constant-time lookup.
+- Local app verification: ran the updated ALMG backend on loopback port 29004 from
+  a clean source snapshot plus this change, using an isolated copy of the actual
+  prior-commit three-source mixture and report. Its unchanged report had 15 sampled
+  references. Seven-record pages exposed all 93 exact record pairs (31 distinct
+  shared groups) across 14 pages. After three pages/21 records, restarted the app
+  and continued from the saved cursor. Verified the complete ordered sequence with
+  no gaps or duplicates against independent fixture-index inspection; all 186
+  original-line references matched raw-line hashes, byte offsets and normalized
+  identities, including JSONL and Unicode normalization. Replaying the saved cursor
+  returned the identical page. Empty results, consent/limit rejection, stale reader
+  and other-mixture cursor rejection passed through the running app API.
+- All 23 retained source/index/plan files stayed byte-identical, with no new files
+  in their data tree. The prior committed report remained exactly compatible.
+  Evidence: /tmp/almg-stream-mixture-findings-api-qa/
+  {verification.json,continuation.json,all-pages.json,python.log}.
+- Verification: 62 focused Python tests passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors. Eight new tests cover exhaustive pagination across empty and
+  populated source-pair boundaries at several page sizes, provenance/alternate
+  splits, cursor/reader/report bindings, consent/limit rejection, concurrent source
+  changes, integrity failures and the app route. No Flutter/native GUI verification
+  is claimed. No source text is included in responses and no training ran.
+- Remaining: durable cross-source audit history, near-duplicate/semantic checks,
+  permission and training-admission integration, mixed sampling and desktop controls.
+  Cursor positions do not prove prior pages were consumed or grant quality clearance,
+  training or release approval. Larger-than-RAM acceptance retains its recorded
+  scratch-space blocker; physical hardware and UI-control blockers remain open and
+  skipped. User edits, training artifacts and weights are preserved; no external
+  collection, generated artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

@@ -40,7 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
-    from . import decoder_stream_mixtures, decoder_stream_mixture_overlap
+    from . import decoder_stream_mixtures, decoder_stream_mixture_overlap, decoder_stream_mixture_findings
     from . import decoder_architecture_feasibility, decoder_architecture_backward, decoder_architecture_initializations, decoder_architecture_plans, decoder_stream_imports, decoder_stream_archives, decoder_stream_evaluations, decoder_stream_previews, decoder_stream_training, decoder_stream_persistence, decoder_stream_unigram, decoder_stream_unigram_candidates, decoder_stream_character_bpe, decoder_stream_learned_optimization, decoder_stream_learned_windows, decoder_stream_fitted_tokenizer_evaluations, decoder_stream_iterative_bpe, decoder_stream_bpe, decoder_stream_tokenizer_evaluations, decoder_stream_tokenizer_experiments, decoder_tokenizer_adoptions, decoder_tokenizer_compatibility, decoder_tokenizer_experiments, decoder_stream_jsonl, decoder_stream_plans, decoder_jsonl_preparations, decoder_jsonl, decoder_stream_optimization, decoder_stream_batches, decoder_stream_windows, decoder_stream_tokenizers, decoder_html_preparations, decoder_html, decoder_stream_redactions, decoder_stream_overlap, decoder_stream_languages, decoder_stream_permissions, decoder_stream_token_stats, decoder_provider_contracts, decoder_stream_exports, decoder_stream_audits, decoder_stream_indexes, decoder_streams, decoder_licenses, decoder_languages, decoder_preparations, decoder_datasets, decoder_trials, decoder_training, run_manifest, training_resources, lora_validation, recipe_contracts, chat_history, image_recipe, inference, loc_discovery, europe_pmc, wikidata_discovery, world_bank, federal_register, crossref_discovery, sec_discovery, website_access, wikipedia_reuse
     from . import decoder_stream_training_feasibility
     from . import decoder_stream_training_measurements
@@ -51,7 +51,7 @@ if __package__:
     from . import image_resource_trials
     from . import classifier_resource_trials
 else:
-    import decoder_stream_mixtures, decoder_stream_mixture_overlap
+    import decoder_stream_mixtures, decoder_stream_mixture_overlap, decoder_stream_mixture_findings
     import training_resources
     import lora_validation
     import recipe_contracts
@@ -2360,6 +2360,8 @@ class Handler(BaseHTTPRequestHandler):
             mixture_parts = self.path.strip('/').split('/')
             if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixtures' and mixture_parts[2] == 'exact-overlap-review':
                 return self.respond(decoder_stream_mixture_overlap.review(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed')))
+            if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixtures' and mixture_parts[2] == 'exact-overlap-findings':
+                return self.respond(decoder_stream_mixture_findings.record_page(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed'), data.get('reviewed_report'), data.get('cursor'), data.get('limit', 20)))
             if self.path == '/decoder-dataset-mixtures':
                 return self.respond(decoder_datasets.mix_datasets(ROOT, data.get('selections'), data.get('confirmed')))
             if self.path == '/decoder-preparations':
