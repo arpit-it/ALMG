@@ -10043,6 +10043,43 @@ P3-LMF-01 acceptance recheck · 2026-11-22:
   downstream requirement. No external collection, weights or generated artifacts
   are included in the commit.
 
+P3-LMF-02 partial progress · source-bound streamed mixture plans · 2026-11-22:
+- [ ] P3-LMF-02 remains open. Added separate local API review, confirmed save and
+  reopen for metadata-only weighted mixture plans over two to eight completed
+  streamed text indexes. Each source has an integer relative weight from 1 to
+  1000. Plans preserve the selected existing split and calculate exact rational
+  target record shares; weights do not claim token proportions or achieved samples.
+- The immutable version-1 manifest binds each source index ID/revision/database
+  hash, original source ID/name/hash/bytes, split counts and requested weight.
+  Duplicate indexes and repeated original source hashes, unfinished indexes,
+  empty selected splits, invalid IDs/weights, unconfirmed writes and stale reviews
+  reject. Source bindings are checked again before atomic publication and whenever
+  reopened. Older producer provenance remains readable without rewriting records;
+  saving again requires a current review. No source text is copied or changed.
+- Local app verification: ran the updated ALMG backend from a clean source snapshot
+  with only this change, on loopback port 29002 and isolated local fixtures.
+  Uploaded and indexed 100 plain-text documents and 100 text-only JSONL documents
+  using the app's confirmed storage/preparation APIs. Reviewed weights 1:3 and
+  independently checked exact shares 1/4 and 3/4, split counts and provenance.
+  Confirmed save/reopen matched exactly; all eight existing source/index files
+  stayed byte-identical. Invalid/unconfirmed/stale requests returned 400 without
+  publishing a plan. After restarting the app, the prior manifest reopened exactly;
+  a fresh review/save/reopen with the final source also passed. No training ran.
+  Evidence: /tmp/almg-stream-mixture-plans-api-qa/verification.json and saved manifests.
+- Verification: 47 focused Python tests passed, with ALMG_METAL_TESTS=1 and warnings
+  treated as errors. Seven new tests cover weights/provenance, plain-text/JSONL
+  compatibility, consent/invalid selections, incomplete/repeated/empty sources,
+  failed publication cleanup, stale reviews, integrity failures, prior-producer
+  reads and API routes. Existing indexing, JSONL, permissions, overlap and recipe
+  tests remain green. No Flutter change or native GUI verification is claimed.
+- Remaining: actual mixed sampling/training, cross-source duplicate/contamination
+  and permission admission, desktop controls and broader incremental policies.
+  Summed per-source record counts may overlap; plans explicitly label those checks
+  unperformed and never grant training/release approval. Larger-than-RAM acceptance
+  remains blocked by the recorded scratch-space requirement. Independent physical
+  hardware and UI-control blockers stay open and skipped. Existing user edits,
+  training artifacts and weights are preserved; no external collection or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
