@@ -10293,6 +10293,53 @@ P3-LMF-02 partial progress · declaration-bound weighted record previews · 2026
   User edits, artifacts and weights are preserved; no external collection, generated
   artifact commit or push.
 
+P3-LMF-02 partial progress · durable weighted source-record sessions · 2026-11-22:
+- [ ] P3-LMF-02 remains open. Added a separate confirmed one-pass weighted record
+  session that persists per-source keyset cursors, credits and emitted counts,
+  removing the preview's 256-record ceiling for this reader. Each explicit step
+  selects 1–16 training records, using the existing deterministic weighted ordering
+  and capacity/exhaustion policy. Cross-source duplicates are retained separately;
+  this is a source-record reader, not tokenized model-input or training approval.
+- SQLite commits a batch receipt and cursor together. Stable client request IDs
+  make retries return the identical committed batch without advancing; reusing an
+  ID with another batch size rejects. Sequence-based replay reconstructs normalized
+  text from source indexes and checks its saved payload hash. Receipts persist only
+  references, counts, payload hashes and the previous-receipt revision, never source
+  text. Completed manifests bind the full receipt database and verified chain.
+  Failed publication can retry the last committed receipt without new selection.
+- Current source/declaration bindings guard every step and replay. Resume under a
+  changed implementation/runtime rejects while prior committed receipts remain
+  readable when their versioned inputs still match. Concurrent declaration changes
+  before commit roll back the cursor and receipt. No permission verification, quality
+  clearance, model training or release approval is granted. Existing preview
+  contracts/cursors and all source schemas remain unchanged; the session uses a new
+  versioned namespace.
+- Local app verification: ran the updated backend on loopback port 29008 from a
+  clean source snapshot plus this change. Through confirmed app ingestion/declaration
+  APIs, prepared two 211-record local text/JSONL indexes with duplicated occurrences
+  and weights 1:3, yielding 321 training-source references. Paused after four batches/
+  64 records (heavy/light counts 48/16), restarted the app and reopened the identical
+  state. Retrying batch 2 and replaying batch 1 returned original payloads with no
+  database write; changing the reused request's size returned 400. Continued the
+  full pass to 321 records in 21 batches. Verified every record/provenance reference,
+  receipt chain and payload hash, with no within-source repetition. The first 256
+  records matched the unchanged preview exactly; that preview still reported its cap.
+- A second app restart reopened the completed manifest and historical/final batches
+  identically. New work on the exhausted pass rejected without changing its database.
+  The receipt database contained no normalized fixture text. All 81 input/retained
+  files, including 70 prior artifacts, remained byte-identical. No training ran.
+  Evidence: /tmp/almg-stream-mixture-sessions-api-qa/verification.json.
+- Verification: 98 focused Python tests passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors. Nine new tests cover preview equivalence/full passes, retry
+  identity and historical replay, transactional rollback, publication retry, scope/
+  runtime guards, passes beyond 256 records, concurrent declarations, integrity and
+  app routes. No native GUI verification or large-scale performance claim is made.
+- Remaining: randomized/multi-epoch sampling, session discovery/desktop controls,
+  quality/permission training-admission integration and mixed tokenized batches/
+  pretraining. Larger-than-RAM, physical hardware and UI-control blockers remain
+  open and skipped. User edits, training artifacts and weights are preserved;
+  no external collection, generated artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

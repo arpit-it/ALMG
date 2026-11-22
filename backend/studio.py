@@ -40,6 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
+    from . import decoder_stream_mixture_sessions
     from . import decoder_stream_mixture_sampling
     from . import decoder_stream_mixture_near_overlap
     from . import decoder_stream_mixture_audits
@@ -54,6 +55,7 @@ if __package__:
     from . import image_resource_trials
     from . import classifier_resource_trials
 else:
+    import decoder_stream_mixture_sessions
     import decoder_stream_mixture_sampling
     import decoder_stream_mixture_near_overlap
     import decoder_stream_mixture_audits
@@ -2089,6 +2091,11 @@ class Handler(BaseHTTPRequestHandler):
         if self.path == '/decoder-streams':
             return self.respond({'sources': decoder_streams.list_sources(ROOT)})
         stream_parts = self.path.strip('/').split('/')
+        if len(stream_parts) == 2 and stream_parts[0] == 'decoder-stream-mixture-sessions':
+            try:
+                return self.respond(decoder_stream_mixture_sessions.read(ROOT, stream_parts[1]))
+            except ValueError as error:
+                return self.respond({'error': str(error)}, 404)
         if len(stream_parts) == 2 and stream_parts[0] == 'decoder-stream-mixture-near-overlap':
             try:
                 return self.respond(decoder_stream_mixture_near_overlap.read(ROOT, stream_parts[1]))
@@ -2376,6 +2383,16 @@ class Handler(BaseHTTPRequestHandler):
             if self.path == '/decoder-stream-mixtures':
                 return self.respond(decoder_stream_mixtures.save(ROOT, data.get('confirmed'), data.get('reviewed')))
             mixture_parts = self.path.strip('/').split('/')
+            if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixtures':
+                if mixture_parts[2] == 'session-review':
+                    return self.respond(decoder_stream_mixture_sessions.review(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed')))
+                if mixture_parts[2] == 'sampling-sessions':
+                    return self.respond(decoder_stream_mixture_sessions.begin(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed')))
+            if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixture-sessions':
+                if mixture_parts[2] == 'step':
+                    return self.respond(decoder_stream_mixture_sessions.step(ROOT, mixture_parts[1], data.get('confirmed'), data.get('request_id'), data.get('limit', 16)))
+                if mixture_parts[2] == 'batch':
+                    return self.respond(decoder_stream_mixture_sessions.batch(ROOT, mixture_parts[1], data.get('confirmed'), data.get('sequence')))
             if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixtures':
                 if mixture_parts[2] == 'sampling-review':
                     return self.respond(decoder_stream_mixture_sampling.review(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed')))
