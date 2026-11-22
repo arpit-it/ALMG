@@ -9876,6 +9876,36 @@ P3-LMF-07 partial progress · exact trial storage observations in proposals · 2
   Native GUI verification remains separately blocked; actual local API workflows
   were exercised. User edits, seeded-order work, artifacts and weights preserved.
 
+P3-LMF-06 partial progress · profiled forty-update sixteen-ID budget · 2026-11-22:
+- [ ] P3-LMF-06 remains open. The fixed 232,448-parameter seven-layer/sixteen-ID
+  FP32 recipe additionally admits exactly forty updates through existing cyclic
+  schema six. Ten/twenty-update schema-five behavior remains supported; larger
+  four-ID recipes retain their previous budgets. Eighty updates, other larger
+  shapes and unsupported precision/settings stay blocked. Parameter caps,
+  resource reserves, optimizer controls and numeric tolerances are unchanged.
+- Actual local app port 28993 completed separately confirmed forty-update SGD
+  and AdamW runs and twenty-step-midpoint continuations. Loss decreased from
+  2.7686369742 to 2.7494829801 / 1.4805064509; checkpoint parameter/moment and
+  continuation errors were zero. Both optimizer counters finished at forty and
+  checkpoint restore counters were twenty; generated tokens matched after resume.
+  Unsupported, stale and unconfirmed requests failed before writes.
+- The run preserved all 28 original fixture files and retained 140 files. A fresh
+  app process on port 28994 reopened both checkpoints with all 140 files unchanged.
+  Fresh-worker SGD / AdamW Metal peaks were 4,169,728 / 4,169,728 bytes, process
+  RSS peaks 193,658,880 / 249,839,616 bytes and elapsed times 2.5314 / 2.2118 seconds.
+  These bounded observations are not quality or future-duration guarantees;
+  unified-memory peak counters may overlap.
+- Final clean-export regression: all 809 tests passed in 261.131 seconds with
+  Metal enabled, warnings treated as errors, no skips or exclusions. Coverage
+  includes both new optimizers, exact budget/counter restoration, unsupported
+  eighty-update settings, resource denials and unchanged four-ID restrictions.
+  Evidence: /tmp/almg-forty-update-recipe-api-qa/{python.log,verify-app.log,
+  verification.json,profile-summary.json,reopen-verification.json}.
+- Remaining: broader budgets/precision/layouts, 50M–100M engineering and language
+  quality/remaining acceptance criteria. Native GUI verification remains
+  separately blocked; actual local API workflows were exercised. User edits,
+  seeded-order work, artifacts and downloaded weights preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

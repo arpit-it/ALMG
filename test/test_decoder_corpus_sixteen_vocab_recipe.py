@@ -39,7 +39,7 @@ class SixteenVocabularyRecipeTest(unittest.TestCase):
                 for kind in ('sgd','adamw'):
                     config={**c,'optimizer':kind,'weight_decay':.01 if kind=='adamw' else 0.}
                     self.assertTrue(isolated.review(root,source,saved,config)['feasible'])
-                for changes in ({'learning_rate':.005},{'gradient_accumulation_steps':1},{'compute_precision':'mixed_float16','loss_scale':128.},{'schema_version':6,'steps':40}):
+                for changes in ({'learning_rate':.005},{'gradient_accumulation_steps':1},{'compute_precision':'mixed_float16','loss_scale':128.},{'schema_version':7,'steps':80}):
                     config={**c,**changes};review=isolated.review(root,source,saved,config);self.assertFalse(review['feasible'])
                     with self.assertRaises(ValueError):isolated.run(root,True,source,saved,config,review,uuid.uuid4().hex)
             profile.update(available_memory_bytes=1,free_disk_bytes=1)
