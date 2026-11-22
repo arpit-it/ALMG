@@ -4,7 +4,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import patch
 import uuid
-from backend import decoder_corpus_budget as budget, decoder_corpus_optimizer as training, decoder_corpus_isolated as isolated
+from backend import decoder_corpus_budget as budget, decoder_corpus_optimizer as training, decoder_corpus_isolated as isolated, decoder_corpus_storage_profile as storage
 from test_decoder_corpus_optimizer import corpus
 
 
@@ -40,6 +40,13 @@ class TrialAssessmentTest(unittest.TestCase):
                 assessment = budget.assess_quick_trial(root, trial['id'], config)
                 self.assertEqual(assessment['trial_source']['record_revision'], trial['revision'])
                 self.assertTrue(assessment['trial_validation']['training_loss_decreased'])
+                observations=assessment['trial_observations']
+                self.assertEqual(observations['update_budget'],10)
+                self.assertEqual(observations['workflow'],trial['isolated_workflow_measurements'])
+                self.assertEqual(observations['storage']['source']['record_id'],trial['id'])
+                self.assertEqual(observations['storage']['total_bytes'],storage.profile(root,trial['id'])['total_bytes'])
+                self.assertFalse(observations['requested_budget_extrapolated'])
+                self.assertIsNone(assessment['requested_budget_review']['observed_storage'])
                 self.assertFalse(assessment['requested_update_budget_covered_by_trial'])
                 self.assertFalse(assessment['compatible_requested_budget_timing_available'])
                 self.assertFalse(assessment['training_approved']); self.assertFalse(assessment['release_approved'])
@@ -67,3 +74,9 @@ class TrialAssessmentTest(unittest.TestCase):
                 with patch.object(training.hardware, 'hardware', return_value=profile):
                     blocked = budget.assess_quick_trial(root, trial['id'], config)
                 self.assertFalse(blocked['feasible']); self.assertTrue(blocked['blockers'])
+                self.assertTrue(blocked['trial_observations']['workflow']['measured'])
+                self.assertFalse(blocked['training_approved'])
+                unknown=root/storage.interruptions.DIRECTORY/('f'*32);unknown.mkdir();(unknown/'record.json').write_text('{}')
+                incomplete=budget.assess_quick_trial(root,trial['id'],config)
+                self.assertFalse(incomplete['trial_observations']['storage']['inventory_complete'])
+                self.assertFalse(incomplete['training_approved'])

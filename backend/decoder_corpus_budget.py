@@ -225,10 +225,22 @@ def assess_quick_trial(root, identifier, settings):
     origin = approved['source']
     initialized = training.hardware.initializations.read(root, origin['plan_id'], origin['initialization_id'])
     requested = review(root, initialized, saved, config)
+    if __package__:from . import decoder_corpus_storage_profile as storage
+    else:import decoder_corpus_storage_profile as storage
+    trial_storage=storage.profile(root,identifier)
+    if trial_storage['source']['record_revision']!=trial['revision']:
+        raise ValueError('Quick-trial storage source changed; reopen its assessment.')
     result = {
         'format': 'almg-corpus-quick-trial-assessment-v1', 'schema_version': 1,
         'trial_source': {'record_id': trial['id'], 'record_revision': trial['revision']},
         'trial_config': approved['config'], 'requested_config': config,
+        'trial_observations': {
+            'format':'almg-quick-trial-resource-observations-v1','schema_version':1,
+            'update_budget':10,'workflow':dict(training.feedback.measurements(trial)),
+            'storage':trial_storage,'requested_budget_extrapolated':False,
+            'language_quality_validated':False,
+            'scope':'Measured ten-update trial workflow and validated logical saved storage only. Worker RSS and Metal peaks may overlap and include runtime overhead; storage excludes filesystem overhead and unpublished artifacts. Neither observation predicts a larger budget or supplies training/release approval.',
+        },
         'trial_validation': {
             'training_loss_decreased': trial['final_losses']['train'] < trial['initial_losses']['train'],
             'initial_training_loss': trial['initial_losses']['train'], 'final_training_loss': trial['final_losses']['train'],

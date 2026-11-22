@@ -9906,6 +9906,34 @@ P3-LMF-06 partial progress · profiled forty-update sixteen-ID budget · 2026-11
   separately blocked; actual local API workflows were exercised. User edits,
   seeded-order work, artifacts and downloaded weights preserved.
 
+P3-LMF-07 partial progress · measured quick-trial resource assessment · 2026-11-22:
+- [ ] P3-LMF-07 remains open. Quick-trial assessments now include the saved
+  ten-update fresh-worker measurements and a validated storage profile bound to
+  that trial revision. Workflow scope/overhead and overlapping RSS/Metal peaks
+  remain explicit. Storage inventories retain completeness, hashes and exclusions.
+  The observations do not extrapolate a larger budget or approve training/release.
+- Actual local app port 28995 independently confirmed SGD and AdamW ten-update
+  trials for requested forty-update settings on the 232,448-parameter fixture.
+  Assessments matched stored worker measurements and direct storage-profile
+  lengths: SGD elapsed 0.9456 seconds, RSS 157,253,632 bytes and 20,048,584 logical
+  saved bytes; AdamW 1.0940 seconds, RSS 205,815,808 and 52,376,298 bytes. These
+  bounded observations do not establish physical disk allocation or future costs.
+- The requested forty-update timing and storage stayed unknown; larger training
+  was not approved. Re-assessment for the exact ten-update settings recognized
+  only its matching timing evidence. Unconfirmed and wrong-budget trial execution
+  requests failed before writes. Assessment requests changed no stored files;
+  all 28 original files were preserved and 132 final files retained.
+- Clean-export targeted verification: all twenty assessment, quick-trial,
+  corpus-budget and storage-profile tests passed in 7.268 seconds with real Metal
+  enabled and warnings treated as errors, no skips. Updated checks cover exact
+  observations/provenance, no larger-budget extrapolation, blocked resources,
+  incomplete inventories and immutable artifacts. Evidence:
+  /tmp/almg-quick-trial-observations-api-qa/{final-tests.log,verify-app.log,
+  verification.json,sgd-assessment.json,adamw-assessment.json,trials.json}.
+- Broader planning/energy/scale and desktop presentation criteria remain open.
+  Native GUI verification remains separately blocked; actual local API workflows
+  were exercised. User edits, seeded-order work, artifacts and weights preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
