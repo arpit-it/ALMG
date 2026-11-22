@@ -9846,6 +9846,36 @@ P3-LMF-06 partial progress · profiled sixteen-ID vocabulary recipe · 2026-11-2
   remains separately blocked; actual local API workflows were exercised. User
   edits, seeded-order work, retained training artifacts and weights preserved.
 
+P3-LMF-07 partial progress · exact trial storage observations in proposals · 2026-11-22:
+- [ ] P3-LMF-07 remains open. Fresh corpus budget proposals now attach up to the
+  latest three exactly compatible completed trial storage observations from
+  existing duration-calibration sources. Source revision, corpus, settings,
+  architecture, runtime and producer compatibility are rechecked. Each summary
+  retains observation time, source/profile revisions and storage implementation.
+  Complete observations have measured ranges; incomplete inventories are excluded
+  from those ranges. Missing/incompatible history remains unknown, not zero.
+- No future storage estimate or cross-budget extrapolation is invented. Existing
+  admission reserves, blockers and separate training approval remain unchanged.
+  This applies to fresh corpus proposals, not every recovery-planning variant.
+- Actual local app on port 28992 reviewed saved 232,448-parameter SGD/AdamW trials.
+  Each proposal attached two complete samples whose bytes matched their direct
+  storage profiles: SGD total range 20,086,108–20,120,142 bytes; AdamW
+  52,413,869–52,447,812 bytes. The current 2,120,089,600-byte disk reserve stayed
+  unchanged. Ten-update proposals had no extrapolated observations; unsupported
+  precision stayed blocked. All 252 fixture files remained byte-identical and
+  these planning requests queued no training.
+- Clean-export targeted verification: all eleven budget tests and all three
+  storage-profile tests passed with Metal enabled and warnings treated as errors,
+  no skips. New coverage includes no-history behavior, actual completed-trial
+  feedback, exact lengths, incompatible producers/budgets, stale revisions,
+  incomplete inventories and read-only behavior. Evidence:
+  /tmp/almg-budget-storage-observations-api-qa/{final-tests.log,verify-app.log,
+  verification.json,sgd-proposal.json,adamw-proposal.json,*-different-budget.json,
+  *-blocked.json}.
+- Broader planning/energy/scale and desktop presentation criteria remain open.
+  Native GUI verification remains separately blocked; actual local API workflows
+  were exercised. User edits, seeded-order work, artifacts and weights preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

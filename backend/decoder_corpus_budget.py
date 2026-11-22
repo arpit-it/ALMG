@@ -109,6 +109,40 @@ def _finish(result):
     return result
 
 
+
+def observed_storage(root, resources):
+    """Attach bounded exact-producer observations, never a future storage estimate."""
+    work=resources.get('estimates',{}).get('corpus_work_estimate')
+    if not isinstance(work,dict) or not isinstance(work.get('source_records'),list) or not work['source_records']:
+        return None
+    if __package__:from . import decoder_corpus_storage_profile as storage
+    else:import decoder_corpus_storage_profile as storage
+    samples=[]
+    for source in work['source_records'][-3:]:
+        record=training.read(root,source['record_id'])
+        if record['revision']!=source['record_revision']:raise ValueError('Storage observation source changed; reopen budget planning.')
+        _,compatible=training.feedback.feedback([record],resources)
+        if compatible is None:continue
+        profile=storage.profile(root,record['id'])
+        if profile['source']['record_revision']!=record['revision']:raise ValueError('Storage observation changed during budget planning.')
+        samples.append({'record_id':record['id'],'record_revision':record['revision'],
+                        'storage_profile_revision':profile['revision'],'storage_implementation_sha256':profile['implementation_sha256'],
+                        'observed_at':profile['observed_at'],
+                        'inventory_complete':profile['inventory_complete'],'run_bytes':profile['run_bytes'],
+                        'retained_progress_bytes':profile['retained_progress_bytes'],'total_bytes':profile['total_bytes'],
+                        'file_count':profile['file_count'],'retained_progress_count':profile['retained_progress_count']})
+    if not samples:return None
+    complete=[sample for sample in samples if sample['inventory_complete']]
+    return {'format':'almg-corpus-budget-storage-observations-v1','schema_version':1,'measured':True,
+            'sample_count':len(samples),'complete_sample_count':len(complete),'incomplete_sample_count':len(samples)-len(complete),
+            'source_records':samples,'sample_limit':3,
+            'observed_min_complete_total_bytes':min(sample['total_bytes'] for sample in complete) if complete else None,
+            'observed_max_complete_total_bytes':max(sample['total_bytes'] for sample in complete) if complete else None,
+            'observed_max_complete_progress_bytes':max(sample['retained_progress_bytes'] for sample in complete) if complete else None,
+            'estimated_future_bytes':None,'admission_reserves_changed':False,
+            'scope':'Up to the latest three exact compatible completed fresh-worker trials from the existing duration calibration. Source, corpus, settings, model, runtime and producer compatibility are rechecked. Validated logical run/progress lengths, not physical allocated blocks or a future bound. Incomplete inventories are excluded from summary ranges. No extrapolation, reserve reduction, storage deletion or training approval.'}
+
+
 def review(root, initialized, reviewed_inputs, settings):
     if not isinstance(reviewed_inputs, dict) or not isinstance(reviewed_inputs.get('review'), dict):
         raise ValueError('Reopen saved reviewed corpus inputs before budget planning.')
@@ -127,6 +161,7 @@ def review(root, initialized, reviewed_inputs, settings):
         'required_available_memory_bytes': estimates['required_available_memory_bytes'],
         'required_free_disk_bytes': estimates['required_free_disk_bytes'],
         'durable_checkpoint_disk_reserve_bytes': estimates['interruption_checkpoint_extra_disk_bytes'],
+        'observed_storage': observed_storage(root, resources),
         'workflow_duration_estimate': work, 'optimizer_only_tokens_per_second': None,
         'estimated_energy_wh': None, 'quality_token_requirement': None,
         'training_approved': False, 'release_approved': False,
