@@ -9784,6 +9784,35 @@ P3-LMF-06 partial progress · byte-preserving legacy midpoint recovery · 2026-1
   Native GUI verification remains separately blocked. User edits, seeded-order
   work, retained training artifacts and downloaded weights are preserved.
 
+P3-LMF-07 partial progress · observed retained-checkpoint storage · 2026-11-22:
+- [ ] P3-LMF-07 remains open. Completed corpus runs expose read-only
+  storage-profile: validated logical file lengths/hashes for the run and matching
+  published progress snapshots, including manifests, grouped by artifact kind.
+  The report separates observed bytes from the original calculated progress
+  reserve. It does not lower reserves, approve training or queue work.
+- Unknown/unreadable source bindings and bounded-scan truncation mark inventories
+  incomplete; incomplete known-under-reserve totals do not claim reserve coverage.
+  Matching corrupt artifacts fail validation. Logical lengths exclude filesystem
+  overhead, inputs, initialization, continuations, unpublished artifacts and
+  future writes; duplicate content at separate paths counts separately.
+- Final local app on port 28988 profiled saved 230,912-parameter SGD/AdamW runs.
+  Each report counted 52 files and eight retained progress checkpoints. SGD:
+  9,908,730 run bytes + 69,306,996 progress bytes = 79,215,726 total. AdamW:
+  12,376,635 + 183,241,223 = 195,617,858 bytes. Both observations retained the
+  unchanged 1,891,631,104-byte calculated progress reserve. Every reported total
+  matched the actual file lengths, and all 158 fixture files were byte-identical
+  afterward. No training was queued by these storage-report requests.
+- Clean-export targeted verification: three storage tests and all nine existing
+  corpus-budget tests passed with real Metal enabled and warnings treated as
+  errors, no skips. Coverage includes an actual run/eight snapshots, read-only
+  behavior, provenance, exact totals, unknown records, truncation, bounded reads,
+  checksum/manifest tampering and corrupt progress rejection. Evidence:
+  /tmp/almg-corpus-storage-profile-api-qa/{final-tests.log,verify-app.log,
+  verification.json,sgd-profile.json,adamw-profile.json}.
+- Broader planning/energy/scale and desktop presentation criteria remain open.
+  Native GUI verification remains separately blocked; this slice exercised the
+  actual local API. User edits, seeded-order work, artifacts and weights preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

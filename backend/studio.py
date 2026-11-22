@@ -2423,6 +2423,10 @@ class Handler(BaseHTTPRequestHandler):
                     return self.respond(decoder_corpus_evaluations.save(ROOT,corpus_parts[1],data.get('confirmed'),data.get('reviewed')),201)
                 if corpus_parts[2] == 'evaluations':
                     return self.respond({'records':decoder_corpus_evaluations.history(ROOT,corpus_parts[1])})
+                if corpus_parts[2] == 'storage-profile':
+                    if __package__:from . import decoder_corpus_storage_profile
+                    else:import decoder_corpus_storage_profile
+                    return self.respond(decoder_corpus_storage_profile.profile(ROOT,corpus_parts[1]))
                 if corpus_parts[2] == 'inference-profile':
                     return self.respond(decoder_corpus_inference_profile.profile(ROOT,corpus_parts[1]))
                 if corpus_parts[2] == 'inference-benchmark':
