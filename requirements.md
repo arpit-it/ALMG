@@ -10021,6 +10021,28 @@ P3-LMF-05 partial progress · geometry-aware corpus activation reserves · 2026-
 - Broader hardware/scale and native GUI acceptance remains open or independently
   blocked. User edits, seeded-order work, artifacts and weights are preserved.
 
+P3-LMF-01 acceptance recheck · 2026-11-22:
+- [x] The bounded architecture acceptance recorded on 2026-11-19 remains complete;
+  no unfinished P3-LMF-01 implementation criterion was found. The Planned entry
+  in the pending user edits to PROJECT_TASKS.md is stale; those edits are preserved
+  and excluded from this commit.
+- Ran the current committed ALMG backend locally against an isolated copy of the
+  retained pipeline fixture. Recipe discovery returned classifier/image recipes
+  and the decoder's eight versioned stages. Unknown recipes returned 404 and an
+  unconfirmed manifest save returned 400. Confirmed saving reproduced the original
+  complete manifest exactly, including revision
+  eb4849723f6c2c0595f63e9ec9640aa3877a08498e96efca47617d3ef6ba8f48.
+  All 20 existing fixture files remained byte-identical. Repeating the workflow
+  after restarting the app backend returned the same manifest.
+- All 44 focused recipe-contract, decoder-recipe, pipeline, bundle and run-manifest
+  tests passed with ALMG_METAL_TESTS=1 and warnings treated as errors. Evidence:
+  /tmp/almg-p301-status-reconciliation-qa/verification.json.
+- Documentation-only acceptance recheck; no new implementation or native GUI
+  verification is claimed. Independent hardware, UI-control and oversized-ingestion
+  blockers remain open and skipped. The next implementation belongs to an unblocked
+  downstream requirement. No external collection, weights or generated artifacts
+  are included in the commit.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
