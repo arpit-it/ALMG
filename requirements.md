@@ -10203,6 +10203,52 @@ P3-LMF-02 partial progress · saved exact-overlap audit history · 2026-11-22:
   training artifacts and weights are preserved; no external collection, generated
   artifact commit or push.
 
+P3-LMF-02 partial progress · resumable cross-source near-overlap diagnostics · 2026-11-22:
+- [ ] P3-LMF-02 remains open. Added a separately confirmed lexical near-duplicate
+  audit over every cross-source record pair in a saved streamed mixture, across
+  all saved splits. It uses five-word shingle Jaccard similarity >= 0.8 for records
+  of at least 12 words. Exact identities and short pairs are counted separately;
+  source weights and duplicate occurrence counts do not expand the population.
+  The cross-split counter covers near findings only; exact matches retain their
+  separate exact-overlap audit. This is not semantic contamination clearance.
+- Each explicit step processes at most 100 pairs and 1,048,576 record characters,
+  with read-only source attachments and bounded per-source SQLite page caches.
+  SQLite commits findings and the source-pair/group cursor together. Source file
+  guards and full mixture binding checks reject changed inputs; implementation/
+  runtime changes reject resume while preserving progress. Interrupted publication
+  retries from committed awaiting-publication state without repeating comparisons.
+  Completed manifests bind the finding database hash and original source lineage.
+- New local API routes start, inspect, explicitly advance and page completed audits.
+  Findings preserve both source/index IDs, groups, saved splits, first line/byte
+  offsets, raw-line hashes and occurrences, without copying source text. Stale
+  cursors, unconfirmed operations and attempts to read partial findings reject.
+  No training or release approval is granted or transferred.
+- Local app verification: ran the updated backend on loopback port 29006 from a
+  clean committed-source snapshot plus this change. Through confirmed app APIs,
+  prepared local plain-text and JSONL sources with 12 and 13 unique records and a
+  duplicated original occurrence, then saved weights 1:3. The default first scan
+  step committed exactly 100 of 156 pairs. App restart reopened the identical
+  cursor/database; unconfirmed resume returned 400 with no write. Confirmed resume
+  completed all 156: one exact pair skipped, 153 short pairs skipped, two lexical
+  comparisons and two near matches, both across saved splits. Independently checked
+  scores (25/27, stored as 0.925926) and every finding/source reference against the
+  original fixture lines. A second app restart reopened the completed manifest and
+  both finding pages identically. All 64 preexisting input/retained files, including
+  55 prior artifacts, stayed byte-identical. No training ran. Evidence:
+  /tmp/almg-stream-mixture-near-overlap-api-qa/verification.json.
+- Verification: 80 focused Python tests passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors. Nine new tests cover exhaustive counts, real split detection,
+  pair/character step budgets, multiple source-pair boundaries, pause/reopen/resume,
+  transaction rollback after finding insertion, publication retry, runtime/input
+  guards, integrity, pagination and app routes. No native GUI verification claimed.
+- Remaining: broader lexical/language validation and semantic checks, audit discovery/
+  desktop controls, permission/training-admission integration and mixed sampling.
+  Exhaustive comparisons have quadratic cost; no large-scale throughput or peak-RAM
+  claim is made. Larger-than-RAM acceptance retains its recorded scratch-space
+  blocker; physical hardware and UI-control blockers remain open and skipped.
+  User edits, training artifacts and weights are preserved; no external collection,
+  generated artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
