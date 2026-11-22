@@ -9964,6 +9964,33 @@ P3-LMF-05 partial progress · measured Metal working-set admission floors · 202
   or independently blocked. User edits, pending seeded-order work, all retained
   training artifacts and downloaded weights are preserved.
 
+P3-LMF-05 partial progress · calibrated Metal budget diagnostics · 2026-11-22:
+- [ ] P3-LMF-05 remains open. Corpus budget diagnostics now separately report
+  Metal working-set availability/recommendation, required calibrated working
+  bytes, exact shortfall, fit/unknown status and whether the check is enforced.
+  Required values use the same calibrated GPU estimate as admission. Missing or
+  invalid optional recommendations remain unknown rather than being reported as
+  fits. RAM/disk checks remain mandatory; overall feasibility/blockers are retained.
+  The device recommendation is explicitly not free GPU memory.
+- Actual local app ports 28998/28999 exercised six budget workflows: SGD/AdamW
+  fresh proposals and continuations, plus reference and recorded-training recovery.
+  Reported Metal requirements matched captured estimates in every case, including
+  fresh 5,227,520 / 5,212,160-byte calibrated floors and 31,195-byte phase floors.
+  Captured timestamps and all RAM/disk/Metal arithmetic matched their resource
+  reviews. Unsupported precision remained blocked independently of resource fits.
+  All 140 main-fixture and 167 phase-fixture files stayed byte-identical; these
+  diagnostic requests queued no training and did not change admission policy.
+- Clean-export targeted verification: all 21 budget, quick-trial, assessment and
+  storage tests passed in 5.844 seconds with Metal enabled and warnings treated
+  as errors, no skips. Updated coverage includes zero thresholds, calibrated GPU
+  shortfalls matching the actual admission predicate, invalid/unknown optional
+  recommendations, mandatory resource checks and read-only blocker preservation.
+  Evidence: /tmp/almg-metal-budget-diagnostics-api-qa/{tests.log,verify-app.log,
+  verification.json,*-budget.json}.
+- Broader hardware/runtime, scale and desktop presentation criteria remain open.
+  Native GUI verification remains separately blocked; actual local API workflows
+  were exercised. User edits, seeded-order work, artifacts and weights preserved.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design

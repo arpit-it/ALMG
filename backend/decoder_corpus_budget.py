@@ -81,24 +81,25 @@ def resource_admission(resources):
     """Explain the captured reserve check without taking another hardware sample."""
     hardware = resources.get('hardware') or {}
     estimates = resources.get('estimates') or {}
+    working = (hardware.get('metal_device') or {}).get('max_recommended_working_set_size')
     checks = []
-    for name, available_field, required_field in (
-        ('memory', 'available_memory_bytes', 'required_available_memory_bytes'),
-        ('disk', 'free_disk_bytes', 'required_free_disk_bytes'),
+    for name, available, required, enforced in (
+        ('memory', hardware.get('available_memory_bytes'), estimates.get('required_available_memory_bytes'), True),
+        ('disk', hardware.get('free_disk_bytes'), estimates.get('required_free_disk_bytes'), True),
+        ('metal_working_set', working, estimates.get('calibrated_gpu_working_bytes', estimates.get('estimated_gpu_working_bytes')), type(working) is int),
     ):
-        available, required = hardware.get(available_field), estimates.get(required_field)
         available = available if type(available) is int and available >= 0 else None
         required = required if type(required) is int and required >= 0 else None
         known = available is not None and required is not None
         checks.append({'resource': name, 'available_bytes': available, 'required_bytes': required,
                        'shortfall_bytes': max(0, required - available) if known else None,
-                       'fits': available >= required if known else None})
+                       'fits': available >= required if known else None, 'enforced': enforced})
     return {
         'format': 'almg-corpus-resource-admission-diagnostics-v1', 'schema_version': 1,
         'checks': checks, 'shortfalls': [check for check in checks if check['fits'] is False],
         'unknown_resources': [check['resource'] for check in checks if check['fits'] is None],
         'observed_at': hardware.get('observed_at'),
-        'scope': 'Arithmetic on the captured conservative admission reserves. Not measured peak usage, a reservation or a future guarantee. Independent blockers remain in force; this does not approve training.',
+        'scope': 'Arithmetic on the captured conservative admission reserves, using calibrated GPU working bytes when present. Metal availability is a device working-set recommendation, not free GPU memory. A missing recommendation stays unknown and is not enforced by the existing policy. Not measured peak usage, a reservation or a future guarantee. Independent blockers remain in force; this does not approve training.',
     }
 
 
