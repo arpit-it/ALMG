@@ -40,6 +40,7 @@ from sklearn.naive_bayes import ComplementNB
 from sklearn.pipeline import make_pipeline
 
 if __package__:
+    from . import decoder_stream_mixture_inputs
     from . import decoder_stream_mixture_sessions
     from . import decoder_stream_mixture_sampling
     from . import decoder_stream_mixture_near_overlap
@@ -55,6 +56,7 @@ if __package__:
     from . import image_resource_trials
     from . import classifier_resource_trials
 else:
+    import decoder_stream_mixture_inputs
     import decoder_stream_mixture_sessions
     import decoder_stream_mixture_sampling
     import decoder_stream_mixture_near_overlap
@@ -2389,6 +2391,10 @@ class Handler(BaseHTTPRequestHandler):
                 if mixture_parts[2] == 'sampling-sessions':
                     return self.respond(decoder_stream_mixture_sessions.begin(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed')))
             if len(mixture_parts) == 3 and mixture_parts[0] == 'decoder-stream-mixture-sessions':
+                if mixture_parts[2] == 'input-review':
+                    return self.respond(decoder_stream_mixture_inputs.review(ROOT, mixture_parts[1], data.get('confirmed'), data.get('sequence'), data.get('reviewed_receipt'), data.get('tokenizer_id'), data.get('reviewed_tokenizer')))
+                if mixture_parts[2] == 'input-batch':
+                    return self.respond(decoder_stream_mixture_inputs.batch(ROOT, mixture_parts[1], data.get('confirmed'), data.get('reviewed'), data.get('cursor'), data.get('batch_size', 4)))
                 if mixture_parts[2] == 'step':
                     return self.respond(decoder_stream_mixture_sessions.step(ROOT, mixture_parts[1], data.get('confirmed'), data.get('request_id'), data.get('limit', 16)))
                 if mixture_parts[2] == 'batch':

@@ -10340,6 +10340,50 @@ P3-LMF-02 partial progress · durable weighted source-record sessions · 2026-11
   open and skipped. User edits, training artifacts and weights are preserved;
   no external collection, generated artifact commit or push.
 
+P3-LMF-02 partial progress · receipt-bound byte-token model-input inspection · 2026-11-22:
+- [ ] P3-LMF-02 remains open. Added separately confirmed read-only review and
+  paginated causal model inputs for an immutable committed mixture-session receipt.
+  The selected saved fixed-byte tokenizer must bind a current source in the mixture.
+  Its original single-source training provenance is retained; no joint mixture
+  fitting, learned vocabulary, special tokens or model training is implied.
+- Every receipt record is losslessly encoded and checked against the existing
+  4096-byte document limit. Over-limit records reject without truncation or sampler
+  advancement. Windows contain up to 17 IDs with stride 16 and never cross document
+  boundaries; inputs/targets have width 16, explicit sequence lengths and loss masks.
+  Padding value zero is not treated as a special token. One-byte records yield no
+  artificial targets and are listed explicitly. Weight units remain records, not
+  token proportions. Pages retain complete record/source/offset provenance without
+  copying text into a new artifact or advancing the source session.
+- Review/cursor bindings cover the committed receipt, codec artifact/revision,
+  implementation/runtime and token counts. Source/declaration/tokenizer changes,
+  stale receipts/cursors, invalid sizes and unconfirmed operations reject. Missing
+  files and SQLite failures become explicit rejection rather than dropped responses.
+  Permission verification, quality clearance, training and release flags remain false.
+- Local app verification: ran the updated backend on loopback port 29009 from a
+  clean source snapshot plus this change. Through confirmed app APIs, prepared local
+  text/JSONL Unicode sources, declarations, a six-record weighted receipt and a saved
+  anchor-source byte tokenizer. Two one-byte records were reported without targets.
+  After app restart, review and cursor replay reproduced all 28 windows over 14
+  two-window pages, containing exactly 418 real causal byte targets and 30 masked
+  padding positions. Independently checked every transition, shifted target, mask,
+  provenance and document boundary, including multi-byte Unicode split by windows.
+  The original receipt replay remained identical and all 99 data files, including
+  83 prior artifacts, stayed byte-identical. A missing test tokenizer returned HTTP
+  400; restoring its original bytes and refreshing the implementation-bound review
+  restored identical inputs. No training ran. Evidence:
+  /tmp/almg-stream-mixture-inputs-api-qa/{verification.json,failure-verification.json}.
+- Verification: 107 focused Python tests plus nine existing byte-statistics,
+  tokenizer and window regressions passed with ALMG_METAL_TESTS=1 and warnings
+  treated as errors. Nine new tests cover exhaustive byte transitions/Unicode,
+  masks/zero-target records, provenance, stale bindings/consent/cursors, over-limit
+  rejection without sampler writes, unavailable artifacts/SQLite and app routes.
+  No native GUI or large-scale performance verification is claimed.
+- Remaining: jointly trained/learned mixture codecs, packing/other context lengths,
+  mixed-input training integration and approval/quality admission, randomized epochs
+  and desktop controls. Larger-than-RAM, physical hardware and UI-control blockers
+  remain open and skipped. User changes, training artifacts and weights are preserved;
+  no external collection, generated artifact commit or push.
+
 See [PROJECT_TASKS.md](PROJECT_TASKS.md) for the existing implementation baseline and more detailed backlog.
 
 ## Model Training workspace design
